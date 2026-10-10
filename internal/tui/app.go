@@ -57,10 +57,11 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
-	Project string
-	Topic   string
-	Session *review.Session
-	Author  string
+	Documents []review.AttachedDocument
+	Project   string
+	Topic     string
+	Session   *review.Session
+	Author    string
 	// Staged reads code-review files and diffs from the Git index.
 	Staged    bool
 	Patch     *gitpkg.Patch
@@ -76,6 +77,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
 	width, height int
@@ -242,7 +244,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		cursorLine: 1,
 	}
 
-	return AppModel{
+	m := AppModel{
 		project:         cfg.Project,
 		topic:           cfg.Topic,
 		filePath:        filePath,
@@ -259,6 +261,8 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		fileTree:        newFileTree(),
 		modalTextarea:   ta,
 	}
+	m.addDocuments(cfg.Documents)
+	return m
 }
 
 // NewCodeReviewApp creates a multi-file code review TUI.
@@ -306,6 +310,9 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		for _, tab := range tabs {
 			present[tab.path] = true
 		}
+		for _, doc := range cfg.Documents {
+			present[doc.Path()] = true
+		}
 		for path, file := range cfg.Session.CJ.Files {
 			if !present[path] && len(file.Comments) > 0 {
 				tab := newFileTab(path, nil)
@@ -316,7 +323,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		sort.Slice(tabs, func(i, j int) bool { return tabs[i].path < tabs[j].path })
 	}
 
-	return AppModel{
+	m := AppModel{
 		project:         cfg.Project,
 		topic:           cfg.Topic,
 		tabs:            tabs,
@@ -337,6 +344,31 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		fileTree:        newFileTree(),
 		modalTextarea:   ta,
 	}
+	m.addDocuments(cfg.Documents)
+	return m
+}
+
+func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
+	var active, removed []FileTab
+	m.attachments = make(map[string]review.AttachedDocument, len(docs))
+	for _, d := range docs {
+		if d.Removed && (m.session == nil || len(m.session.FileComments(d.Path())) == 0) {
+			continue
+		}
+		tab := newFileTab(d.Path(), nil)
+		m.attachments[d.Path()] = d
+		tab.attachment = &d
+		if d.Removed {
+			removed = append(removed, tab)
+		} else {
+			active = append(active, tab)
+		}
+	}
+	if len(active)+len(removed) == 0 {
+		return
+	}
+	m.tabs = append(append(active, m.tabs...), removed...)
+	m.multiFile = true
 }
 
 func (m AppModel) Init() tea.Cmd {
@@ -358,6 +390,9 @@ func (m AppModel) loadDocuments() tea.Cmd {
 }
 
 func (m AppModel) loadDocument(path string) (*document.Document, error) {
+	if d, ok := m.attachments[path]; ok {
+		return document.FromContent(path, []byte(d.Content)), nil
+	}
 	if m.source != nil {
 		content, err := m.source.Content(path)
 		if err != nil {
@@ -2176,7 +2211,7 @@ func truncateLeftToWidth(s string, width int) string {
 }
 
 func (m AppModel) reviewScopeLabel() string {
-	if !m.multiFile {
+	if !m.multiFile || m.filePath != "" {
 		return ""
 	}
 	if m.patch != nil {
@@ -2210,7 +2245,12 @@ func (m AppModel) renderHeader() string {
 		commentCount = unresolvedCommentCount(t.state.Comments)
 	}
 	displayPath := t.path
-	if m.filePath != "" {
+	if t.attachment != nil {
+		displayPath = t.attachment.Source
+		if t.attachment.Removed {
+			displayPath += " (removed attachment)"
+		}
+	} else if m.filePath != "" {
 		displayPath = m.filePath
 	}
 
@@ -2325,7 +2365,7 @@ func scopeWordStyle(scope string) (lipgloss.Style, bool) {
 // is "staged" or "unstaged" when the review is limited to one of them and
 // empty otherwise.
 func (m AppModel) reviewSubject() (scope, subject string) {
-	if !m.multiFile {
+	if !m.multiFile || m.filePath != "" {
 		return "", "document"
 	}
 	if m.source != nil {
@@ -2335,6 +2375,18 @@ func (m AppModel) reviewSubject() (scope, subject string) {
 	}
 	if _, ok := scopeWordStyle(scope); !ok {
 		scope = ""
+	}
+	if len(m.attachments) > 0 {
+		hasChanges := false
+		for _, tab := range m.tabs {
+			if tab.attachment == nil && !tab.outsideChanges {
+				hasChanges = true
+				break
+			}
+		}
+		if !hasChanges {
+			return scope, "attachments (no file changes)"
+		}
 	}
 	return scope, "changes"
 }
@@ -2450,7 +2502,7 @@ type tabLabel struct {
 func (m *AppModel) tabLabels() []tabLabel {
 	labels := make([]tabLabel, len(m.tabs))
 	for i, t := range m.tabs {
-		label := abbreviatedTabPath(t.path)
+		label := abbreviatedTabPath(t.displayPath())
 		start := strings.LastIndexByte(label, '/') + 1
 		filenameStyle := ansi.NewStyle().Underline(t.state != nil && unresolvedCommentCount(t.state.Comments) > 0)
 		if i == m.activeTab {

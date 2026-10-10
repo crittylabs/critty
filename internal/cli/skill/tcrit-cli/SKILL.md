@@ -30,6 +30,8 @@ A human review's `approved: true` is meaningful only when correlated with its in
 
 ## Comment scopes
 
+Repeated `--attachment FILE` flags on `review`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.  These documents have no interactive form or consent semantics.
+
 - **Line** (`scope: "line"`): attached to a line range of one file.  Stored under `files.<path>.comments`.
 - **File** (`scope: "file"`): about one file as a whole.  Stored under `files.<path>.comments` with `start_line: 0`.
 - **Review** (`scope: "review"`): general feedback.  Stored in the top-level `review_comments` array.

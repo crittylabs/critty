@@ -49,7 +49,7 @@ func resolveCodeScope() (*reviewMode, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(files) == 0 {
+	if len(files) == 0 && len(attachmentPaths) == 0 {
 		return nil, fmt.Errorf("no changes in the selected scope")
 	}
 	return &reviewMode{files: files, ref: source.Base, staged: source.Scope == "staged", source: source}, nil

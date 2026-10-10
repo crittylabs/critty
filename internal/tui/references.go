@@ -120,7 +120,7 @@ func escapeReferencePath(path string) string {
 // dropped; ASCII terminators are explicit in the notation.
 func (m *AppModel) resolveReferencePath(raw string) (string, int) {
 	path := unescapeReferencePath(raw)
-	if regularFile(m.sourcePath(path)) {
+	if m.referencePathExists(path) {
 		return path, len(raw)
 	}
 	var cuts []int
@@ -141,11 +141,16 @@ func (m *AppModel) resolveReferencePath(raw string) (string, int) {
 			break
 		}
 		path := unescapeReferencePath(raw[:cuts[j]])
-		if regularFile(m.sourcePath(path)) {
+		if m.referencePathExists(path) {
 			return path, cuts[j]
 		}
 	}
 	return "", 0
+}
+
+func (m *AppModel) referencePathExists(path string) bool {
+	_, attached := m.attachments[path]
+	return attached || regularFile(m.sourcePath(path))
 }
 
 func unescapeReferencePath(path string) string {

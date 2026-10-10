@@ -36,6 +36,10 @@ to save a new version and continue a previous review.`,
 }
 
 func runPlan(args []string) error {
+	inputs := &reviewMode{sessionKey: planSession}
+	if err := prepareDocuments(inputs); err != nil {
+		return err
+	}
 	cfg, err := config.LoadCurrent()
 	if err != nil {
 		return err
@@ -80,6 +84,10 @@ func runPlan(args []string) error {
 		}
 		mode = &reviewMode{docPath: filepath.Join(sess.Dir, "current.md"), planSlug: slug, sessionKey: sess.Key}
 	}
+	if inputs.replaceDocuments {
+		mode.documents, mode.replaceDocuments = inputs.documents, true
+	}
+	mode.documentsPrepared = true
 	mode.planFile = sourceFile
 	mode.planContent = content
 	sess.Meta.Args = []string{"plan", "--name", slug, sourceFile}
@@ -116,6 +124,7 @@ func init() {
 	rootCmd.AddCommand(planCmd)
 	addFocusFlag(planCmd)
 	addHeaderFlags(planCmd)
+	addAttachmentFlags(planCmd)
 	planCmd.Flags().StringVar(&planSession, "session", "", "continue a saved plan review")
 	planCmd.Flags().StringVar(&planName, "name", "", "plan slug (derived from the first heading when omitted)")
 }

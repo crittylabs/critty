@@ -50,9 +50,25 @@ func resolveFocus(mode *reviewMode) error {
 	if err != nil {
 		return err
 	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
+	}
 	match := func(candidate string) bool {
 		full, err := filepath.Abs(candidate)
+		if resolved, resolveErr := filepath.EvalSymlinks(full); resolveErr == nil {
+			full = resolved
+		}
 		return err == nil && full == abs
+	}
+	for _, doc := range mode.documents {
+		if doc.Removed || (!match(doc.Source) && path != doc.Path()) {
+			continue
+		}
+		if line > 0 && !document.FromContent(doc.Path(), []byte(doc.Content)).HasLine(line) {
+			return fmt.Errorf("focus line %d is not in the review: %s", line, path)
+		}
+		mode.focusPath, mode.focusLine = doc.Path(), line
+		return nil
 	}
 	var data []byte
 	if !mode.code() {

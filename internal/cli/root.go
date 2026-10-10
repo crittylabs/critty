@@ -72,4 +72,5 @@ func init() {
 	addDiffFlag(rootCmd)
 	addFocusFlag(rootCmd)
 	addHeaderFlags(rootCmd)
+	addAttachmentFlags(rootCmd)
 }

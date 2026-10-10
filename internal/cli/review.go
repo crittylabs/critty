@@ -70,18 +70,21 @@ the current terminal.`,
 
 // reviewMode describes what is being reviewed.
 type reviewMode struct {
-	docPath     string // non-empty for single-document and plan modes
-	ref         string // diff base for code mode
-	files       []git.FileChange
-	staged      bool
-	planSlug    string // non-empty for plan mode
-	planFile    string // original plan path ("" when read from stdin)
-	planContent []byte // replacement plan input, saved after acquiring the run lock
-	patch       *git.Patch
-	sessionKey  string // exact saved session opened by the TUI
-	source      *git.ReviewSource
-	focusPath   string
-	focusLine   int
+	documents         []review.AttachedDocument
+	replaceDocuments  bool
+	documentsPrepared bool
+	docPath           string // non-empty for single-document and plan modes
+	ref               string // diff base for code mode
+	files             []git.FileChange
+	staged            bool
+	planSlug          string // non-empty for plan mode
+	planFile          string // original plan path ("" when read from stdin)
+	planContent       []byte // replacement plan input, saved after acquiring the run lock
+	patch             *git.Patch
+	sessionKey        string // exact saved session opened by the TUI
+	source            *git.ReviewSource
+	focusPath         string
+	focusLine         int
 }
 
 func (m *reviewMode) code() bool { return m.docPath == "" }
@@ -140,6 +143,9 @@ func runReview(args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := prepareDocuments(mode); err != nil {
+		return err
+	}
 
 	sess, err := openReviewSession(cfg, mode)
 	if err != nil {
@@ -151,6 +157,9 @@ func runReview(args []string) error {
 
 // runReviewFlow opens one round in the caller's multiplexer or terminal.
 func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) error {
+	if err := prepareDocuments(mode); err != nil {
+		return err
+	}
 	if err := resolveFocus(mode); err != nil {
 		return err
 	}
@@ -302,6 +311,12 @@ func openReviewSession(cfg *config.Config, mode *reviewMode) (*review.Session, e
 
 func saveReviewMode(sess *review.Session, mode *reviewMode) error {
 	mode.sessionKey = sess.Key
+	if mode.replaceDocuments {
+		if err := sess.ReplaceDocuments(mode.documents); err != nil {
+			return err
+		}
+		mode.replaceDocuments = false
+	}
 	if mode.planContent != nil {
 		if _, err := review.SavePlanVersionAt(filepath.Dir(mode.docPath), mode.planContent); err != nil {
 			return err
@@ -578,6 +593,7 @@ func init() {
 	addDiffFlag(reviewCmd)
 	addFocusFlag(reviewCmd)
 	addHeaderFlags(reviewCmd)
+	addAttachmentFlags(reviewCmd)
 	reviewCmd.Flags().BoolVar(&reviewStaged, "staged", false, "review only changes staged in the index (alias for --scope=staged)")
 	reviewCmd.Flags().BoolVar(&reviewUnstaged, "unstaged", false, "review unstaged and untracked changes (alias for --scope=unstaged)")
 

@@ -32,6 +32,11 @@ func loadReviewSession(key string) (*review.Session, *reviewMode, error) {
 		return nil, nil, err
 	}
 	mode := &reviewMode{sessionKey: key}
+	documents, err := sess.LoadDocuments()
+	if err != nil {
+		return nil, nil, err
+	}
+	mode.documents = documents.Documents
 	args := entry.Args
 	kind := entry.Mode
 	if kind == "" {
@@ -117,6 +122,7 @@ func resumeDiff(key string, args []string) error {
 	if err != nil {
 		return err
 	}
+	updated.documents, updated.sessionKey = mode.documents, key
 	cfg, err := config.LoadCurrent()
 	if err != nil {
 		return err

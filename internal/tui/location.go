@@ -76,6 +76,12 @@ func regularFile(path string) bool {
 }
 
 func (m *AppModel) openSourceEditor(location sourceLocation) tea.Cmd {
+	for _, tab := range m.tabs {
+		if tab.path == location.path && tab.attachment != nil {
+			location.path = tab.attachment.Source
+			break
+		}
+	}
 	location.path = m.sourcePath(location.path)
 	if !regularFile(location.path) {
 		return nil

@@ -24,8 +24,13 @@ import (
 // payloads and can start new rounds; otherwise it returns the last finish
 // payload for the caller to print (inline mode).
 func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, serving bool) (*ipc.FinishPayload, error) {
+	documents, err := sess.LoadDocuments()
+	if err != nil {
+		return nil, err
+	}
 	finishCh := make(chan tui.FinishEvent, 4)
 	appCfg := tui.AppConfig{
+		Documents: documents.Documents,
 		Project:   reviewProjectLabel(cfg.ProjectRoot, sess),
 		Topic:     reviewTopicLabel(sess, mode),
 		Session:   sess,
@@ -256,6 +261,20 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 	}
 
 	finishPrompt := prompt.RenderFinish(cfg.Prompts, cfg.ProjectRoot, ctx)
+	if mode.code() && len(mode.files) == 0 {
+		finishPrompt += "\n\nThe selected review scope contains no file changes."
+	}
+	if documents, err := sess.LoadDocuments(); err == nil && len(documents.Documents) > 0 {
+		finishPrompt += "\n\nAttached documents (comment paths identify snapshots, not working files):"
+		for _, d := range documents.Documents {
+			state := ""
+			if d.Removed {
+				state = " (removed from the review)"
+			}
+			finishPrompt += fmt.Sprintf("\n- %q → %q (%s)%s\n%s", d.Path(), d.Source, d.Revision, state, d.Content)
+		}
+		finishPrompt += "\nTo revise attachments, pass the complete ordered list with repeated --attachment flags when resuming the session. Without these flags, saved snapshots are reused. Use --clear-attachments to remove the list."
+	}
 	if sess.HasAttachments() {
 		finishPrompt += fmt.Sprintf("\n\nImage attachments: resolve Markdown attachments/ paths relative to %q. Read referenced images with your image-viewing tool, including images in resolved comments and replies.", sess.Dir)
 		if approved && cfg.CleanupOnApprove {

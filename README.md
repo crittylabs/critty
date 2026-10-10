@@ -294,6 +294,19 @@ tcrit plan --name auth docs/plans/plan.md   # pinned slug
 
 Saves numbered versions of the plan in the session directory.  Run `tcrit plan --session <id> <file>` to submit a revised version (stdin works too), or `tcrit --session <id>` to reopen the saved one.  Comments carry forward onto the revised text.
 
+### Attached documents
+
+Attach notices, approval notes, or a commit message without staging them:
+
+```bash
+tcrit review --staged --attachment .tmp/NOTICE.md --attachment .tmp/COMMIT_MESSAGE.md
+tcrit plan design.md --attachment .tmp/APPROVAL.md
+```
+
+Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported; checkboxes are display-only.
+
+Resuming with `tcrit --session <id>` uses the saved document snapshots.  To revise them, pass the complete list again with `--attachment`; use `--clear-attachments` to remove all of them.  Comments on removed documents remain accessible.  A file can appear both as an attachment and in the diff, with separate comments.  Attachments also allow reviewing a clean Git scope.
+
 ## Document Review (single file)
 
 ```bash

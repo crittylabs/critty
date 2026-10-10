@@ -143,24 +143,55 @@ func (m *AppModel) syncFileTree() {
 		tree.viewport.SetContent("")
 		return
 	}
-	paths := make([]string, len(m.tabs))
+	var paths []string
+	var indices []int
+	attachments := &treeNode{name: "attachments", path: "\x00attachments", isDir: true}
 	for i, t := range m.tabs {
-		paths[i] = t.path
+		if t.attachment != nil {
+			name := t.attachment.Name
+			if t.attachment.Removed {
+				name += " (removed)"
+			}
+			attachments.children = append(attachments.children, &treeNode{name: name, path: t.path, tabIndex: i})
+		} else {
+			paths = append(paths, t.path)
+			indices = append(indices, i)
+		}
 	}
 	root := buildFileTree(paths)
+	var remap func(*treeNode)
+	remap = func(node *treeNode) {
+		if !node.isDir {
+			node.tabIndex = indices[node.tabIndex]
+		}
+		for _, child := range node.children {
+			remap(child)
+		}
+	}
+	remap(root)
 	root.name = m.project
 	if root.name == "" {
 		root.name = "Files"
 	}
-	tree.root = root
+	forest := &treeNode{isDir: true, path: "\x00root"}
+	if len(attachments.children) > 0 {
+		forest.children = append(forest.children, attachments)
+	}
+	if len(paths) > 0 {
+		forest.children = append(forest.children, root)
+	}
+	tree.root = forest
 	if tree.syncedTab != m.activeTab {
 		delete(tree.collapsed, "")
+		if m.tabs[m.activeTab].attachment != nil {
+			delete(tree.collapsed, attachments.path)
+		}
 		parts := strings.Split(strings.Trim(filepath.ToSlash(m.tabs[m.activeTab].path), "/"), "/")
 		for j := 1; j < len(parts); j++ {
 			delete(tree.collapsed, strings.Join(parts[:j], "/"))
 		}
 	}
-	tree.rows = visibleTreeRows(&treeNode{children: []*treeNode{root}}, tree.collapsed)
+	tree.rows = visibleTreeRows(forest, tree.collapsed)
 	if tree.syncedTab != m.activeTab {
 		for i, row := range tree.rows {
 			if !row.isDir && row.tabIndex == m.activeTab {
@@ -192,8 +223,19 @@ func (m *AppModel) treeRowText(i int) string {
 		label += "/"
 	}
 	style := lipgloss.NewStyle().Foreground(textSecondary)
+	if row.isDir {
+		style = style.Foreground(lipgloss.Cyan)
+		if row.path == "\x00attachments" {
+			style = style.Foreground(lipgloss.Magenta)
+		}
+	} else if m.tabs[row.tabIndex].attachment != nil {
+		style = style.Foreground(lipgloss.Yellow)
+	}
 	if !row.isDir && row.tabIndex == m.activeTab {
-		style = style.Bold(true).Foreground(textPrimary)
+		style = style.Bold(true)
+		if m.tabs[row.tabIndex].attachment == nil {
+			style = style.Foreground(textPrimary)
+		}
 	}
 	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon+label)
 	if !row.isDir {

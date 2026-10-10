@@ -102,6 +102,13 @@ func TestResolveExplicitScopes(t *testing.T) {
 			t.Fatal("clean worktree fell back to committed changes")
 		}
 	}
+	oldAttachments := attachmentPaths
+	t.Cleanup(func() { attachmentPaths = oldAttachments })
+	attachmentPaths = []string{"notice.md"}
+	mode, err = resolveReviewMode(nil)
+	if err != nil || len(mode.files) != 0 || mode.source == nil {
+		t.Fatalf("clean scope with attachment: %+v, %v", mode, err)
+	}
 }
 
 func TestReviewSourceSessionIsolation(t *testing.T) {

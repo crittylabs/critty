@@ -19,6 +19,7 @@ type fileReview struct {
 
 // FileTab holds per-file state for a single tab in the code review TUI.
 type FileTab struct {
+	attachment    *review.AttachedDocument
 	path          string
 	status        string
 	doc           *document.Document
@@ -107,6 +108,13 @@ func (ft *FileTab) ensureHighlightCache() {
 		}
 		ft.deletedLineCache[afterLine] = highlighted
 	}
+}
+
+func (t *FileTab) displayPath() string {
+	if t.attachment != nil {
+		return "attachments/" + t.attachment.Name
+	}
+	return t.path
 }
 
 // computeChangeChunks groups contiguous changed/deleted lines into navigable chunks.
