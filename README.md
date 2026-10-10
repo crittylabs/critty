@@ -303,9 +303,35 @@ tcrit review --staged --attachment .tmp/NOTICE.md --attachment .tmp/COMMIT_MESSA
 tcrit plan design.md --attachment .tmp/APPROVAL.md
 ```
 
-Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported; checkboxes are display-only.
+Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported.
 
 Resuming with `tcrit --session <id>` uses the saved document snapshots.  To revise them, pass the complete list again with `--attachment`; use `--clear-attachments` to remove all of them.  Comments on removed documents remain accessible.  A file can appear both as an attachment and in the diff, with separate comments.  Attachments also allow reviewing a clean Git scope.
+
+### Interactive forms
+
+In attached Markdown (`.md` or `.markdown`), press `Space` on a task-list item or click its checkbox or label to answer.  Wrapped labels are clickable through the end of their text; trailing whitespace is not.  `Enter` still opens a comment.  Code examples, quoted lists, and checkboxes in working files or the main document are display-only.  Answers are saved separately; the source document stays unchanged.
+
+```markdown
+- [ ] Send a copy of the report
+- [ ] I checked the destination <!-- form: id=destination required -->
+- [ ] Small batch <!-- form: id=batch value=small required -->
+- [ ] Large batch <!-- form: id=batch value=large required -->
+- [ ] Publish this report to the named repository <!-- form: id=publish consent -->
+```
+
+Use `required` for a confirmation that blocks approval until answered, and `consent` for an individual operation permission.  They can be combined.  Required items remain marked **Required** after confirmation.  Items with the same `id` and different `value` attributes form a single choice; selecting one clears the previous choice.  Give required, consent, and choice items an explicit `id`.  Quote attribute values containing spaces.  Describe each operation and its exact target in the document.
+
+An initial `[x]` supplies a default for ordinary items only.  Required confirmations and consents need a human action.  With missing confirmations, **Finish Review** sends feedback and draft answers without approving.  **Resolve All & Approve** resolves comments without checking any form items.  The finish dialog lists missing confirmations and the operations allowed or declined; scroll long details with `↑` / `↓` or the mouse wheel.
+
+Resuming unchanged input keeps draft answers.  Changing a field's definition resets that field.  Changing the review target or the content, order, or membership of the attachment list resets every required confirmation and consent.  Ordinary fields with explicit IDs and unchanged definitions keep their answers; unnamed fields may reset when the document changes.
+
+Use `--result FILE` to save the self-contained JSON result, including source snapshots, field definitions, answers, human provenance, and the review revision:
+
+```bash
+tcrit review --staged --attachment .tmp/APPROVAL.md --result .tmp/result.json
+```
+
+Completed form results are also retained as `result-<round>.json` in the session directory and included in the finish prompt.  Only a consent explicitly `true` in an approved result grants its described permission for the exact reviewed target.  Overall approval supplies no individual consent; feedback and stopped reviews grant none.  TCrit records decisions and executes no operations.  Approval retains form reviews until the result has been recorded and the printed `tcrit clear --session <id>` command is run.  The result remains usable after session deletion.
 
 ## Document Review (single file)
 

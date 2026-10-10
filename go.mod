@@ -16,6 +16,7 @@ require (
 	github.com/sahilm/fuzzy v0.1.3
 	github.com/spf13/cobra v1.10.2
 	github.com/tklauser/ps v0.0.4
+	github.com/yuin/goldmark v1.8.6
 	golang.org/x/term v0.46.0
 )
 

@@ -53,6 +53,7 @@ const (
 // round.  The runner turns it into a payload for blocked agent clients.
 type FinishEvent struct {
 	Approved bool
+	Result   *review.FormResult
 }
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
@@ -77,6 +78,8 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	forms         *review.FormState
+	formRows      map[string]map[int]formRow
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
@@ -142,6 +145,7 @@ type AppModel struct {
 	pendingDelete        int
 	modalFocus           int  // focus index within the active modal
 	newFeedback          bool // true after adding or editing a comment in this round
+	finishSaveFailed     bool
 	lineInput            textinput.Model
 	pendingLocation      sourceLocation
 	locationError        string
@@ -166,11 +170,12 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
-	rows       []contentMouseTarget
-	lineRanges map[int]renderedRange
-	oldRanges  map[int]renderedRange
-	actions    []commentHeaderRegion
-	markers    []commentMarker
+	formControls []formControl
+	rows         []contentMouseTarget
+	lineRanges   map[int]renderedRange
+	oldRanges    map[int]renderedRange
+	actions      []commentHeaderRegion
+	markers      []commentMarker
 }
 
 type commentHeaderRegion struct {
@@ -593,6 +598,18 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.err != nil {
+		if m.finishSaveFailed && (msg.String() == "enter" || msg.String() == "y") {
+			return m.doFinish()
+		}
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if m.finishSaveFailed && msg.String() == "esc" {
+			m.err, m.finishSaveFailed, m.modal = nil, false, noModal
+		}
+		return m, nil
+	}
 	if m.modal == gotoLineModal || m.modal == openSourceModal {
 		return m.handleLocationModal(msg)
 	}
@@ -632,6 +649,11 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	t := m.tab()
+	if msg.String() == "space" || msg.String() == " " {
+		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
+			return m, nil
+		}
+	}
 	if msg.String() == "alt+e" {
 		m.locationError = ""
 		return m, m.openSourceEditor(sourceLocation{path: t.path, line: max(1, t.cursorLine)})
@@ -1672,6 +1694,12 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
+	case "up", "k":
+		m.modalReferenceOffset = max(0, m.modalReferenceOffset-1)
+		return m, nil
+	case "down", "j":
+		m.modalReferenceOffset++
+		return m, nil
 	case "y", "Y":
 		return m.doFinish()
 	case "n", "N":
@@ -1696,9 +1724,13 @@ func (m *AppModel) openFinishModal() {
 	m.persist()
 	m.modal = finishModal
 	m.modalFocus = 0
+	m.modalReferenceOffset = 0
 }
 
 func (m *AppModel) finishActionLabel() string {
+	if len(m.missingForms()) > 0 {
+		return "Finish Review"
+	}
 	unresolved := m.unresolvedTotal()
 	switch {
 	case unresolved == 0:
@@ -1735,14 +1767,13 @@ func (m *AppModel) unresolvedTotal() int {
 }
 
 func (m *AppModel) resolvesAllOnFinish() bool {
-	return !m.newFeedback && m.unresolvedTotal() > 0
+	return len(m.missingForms()) == 0 && !m.newFeedback && m.unresolvedTotal() > 0
 }
 
 // doFinish saves the completed round before closing the TUI.
 func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
-	if m.session != nil {
-		m.session.CJ.RoundState.Finished = true
-		m.session.CJ.RoundState.SubmittedReplies = m.replyIDs()
+	if m.finishSaveFailed {
+		m.err, m.finishSaveFailed = nil, false
 	}
 	if m.resolvesAllOnFinish() {
 		m.resolveAll()
@@ -1752,9 +1783,34 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 	if m.err != nil {
 		return m, nil
 	}
-	approved := m.unresolvedTotal() == 0
+	if m.session != nil {
+		previous := m.session.CJ.RoundState
+		m.session.CJ.RoundState.Finished = true
+		m.session.CJ.RoundState.SubmittedReplies = m.replyIDs()
+		if err := m.session.Save(); err != nil {
+			m.session.CJ.RoundState = previous
+			m.err, m.finishSaveFailed = err, true
+			return m, nil
+		}
+	}
+	approved := m.unresolvedTotal() == 0 && len(m.missingForms()) == 0
+	var result *review.FormResult
+	if m.forms != nil && m.forms.HasForms() {
+		value := m.forms.Result(approved, m.session.CJ.ReviewRound)
+		value.Session = m.session.Key
+		if err := m.session.SaveFormResult(value); err != nil {
+			m.session.CJ.RoundState.Finished = false
+			m.session.CJ.RoundState.SubmittedReplies = nil
+			if rollbackErr := m.session.Save(); rollbackErr != nil {
+				err = fmt.Errorf("%w; restoring unfinished round: %v", err, rollbackErr)
+			}
+			m.err, m.finishSaveFailed = err, true
+			return m, nil
+		}
+		result = &value
+	}
 	if m.finishCh != nil {
-		m.finishCh <- FinishEvent{Approved: approved}
+		m.finishCh <- FinishEvent{Approved: approved, Result: result}
 	}
 	m.modal = noModal
 	return m, tea.Quit
@@ -2393,7 +2449,11 @@ func (m AppModel) reviewSubject() (scope, subject string) {
 
 func (m AppModel) View() tea.View {
 	if m.err != nil {
-		v := tea.NewView(fmt.Sprintf("Error: %v\n\nPress q to quit.", m.err))
+		hint := "Press q to quit."
+		if m.finishSaveFailed {
+			hint = "Enter: retry saving · esc: return to review · q: quit without finishing"
+		}
+		v := tea.NewView(fmt.Sprintf("Error: %v\n\n%s", m.err, hint))
 		v.AltScreen = true
 		return v
 	}
@@ -2708,6 +2768,14 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
 		if !m.tab().selecting {
 			point := tea.Mouse{X: mouse.X - left, Y: mouse.Y - top + m.contentViewport.YOffset()}
+			for _, control := range m.contentLayout.formControls {
+				if control.rect.contains(point) {
+					m.focused = contentPane
+					m.tab().cursorLine, m.tab().cursorSide, m.tab().cursorOnAnnotation = control.line, "", false
+					m.toggleForm(control.line)
+					return m, nil
+				}
+			}
 			for _, marker := range m.contentLayout.markers {
 				if marker.rect.contains(point) {
 					m.selectMarker(marker.ids)
@@ -3322,6 +3390,15 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	if m.isTextModal() {
 		return m.handleTextModalWheel(msg.Mouse())
 	}
+	if m.modal == finishModal {
+		if msg.Mouse().Button == tea.MouseWheelUp {
+			m.modalReferenceOffset = max(0, m.modalReferenceOffset-3)
+		}
+		if msg.Mouse().Button == tea.MouseWheelDown {
+			m.modalReferenceOffset += 3
+		}
+		return m, nil
+	}
 	if m.modal != noModal {
 		return m, nil
 	}
@@ -3513,6 +3590,9 @@ func (m AppModel) renderFooter() string {
 			}, items...)
 		}
 	}
+	if row, ok := m.formRows[t.path][t.cursorLine]; ok && row.item != nil && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" {
+		items = append([]string{k("space", "answer")}, items...)
+	}
 	items = append([]string{m.footerHelpButton()}, items...)
 
 	return footerStyle.Width(m.width).Render(strings.Join(items, " · "))
@@ -3576,7 +3656,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	general := renderHelpGroup("General", []helpItem{
 		{keys: "enter", desc: "comment/open"},
 		{keys: "f", desc: "file comment"},
-		{keys: "v", desc: "select"},
+		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
 		{keys: "h/H", desc: "fold/hide"},
@@ -4078,7 +4158,10 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		unresolved := m.unresolvedTotal()
 		titleStyle := modalTitleStyle
 		var titleText, info string
-		if unresolved == 0 {
+		if len(m.missingForms()) > 0 {
+			titleText = "Finish review with missing confirmations?"
+			info = "Approval is blocked. Draft answers and feedback will be sent."
+		} else if unresolved == 0 {
 			titleText = "Approve review?"
 			info = "No unresolved comments — approving ends the review."
 		} else if !m.newFeedback {
@@ -4088,14 +4171,14 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			titleText = "Finish review?"
 			info = fmt.Sprintf("%d unresolved comment(s) will be sent to the agent.", unresolved)
 		}
-		if unresolved == 0 || !m.newFeedback {
+		if len(m.missingForms()) == 0 && (unresolved == 0 || !m.newFeedback) {
 			frameStyle = frameStyle.BorderForeground(lipgloss.BrightGreen)
 			titleStyle = titleStyle.Foreground(lipgloss.BrightGreen)
 			info = lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Render(info)
 		}
 		title, closeRegion := modalTitleRow(titleStyle.MarginBottom(0).Render(titleText), innerWidth)
 
-		prefix := title + "\n\n" + info + "\n\n"
+		prefix := title + "\n\n" + info + m.formSummary(innerWidth, m.height-15) + "\n\n"
 		prefix = lipgloss.Wrap(prefix, innerWidth, "")
 		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
 			{rendered: m.renderModalButton(m.finishActionLabel(), "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},

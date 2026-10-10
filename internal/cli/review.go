@@ -160,6 +160,9 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 	if err := prepareDocuments(mode); err != nil {
 		return err
 	}
+	if err := validateResultPath(mode, sess); err != nil {
+		return err
+	}
 	if err := resolveFocus(mode); err != nil {
 		return err
 	}
@@ -213,7 +216,9 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 			fmt.Fprintln(os.Stderr, "approved: false")
 			return fmt.Errorf("review ended without finishing")
 		}
-		printFinish(payload)
+		if err := printFinish(payload, sess); err != nil {
+			return err
+		}
 		if payload.Approved {
 			cleanupOnApprove(cfg, sess)
 		}
@@ -350,7 +355,9 @@ func runReviewCycle(cfg *config.Config, sess *review.Session, sock string) error
 		fmt.Fprintln(os.Stderr, "approved: false")
 		return err
 	}
-	printFinish(payload)
+	if err := printFinish(payload, sess); err != nil {
+		return err
+	}
 	if payload.Approved {
 		cleanupOnApprove(cfg, sess)
 	}
@@ -359,19 +366,40 @@ func runReviewCycle(cfg *config.Config, sess *review.Session, sock string) error
 
 // printFinish writes the agent contract: the rendered prompt on stdout and
 // the approval verdict on stderr.
-func printFinish(payload *ipc.FinishPayload) {
-	if payload.Approved {
-		fmt.Fprintln(os.Stderr, "approved: true")
-	} else {
-		fmt.Fprintln(os.Stderr, "approved: false")
+func printFinish(payload *ipc.FinishPayload, sess *review.Session) error {
+	if resultPath != "" {
+		if payload.Result == nil {
+			return fmt.Errorf("--result requires an interactive attachment form")
+		}
+		mode := &reviewMode{}
+		for _, d := range payload.Result.Documents {
+			mode.documents = append(mode.documents, d.AttachedDocument)
+		}
+		for path := range payload.Result.Input.Files {
+			mode.files = append(mode.files, git.FileChange{Path: path})
+		}
+		if err := validateResultPath(mode, sess); err != nil {
+			return err
+		}
+		if err := review.WriteJSON(resultPath, payload.Result); err != nil {
+			return fmt.Errorf("saving form result: %w", err)
+		}
 	}
 	if payload.Prompt != "" {
-		fmt.Println(payload.Prompt)
+		if _, err := fmt.Fprintln(os.Stdout, payload.Prompt); err != nil {
+			return err
+		}
 	}
+	_, err := fmt.Fprintf(os.Stderr, "approved: %t\n", payload.Approved)
+	return err
 }
 
 func cleanupOnApprove(cfg *config.Config, sess *review.Session) {
 	if !cfg.CleanupOnApprove || sess.HasAttachments() {
+		return
+	}
+	forms, err := sess.LoadForms()
+	if err != nil || forms.HasForms() {
 		return
 	}
 	if err := sess.Clear(); err != nil {

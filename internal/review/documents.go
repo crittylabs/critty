@@ -66,6 +66,11 @@ func ReadAttachedDocuments(paths []string) ([]AttachedDocument, error) {
 			Content: string(data), Revision: fmt.Sprintf("sha256:%x", revision)})
 	}
 	setDocumentNames(docs)
+	for _, d := range docs {
+		if _, err := ParseDocumentForm(d); err != nil {
+			return nil, err
+		}
+	}
 	return docs, nil
 }
 

@@ -132,3 +132,24 @@ func (s ReviewSource) Content(path string) ([]byte, error) {
 		return os.ReadFile(path)
 	}
 }
+
+// Snapshot records raw changes, including mode and binary changes, without
+// applying the display's whitespace filtering.
+func (s ReviewSource) Snapshot() (ReviewSource, string, error) {
+	out, err := gitCommand(append(s.diffArgs(), "--binary", "--full-index", "--")...)
+	if err != nil {
+		return s, "", err
+	}
+	if s.Scope != "unstaged" && s.Scope != "range" {
+		base := s.Base
+		if base == "" {
+			base = "HEAD"
+		}
+		sha, err := gitCommand("rev-parse", "--verify", "--end-of-options", base+"^{commit}")
+		if err != nil {
+			return s, "", err
+		}
+		s.Base = strings.TrimSpace(sha)
+	}
+	return s, out, nil
+}

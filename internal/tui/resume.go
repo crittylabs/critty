@@ -46,6 +46,9 @@ func (m *AppModel) restoreRound() error {
 	if err := m.session.BeginRound(files, rawDiff); err != nil {
 		return err
 	}
+	if err := m.beginForms(files, rawDiff); err != nil {
+		return err
+	}
 	m.newFeedback = m.session.CJ.RoundState.NewFeedback
 	return nil
 }

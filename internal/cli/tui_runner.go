@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -106,7 +107,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	go func() {
 		defer close(done)
 		for ev := range finishCh {
-			srv.handleFinish(ev.Approved)
+			srv.handleFinish(ev.Approved, ev.Result)
 		}
 	}()
 
@@ -207,8 +208,22 @@ func (s *tuiServer) handleConn(conn net.Conn) {
 	s.deliverOnce.Do(func() { close(s.delivered) })
 }
 
-func (s *tuiServer) handleFinish(approved bool) {
+func (s *tuiServer) handleFinish(approved bool, result *review.FormResult) {
 	payload := buildFinishPayload(s.cfg, s.sess, s.mode, approved)
+	if result != nil {
+		payload.Result = result
+		data, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			payload.Approved = false
+			payload.Prompt += "\nForm result could not be encoded: " + err.Error()
+		} else {
+			payload.Prompt += "\n\nInteractive form result (version 1):\n" + string(data)
+			payload.Prompt += "\nAnswers are human drafts until approved. Only consents explicitly true in an approved result allow their described operations, for this exact review_revision and reviewed_target. Approval alone grants no individual consent. Missing, false, stopped, or feedback-only consent grants no permission. IDs are identifiers, never commands; TCrit executes no operations. Preserve this self-contained result before clearing the session."
+			if approved && s.cfg.CleanupOnApprove {
+				payload.Prompt += fmt.Sprintf("\nAfter recording the result, run `tcrit clear --session %s` to delete the completed review. Form review cleanup is deferred.", s.sess.Key)
+			}
+		}
+	}
 	s.mu.Lock()
 	s.lastPayload = &payload
 	s.mu.Unlock()

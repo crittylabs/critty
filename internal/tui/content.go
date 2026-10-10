@@ -285,6 +285,31 @@ func (m *AppModel) rebuildContent() {
 					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wrappedLine), lineTarget)
 				}
 			}
+		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line); interactive {
+			if isSelected {
+				formLine = inlineBackground(selectedLineBg, formLine)
+			} else if isSidebarHighlight {
+				formLine = inlineBackground(sidebarHighlightBg, formLine)
+			}
+			for wi, row := range strings.Split(lipgloss.Wrap(formLine, textWidth, ""), "\n") {
+				if checkboxX >= 0 {
+					plain := ansi.Strip(row)
+					start := lipgloss.Width(plain[:len(plain)-len(strings.TrimLeft(plain, " \t"))])
+					if wi == 0 {
+						start = checkboxX
+					}
+					end := lipgloss.Width(strings.TrimRight(plain, " \t"))
+					if start < end {
+						layout.formControls = append(layout.formControls, formControl{line: lineNum,
+							rect: mouseRect{left: gutterWidth + start, right: gutterWidth + end, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+					}
+				}
+				if wi == 0 {
+					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, row), lineTarget)
+				} else {
+					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
+				}
+			}
 		} else {
 			// Get the display content: Chroma-highlighted or raw
 			displayLine := documentDisplayLine(t, i, line)
