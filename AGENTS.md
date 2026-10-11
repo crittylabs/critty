@@ -15,6 +15,14 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 - Follow [crit](https://github.com/tomasz-tomczyk/crit) for specification and compatibility decisions, and check its current implementation and documentation when a change touches the review format or workflow.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.
 
+## TUI design
+
+- Keep text, diffs, selections, focus indicators, and dialogs readable in both light and dark color schemes.
+- Make basic operations available through both keyboard and mouse.  Provide clickable buttons for actions and closing dialogs, and let users click input fields and tabs to focus them.
+- Support multilingual input and Unicode text, including wide and combining characters.  Keep rendering, selection, mouse hit areas, and the terminal cursor aligned through wrapping and scrolling so IME input appears at the correct position.
+- Keep dialogs usable in small terminals and after resizing.  Keep confirm and cancel controls reachable, let users scroll content that does not fit, and restore focus appropriately when dialogs close.
+- Keep editing behavior consistent across input fields.  Preserve existing Emacs-style editing and paste operations when adding shortcuts, and document new key bindings in the help.
+
 ## Development
 
 Build, test, and vet with the standard Go tools:
