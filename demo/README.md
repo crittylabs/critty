@@ -16,6 +16,16 @@ MP4s are local build outputs ignored by Git.  Published recordings are hosted as
 
 For inline playback in the GitHub README, upload the MP4s as GitHub video attachments and use their `https://github.com/user-attachments/assets/...` URLs in `<video controls>` elements.  Keep the versioned release assets for downloads.
 
+Upload each video through the attachment API with this repository's ID:
+
+```sh
+gh api --method POST 'https://uploads.github.com/user-attachments/assets?name=review-flow-codex-v0.18.0.mp4&content_type=video%2Fmp4&repository_id=1175711121' \
+  -H 'Content-Type: application/octet-stream' -H "Content-Length: $(wc -c < demo/review-flow-codex.mp4)" \
+  --input demo/review-flow-codex.mp4 | jq -r .url
+```
+
+The returned URL stays private until an issue or comment shows it, so post the URLs in an issue before the README goes out.  Then download each URL without credentials and compare it with the local file.
+
 ## Uploading recordings
 
 Use an existing draft or published release to host recordings without adding them to Git:
