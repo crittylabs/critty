@@ -1,9 +1,10 @@
-"""Generate the Critty logo and icon in this directory.
+"""Generate the Critty logo, icon, and social preview in this directory.
 
 Text is converted to outlines, so the SVGs render the same without the font.
-Requirements: fontTools, rsvg-convert, and Monaspace Neon SemiBold
-(https://github.com/githubnext/monaspace, SIL OFL).  Pass the font path as
-the first argument if it is not in ~/Library/Fonts.
+Requirements: fontTools, rsvg-convert, and Monaspace Neon SemiBold and
+Regular (https://github.com/githubnext/monaspace, SIL OFL).  Pass the
+directory holding the fonts as the first argument if it is not
+~/Library/Fonts.
 """
 
 import subprocess
@@ -16,7 +17,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
 OUT = Path(__file__).resolve().parent
-DEFAULT_FONT = Path.home() / "Library/Fonts/MonaspaceNeon-SemiBold.otf"
+DEFAULT_FONT_DIR = Path.home() / "Library/Fonts"
 
 INK, PAPER = "#111418", "#ffffff"
 DARK_INK, DARK_BG = "#e6edf3", "#0d1117"
@@ -134,6 +135,61 @@ def logo(face: Face, theme: Theme, boxed: bool) -> str:
     return svg(w, h, body)
 
 
+PREVIEW_W, PREVIEW_H = 1280, 640
+TAGLINE = "Review AI-generated code and plans in your terminal"
+AGENTS = ["Claude Code", "Codex", "OpenCode", "Gemini CLI"]
+TERMINALS = ["tmux", "Herdr"]
+TOOL, MUTED, QUIET = "#79c0ff", "#8b949e", "#6e7681"
+
+
+def text_line(
+    face: Face, parts: list[tuple[str, str | None]], size: float, y: float
+) -> str:
+    """Center a line of (text, color) parts.
+
+    A part with a None color is a gap whose text gives its width in cells.
+    """
+    a = face.advance(size)
+
+    def cells(text: str, color: str | None) -> float:
+        return len(text) if color else float(text)
+
+    x = (PREVIEW_W - a * sum(cells(t, c) for t, c in parts)) / 2
+    out = []
+    for text, color in parts:
+        if color:
+            out.append(f'<path d="{face.path(text, size, x, y)}" fill="{color}"/>')
+        x += a * cells(text, color)
+    return "".join(out)
+
+
+def tools(names: list[str]) -> list[tuple[str, str | None]]:
+    parts: list[tuple[str, str | None]] = []
+    for i, name in enumerate(names):
+        if i:
+            parts.append((" · ", QUIET))
+        parts.append((name, TOOL))
+    return parts
+
+
+def social_preview(mark: Face, body: Face) -> str:
+    """Draw the GitHub social preview: the dark logo, tagline, and integrations."""
+    theme = next(t for t in THEMES if t.name == "dark")
+    scale = 0.85
+    w = PAD * 2 + TILE + GAP + 6 * mark.advance(TEXT_SIZE)
+    h = PAD * 2 + TILE
+    base = PAD + TILE / 2 + mark.cap * TEXT_SIZE / mark.upm / 2 - 10
+    logo_body = icon(mark, PAD, PAD, TILE, theme.tile)
+    logo_body += wordmark(mark, PAD + TILE + GAP, base, theme.ink, theme.accent)
+    x, y = (PREVIEW_W - w * scale) / 2, 235 - h * scale / 2
+    out = f'<g transform="translate({x:.1f} {y:.1f}) scale({scale})">{logo_body}</g>'
+    out += text_line(body, [(TAGLINE, MUTED)], 34, 440)
+    out += text_line(body, tools(AGENTS), 28, 500)
+    # Give "on" a little more room than a single space before the terminals.
+    out += text_line(body, [("on", QUIET), ("1.6", None)] + tools(TERMINALS), 28, 546)
+    return svg(PREVIEW_W, PREVIEW_H, out, theme.paper)
+
+
 def write(name: str, text: str) -> None:
     path = OUT / name
     path.write_text(text)
@@ -141,11 +197,16 @@ def write(name: str, text: str) -> None:
 
 
 def main() -> None:
-    face = Face(Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_FONT)
+    fonts = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_FONT_DIR
+    face = Face(fonts / "MonaspaceNeon-SemiBold.otf")
     for theme in THEMES:
         write(f"critty-logo-{theme.name}.svg", logo(face, theme, boxed=False))
         write(f"critty-logo-{theme.name}-boxed.svg", logo(face, theme, boxed=True))
     write("critty-icon.svg", svg(512, 512, icon(face, 0, 0, 512, DARK_BG)))
+    write(
+        "critty-social-preview.svg",
+        social_preview(face, Face(fonts / "MonaspaceNeon-Regular.otf")),
+    )
 
 
 if __name__ == "__main__":
