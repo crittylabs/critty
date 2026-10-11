@@ -972,6 +972,38 @@ func TestScrollableModalBoxHonorsMinimumHeight(t *testing.T) {
 	}
 }
 
+func TestModalBoxKeepsTabbedLinesInsideBorders(t *testing.T) {
+	box, _, _ := renderScrollableModalBox("15 \t"+strings.Repeat("a", 23), 30, 10, 0)
+	for i, row := range strings.Split(ansi.Strip(box), "\n") {
+		if width := lipgloss.Width(row); width != 30 {
+			t.Errorf("row %d width = %d, want 30: %q", i, width, row)
+		}
+		if !strings.ContainsAny(row[:3], "╭│╰") {
+			t.Errorf("row %d lacks a left border: %q", i, row)
+		}
+	}
+}
+
+func TestContextPreviewIndentsWrappedTabbedLines(t *testing.T) {
+	app := setupAppWithDoc(t, "x\n\tn, err := strconv.Atoi(os.Getenv(\"GREET_COUNT\"))\n")
+	preview := ansi.Strip(app.renderContextPreview("", 2, 2, 30, 0))
+	lines := strings.Split(preview, "\n")
+	if len(lines) < 2 {
+		t.Fatalf("preview did not wrap: %q", preview)
+	}
+	for i, line := range lines {
+		if strings.Contains(line, "\t") {
+			t.Errorf("line %d keeps a tab: %q", i, line)
+		}
+		if width := lipgloss.Width(line); width > 30 {
+			t.Errorf("line %d width = %d, max 30: %q", i, width, line)
+		}
+		if i > 0 && !strings.HasPrefix(line, strings.Repeat(" ", 6)) {
+			t.Errorf("continuation line %d is not indented: %q", i, line)
+		}
+	}
+}
+
 func TestEnterAddsThenEditsOwnCurrentRoundReply(t *testing.T) {
 	comment := testComment()
 	comment.Author = "Tester"

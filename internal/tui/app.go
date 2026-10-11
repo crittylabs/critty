@@ -3772,7 +3772,8 @@ func renderModalBoxAt(content string, width, maxHeight, offset, initialOffset in
 	}
 
 	contentWidth := max(1, width-2)
-	wrapped := lipgloss.Wrap(content, contentWidth, "")
+	// Measure and render with the same tab width; lipgloss expands tabs only when rendering.
+	wrapped := lipgloss.Wrap(expandDisplayTabs(content), contentWidth, "")
 	lines := strings.Split(wrapped, "\n")
 	maxContentHeight := maxHeight - 2
 	maxOffset := max(0, len(lines)-maxContentHeight)
@@ -3884,7 +3885,7 @@ func (m AppModel) renderContextPreview(side string, start, end, maxWidth, maxLin
 		maxLineText = 10
 	}
 	for i := start; i <= end; i++ {
-		lineText := m.anchorText(&t, side, i, i)
+		lineText := expandDisplayTabs(m.anchorText(&t, side, i, i))
 		if lineText == "" {
 			continue
 		}
