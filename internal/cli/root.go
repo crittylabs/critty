@@ -25,13 +25,13 @@ var rootCmd = &cobra.Command{
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if rootSession != "" {
-			if len(args) > 0 && reviewDiff == "" {
+			if len(args) > 0 && reviewDiff == "" && !reviewNull {
 				return fmt.Errorf("--session cannot be combined with a file argument")
 			}
 			if reviewStaged || reviewUnstaged || reviewScope != "" {
 				return fmt.Errorf("--session cannot be combined with --staged, --unstaged, or --scope")
 			}
-			if reviewDiff != "" {
+			if reviewDiff != "" || reviewNull {
 				return resumeDiff(rootSession, args)
 			}
 			return reconnectSession(rootSession)

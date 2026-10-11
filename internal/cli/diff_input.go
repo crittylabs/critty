@@ -11,6 +11,7 @@ import (
 )
 
 func addDiffFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&reviewNull, "null", false, "review only attachments, without Git or diff input")
 	cmd.Flags().StringVar(&reviewDiff, "diff", "", "read a Git unified diff from FILE or stdin (-)")
 	cmd.Flags().Lookup("diff").NoOptDefVal = "-"
 	cmd.PreRunE = validateScopeFlags

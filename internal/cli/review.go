@@ -25,6 +25,7 @@ var reviewCode bool
 var reviewStaged bool
 var reviewUnstaged bool
 var reviewDiff string
+var reviewNull bool
 var reviewScope string
 
 // The following function variables allow tests to replace shell interactions
@@ -56,6 +57,7 @@ With no file argument, reviews the current git changes (multi-file mode).
 With a file argument, reviews that document.
 With --diff[=FILE], reads a Git unified diff from a file or stdin (-), without
 requiring a repository.  A file argument after --diff is also accepted.
+With --null, reviews only attachments without requiring a repository.
 
 Inside Herdr the TUI opens in a dedicated tab; inside tmux it opens in a
 split pane. This command blocks until the reviewer approves or finishes
@@ -119,6 +121,9 @@ func (m *reviewMode) persistedCLIArgs() []string {
 		return nil
 	}
 	if m.patch != nil {
+		if len(m.patch.Files) == 0 {
+			return []string{"--null"}
+		}
 		return []string{"--diff"}
 	}
 	if m.source != nil {
@@ -146,6 +151,9 @@ func runReview(args []string) error {
 	if err := prepareDocuments(mode); err != nil {
 		return err
 	}
+	if err := mode.validateTarget(); err != nil {
+		return err
+	}
 
 	sess, err := openReviewSession(cfg, mode)
 	if err != nil {
@@ -158,6 +166,9 @@ func runReview(args []string) error {
 // runReviewFlow opens one round in the caller's multiplexer or terminal.
 func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) error {
 	if err := prepareDocuments(mode); err != nil {
+		return err
+	}
+	if err := mode.validateTarget(); err != nil {
 		return err
 	}
 	if err := validateResultPath(mode, sess); err != nil {
@@ -245,6 +256,12 @@ func reviewArgSuffix(mode *reviewMode) string {
 // resolveReviewMode classifies the arguments and, for code mode, detects
 // the changed files up front so failures surface before any TUI spawns.
 func resolveReviewMode(args []string) (*reviewMode, error) {
+	if reviewNull {
+		if reviewDiff != "" || reviewScope != "" || reviewStaged || reviewUnstaged || reviewCode || len(args) > 0 {
+			return nil, fmt.Errorf("--null cannot be combined with --diff, --scope, --code, --staged, --unstaged, or a file argument")
+		}
+		return &reviewMode{patch: &git.Patch{}}, nil
+	}
 	if reviewDiff != "" {
 		if reviewScope != "" || reviewStaged || reviewUnstaged || reviewCode {
 			return nil, fmt.Errorf("--diff cannot be combined with --scope, --code, --staged, or --unstaged")
@@ -292,6 +309,18 @@ func resolveReviewMode(args []string) (*reviewMode, error) {
 	}
 
 	return resolveCodeScope()
+}
+
+func (m *reviewMode) validateTarget() error {
+	if m.patch == nil || len(m.files) > 0 {
+		return nil
+	}
+	for _, d := range m.documents {
+		if !d.Removed {
+			return nil
+		}
+	}
+	return fmt.Errorf("empty diff requires --attachment")
 }
 
 func openReviewSession(cfg *config.Config, mode *reviewMode) (*review.Session, error) {

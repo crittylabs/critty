@@ -37,6 +37,9 @@ func ParsePatch(r io.Reader) (*Patch, error) {
 	if len(raw) > maxBytes {
 		return nil, fmt.Errorf("diff exceeds 64 MiB")
 	}
+	if len(raw) == 0 {
+		return &Patch{}, nil
+	}
 	files, _, err := gitdiff.Parse(bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("parsing diff: %w", err)
@@ -164,7 +167,7 @@ func LoadPatch(path string) (*Patch, error) {
 	if err := json.Unmarshal(data, &p); err != nil {
 		return nil, fmt.Errorf("parsing diff snapshot: %w", err)
 	}
-	if len(p.Files) == 0 {
+	if len(p.Files) == 0 && p.Raw != "" {
 		return nil, fmt.Errorf("empty diff snapshot")
 	}
 	return &p, nil

@@ -123,6 +123,7 @@ func resumeDiff(key string, args []string) error {
 		return err
 	}
 	updated.documents, updated.sessionKey = mode.documents, key
+	sess.Meta.Args = updated.persistedCLIArgs()
 	cfg, err := config.LoadCurrent()
 	if err != nil {
 		return err

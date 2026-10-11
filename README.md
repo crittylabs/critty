@@ -309,9 +309,12 @@ Attach notices, approval notes, or a commit message without staging them:
 ```bash
 critty review --staged --attachment .tmp/NOTICE.md --attachment .tmp/COMMIT_MESSAGE.md
 critty plan design.md --attachment .tmp/APPROVAL.md
+critty --null --attachment .tmp/APPROVAL.md
 ```
 
 Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported.
+
+Use `--null` to review only attachments, including outside a Git repository.  `--diff=/dev/null` or an empty diff file or stdin also works with attachments.  An empty diff without attachments is rejected.
 
 Resuming with `critty --session <id>` uses the saved document snapshots.  To revise them, pass the complete list again with `--attachment`; use `--clear-attachments` to remove all of them.  Comments on removed documents remain accessible.  A file can appear both as an attachment and in the diff, with separate comments.  Attachments also allow reviewing a clean Git scope.
 

@@ -15,6 +15,117 @@ import (
 
 const addedPatch = "diff --git a/a.txt b/a.txt\nnew file mode 100644\n--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+snapshot\n"
 
+func TestAttachmentOnlyReview(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	if err := os.WriteFile("notice.md", []byte("Review this notice.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("empty.diff", nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	oldDiff, oldNull, oldAttachments, oldClear, oldStdin := reviewDiff, reviewNull, attachmentPaths, clearAttachments, os.Stdin
+	t.Cleanup(func() {
+		reviewDiff, reviewNull, attachmentPaths, clearAttachments, os.Stdin = oldDiff, oldNull, oldAttachments, oldClear, oldStdin
+	})
+	for _, input := range []string{"null", os.DevNull, "empty.diff", "-"} {
+		t.Run(input, func(t *testing.T) {
+			reviewNull, reviewDiff = input == "null", input
+			if reviewNull {
+				reviewDiff = ""
+			}
+			if input == "-" {
+				f, err := os.Open("empty.diff")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					if err := f.Close(); err != nil {
+						t.Error(err)
+					}
+				})
+				os.Stdin = f
+			}
+			attachmentPaths, clearAttachments = nil, false
+			mode, err := resolveReviewMode(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := mode.validateTarget(); err == nil {
+				t.Fatal("accepted empty review without attachments")
+			}
+			attachmentPaths = []string{"notice.md"}
+			if err := prepareDocuments(mode); err != nil {
+				t.Fatal(err)
+			}
+			if err := mode.validateTarget(); err != nil {
+				t.Fatal(err)
+			}
+			sess, err := openReviewSession(&config.Config{}, mode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			attachmentPaths = nil
+			_, resumed, err := loadReviewSession(sess.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resumed.patch == nil || len(resumed.files) != 0 || len(resumed.documents) != 1 {
+				t.Fatalf("resumed review = %+v", resumed)
+			}
+			if err := resumed.validateTarget(); err != nil {
+				t.Fatal(err)
+			}
+			resumed.documents[0].Removed = true
+			if err := resumed.validateTarget(); err == nil {
+				t.Fatal("accepted removed attachments as review targets")
+			}
+			resumed.documents[0].Removed = false
+			if got := nextRoundCommand(sess, resumed); got != "critty --session "+sess.Key {
+				t.Fatalf("continuation = %q", got)
+			}
+			clearAttachments = true
+			if err := prepareDocuments(resumed); err != nil {
+				t.Fatal(err)
+			}
+			if err := resumed.validateTarget(); err == nil {
+				t.Fatal("accepted removal of all review targets")
+			}
+		})
+	}
+}
+
+func TestNullRejectsOtherInputs(t *testing.T) {
+	oldNull, oldDiff, oldScope, oldCode, oldStaged, oldUnstaged := reviewNull, reviewDiff, reviewScope, reviewCode, reviewStaged, reviewUnstaged
+	t.Cleanup(func() {
+		reviewNull, reviewDiff, reviewScope, reviewCode, reviewStaged, reviewUnstaged = oldNull, oldDiff, oldScope, oldCode, oldStaged, oldUnstaged
+	})
+	reviewNull = true
+	for _, input := range []string{"diff", "scope", "code", "staged", "unstaged", "file"} {
+		t.Run(input, func(t *testing.T) {
+			reviewDiff, reviewScope, reviewCode, reviewStaged, reviewUnstaged = "", "", false, false, false
+			var args []string
+			switch input {
+			case "diff":
+				reviewDiff = os.DevNull
+			case "scope":
+				reviewScope = "all"
+			case "code":
+				reviewCode = true
+			case "staged":
+				reviewStaged = true
+			case "unstaged":
+				reviewUnstaged = true
+			case "file":
+				args = []string{"notice.md"}
+			}
+			if _, err := resolveReviewMode(args); err == nil {
+				t.Fatal("accepted conflicting input")
+			}
+		})
+	}
+}
+
 func TestDiffReviewSessionAndDetachedCommand(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

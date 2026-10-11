@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+### Features
+
+- `--null` reviews only attached documents without requiring a Git repository.
+
 ### Fixes
+
+- Empty diff input, including `--diff=/dev/null`, can be reviewed with attachments and resumed from its saved session.
 
 - Markdown quotes and italic text use the primary text color to stay readable on diff backgrounds.
 - `n` and `N` stop at added, deleted, and modified binary files even though they have no diff hunks.

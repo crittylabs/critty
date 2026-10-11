@@ -38,6 +38,7 @@ critty --unstaged            # alias for --scope=unstaged
 critty --scope=main...       # merge base with main versus HEAD, using committed contents
 critty plan <file>           # a plan written in this conversation: each round is saved as a new version
 git diff <base> <head> | critty --diff  # review a supplied Git unified diff
+critty --null --attachment notice.md  # review only attachments, without Git
 ```
 
 With no argument, review a plan file written earlier in this conversation with `critty plan <file>`; otherwise run bare `critty` for the git changes.
@@ -49,6 +50,8 @@ For a supplied diff, use `critty --diff=changes.diff` or `critty --diff changes.
 For a single document, `critty FILE:LINE` or `critty review FILE:LINE` starts at that line.  To start at a requested file or line, add `--focus 'path/to/file[:LINE]'`, for example `critty review --staged --focus 'internal/tui/app.go:120'` or `critty --session <id> --focus 'internal/tui/app.go'`.  The path must be in the review; a line must be a positive, 1-indexed new-side source line present in the reviewed content.  Relative and absolute paths are accepted, including the original plan path for plan reviews.  From round 2 onward, automatic focus selects the first visible thread, in file and display order, with a reply added since the previous submission by an author other than the reviewer.  An explicit document line or `--focus` overrides that automatic focus for the invocation; `--focus` wins when both are given.  Pass the option again in later rounds when needed.
 
 Use repeated `--attachment FILE` flags to show text documents before any review, without staging them.  Attached documents have separate comment paths and saved snapshots.  The finish prompt includes their text and original paths; use that mapping when addressing comments.  Plain `--session <id>` reuses snapshots.  To revise them, pass the complete ordered list again; `--clear-attachments` removes the list while retaining its comment threads.
+
+Use `--null` for attachment-only reviews, including outside a Git repository.  Empty diff input (`--diff=/dev/null`, an empty file, or empty stdin) also works with attachments.  Both require at least one active attachment.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`; pass the complete attachment list to refresh its snapshots.
 
 Attached Markdown task lists are interactive forms.  Add `<!-- form: id=destination required -->` to a required human confirmation, `<!-- form: id=publish consent -->` to an individual operation permission, or repeated IDs with distinct `value=...` attributes for a single choice.  Describe the exact operation and target in the label or surrounding document.  Required, consent, and choice fields need explicit IDs.  Required and consent fields ignore initial `[x]` values; source text never establishes human permission.  Missing required fields allow feedback but block approval.  Revised review targets or attachment sets reset all required confirmations and consents.  Ordinary explicit IDs carry answers only when their definitions stay unchanged.
 

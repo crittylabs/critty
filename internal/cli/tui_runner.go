@@ -307,7 +307,7 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 
 // nextRoundCommand targets the saved review and, when needed, replacement input.
 func nextRoundCommand(sess *review.Session, mode *reviewMode) string {
-	if mode.patch != nil {
+	if mode.patch != nil && len(mode.files) > 0 {
 		return "critty --diff --session " + sess.Key + " < updated.diff"
 	}
 	if mode.plan() && mode.planFile != "" {

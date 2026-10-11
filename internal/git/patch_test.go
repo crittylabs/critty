@@ -45,7 +45,7 @@ func TestParsePatch(t *testing.T) {
 func TestParsePatchRejectsInvalidInput(t *testing.T) {
 	t.Chdir(t.TempDir())
 	for _, raw := range []string{
-		"", "not a diff\n", "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@\n-old\n+new\n",
+		"not a diff\n", "diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1,2 +1,2 @@\n-old\n+new\n",
 		"diff --git a/../escape b/../escape\nnew file mode 100644\n",
 		"diff --git a/a b/a\nnew file mode 100644\ndiff --git a/a b/a\nnew file mode 100644\n",
 		"diff --git a/a b/a\n--- a/a\n+++ b/a\n@@ -1000001 +1000001 @@\n-old\n+new\n",
