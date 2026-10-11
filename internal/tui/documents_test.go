@@ -83,7 +83,7 @@ func TestAttachedDocumentCommentsAndResume(t *testing.T) {
 	}
 	docs[0].Removed = true
 	resumed := NewApp(path, AppConfig{Session: sess, Documents: docs})
-	if resumed.tabs[0].path != path || resumed.tabs[1].attachment == nil {
+	if resumed.tabs[0].attachment == nil || resumed.tabs[1].path != path {
 		t.Fatal("removed document did not retain separate comment tab")
 	}
 	resumed.syncFileTree()

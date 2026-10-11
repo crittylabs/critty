@@ -7,7 +7,59 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/knu/tcrit/internal/document"
+	gitpkg "github.com/knu/tcrit/internal/git"
+	"github.com/knu/tcrit/internal/review"
 )
+
+func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
+	files := []gitpkg.FileChange{
+		{Path: "root.go"}, {Path: "a.go"}, {Path: "a/y.go"},
+		{Path: "b/x.go"}, {Path: "a/z/sub.go"}, {Path: "a/sub/z.go"},
+		{Path: "a/a.go"}, {Path: ".config"}, {Path: "attachments/local.md"},
+	}
+	docs := []review.AttachedDocument{
+		{ID: "z", Source: "/docs/z.md", Name: "z.md"},
+		{ID: "a", Source: "/docs/a.md", Name: "a.md"},
+		{ID: "removed", Source: "/docs/removed.md", Name: "removed.md", Removed: true},
+	}
+	sess := &review.Session{CJ: review.NewCritJSON()}
+	sess.SetFileComments(docs[2].Path(), "", []review.Comment{{ID: "removed-comment", Body: "keep"}})
+	sess.SetFileComments("c/outside.go", "", []review.Comment{{ID: "outside-comment", Body: "keep"}})
+	app := NewCodeReviewApp(files, "HEAD", AppConfig{Patch: &gitpkg.Patch{}, Session: sess, Documents: docs})
+	want := []string{
+		docs[0].Path(), docs[1].Path(), docs[2].Path(),
+		"a/sub/z.go", "a/z/sub.go", "a/a.go", "a/y.go",
+		"attachments/local.md", "b/x.go", "c/outside.go", ".config", "a.go", "root.go",
+	}
+	if len(app.tabs) != len(want) {
+		t.Fatalf("tab count = %d, want %d", len(app.tabs), len(want))
+	}
+	for i, path := range want {
+		if app.tabs[i].path != path {
+			t.Fatalf("tab %d = %q, want %q", i, app.tabs[i].path, path)
+		}
+	}
+	app.syncFileTree()
+	index := 0
+	for _, row := range app.fileTree.rows {
+		if row.isDir {
+			continue
+		}
+		if row.tabIndex != index || row.path != want[index] {
+			t.Fatalf("tree leaf %d = %+v, want %q", index, row, want[index])
+		}
+		index++
+	}
+	if !app.tabs[9].outsideChanges || app.tabs[2].attachment == nil || !app.tabs[2].attachment.Removed {
+		t.Fatal("sorting lost restored tab metadata")
+	}
+	app.toggleTreeDir(0)
+	for i, path := range want {
+		if app.tabs[i].path != path {
+			t.Fatal("folding reordered tabs")
+		}
+	}
+}
 
 func newFileTreeTestApp() AppModel {
 	app := NewApp("root.go", AppConfig{Project: "test-project"})

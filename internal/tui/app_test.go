@@ -814,7 +814,7 @@ func TestRoundStartRefreshesCodeReviewTabs(t *testing.T) {
 	}
 
 	app = restartRound(t, app)
-	want := []string{"existing.go", "go.mod", "internal/cli/process_darwin.go", "internal/cli/process_linux.go", "internal/cli/process_other.go"}
+	want := []string{"internal/cli/process_darwin.go", "internal/cli/process_linux.go", "internal/cli/process_other.go", "existing.go", "go.mod"}
 	if len(app.tabs) != len(want) {
 		t.Fatalf("refreshed tabs = %d, want %d", len(app.tabs), len(want))
 	}

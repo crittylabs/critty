@@ -134,15 +134,8 @@ func visibleTreeRows(root *treeNode, collapsed map[string]bool) []treeRow {
 	return rows
 }
 
-// syncFileTree rebuilds the visible rows and, when the active tab changed
-// elsewhere, moves the cursor to it, unfolding its directories.
-func (m *AppModel) syncFileTree() {
-	tree := &m.fileTree
-	if len(m.tabs) == 0 {
-		tree.rows = nil
-		tree.viewport.SetContent("")
-		return
-	}
+// reviewFileTree keeps attachment order separate from directory-first paths.
+func (m *AppModel) reviewFileTree() *treeNode {
 	var paths []string
 	var indices []int
 	attachments := &treeNode{name: "attachments", path: "\x00attachments", isDir: true}
@@ -180,18 +173,41 @@ func (m *AppModel) syncFileTree() {
 	if len(paths) > 0 {
 		forest.children = append(forest.children, root)
 	}
-	tree.root = forest
+	return forest
+}
+
+func (m *AppModel) orderTabsByTree() {
+	rows := visibleTreeRows(m.reviewFileTree(), nil)
+	tabs := make([]FileTab, 0, len(m.tabs))
+	for _, row := range rows {
+		if !row.isDir {
+			tabs = append(tabs, m.tabs[row.tabIndex])
+		}
+	}
+	m.tabs = tabs
+}
+
+// syncFileTree rebuilds the visible rows and, when the active tab changed
+// elsewhere, moves the cursor to it, unfolding its directories.
+func (m *AppModel) syncFileTree() {
+	tree := &m.fileTree
+	if len(m.tabs) == 0 {
+		tree.rows = nil
+		tree.viewport.SetContent("")
+		return
+	}
+	tree.root = m.reviewFileTree()
 	if tree.syncedTab != m.activeTab {
 		delete(tree.collapsed, "")
 		if m.tabs[m.activeTab].attachment != nil {
-			delete(tree.collapsed, attachments.path)
+			delete(tree.collapsed, "\x00attachments")
 		}
 		parts := strings.Split(strings.Trim(filepath.ToSlash(m.tabs[m.activeTab].path), "/"), "/")
 		for j := 1; j < len(parts); j++ {
 			delete(tree.collapsed, strings.Join(parts[:j], "/"))
 		}
 	}
-	tree.rows = visibleTreeRows(forest, tree.collapsed)
+	tree.rows = visibleTreeRows(tree.root, tree.collapsed)
 	if tree.syncedTab != m.activeTab {
 		for i, row := range tree.rows {
 			if !row.isDir && row.tabIndex == m.activeTab {

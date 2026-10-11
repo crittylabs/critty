@@ -267,6 +267,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		modalTextarea:   ta,
 	}
 	m.addDocuments(cfg.Documents)
+	m.orderTabsByTree()
 	return m
 }
 
@@ -277,15 +278,8 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	ta.Placeholder = "Type your comment..."
 	ta.ShowLineNumbers = false
 
-	// Sort files alphabetically by path
-	sortedFiles := make([]gitpkg.FileChange, len(files))
-	copy(sortedFiles, files)
-	sort.Slice(sortedFiles, func(i, j int) bool {
-		return sortedFiles[i].Path < sortedFiles[j].Path
-	})
-
-	tabs := make([]FileTab, 0, len(sortedFiles))
-	for _, f := range sortedFiles {
+	tabs := make([]FileTab, 0, len(files))
+	for _, f := range files {
 		var diff *gitpkg.DiffInfo
 		if cfg.Patch != nil {
 			if pf := cfg.Patch.File(f.Path); pf != nil {
@@ -325,7 +319,6 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 				tabs = append(tabs, tab)
 			}
 		}
-		sort.Slice(tabs, func(i, j int) bool { return tabs[i].path < tabs[j].path })
 	}
 
 	m := AppModel{
@@ -350,6 +343,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		modalTextarea:   ta,
 	}
 	m.addDocuments(cfg.Documents)
+	m.orderTabsByTree()
 	return m
 }
 

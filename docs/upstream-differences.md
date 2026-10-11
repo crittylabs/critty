@@ -1,5 +1,6 @@
 # Differences from upstream
 
+- **Tab order follows the tree** — file tabs follow the fully expanded tree rather than sorting entire paths alphabetically.  At each level, directories come first and siblings sort by name.  Attachments retain their tree order before project files, including removed attachments with saved comments.  Folding folders does not change tab order.
 - **File change markers** — file tabs, the tree, and the file selector show new and untracked files as `(A +12)` and deleted files as `(D -8)`, with zero line counts omitted.  Modified text files retain line counts such as `(+3 -2)`.  Binary files show `(A)`, `(D)`, `(M)`, or `(R)` instead of line counts; their content placeholder shows the same marker.  Additions are green, deletions red, and binary modifications and renames yellow; parentheses keep their neutral color.  Binary detection preserves the change status for working-tree, staged, committed-range, and supplied-diff reviews.  Existing binary statuses in `review.json` and older saved diff snapshots remain compatible.
 
 - **Approval dialog colors** — Submit dialogs for approval, including Resolve All & Approve, use light green borders, titles, and messages.

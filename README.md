@@ -38,6 +38,8 @@ Use `tcrit FILE[:LINE]` to review a single document, or `--focus PATH[:LINE]` wi
 
 Tabs, the file tree, and the file selector use `A` for new files and `D` for deleted files, alongside line counts: `(A +12)` or `(D -8)`.  Modified text files show counts such as `(+3 -2)`.  Empty files and binary files omit counts; binary changes show `(M)` for modifications or `(R)` for renames.  The binary content placeholder uses the same marker.  Additions are green, deletions red, and binary modifications and renames yellow; parentheses keep their normal color.
 
+File tabs follow the expanded file tree from top to bottom: directories come first, and names sort alphabetically within each directory.  Attached documents appear first in the attachments group.
+
 ## Install
 
 Install the `tcrit` binary, then install the review skills for your agent with `tcrit install`.
