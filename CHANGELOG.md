@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.17.0
+
+### Added
+
+- Attach text and Markdown documents to any review with repeatable `--attachment FILE` flags.  Documents appear before the reviewed files, keep their own comments, and survive review restarts as saved snapshots.  Pass the complete attachment list to refresh it, or use `--clear-attachments` to remove it.
+- Answer task-list forms in attached Markdown with `Space` or by clicking their checkboxes and labels.  Forms support required human confirmations, single choices, and individual operation permissions.  Answers persist separately from source documents; changes to the review invalidate confirmations and permissions.
+- Export self-contained form results with `--result FILE`.  Results include the reviewed content, field definitions, human answers, and permissions explicitly granted on approval.  Overall approval alone grants no individual permission.
+- Bundled agent skills explain attachment snapshots, form answers, result verification, and cleanup.
+
+### Changed
+
+- File tabs follow the expanded file tree: directories first, then names within each directory.  Attached documents stay together before project files, including removed documents with saved comments.
+
 ## 0.16.5
 
 ### Changed

@@ -19,6 +19,7 @@ Your agent writes code or a plan, you review it in the TUI, and the agent reads 
 - **Review in the terminal** — read plans, documents, and multi-file diffs with syntax highlighting, and comment on a line, a range, a deleted line, or a whole file.
 - **Round trips with your agent** — the agent opens the review in a Herdr tab or a tmux split, waits for you to submit, reads your comments, and comes back with the next round.  `tcrit install` sets this up for Claude Code, Codex, OpenCode, and Gemini CLI.
 - **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | tcrit --diff`, single documents, and versioned plans that carry comment threads across revisions.
+- **Attached documents and forms** — review notices, commit messages, and approval notes alongside code.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
 - **Comments made for code review** — replies, resolve and reopen, GitHub-style suggestions, clipboard images, `@path L40` and comment-ID references, and editing in `$EDITOR`.  Multi-line comments follow insertions and deletions within the selected range across review rounds.
 - **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
 - **Mouse and keyboard** — vim-style keys throughout, plus clickable tabs, lines, threads, and buttons, gutter drag to select ranges, and wheel scrolling.
@@ -143,19 +144,19 @@ tcrit check                         # Report stale installed integrations
 
 ### Building a custom flow
 
-The skills only run the review loop, so your project instructions can wrap them in a larger flow.  This example has the agent draft the commit message before the review, stage it next to the code so both are reviewed together, and commit once the review is approved.  Put something like this in your `CLAUDE.md` or `AGENTS.md`:
+The skills only run the review loop, so your project instructions can wrap them in a larger flow.  This example has the agent attach the commit message to the code review and commit once the review is approved.  Put something like this in your `CLAUDE.md` or `AGENTS.md`:
 
 ```markdown
 Every implementation request ends with a TCrit review and a commit.  After implementing what was asked:
 
-1. Stage everything with `git add -A`.
-2. Draft the commit message in `.tmp/.review/COMMIT_MESSAGE.md` and stage it with `git add -f`, so the reviewer sees the message with the code.
-3. Review with the `tcrit` skill: run `tcrit review --staged` and wait for it to exit.
-4. For every comment, make the change, update the commit message to match, stage the updated files, reply on the thread, and run the next round with `tcrit --session <id>`.  Repeat until approved.
-5. On approval, run `git restore --staged .tmp/.review/COMMIT_MESSAGE.md`, then `git commit -F .tmp/.review/COMMIT_MESSAGE.md`.
+1. Stage the source changes for this commit.
+2. Draft the commit message in `.tmp/.review/COMMIT_MESSAGE.md`, keeping it outside the index.
+3. Review with the `tcrit` skill: run `tcrit review --staged --attachment .tmp/.review/COMMIT_MESSAGE.md` and wait for it to exit.
+4. Address new feedback, update the message to match, stage the source changes, and reply on the thread.  Run the next round with `tcrit --session <id> --attachment .tmp/.review/COMMIT_MESSAGE.md` to refresh the attached message.  Repeat until approved.
+5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F .tmp/.review/COMMIT_MESSAGE.md`.
 ```
 
-With that in place, an implementation request is all it takes.  Below, the agent implements the change and opens the review with its draft message as the first tab.  The reviewer sends the code back with an inline comment, then reads the updated message and asks for a shorter body, and finally resolves the last thread with `R`, which goes straight to the approval dialog.  The agent commits with the reviewed message.
+With that in place, an implementation request is all it takes.  The recording below shows an earlier flow that staged the message, with the same review and feedback loop.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
 
 In the second round, select the message body from line 3 with `v` and press Enter to comment on the whole paragraph.
 
