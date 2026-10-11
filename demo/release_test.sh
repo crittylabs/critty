@@ -16,7 +16,7 @@ state=$UPLOAD_TEST_DIR
 printf '%s\n' "$*" >> "$state/calls"
 if [ "$1 $2" = 'repo view' ]; then
     [ "$UPLOAD_TEST_CASE" != repo_failure ] || exit 1
-    printf 'knu/tcrit\n'
+    printf 'crittylabs/critty\n'
     exit 0
 fi
 if [ "$1 $2" = 'release upload' ]; then
@@ -61,7 +61,7 @@ else
 fi
 digest=${digest%% *}
 size=$(wc -c <"$test_dir/input")
-url=https://github.com/knu/tcrit/releases/download/demo-assets/recording-v0.15.0.gif
+url=https://github.com/crittylabs/critty/releases/download/demo-assets/recording-v0.15.0.gif
 jq -n --arg digest "sha256:$digest" --arg url "$url" --argjson size "$size" \
     '[[{id:7, name:"recording-v0.15.0.gif", state:"uploaded", size:$size,
     digest:$digest, browser_download_url:$url}]]' >"$test_dir/after.json"

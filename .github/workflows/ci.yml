@@ -51,6 +51,9 @@ jobs:
 
       - run: go test ./...
 
+      - name: Test demo release script
+        run: sh demo/release_test.sh
+
   # Keep the required check stable for branch protection and Mergify.
   test:
     needs: test-platform
