@@ -109,7 +109,7 @@ func TestGotoLineButtons(t *testing.T) {
 		app.openGotoLine()
 		app.lineInput.SetValue("3")
 		content, _ := app.locationModalContent(40)
-		if !strings.Contains(ansi.Strip(content), "Go enter") || !strings.Contains(ansi.Strip(content), "Cancel esc") {
+		if !strings.Contains(ansi.Strip(content), "Go RET") || !strings.Contains(ansi.Strip(content), "Cancel ESC") {
 			t.Fatal("dialog actions missing")
 		}
 		clicked := false

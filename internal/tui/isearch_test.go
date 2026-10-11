@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -458,5 +459,103 @@ func TestISearchSelectionStaysInFile(t *testing.T) {
 	assertTabCursor(t, app, 0, 4)
 	if p := ansi.Strip(app.renderFooter()); strings.Contains(p, "multi-file") {
 		t.Fatalf("a selection searched other files: %q", p)
+	}
+}
+
+func TestISearchPasteAndYank(t *testing.T) {
+	for _, source := range []string{"terminal", "kill-ring"} {
+		for _, tt := range []struct {
+			name, input, want string
+		}{
+			{"Japanese", "検索🙂", "検索🙂"},
+			{"regexp", "alpha|beta", "alpha|beta"},
+			{"multiline", "one\r\ntwo\tthree\rfour", "one two three four"},
+			{"controls", "\x1b[31malpha\x1b[0m\x00", "alpha"},
+			{"empty", "", ""},
+		} {
+			t.Run(source+"/"+tt.name, func(t *testing.T) {
+				app := newISearchApp(t, 1)
+				app = ctrlKey(app, 's')
+				app = typeSearch(app, "a")
+				if source == "terminal" {
+					app, _ = updateApp(app, tea.PasteMsg{Content: tt.input})
+				} else {
+					if tt.input != "" {
+						app.killRing.entries = []string{tt.input, "older"}
+					}
+					app = ctrlKey(app, 'y')
+				}
+				if !app.isearch.active || app.isearch.query != "a"+tt.want {
+					t.Fatalf("active=%v query=%q, want %q", app.isearch.active, app.isearch.query, "a"+tt.want)
+				}
+				if tt.want != "" {
+					app = ctrlKey(app, 'h')
+					if app.isearch.query != "a" {
+						t.Fatalf("backspace left %q, want the query before paste", app.isearch.query)
+					}
+				}
+			})
+		}
+	}
+	app := newISearchApp(t, 1)
+	app = ctrlKey(app, 's')
+	app, _ = updateApp(app, tea.PasteMsg{Content: "beta"})
+	assertCursor(t, app, 2)
+	app = ctrlKey(app, 'g')
+	assertCursor(t, app, 1)
+	if app.View().Cursor != nil {
+		t.Fatal("terminal cursor remains after cancelling search")
+	}
+}
+
+func TestISearchTerminalCursor(t *testing.T) {
+	for _, query := range []string{"", "検索", "e\u0301🙂", strings.Repeat("日本語", 20)} {
+		for _, width := range []int{18, 40, 100} {
+			app := newISearchApp(t, 1)
+			app = ctrlKey(app, 's')
+			app = typeSearch(app, query)
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 30})
+			view := app.View()
+			cursor := view.Cursor
+			if cursor == nil || cursor.X < 0 || cursor.X >= width || cursor.Y < 0 || cursor.Y >= 30 {
+				t.Fatalf("query=%q width=%d cursor=%+v", query, width, cursor)
+			}
+			rows := strings.Split(ansi.Strip(view.Content), "\n")
+			prompt := rows[cursor.Y]
+			if cell := ansi.Cut(prompt, cursor.X, cursor.X+1); cell != " " {
+				t.Fatalf("cursor at %d,%d covers %q in %q", cursor.X, cursor.Y, cell, prompt)
+			}
+			if query != "" {
+				_, n := utf8.DecodeLastRuneInString(query)
+				if before := ansi.Cut(prompt, 0, cursor.X); !strings.HasSuffix(before, query[len(query)-n:]) {
+					t.Fatalf("input end missing before cursor: %q", before)
+				}
+			}
+		}
+	}
+}
+
+func TestISearchYanksCommentEditorKill(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app = pressKey(app, tea.KeyEnter)
+	if app.modal != commentModal {
+		t.Fatalf("modal=%v, want comment editor", app.modal)
+	}
+	app, _ = updateApp(app, tea.PasteMsg{Content: "beta"})
+	app = ctrlKey(app, 'a')
+	app = ctrlKey(app, 'k')
+	app = pressKey(app, tea.KeyEscape)
+	if app.modal != noModal {
+		t.Fatalf("modal=%v after cancelling empty comment", app.modal)
+	}
+	app = ctrlKey(app, 's')
+	app = ctrlKey(app, 'y')
+	if app.isearch.query != "beta" || !app.isearch.active {
+		t.Fatalf("query=%q active=%v", app.isearch.query, app.isearch.active)
+	}
+	assertCursor(t, app, 2)
+	app = ctrlKey(app, 'y')
+	if app.isearch.query != "betabeta" || len(app.killRing.entries) != 1 || app.killRing.entries[0] != "beta" {
+		t.Fatalf("query=%q ring=%v after repeated yank", app.isearch.query, app.killRing.entries)
 	}
 }

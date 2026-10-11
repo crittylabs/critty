@@ -476,11 +476,14 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 
 	background := lipgloss.NewStyle().Width(app.width).Height(app.height).Render("")
 	rendered := app.renderWithModal(background)
+	help := app.renderHelp(app.modalInnerWidth())
 	for _, want := range []string{
 		"Keyboard Help", "General", "Navigation", "Code review", "Selection and dialogs",
-		"↑/↓,j/k", "PgUp/PgDn", "Home/End,g/G,</>", "tab/S-tab", "ctrl+s", "ctrl+PgUp/PgDn", "y/n/esc", "alt+p",
+		"↑/↓,j/k", "PgUp/PgDn", "Home/End,g/G,</>", "TAB/S-TAB", "C-s", "C-PgUp/PgDn", "y/n/ESC", "M-p",
+		"Incremental search", "C-s / C-r", "C-d / C-w", "DEL / C-y", "M-s c/w/r/m", "terminal paste",
+		"C-: ctrl+, M-: meta/alt+, S-: shift+", "RET: enter", "DEL: backspace",
 	} {
-		if !strings.Contains(rendered, want) {
+		if !strings.Contains(rendered+help, want) {
 			t.Errorf("help modal does not contain %q", want)
 		}
 	}
@@ -516,6 +519,57 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	app = pressAltKey(app, '?')
 	if app.modal != noModal {
 		t.Fatalf("second ? left modal %v open", app.modal)
+	}
+}
+
+func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 24})
+	app = pressAltKey(app, '?')
+	app = pressKey(app, tea.KeyEnd)
+	if app.helpOffset == 0 || !strings.Contains(ansi.Strip(app.View().Content), "Selection and dialogs") {
+		t.Fatal("end did not show the bottom of keyboard help")
+	}
+	if !strings.Contains(ansi.Strip(app.View().Content), "C-: ctrl+, M-: meta/alt+, S-: shift+") {
+		t.Fatal("modifier legend scrolled out of keyboard help")
+	}
+	app = pressKey(app, tea.KeyHome)
+	if app.helpOffset != 0 {
+		t.Fatal("home did not restore the top of keyboard help")
+	}
+	app = pressKey(app, tea.KeyPgDown)
+	if app.helpOffset == 0 {
+		t.Fatal("Page Down did not scroll keyboard help")
+	}
+	app = pressKey(app, tea.KeyPgUp)
+	if app.helpOffset != 0 {
+		t.Fatal("Page Up did not restore the top of keyboard help")
+	}
+	app = ctrlKey(app, 'd')
+	if app.helpOffset == 0 {
+		t.Fatal("ctrl+d did not scroll keyboard help")
+	}
+	app = ctrlKey(app, 'u')
+	if app.helpOffset != 0 {
+		t.Fatal("ctrl+u did not restore the top of keyboard help")
+	}
+	app, _ = updateApp(app, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+	if app.helpOffset == 0 {
+		t.Fatal("mouse wheel did not scroll keyboard help")
+	}
+	for _, region := range app.modalMouseRegions() {
+		if region.action.scrollable && region.action.scrollOffset > 0 {
+			app = clickMouse(app, region.rect.left, region.rect.top)
+			break
+		}
+	}
+	if !strings.Contains(ansi.Strip(app.View().Content), "M-s c/w/r/m") {
+		t.Fatal("Down button did not reveal search mode shortcuts")
+	}
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 40})
+	view := app.View()
+	if !strings.Contains(ansi.Strip(view.Content), "General") || lipgloss.Height(view.Content) > 40 {
+		t.Fatal("resizing did not fit the help content to the larger terminal")
 	}
 }
 

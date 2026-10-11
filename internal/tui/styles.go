@@ -102,6 +102,8 @@ var (
 				Bold(true).
 				Foreground(lipgloss.BrightYellow)
 
+	helpLegendStyle = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+
 	// Search matches keep the default foreground on a colored background.
 	isearchMatchStyle   = lipgloss.NewStyle().Bold(true).Background(lipgloss.Cyan)
 	isearchCurrentStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("208"))
@@ -377,6 +379,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	commentStyle = commentStyle.Foreground(textSecondary)
 	footerDescStyle = footerDescStyle.Foreground(textSecondary)
 	helpDescriptionStyle = helpDescriptionStyle.Foreground(textPrimary)
+	helpLegendStyle = helpLegendStyle.Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue))
 	inlineCommentBox = inlineCommentBox.Foreground(textSecondary)
 	mdBoldStyle = mdBoldStyle.Foreground(textPrimary)
 	mdItalicStyle = mdItalicStyle.Foreground(textPrimary)

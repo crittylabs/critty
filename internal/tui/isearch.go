@@ -8,7 +8,6 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -253,6 +252,8 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
 		m.isearchCapture(false)
 	case "ctrl+w":
 		m.isearchCapture(true)
+	case "ctrl+y":
+		m.isearchPaste(m.killRing.current())
 	default:
 		if msg.Text == "" || msg.Mod&(tea.ModCtrl|tea.ModAlt|tea.ModSuper) != 0 {
 			m.exitISearch(false)
@@ -294,6 +295,24 @@ func (m *AppModel) isearchAppend(text string) {
 	m.isearch.history = append(m.isearch.history, m.isearch.query)
 	m.isearch.query += text
 	m.isearchFromOrigin()
+}
+
+// isearchPaste keeps terminal pastes and kill-ring entries on one prompt row.
+func (m *AppModel) isearchPaste(text string) {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.Map(func(r rune) rune {
+		switch r {
+		case '\n', '\r', '\t':
+			return ' '
+		}
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, ansi.Strip(text))
+	if text != "" {
+		m.isearchAppend(text)
+	}
 }
 
 // isearchDeleteUnit removes the last typed or captured unit, as Emacs does
@@ -591,6 +610,15 @@ func highlightISearch(styled string, re *regexp.Regexp, current int) (string, bo
 
 // renderISearchPrompt renders the search prompt shown in place of the footer.
 func (m AppModel) renderISearchPrompt() string {
+	prompt, _ := m.isearchPrompt()
+	return prompt
+}
+
+// isearchPrompt returns the prompt and the terminal cursor's display column.
+func (m AppModel) isearchPrompt() (string, int) {
+	if m.width <= 0 {
+		return "", 0
+	}
 	s := m.isearch
 	// Describe the search as Emacs isearch-message-prefix does.
 	failing := s.failing && s.re != nil
@@ -639,7 +667,18 @@ func (m AppModel) renderISearchPrompt() string {
 	if s.prefix {
 		status += " [M-s: c case-fold/smart-case, w word, r regexp, m multi-file]"
 	}
-	cursor := lipgloss.NewStyle().Reverse(true).Render(" ")
-	// Keep the prompt on one row; the layout reserves exactly one.
-	return ansi.Truncate(labelStyle.Render(label+":")+" "+s.query+cursor+footerStyle.Render(status), m.width, "…")
+	// Keep the input end visible and reserve a cell for the real terminal cursor.
+	queryWidth := ansi.StringWidth(s.query)
+	inputWidth := min(queryWidth, max(2, m.width/2))
+	prefix := ansi.Truncate(labelStyle.Render(label+":")+" ", max(0, m.width-inputWidth-1), "…")
+	available := max(0, m.width-ansi.StringWidth(prefix)-1)
+	query := s.query
+	for queryWidth > available && query != "" {
+		cluster, width := ansi.FirstGraphemeCluster(query, ansi.GraphemeWidth)
+		query = query[len(cluster):]
+		queryWidth -= width
+	}
+	x := ansi.StringWidth(prefix + query)
+	status = ansi.Truncate(footerStyle.Render(status), max(0, m.width-x-1), "…")
+	return prefix + query + " " + status, x
 }

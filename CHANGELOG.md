@@ -16,6 +16,12 @@
 
 ### Fixes
 
+- Incremental search accepts terminal pastes and `ctrl+y` from the shared kill ring.  Its real terminal cursor follows the input for IME candidate placement, including wide and combining characters, and long queries keep their input end visible.
+
+- Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
+
+- Opening the finish dialog refreshes the layout so changes in footer height do not push it beyond the terminal.
+
 - Empty diff input, including `--diff=/dev/null`, can be reviewed with attachments and resumed from its saved session.
 
 - Markdown quotes and italic text use the primary text color to stay readable on diff backgrounds.

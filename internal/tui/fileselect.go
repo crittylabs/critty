@@ -282,5 +282,5 @@ func (m AppModel) fileSelectModalContent(width, maxRows int) (string, []modalMou
 	case len(s.matches) > 0:
 		status = fmt.Sprintf("%d of %s", len(s.matches), countNoun(len(m.tabs), "file", "files"))
 	}
-	return content + footerStyle.Render(status) + "\n" + footerStyle.Render("↑/↓ choose · enter open · esc cancel"), append(regions, closeRegion)
+	return content + footerStyle.Render(status) + "\n" + footerStyle.Render("↑/↓ choose · RET open · ESC cancel"), append(regions, closeRegion)
 }
