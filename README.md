@@ -7,7 +7,7 @@
 
 # critty
 
-> **critty** continues [kevindutra/crit](https://github.com/kevindutra/crit) under a new name, with the fixes and improvements developed as TCrit; see [docs/upstream-differences.md](docs/upstream-differences.md) for the full list.
+> **critty** continues [kevindutra/crit](https://github.com/kevindutra/crit) under a new name, with the fixes and improvements developed as TCrit; see [docs/crit-to-critty.md](docs/crit-to-critty.md) for the full list.
 
 TUI for reviewing AI-generated code and plans — built for human-in-the-loop agentic coding workflows.
 

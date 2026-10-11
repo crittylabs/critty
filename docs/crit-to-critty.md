@@ -1,4 +1,6 @@
-# Differences from upstream
+# From crit to Critty
+
+Critty continues [kevindutra/crit](https://github.com/kevindutra/crit) under a new name.  This historical record lists every change made from crit's last upstream release up to Critty v0.18.0, including small fixes; the README keeps only the highlights.  Later changes are in [CHANGELOG.md](../CHANGELOG.md).
 
 - **Tabbed lines in dialog previews** — the code quoted in comment and reply dialogs expands tabs before wrapping, so wrapped lines of tab-indented code stay inside the preview border and keep their indentation.
 - **Critty name and logo** — the command, review skills, UI, and release archives use `critty`, formerly TCrit, with its own logo and icon.  The Go module and GitHub repository remain `github.com/knu/tcrit`.  Existing state, configuration, prompt paths, the `tcrit_state` JSON field, and `TCRIT_HOST` stay unchanged for compatibility.  Terminal markers use `CRITTY-`, which tfil 0.4.1 and later report with `--critty-notify`.  Old `tcrit` commands and skills are not aliases; update callers and reinstall integrations.
@@ -10,8 +12,6 @@
 - **Inline README videos** — GitHub video attachments render the demos as embedded players.  Versioned release assets remain available for downloads.  The v0.17.0 review-and-commit recordings show commit messages as attached documents outside the Git index.
 
 - **Reuse draft releases** — automated releases update an existing draft, retain its attached recordings, and replace its notes with the matching `CHANGELOG.md` section before publication.
-
-Critty continues [kevindutra/crit](https://github.com/kevindutra/crit) under a new name.  This file lists every change made since its last upstream release, including small fixes; the README keeps only the highlights.  Add an entry here when a feature lands.
 
 - **Startup file and line focus** — `critty FILE:LINE` starts a single-document review at a line; `--focus PATH[:LINE]` selects a reviewed file and optionally scrolls to a new-side line, overriding automatic focus on new replies.  It works with code, supplied diffs, documents, plans, and resumed sessions, including tmux and Herdr launches.  Relative and absolute paths are accepted; plan reviews also accept the original plan path.  Missing files, non-positive line numbers, and lines absent from the reviewed content are rejected.  File-only focus also supports binary and deleted files.  The option applies to the current invocation and does not change the saved review scope or tab order.
 - **Terminal environment export** — `critty env` locates the Herdr or tmux pane as a review does, including through process ancestry, and prints `TMUX`, `TMUX_PANE`, and `TTY`, or `HERDR_ENV`, `HERDR_SOCKET_PATH`, `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, `HERDR_PANE_ID`, and `TTY`, as `NAME=value` lines or a JSON object with `--json`.  When no pane reports a terminal, `TTY` falls back to the controlling terminal of the process or its nearest ancestor, then `SSH_TTY`, so detached hooks still learn their terminal.  `critty env tty` prints only the terminal device.  `critty env run <command>`, or `critty env -- <command>`, replaces itself with the command and those variables set.  For daemon-backed agents such as Codex, `--terminal-request <id>` takes the request ID from `critty terminal prepare` and resolves the pane displaying its marker instead.
