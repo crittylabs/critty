@@ -8,7 +8,6 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## How we work
 
-- Unless `AGENTS.local.md` says otherwise, review changes with Critty itself, running a build of the current checkout so the review dogfoods the work.  If you replace that build while a review round is open, stop the review and start it again.
 - Describe new features in `README.md` at the level of how to use them, not their internal rules, and record every user-visible change, including small fixes, in `CHANGELOG.md` for the next release.  A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
 - Update `README.md` for a release in the release preparation commit.
 - When changing CLI behavior or review workflows, update the affected bundled skills under `internal/cli/skill/` in the same change so agents receive the current usage and constraints.
@@ -23,11 +22,23 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 - Keep dialogs usable in small terminals and after resizing.  Keep confirm and cancel controls reachable, let users scroll content that does not fit, and restore focus appropriately when dialogs close.
 - Keep editing behavior consistent across input fields.  Preserve existing Emacs-style editing and paste operations when adding shortcuts, and document new key bindings in the help.
 
+## Review
+
+- Default to reviewing changes with Critty itself using a build of the current checkout when possible.  If dogfooding is unavailable, explain the limitation and use another review method.  If you replace the review build while a round is open, stop the review and start it again.
+- Before reviewing, verify the binary version and check for active review sessions.  Do not replace a build used by another session.
+- Preserve comments, replies, attachments, and form answers across concurrent TUI and CLI updates, stop/resume, and review rounds.  Report save failures instead of presenting them as success.
+- Keep display options separate from reviewed content and approval state.  Whitespace filtering, folding, and display order must preserve source text and comment anchors.  Show when a comment cannot be reliably matched to the current source, and keep its original context accessible.
+- Treat stdout, stderr, JSON output, exit codes, and continuation commands as contracts for agents.  When changing them, verify a complete review round trip.
+
+### Review build
+
+With the user's permission, make the review build available as `critty` on PATH.  For example, copy it into a directory early on PATH, or copy only the binary into a temporary directory outside the checkout and add that directory to PATH.  Keep the selected build available through all review rounds, then restore any replaced executable or remove the temporary directory.
+
 ## Development
 
 Build, test, and vet with the standard Go tools:
 
-```bash
+```sh
 go build ./...
 go test ./...
 go vet ./...
