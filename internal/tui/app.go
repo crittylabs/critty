@@ -149,6 +149,7 @@ type AppModel struct {
 	lineInput            textinput.Model
 	pendingLocation      sourceLocation
 	locationError        string
+	isearch              isearchState
 
 	err error
 }
@@ -539,6 +540,9 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseClickMsg:
 		m.killRing.interrupt()
+		if m.isearch.active {
+			m.exitISearch(false)
+		}
 		return m.handleMouseClick(msg)
 	case tea.MouseMotionMsg:
 		m.killRing.interrupt()
@@ -643,6 +647,13 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	t := m.tab()
+	if m.isearch.active && m.handleISearchKey(msg) {
+		return m, nil
+	}
+	if (msg.String() == "ctrl+s" || msg.String() == "ctrl+r") && t.doc != nil {
+		m.startISearch(msg.String() == "ctrl+s")
+		return m, nil
+	}
 	if msg.String() == "space" || msg.String() == " " {
 		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
 			return m, nil
@@ -3537,6 +3548,9 @@ const footerMinHeight = 22
 // renderFooter renders the key hints and the Help button, or "" when the
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
+	if m.isearch.active {
+		return m.renderISearchPrompt()
+	}
 	if m.locationError != "" {
 		return footerStyle.Width(m.width).Render(m.locationError)
 	}
@@ -3668,6 +3682,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, columnWidth)
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
 		{keys: "{/}", desc: "unresolved"},
+		{keys: "ctrl+s/r", desc: "search text"},
 		{keys: "alt+e/g", desc: "editor/line"},
 		{keys: "alt+w", desc: "copy ref"},
 		{keys: "alt+p", desc: "open file"},

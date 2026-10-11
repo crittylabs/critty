@@ -63,7 +63,7 @@ func TestDeletedMarkdownLinesWrap(t *testing.T) {
 		0: {{OldLineNum: 1, Content: longLine}},
 	}
 
-	lines := deletedDisplayLines(longLine, "", nil, true, app.contentViewport.Width()-8)
+	lines := deletedDisplayLines(longLine, "", nil, true, app.contentViewport.Width()-8, nil)
 	if len(lines) < 2 {
 		t.Fatalf("expected deleted Markdown line to wrap, got %d display line", len(lines))
 	}
@@ -84,7 +84,7 @@ func TestInlineDiffDisplayLinesUseDistinctBackgrounds(t *testing.T) {
 		{Content: "added", Changed: true},
 	}
 
-	rendered := strings.Join(inlineDiffDisplayLines(segments, true, 80, diffCommonTextBg, diffAddedTextBg), "\n")
+	rendered := strings.Join(inlineDiffDisplayLines(segments, true, 80, diffCommonTextBg, diffAddedTextBg, nil), "\n")
 	commonBackground := bgToAnsi(diffCommonTextBg.GetBackground())
 	changedBackground := bgToAnsi(diffAddedTextBg.GetBackground())
 	if commonBackground == changedBackground {
@@ -106,7 +106,7 @@ func TestInlineDiffMarkdownRestoresSegmentBackgrounds(t *testing.T) {
 		{Content: "**changed** `code` tail", Changed: true},
 	}
 	rendered := strings.Join(inlineDiffDisplayLines(
-		segments, true, 200, diffCommonTextBg, diffAddedTextBg), "\n")
+		segments, true, 200, diffCommonTextBg, diffAddedTextBg, nil), "\n")
 	commonBackground := bgToAnsi(diffCommonTextBg.GetBackground())
 	changedBackground := bgToAnsi(diffAddedTextBg.GetBackground())
 	if !strings.Contains(rendered, "\x1b[m"+commonBackground) {

@@ -102,6 +102,12 @@ var (
 				Bold(true).
 				Foreground(lipgloss.BrightYellow)
 
+	// Search matches keep the default foreground on a colored background.
+	isearchMatchStyle   = lipgloss.NewStyle().Bold(true).Background(lipgloss.Cyan)
+	isearchCurrentStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("208"))
+	isearchPromptStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Cyan)
+	isearchFailingStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Red)
+
 	helpKeyStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.BrightCyan)

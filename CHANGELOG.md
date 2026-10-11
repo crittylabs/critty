@@ -8,6 +8,8 @@
 
 - `--null` reviews only attached documents without requiring a Git repository.
 
+- Search the current file incrementally with `ctrl+s` and `ctrl+r`, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.
+
 ### Fixes
 
 - Empty diff input, including `--diff=/dev/null`, can be reviewed with attachments and resumed from its saved session.
