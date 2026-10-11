@@ -282,6 +282,10 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 		positions[line] = i
 	}
 	var targets []changeTarget
+	if t.isBinary && !t.outsideChanges {
+		// Binary changes have no source lines, but still need a navigation stop.
+		targets = append(targets, changeTarget{position: 0})
+	}
 	for _, chunk := range t.changeChunks {
 		position, ok := positions[m.changeCursor(t, chunk)]
 		if !ok {
@@ -312,6 +316,9 @@ func (m *AppModel) jumpToChange(step int) bool {
 	currentID := m.selectedCommentID()
 	t := m.tab()
 	cursor := m.visualLineIndex(t, lineRef{side: t.cursorSide, line: t.cursorLine})
+	if t.isBinary && !t.cursorOnAnnotation {
+		cursor = 0
+	}
 	if cursor < 0 && t.cursorSide == "" && t.doc != nil && t.cursorLine > t.doc.LineCount() {
 		cursor = len(m.visualLines(t))
 	}
@@ -383,6 +390,9 @@ func (m *AppModel) selectChange(tabIndex int, chunk changeChunk) {
 	m.rebuildContent()
 	m.updateCommentSidebar()
 	m.scrollToChunk(chunk)
+	if t.isBinary {
+		m.contentViewport.SetYOffset(0)
+	}
 	if t.cursorSide == "old" {
 		m.scrollToCursor()
 	}

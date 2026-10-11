@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- `n` and `N` stop at added, deleted, and modified binary files even though they have no diff hunks.
+
 ## 0.18.0
 
 Critty is the new name of crit.  This first release from `crittylabs/critty`, the original crit repository, brings in everything developed as the TCrit fork since crit 0.2.2.  The [changelog](https://github.com/crittylabs/critty/blob/main/CHANGELOG.md) lists every change in detail under TCrit 0.3.0 through 0.17.0.

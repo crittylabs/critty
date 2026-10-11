@@ -173,6 +173,55 @@ func TestChangeNavigationCrossesFilesWithoutWrapping(t *testing.T) {
 	}
 }
 
+func TestChangeNavigationVisitsBinaryFiles(t *testing.T) {
+	for _, status := range []string{"added", "deleted", "modified"} {
+		t.Run(status, func(t *testing.T) {
+			app := newChangeNavigationTestApp()
+			for i := range app.tabs {
+				app.tabs[i].state.Comments = nil
+			}
+			binary := app.tabs[1]
+			binary.doc = nil
+			binary.isBinary = true
+			binary.status = status
+			app.tabs = []FileTab{app.tabs[0], binary, binary, app.tabs[2]}
+			app.tabs[1].state = &fileReview{Comments: []review.Comment{
+				{ID: "resolved", Scope: "file", Resolved: true},
+				{ID: "file", Scope: "file"},
+			}}
+			app.tabs[2].state = &fileReview{}
+			app.tabs[0].cursorLine = 4
+			for _, step := range []struct {
+				key rune
+				tab int
+				id  string
+			}{
+				{'n', 1, "file"}, {'n', 1, ""}, {'n', 2, ""}, {'n', 3, ""},
+				{'N', 2, ""}, {'N', 1, ""}, {'N', 1, "file"}, {'N', 0, ""},
+			} {
+				app = pressKey(app, step.key)
+				if app.activeTab != step.tab || app.selectedCommentID() != step.id || app.focused != contentPane {
+					t.Fatalf("key %c: tab=%d comment=%q focus=%v, want tab=%d comment=%q with content focus",
+						step.key, app.activeTab, app.selectedCommentID(), app.focused, step.tab, step.id)
+				}
+			}
+			app.tabs = app.tabs[1:3]
+			app.activeTab = 1
+			app = pressKey(app, 'n')
+			if app.activeTab != 1 {
+				t.Fatal("next should stop at the last binary file")
+			}
+			app.activeTab = 0
+			app.tabs[0].state.Comments = nil
+			app.tabs[0].cursorOnAnnotation = false
+			app = pressKey(app, 'N')
+			if app.activeTab != 0 || app.tab().cursorOnAnnotation {
+				t.Fatal("previous should stop at the first binary file")
+			}
+		})
+	}
+}
+
 func TestChangeNavigationIncludesUnresolvedComments(t *testing.T) {
 	app := newChangeNavigationTestApp()
 	app.tabs[0].state.Comments[1].Resolved = true
