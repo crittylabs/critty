@@ -11,6 +11,7 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 - Unless `AGENTS.local.md` says otherwise, review changes with Critty itself, running a build of the current checkout so the review dogfoods the work.  If you replace that build while a review round is open, stop the review and start it again.
 - Describe new features in `README.md` at the level of how to use them, not their internal rules, and record every user-visible change, including small fixes, in `CHANGELOG.md` for the next release.  A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
 - Update `README.md` for a release in the release preparation commit.
+- When changing CLI behavior or review workflows, update the affected bundled skills under `internal/cli/skill/` in the same change so agents receive the current usage and constraints.
 - Follow [crit](https://github.com/tomasz-tomczyk/crit) for specification and compatibility decisions, and check its current implementation and documentation when a change touches the review format or workflow.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.
 
