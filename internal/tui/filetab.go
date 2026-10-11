@@ -19,8 +19,10 @@ type fileReview struct {
 
 // FileTab holds per-file state for a single tab in the code review TUI.
 type FileTab struct {
+	preview       imagePreview
 	attachment    *review.AttachedDocument
 	path          string
+	oldPath       string
 	status        string
 	doc           *document.Document
 	state         *fileReview

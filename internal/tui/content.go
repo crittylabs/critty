@@ -133,7 +133,15 @@ func (m *AppModel) rebuildContent() {
 	}
 	if t.isBinary || t.doc == nil {
 		if t.isBinary {
-			layout.appendBlock(&b, "\n  Binary file "+t.changeSummary()+" — cannot display content.", contentMouseTarget{})
+			if preview := m.renderImagePreview(); preview != "" {
+				layout.appendBlock(&b, "\n  Image "+t.changeSummary(), contentMouseTarget{})
+				layout.appendBlock(&b, preview, contentMouseTarget{})
+			} else {
+				layout.appendBlock(&b, "\n  Binary file "+t.changeSummary()+" — cannot display content.", contentMouseTarget{})
+				if t.preview.before.failed || t.preview.after.failed {
+					layout.appendBlock(&b, "  Image preview unavailable (unsupported, damaged, or too large).", contentMouseTarget{})
+				}
+			}
 		} else if t.outsideChanges {
 			layout.appendBlock(&b, "\n  Added file removed — no longer part of the changes.", contentMouseTarget{})
 		}

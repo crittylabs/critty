@@ -1,8 +1,11 @@
 package git
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
@@ -131,6 +134,68 @@ func (s ReviewSource) Content(path string) ([]byte, error) {
 	default:
 		return os.ReadFile(path)
 	}
+}
+
+// PreviewContent bounds reads before loading binary data into memory.
+func (s ReviewSource) PreviewContent(path string, before bool, limit int64) ([]byte, error) {
+	if !before && s.Scope != "staged" && s.Scope != "range" {
+		return readPreviewFile(path, limit)
+	}
+	ref := ":" + path
+	if before && s.Scope != "unstaged" {
+		base := s.Base
+		if base == "" {
+			base = "HEAD"
+		}
+		ref = base + ":" + path
+	} else if !before && s.Scope == "range" {
+		ref = s.Head + ":" + path
+	}
+	out, err := gitCommand("rev-parse", "--verify", "--end-of-options", ref)
+	if err != nil {
+		return nil, err
+	}
+	object := strings.TrimSpace(out)
+	out, err = gitCommand("cat-file", "-s", object)
+	if err != nil {
+		return nil, err
+	}
+	size, err := strconv.ParseInt(strings.TrimSpace(out), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if size > limit {
+		return nil, fmt.Errorf("image exceeds the size limit")
+	}
+	out, err = gitCommand("cat-file", "blob", object)
+	return []byte(out), err
+}
+
+func readPreviewFile(path string, limit int64) (data []byte, err error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > limit {
+		return nil, fmt.Errorf("image is not a regular file within the size limit")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, f.Close()) }()
+	info, err = f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > limit {
+		return nil, fmt.Errorf("image is not a regular file within the size limit")
+	}
+	data, err = io.ReadAll(io.LimitReader(f, limit+1))
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("image exceeds the size limit")
+	}
+	return data, err
 }
 
 // Snapshot records raw changes, including mode and binary changes, without

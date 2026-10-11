@@ -18,6 +18,8 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/document"
@@ -78,6 +80,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	images        imageDisplay
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
 	attachments   map[string]review.AttachedDocument
@@ -251,9 +254,11 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	tab := FileTab{
 		path:       filePath,
 		cursorLine: 1,
+		isBinary:   imagePath(filePath),
 	}
 
 	m := AppModel{
+		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
 		filePath:        filePath,
@@ -297,8 +302,9 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			}
 		}
 		ft := newFileTab(f.Path, diff)
+		ft.oldPath = f.OldPath
 		ft.status = f.Status.String()
-		ft.isBinary = f.IsBinary()
+		ft.isBinary = f.IsBinary() || cfg.Patch == nil && imagePath(f.Path)
 		if f.Status == gitpkg.StatusBinary {
 			ft.status = "modified"
 		}
@@ -326,6 +332,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
 		tabs:            tabs,
@@ -375,7 +382,7 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor)
+	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, m.images.probe())
 }
 
 func (m AppModel) loadDocuments() tea.Cmd {
@@ -433,7 +440,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch app := model.(type) {
 	case AppModel:
 		app.refreshCompletion()
-		return app, cmd
+		return app, tea.Batch(cmd, app.prepareImage())
 	case *AppModel:
 		app.refreshCompletion()
 	}
@@ -454,6 +461,40 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch msg := msg.(type) {
+	case uv.KittyGraphicsEvent:
+		if msg.Options.ID != m.images.probeID {
+			return m, nil
+		}
+		m.images.enabled = string(msg.Payload) == "OK"
+		cleanup := tea.Raw(m.images.wrap(ansi.KittyGraphics(nil, "a=d", "d=I", "q=2", fmt.Sprintf("i=%d", m.images.probeID))))
+		if m.images.enabled {
+			// Placeholder colors encode image IDs and must not be downsampled.
+			return m, tea.Sequence(cleanup, func() tea.Msg { return tea.ColorProfileMsg{Profile: colorprofile.TrueColor} })
+		}
+		return m, cleanup
+	case imageLoadedMsg:
+		return m.finishImageLoad(msg)
+	case imageTransmittedMsg:
+		for i := range m.tabs {
+			if m.tabs[i].path == msg.path {
+				m.tabs[i].preview.side(msg.before).image = &inlineImage{id: msg.id, width: msg.width, height: msg.height}
+			}
+		}
+		return m, nil
+	case imageReadyMsg:
+		for i := range m.tabs {
+			if m.tabs[i].path != msg.path {
+				continue
+			}
+			img := m.tabs[i].preview.side(msg.before).image
+			if img != nil && img.columns == msg.columns && img.rows == msg.rows {
+				img.ready = true
+			}
+		}
+		if len(m.tabs) > 0 && m.tab().state != nil {
+			m.rebuildContent()
+		}
+		return m, nil
 	case tea.BackgroundColorMsg:
 		initAdaptiveStyles(msg.IsDark())
 		m.modalTextarea.SetStyles(textarea.DefaultStyles(msg.IsDark()))
@@ -2547,10 +2588,14 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 
 	header := m.renderHeader()
 
+	content := m.contentViewport.View()
+	if m.modal != noModal {
+		content = hideImagePlaceholders(content)
+	}
 	contentBox := lipgloss.NewStyle().
 		Width(m.contentViewport.Width()).
 		Height(m.contentViewport.Height()).
-		Render(m.contentViewport.View())
+		Render(content)
 	if m.hideComments {
 		contentBox = lipgloss.JoinHorizontal(lipgloss.Top, contentBox, m.renderCommentGutter())
 	}

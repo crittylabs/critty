@@ -4,6 +4,8 @@
 
 ### Features
 
+- PNG, JPEG, GIF, and WebP files appear inline in Ghostty and Kitty when the terminal supports Unicode image placeholders, including through tmux with passthrough enabled.  Modified and renamed images show Before and After comparisons; previews use the selected review scope and include deleted images.  Other terminals retain binary placeholders.
+
 - Incremental search has clickable Search, Prev, Next, Keep, Cancel, case-fold, and multi-file controls.  Search controls stay available in short terminals and wrap after resizing.  `alt+s i` toggles case folding, alongside `alt+s c`.
 
 - Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, `r`, or `m` toggles case folding, word search, regular expressions, and searching across files, and the prompt names the active modes.  Word search recognizes Unicode letters, numbers, and combining marks, including Japanese and accented text.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.

@@ -44,6 +44,10 @@ Tabs, the file tree, and the file selector use `A` for new files and `D` for del
 
 File tabs follow the expanded file tree from top to bottom: directories come first, and names sort alphabetically within each directory.  Attached documents appear first in the attachments group.
 
+PNG, JPEG, GIF, and WebP files appear inline on Ghostty and Kitty terminals that support Unicode image placeholders.  Critty checks support automatically; other terminals keep the binary-file placeholder.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.
+
+Modified and renamed images show **Before** and **After** previews with their pixel sizes, side by side in a wide content pane and stacked in a narrow one.  Previews follow the selected review scope: staged images come from the index, committed comparisons from the selected commits, and deleted images from the old side.  GIF previews show the first frame.  Animated WebP, images larger than 5 MiB or 16 megapixels, and binary files in supplied diffs keep the placeholder.  File comments work as usual; previews scroll with them, fit the content pane after resizing, and hide while a dialog is open.
+
 ## Install
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
