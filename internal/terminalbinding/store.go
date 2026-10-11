@@ -292,7 +292,7 @@ func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Co
 			if lastErr != nil {
 				return Target{}, fmt.Errorf("cannot read registered terminal screens (check socket access): %w", lastErr)
 			}
-			return Target{}, fmt.Errorf("terminal marker not found in registered visible panes; launch through tcrit codex or a notifying filter, display a new marker, and retry")
+			return Target{}, fmt.Errorf("terminal marker not found in registered visible panes; launch through critty codex or a notifying filter, display a new marker, and retry")
 		}
 	}
 }

@@ -1,4 +1,4 @@
-// Package xdg resolves TCrit's state and config directories following the
+// Package xdg resolves Critty's state and config directories following the
 // XDG Base Directory specification on every platform, so review data lives
 // in predictable, user-relocatable locations.
 package xdg

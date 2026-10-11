@@ -147,13 +147,13 @@ func WriteJSON(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), ".tcrit-result-*.tmp")
+	f, err := os.CreateTemp(filepath.Dir(path), ".critty-result-*.tmp")
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "tcrit: removing temporary result: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: removing temporary result: %v\n", err)
 		}
 	}()
 	_, writeErr := f.Write(append(data, '\n'))

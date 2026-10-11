@@ -20,7 +20,7 @@ import (
 	"github.com/knu/tcrit/internal/review"
 )
 
-func TestRenderHeaderUsesTCritBrand(t *testing.T) {
+func TestRenderHeaderUsesCrittyBrand(t *testing.T) {
 	tests := []struct {
 		name  string
 		setup func(*AppModel)
@@ -39,8 +39,8 @@ func TestRenderHeaderUsesTCritBrand(t *testing.T) {
 			}
 
 			header := ansi.Strip(app.renderHeader())
-			if !strings.Contains(header, " TCrit:") {
-				t.Errorf("header = %q, want TCrit branding", header)
+			if !strings.Contains(header, " Critty:") {
+				t.Errorf("header = %q, want Critty branding", header)
 			}
 			if strings.Contains(header, " Crit:") {
 				t.Errorf("header = %q, contains legacy Crit branding", header)
@@ -51,10 +51,10 @@ func TestRenderHeaderUsesTCritBrand(t *testing.T) {
 
 func TestReviewBarProjectAndTopic(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.project, app.topic = "tcrit", "header-project-topic"
+	app.project, app.topic = "critty", "header-project-topic"
 	app.width = 120
 	bar := ansi.Strip(app.renderReviewBar())
-	if !strings.HasPrefix(bar, " TCrit: tcrit · header-project-topic — review the document.") {
+	if !strings.HasPrefix(bar, " Critty: critty · header-project-topic — review the document.") {
 		t.Fatalf("bar = %q", bar)
 	}
 	app.topic = "\x1b[31m" + strings.Repeat("長いトピック", 20) + "\n\t"
@@ -1119,11 +1119,11 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 		t.Fatalf("bar width = %d, want %d", got, app.width)
 	}
 	plain := ansi.Strip(bar)
-	if !strings.HasPrefix(plain, " TCrit: review the document on tmux.") || !strings.HasSuffix(plain, " Submit q ") {
+	if !strings.HasPrefix(plain, " Critty: review the document on tmux.") || !strings.HasSuffix(plain, " Submit q ") {
 		t.Fatalf("bar = %q, want the subject on the left and Submit on the right", plain)
 	}
 	for _, part := range []string{
-		reviewBarStyle.Bold(true).Render(" TCrit"),
+		reviewBarStyle.Bold(true).Render(" Critty"),
 		reviewBarStyle.Render(": "),
 		reviewBarStyle.Render("review the "),
 		reviewBarStyle.Render("document on tmux."),

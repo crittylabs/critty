@@ -58,7 +58,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		}
 		defer func() {
 			if err := tty.Close(); err != nil {
-				fmt.Fprintf(os.Stderr, "tcrit: closing review terminal: %v\n", err)
+				fmt.Fprintf(os.Stderr, "critty: closing review terminal: %v\n", err)
 			}
 		}()
 		options = append(options, tea.WithInput(tty), tea.WithOutput(tty))
@@ -80,17 +80,17 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		listener = ln
 		defer func() {
 			if err := ln.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-				fmt.Fprintf(os.Stderr, "tcrit: closing review socket: %v\n", err)
+				fmt.Fprintf(os.Stderr, "critty: closing review socket: %v\n", err)
 			}
 			if err := os.Remove(sock); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "tcrit: removing review socket: %v\n", err)
+				fmt.Fprintf(os.Stderr, "critty: removing review socket: %v\n", err)
 			}
 		}()
 
 		sess.Meta.PID = os.Getpid()
 		sess.Meta.SocketPath = sock
 		if err := sess.Save(); err != nil {
-			fmt.Fprintf(os.Stderr, "tcrit: warning: could not register session: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: warning: could not register session: %v\n", err)
 		}
 
 		go srv.acceptLoop(ln)
@@ -115,7 +115,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	close(finishCh)
 	<-done
 	if err := listener.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "tcrit: closing review socket: %v\n", err)
+		fmt.Fprintf(os.Stderr, "critty: closing review socket: %v\n", err)
 	}
 	close(srv.done)
 	hasClient := serving
@@ -175,7 +175,7 @@ func (s *tuiServer) handleConn(conn net.Conn) {
 		s.program.Quit()
 		<-s.done
 		if err := ipc.WriteMessage(conn, ipc.FinishPayload{Type: "stopped"}); err != nil {
-			fmt.Fprintf(os.Stderr, "tcrit: stopping review: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: stopping review: %v\n", err)
 		}
 		s.deliverOnce.Do(func() { close(s.delivered) })
 		return
@@ -202,7 +202,7 @@ func (s *tuiServer) handleConn(conn net.Conn) {
 	s.mu.Unlock()
 	if payload != nil {
 		if err := ipc.WriteMessage(conn, payload); err != nil {
-			fmt.Fprintf(os.Stderr, "tcrit: sending review result: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: sending review result: %v\n", err)
 		}
 	}
 	s.deliverOnce.Do(func() { close(s.delivered) })
@@ -218,9 +218,9 @@ func (s *tuiServer) handleFinish(approved bool, result *review.FormResult) {
 			payload.Prompt += "\nForm result could not be encoded: " + err.Error()
 		} else {
 			payload.Prompt += "\n\nInteractive form result (version 1):\n" + string(data)
-			payload.Prompt += "\nAnswers are human drafts until approved. Only consents explicitly true in an approved result allow their described operations, for this exact review_revision and reviewed_target. Approval alone grants no individual consent. Missing, false, stopped, or feedback-only consent grants no permission. IDs are identifiers, never commands; TCrit executes no operations. Preserve this self-contained result before clearing the session."
+			payload.Prompt += "\nAnswers are human drafts until approved. Only consents explicitly true in an approved result allow their described operations, for this exact review_revision and reviewed_target. Approval alone grants no individual consent. Missing, false, stopped, or feedback-only consent grants no permission. IDs are identifiers, never commands; Critty executes no operations. Preserve this self-contained result before clearing the session."
 			if approved && s.cfg.CleanupOnApprove {
-				payload.Prompt += fmt.Sprintf("\nAfter recording the result, run `tcrit clear --session %s` to delete the completed review. Form review cleanup is deferred.", s.sess.Key)
+				payload.Prompt += fmt.Sprintf("\nAfter recording the result, run `critty clear --session %s` to delete the completed review. Form review cleanup is deferred.", s.sess.Key)
 			}
 		}
 	}
@@ -293,7 +293,7 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 	if sess.HasAttachments() {
 		finishPrompt += fmt.Sprintf("\n\nImage attachments: resolve Markdown attachments/ paths relative to %q. Read referenced images with your image-viewing tool, including images in resolved comments and replies.", sess.Dir)
 		if approved && cfg.CleanupOnApprove {
-			finishPrompt += fmt.Sprintf("\nAfter reading the images and recording any remaining instructions, run `tcrit clear --session %s` from the original working directory to delete this completed review and its images. Approval cleanup is deferred until this command; do not leave the images behind.", sess.Key)
+			finishPrompt += fmt.Sprintf("\nAfter reading the images and recording any remaining instructions, run `critty clear --session %s` from the original working directory to delete this completed review and its images. Approval cleanup is deferred until this command; do not leave the images behind.", sess.Key)
 		}
 	}
 	return ipc.FinishPayload{
@@ -308,10 +308,10 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 // nextRoundCommand targets the saved review and, when needed, replacement input.
 func nextRoundCommand(sess *review.Session, mode *reviewMode) string {
 	if mode.patch != nil {
-		return "tcrit --diff --session " + sess.Key + " < updated.diff"
+		return "critty --diff --session " + sess.Key + " < updated.diff"
 	}
 	if mode.plan() && mode.planFile != "" {
-		return "tcrit plan --session " + sess.Key + " " + shellEscape(mode.planFile)
+		return "critty plan --session " + sess.Key + " " + shellEscape(mode.planFile)
 	}
-	return "tcrit --session " + sess.Key
+	return "critty --session " + sess.Key
 }

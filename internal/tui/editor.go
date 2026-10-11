@@ -19,7 +19,7 @@ type editorFinishedMsg struct {
 }
 
 func (m *AppModel) openExternalEditor() tea.Cmd {
-	file, err := os.CreateTemp("", "tcrit-comment-*.md")
+	file, err := os.CreateTemp("", "critty-comment-*.md")
 	if err != nil {
 		return func() tea.Msg { return errMsg{fmt.Errorf("creating editor file: %w", err)} }
 	}

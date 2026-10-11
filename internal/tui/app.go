@@ -2347,7 +2347,7 @@ func (m AppModel) renderReviewBar() string {
 		subject += " on " + m.host
 	}
 	subject += "."
-	text := reviewBarStyle.Bold(true).Render(" TCrit") + reviewBarStyle.Render(": ")
+	text := reviewBarStyle.Bold(true).Render(" Critty") + reviewBarStyle.Render(": ")
 	if m.project != "" {
 		text += reviewBarStyle.Bold(true).Render(headerLabel(m.project))
 		if m.topic != "" {

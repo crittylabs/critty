@@ -1,5 +1,5 @@
 // Package ipc implements the Unix-socket protocol between the blocking
-// tcrit client (run by an agent) and the TUI process that owns a review
+// critty client (run by an agent) and the TUI process that owns a review
 // session.  It replaces crit's HTTP review-cycle API with newline-delimited
 // JSON messages.
 package ipc
@@ -59,7 +59,7 @@ func Alive(path string) bool {
 		return false
 	}
 	if err := conn.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "tcrit: closing review session probe: %v\n", err)
+		fmt.Fprintf(os.Stderr, "critty: closing review session probe: %v\n", err)
 	}
 	return true
 }

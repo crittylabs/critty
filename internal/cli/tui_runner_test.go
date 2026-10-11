@@ -97,7 +97,7 @@ func TestDisconnectedClientEndsTUI(t *testing.T) {
 
 func TestFinishResultWaitsForTUIExit(t *testing.T) {
 	s := testRoundServer(t)
-	s.lastPayload = &ipc.FinishPayload{Type: "finish", Approved: false, NextCommand: "tcrit --session 0123456789ab"}
+	s.lastPayload = &ipc.FinishPayload{Type: "finish", Approved: false, NextCommand: "critty --session 0123456789ab"}
 	client, server := net.Pipe()
 	defer func() { _ = client.Close() }()
 	go s.handleConn(server)

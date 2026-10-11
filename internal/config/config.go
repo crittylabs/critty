@@ -1,6 +1,6 @@
-// Package config loads TCrit configuration from the XDG config directory
+// Package config loads Critty configuration from the XDG config directory
 // (global) and the project root (.tcrit.config.json), mirroring crit's
-// two-level merge semantics for the subset of keys TCrit supports.
+// two-level merge semantics for the subset of keys Critty supports.
 package config
 
 import (

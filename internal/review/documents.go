@@ -148,7 +148,7 @@ func (s *Session) ReplaceDocuments(docs []AttachedDocument) error {
 	}
 	defer func() {
 		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "tcrit: removing temporary document snapshot: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: removing temporary document snapshot: %v\n", err)
 		}
 	}()
 	_, writeErr := f.Write(append(data, '\n'))

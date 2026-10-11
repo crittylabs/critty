@@ -144,7 +144,7 @@ func TestWaitAliveTimesOut(t *testing.T) {
 // sun_path limit (t.TempDir embeds long test names).
 func shortSockPath(t *testing.T) string {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "tcrit-ipc")
+	dir, err := os.MkdirTemp("", "critty-ipc")
 	if err != nil {
 		t.Fatal(err)
 	}

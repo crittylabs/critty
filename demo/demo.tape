@@ -1,6 +1,6 @@
-# TCrit — reviewing a Markdown document
+# Critty — reviewing a Markdown document
 #
-# Run `make` in this directory; it runs setup.sh (builds tcrit and copies the
+# Run `make` in this directory; it runs setup.sh (builds critty and copies the
 # document under $DEMO_DIR) and records an MP4 with VHS.
 
 Output demo.mp4
@@ -23,15 +23,15 @@ Hide
 
 # Detach from the recording host's multiplexer, use the demo build and an
 # isolated review state, and start a private tmux server for the recording.
-Type "unset TMUX TMUX_PANE NO_COLOR; export COLORTERM=truecolor; unset -m 'HERDR_*'; export TAPE_DIR=$PWD DEMO_DIR=${DEMO_DIR:-${${TMPDIR:-/tmp}%/}/tcrit-demo}; export XDG_STATE_HOME=$DEMO_DIR/state PATH=$DEMO_DIR/bin:$PATH; cd $DEMO_DIR/doc; clear"
+Type "unset TMUX TMUX_PANE NO_COLOR; export COLORTERM=truecolor; unset -m 'HERDR_*'; export TAPE_DIR=$PWD DEMO_DIR=${DEMO_DIR:-${${TMPDIR:-/tmp}%/}/critty-demo}; export XDG_STATE_HOME=$DEMO_DIR/state PATH=$DEMO_DIR/bin:$PATH; cd $DEMO_DIR/doc; clear"
 Enter
 Type "tmux -L demo -f $TAPE_DIR/tmux.conf new -s demo"
 Enter
 Sleep 1s
 
-# Open the document review; TCrit opens the TUI in a split pane, which the
+# Open the document review; Critty opens the TUI in a split pane, which the
 # tmux zoom (prefix z) expands to the whole window for the recording.
-Type "tcrit plan.md"
+Type "critty plan.md"
 Enter
 Wait+Screen@30s /Comments \(\d+\)/
 Ctrl+B

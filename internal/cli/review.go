@@ -176,7 +176,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 	}
 	defer func() {
 		if err := lock.Unlock(); err != nil {
-			fmt.Fprintf(os.Stderr, "tcrit: releasing review lock: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: releasing review lock: %v\n", err)
 		}
 	}()
 	fmt.Fprintf(os.Stderr, "Review session: %s\n", sess.Key)
@@ -225,7 +225,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 		return nil
 	}
 
-	return withCodexWrapperHint(fmt.Errorf("no Herdr or tmux session and no terminal to open the TUI in; run inside Herdr or tmux, or have the reviewer run `tcrit%s` in a terminal", reviewArgSuffix(mode)))
+	return withCodexWrapperHint(fmt.Errorf("no Herdr or tmux session and no terminal to open the TUI in; run inside Herdr or tmux, or have the reviewer run `critty%s` in a terminal", reviewArgSuffix(mode)))
 }
 
 func reviewArgSuffix(mode *reviewMode) string {
@@ -403,11 +403,11 @@ func cleanupOnApprove(cfg *config.Config, sess *review.Session) {
 		return
 	}
 	if err := sess.Clear(); err != nil {
-		fmt.Fprintf(os.Stderr, "tcrit: warning: could not clean up review: %v\n", err)
+		fmt.Fprintf(os.Stderr, "critty: warning: could not clean up review: %v\n", err)
 	}
 }
 
-// spawnTUIPane opens the TUI in a tmux split pane running `tcrit _tui`.
+// spawnTUIPane opens the TUI in a tmux split pane running `critty _tui`.
 func spawnTUIPane(mode *reviewMode, tmux tmuxContext) (tmuxLaunch, error) {
 	tmuxBin, err := lookPath("tmux")
 	if err != nil {
@@ -440,9 +440,9 @@ func spawnTUIPane(mode *reviewMode, tmux tmuxContext) (tmuxLaunch, error) {
 // buildTUICommand builds the shell command that runs the TUI inside a pane
 // of host, the multiplexer named in the TUI's top bar.
 func buildTUICommand(mode *reviewMode, host string) (string, error) {
-	tcritBin, err := resolveExec()
+	crittyBin, err := resolveExec()
 	if err != nil {
-		return "", fmt.Errorf("resolving tcrit binary path: %w", err)
+		return "", fmt.Errorf("resolving critty binary path: %w", err)
 	}
 
 	// Multiplexer panes inherit their host's environment, not necessarily the
@@ -457,7 +457,7 @@ func buildTUICommand(mode *reviewMode, host string) (string, error) {
 	if mode.sessionKey == "" {
 		return "", fmt.Errorf("missing review session ID")
 	}
-	command := fmt.Sprintf("%s %s _tui --session %s", envPrefix, shellEscape(tcritBin), shellEscape(mode.sessionKey))
+	command := fmt.Sprintf("%s %s _tui --session %s", envPrefix, shellEscape(crittyBin), shellEscape(mode.sessionKey))
 	if mode.focusPath != "" {
 		focus := mode.focusPath
 		if mode.focusLine > 0 {

@@ -23,7 +23,7 @@ var planCmd = &cobra.Command{
 	Long: `Create or continue a plan review.  The plan content (from the file
 argument or piped stdin) is saved as a new immutable version under the
 plan's storage directory, and a review of the latest version opens,
-blocking like ` + "`tcrit review`" + `.
+blocking like ` + "`critty review`" + `.
 
 Without --name, the slug is derived from the plan's first heading.
 Each new invocation creates an independent session.  Use --session <id>
@@ -108,7 +108,7 @@ func readPlanContent(args []string) (content []byte, sourceFile string, err erro
 	}
 
 	if term.IsTerminal(int(os.Stdin.Fd())) {
-		return nil, "", fmt.Errorf("usage: tcrit plan [--name <slug>] <file>  (or pipe the plan on stdin)")
+		return nil, "", fmt.Errorf("usage: critty plan [--name <slug>] <file>  (or pipe the plan on stdin)")
 	}
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {

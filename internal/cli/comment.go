@@ -33,12 +33,12 @@ var commentCmd = &cobra.Command{
 	Long: `Add, reply to, bulk import, or clear review comments.
 
 Usage forms:
-  tcrit comment [opts] <body>                        Review-level comment
-  tcrit comment [opts] <path> <body>                 File-level comment
-  tcrit comment [opts] <path>:<line[-end]> <body>    Line-level comment
-  tcrit comment [opts] --reply-to <id> [--resolve] [--path <p>] <body>
-  tcrit comment [opts] --json [--file <path>|-]      Bulk import (JSON array)
-  tcrit comment [opts] --clear                       Remove the review
+  critty comment [opts] <body>                        Review-level comment
+  critty comment [opts] <path> <body>                 File-level comment
+  critty comment [opts] <path>:<line[-end]> <body>    Line-level comment
+  critty comment [opts] --reply-to <id> [--resolve] [--path <p>] <body>
+  critty comment [opts] --json [--file <path>|-]      Bulk import (JSON array)
+  critty comment [opts] --clear                       Remove the review
 
 Bulk import entries are objects with "body" (required) and any of "file"
 or "path", "line" (42 or "56-58"), "end_line", "author", "scope" ("review"
@@ -63,7 +63,7 @@ or "file"), "reply_to" (a comment ID), and "resolve" (bool).  For example:
 		switch {
 		case commentJSON:
 			if commentReplyTo != "" {
-				return fmt.Errorf("--json and --reply-to cannot be used together; for a single reply use: tcrit comment --reply-to <id> [--author <name>] <body>")
+				return fmt.Errorf("--json and --reply-to cannot be used together; for a single reply use: critty comment --reply-to <id> [--author <name>] <body>")
 			}
 			if len(args) > 0 {
 				return fmt.Errorf("--json takes no positional arguments")
@@ -76,7 +76,7 @@ or "file"), "reply_to" (a comment ID), and "resolve" (bool).  For example:
 			return runCommentClear(output)
 		case commentReplyTo != "":
 			if len(args) != 1 {
-				return fmt.Errorf("usage: tcrit comment --reply-to <comment-id> [--resolve] <body>")
+				return fmt.Errorf("usage: critty comment --reply-to <comment-id> [--resolve] <body>")
 			}
 			return runCommentReply(output, author, commentReplyTo, args[0])
 		case len(args) == 1:
@@ -84,7 +84,7 @@ or "file"), "reply_to" (a comment ID), and "resolve" (bool).  For example:
 		case len(args) == 2:
 			return runFileOrLineComment(output, author, args[0], args[1])
 		default:
-			return fmt.Errorf("usage: tcrit comment [<path>[:<line[-end]>]] <body> (see --help)")
+			return fmt.Errorf("usage: critty comment [<path>[:<line[-end]>]] <body> (see --help)")
 		}
 	},
 }

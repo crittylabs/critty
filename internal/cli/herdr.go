@@ -186,7 +186,7 @@ func spawnTUIHerdrTab(mode *reviewMode, herdr herdrContext) (herdrLaunch, error)
 		return herdrLaunch{}, fmt.Errorf("resolving working directory: %w", err)
 	}
 
-	args := []string{"tab", "create", "--workspace", herdr.workspace, "--cwd", cwd, "--label", "TCrit", "--no-focus"}
+	args := []string{"tab", "create", "--workspace", herdr.workspace, "--cwd", cwd, "--label", "Critty", "--no-focus"}
 	for _, name := range []string{"XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
 		if value := os.Getenv(name); value != "" {
 			args = append(args, "--env", name+"="+value)

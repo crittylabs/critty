@@ -9,7 +9,7 @@ import (
 )
 
 func TestRankFileMatches(t *testing.T) {
-	paths := []string{"docs/app.md", "internal/tui/app.go", "internal/tui/app_test.go", "cmd/tcrit/main.go", "internal/tui/thread.go"}
+	paths := []string{"docs/app.md", "internal/tui/app.go", "internal/tui/app_test.go", "cmd/critty/main.go", "internal/tui/thread.go"}
 	order := func(query string) string {
 		var names []string
 		for _, match := range rankFileMatches(paths, query) {

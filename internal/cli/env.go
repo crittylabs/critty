@@ -31,7 +31,7 @@ ancestry otherwise, so a tool started from the terminal's process tree can
 recover its terminal even without the variables.  Without a pane terminal, TTY
 is the controlling terminal of this process or its nearest ancestor, then
 SSH_TTY.  A background server such as Codex's daemon has no such ancestry;
-pass --terminal-request <id> from a marker prepared by ` + "`tcrit terminal prepare`" + `
+pass --terminal-request <id> from a marker prepared by ` + "`critty terminal prepare`" + `
 to locate the pane that displays it.`,
 	Args: cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {

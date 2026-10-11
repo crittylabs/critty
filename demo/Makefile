@@ -9,7 +9,7 @@
 # published recordings are hosted as release assets.
 
 # Fixtures are built here, outside the checkout (see setup.sh).
-DEMO_DIR ?= $(patsubst %/,%,$(or $(TMPDIR),/tmp))/tcrit-demo
+DEMO_DIR ?= $(patsubst %/,%,$(or $(TMPDIR),/tmp))/critty-demo
 export DEMO_DIR
 
 MP4S = code-review-claude.mp4 demo.mp4
@@ -32,7 +32,7 @@ mp4: $(MP4S)
 clean:
 	rm -f $(MP4S)
 
-# Every recording rebuilds tcrit and the fixture, so the MP4s depend on the
+# Every recording rebuilds critty and the fixture, so the MP4s depend on the
 # demo scripts as well as the tape; Go sources would rebuild on every edit.
 code-review-claude.mp4: code-review.tape
 code-review-claude.mp4: TAPE = code-review.tape

@@ -60,14 +60,14 @@ func (m *AppModel) linkCommentReferences(body string) string {
 		if _, ok := m.commentReferenceTab(id); !ok {
 			return id
 		}
-		uri := url.URL{Scheme: "tcrit", Host: "comment", RawQuery: url.Values{"id": {id}}.Encode()}
+		uri := url.URL{Scheme: "critty", Host: "comment", RawQuery: url.Values{"id": {id}}.Encode()}
 		return ansi.SetHyperlink(uri.String()) + "\x1b[4m" + id + "\x1b[24m" + ansi.ResetHyperlink()
 	})
 }
 
 func (m *AppModel) navigateCommentReference(uri string) bool {
 	u, err := url.Parse(uri)
-	if err != nil || u.Scheme != "tcrit" || u.Host != "comment" {
+	if err != nil || u.Scheme != "critty" || u.Host != "comment" {
 		return false
 	}
 	id := u.Query().Get("id")
@@ -191,7 +191,7 @@ func (m *AppModel) linkFileReferences(body string) string {
 		}
 		start := match[4] - 1 // include @, preserve the preceding whitespace
 		out.WriteString(m.linkCommentReferences(body[end:start]))
-		uri := url.URL{Scheme: "tcrit", Host: "source", RawQuery: url.Values{
+		uri := url.URL{Scheme: "critty", Host: "source", RawQuery: url.Values{
 			"path": {path}, "line": {strconv.Itoa(line)},
 		}.Encode()}
 		out.WriteString(ansi.SetHyperlink(uri.String()))
@@ -207,7 +207,7 @@ func (m *AppModel) linkFileReferences(body string) string {
 
 func sourceLink(uri string) (sourceLocation, bool) {
 	u, err := url.Parse(uri)
-	if err != nil || u.Scheme != "tcrit" || u.Host != "source" {
+	if err != nil || u.Scheme != "critty" || u.Host != "source" {
 		return sourceLocation{}, false
 	}
 	path := u.Query().Get("path")

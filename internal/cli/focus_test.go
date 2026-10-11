@@ -40,7 +40,7 @@ func TestResolveFocusPatchAndCommand(t *testing.T) {
 	t.Chdir(t.TempDir())
 	originalFocus, originalExec := reviewFocus, resolveExec
 	t.Cleanup(func() { reviewFocus, resolveExec = originalFocus, originalExec })
-	resolveExec = func() (string, error) { return "/a path/tcrit", nil }
+	resolveExec = func() (string, error) { return "/a path/critty", nil }
 	patch, err := git.ParsePatch(strings.NewReader("diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -10 +10 @@\n-old\n+new\n"))
 	if err != nil {
 		t.Fatal(err)

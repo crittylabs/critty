@@ -1,9 +1,10 @@
 version: 2
+project_name: critty
 
 builds:
-  - id: tcrit
-    main: ./cmd/tcrit/
-    binary: tcrit
+  - id: critty
+    main: ./cmd/critty/
+    binary: critty
     ldflags:
       - -s -w -X github.com/knu/tcrit/internal/cli.version=v{{.Version}}
     goos:

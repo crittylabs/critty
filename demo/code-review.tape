@@ -1,6 +1,6 @@
-# TCrit — staged-change review loop with Claude Code
+# Critty — staged-change review loop with Claude Code
 #
-# Run `make` in this directory; it runs setup.sh (builds tcrit and prepares
+# Run `make` in this directory; it runs setup.sh (builds critty and prepares
 # the fixture under $DEMO_DIR) and records an MP4 with VHS.
 
 Output code-review-claude.mp4
@@ -24,7 +24,7 @@ Hide
 
 # Detach from the recording host's multiplexer, use the demo build and an
 # isolated review state, and start a private tmux server for the recording.
-Type "unset TMUX TMUX_PANE NO_COLOR; export COLORTERM=truecolor; unset -m 'HERDR_*'; export TAPE_DIR=$PWD DEMO_DIR=${DEMO_DIR:-${${TMPDIR:-/tmp}%/}/tcrit-demo}; export XDG_STATE_HOME=$DEMO_DIR/state PATH=$DEMO_DIR/bin:$PATH; cd $DEMO_DIR/work; clear"
+Type "unset TMUX TMUX_PANE NO_COLOR; export COLORTERM=truecolor; unset -m 'HERDR_*'; export TAPE_DIR=$PWD DEMO_DIR=${DEMO_DIR:-${${TMPDIR:-/tmp}%/}/critty-demo}; export XDG_STATE_HOME=$DEMO_DIR/state PATH=$DEMO_DIR/bin:$PATH; cd $DEMO_DIR/work; clear"
 Enter
 Type "tmux -L demo -f $TAPE_DIR/tmux.conf new -s demo"
 Enter
@@ -53,8 +53,8 @@ Sleep 1s
 
 Show
 
-# Ask for a review; the tcrit skill opens the TUI in a tmux split pane.
-Type@40ms "Review the staged changes with TCrit."
+# Ask for a review; the critty skill opens the TUI in a tmux split pane.
+Type@40ms "Review the staged changes with Critty."
 Sleep 500ms
 Enter
 Wait+Screen@300s /Comments \(\d+\)/

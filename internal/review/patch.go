@@ -43,7 +43,7 @@ func (s *Session) SaveDiff(p *git.Patch) error {
 	}
 	defer func() {
 		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "tcrit: removing temporary diff: %v\n", err)
+			fmt.Fprintf(os.Stderr, "critty: removing temporary diff: %v\n", err)
 		}
 	}()
 	_, writeErr := f.Write(data)

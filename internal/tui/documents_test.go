@@ -42,7 +42,7 @@ func TestAttachedDocumentMixedReview(t *testing.T) {
 		t.Fatal("attachment root did not fold")
 	}
 	reference := "@" + escapeReferencePath(d.Path()) + " L2"
-	if !strings.Contains(app.linkFileReferences(reference), "tcrit://source") {
+	if !strings.Contains(app.linkFileReferences(reference), "critty://source") {
 		t.Fatal("snapshot reference did not become a link")
 	}
 	app.activeTab = 1

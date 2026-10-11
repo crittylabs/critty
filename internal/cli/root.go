@@ -13,14 +13,14 @@ import (
 var rootSession string
 
 var rootCmd = &cobra.Command{
-	Use:     "tcrit [file[:LINE]]",
+	Use:     "critty [file[:LINE]]",
 	Version: versionString(),
 	Short:   "Review code changes and documents from the terminal",
-	Long: "TCrit is a terminal-based review tool for code changes and documents. " +
+	Long: "Critty is a terminal-based review tool for code changes and documents. " +
 		"It provides an interactive TUI for humans and scriptable CLI commands for agents.\n\n" +
-		"Run `tcrit` to review the current git changes, `tcrit --staged` to review only the index, " +
-		"`tcrit <file>` to review a document, " +
-		"or `tcrit --session <id>` to resume a saved review.",
+		"Run `critty` to review the current git changes, `critty --staged` to review only the index, " +
+		"`critty <file>` to review a document, " +
+		"or `critty --session <id>` to resume a saved review.",
 	Args:         cobra.MaximumNArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

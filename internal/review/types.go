@@ -8,7 +8,7 @@ import (
 
 // The types in this file mirror the review.json ("CritJSON") format of
 // tomasz-tomczyk/crit so that reviews, prompts, and agent tooling written
-// for crit work against TCrit reviews unchanged.  Fields TCrit does not
+// for crit work against Critty reviews unchanged.  Fields Critty does not
 // produce (forge sync, sharing) are kept so files round-trip losslessly.
 
 // Reply represents a single reply in a comment thread.
@@ -55,7 +55,7 @@ type Comment struct {
 	ReviewRound    int     `json:"review_round,omitempty"`
 	Replies        []Reply `json:"replies,omitempty"`
 
-	// Forge-sync fields written by crit; TCrit preserves but never sets them.
+	// Forge-sync fields written by crit; Critty preserves but never sets them.
 	GitHubID           int64  `json:"github_id,omitempty"`
 	GitLabNoteID       int64  `json:"gitlab_note_id,omitempty"`
 	GitLabDiscussionID string `json:"gitlab_discussion_id,omitempty"`
@@ -95,7 +95,7 @@ type CritJSON struct {
 	CliArgs        []string                `json:"cli_args,omitempty"`
 	Files          map[string]CritJSONFile `json:"files"`
 
-	// Sharing fields written by crit; preserved but unused by TCrit.
+	// Sharing fields written by crit; preserved but unused by Critty.
 	ShareURL        string `json:"share_url,omitempty"`
 	DeleteToken     string `json:"delete_token,omitempty"`
 	ShareScope      string `json:"share_scope,omitempty"`

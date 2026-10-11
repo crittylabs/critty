@@ -1,1 +1,1 @@
-Write everything in English: chat responses, TCrit comment replies, and commit messages.
+Write everything in English: chat responses, Critty comment replies, and commit messages.

@@ -8,7 +8,7 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## How we work
 
-- Unless `AGENTS.local.md` says otherwise, review changes with TCrit itself, running a build of the current checkout so the review dogfoods the work.  If you replace that build while a review round is open, stop the review and start it again.
+- Unless `AGENTS.local.md` says otherwise, review changes with Critty itself, running a build of the current checkout so the review dogfoods the work.  If you replace that build while a review round is open, stop the review and start it again.
 - Describe new features in `README.md` at the level of how to use them, not their internal rules, and record every difference from upstream, including small fixes, in `docs/upstream-differences.md`.
 - Update `README.md` for a release in the release preparation commit.
 - Follow [crit](https://github.com/tomasz-tomczyk/crit) for specification and compatibility decisions, and check its current implementation and documentation when a change touches the review format or workflow.
@@ -24,4 +24,4 @@ go test ./...
 go vet ./...
 ```
 
-See the README for installing the binary and the agent skills, and `docs/upstream-differences.md` for how this fork differs from upstream crit.
+See the README for installing the binary and the agent skills, and `docs/upstream-differences.md` for how Critty differs from the last upstream crit release.

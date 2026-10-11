@@ -20,7 +20,7 @@ func Run(args []string, wrapped bool) error {
 		err = terminalbinding.DefaultStore().Register(target)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tcrit codex: terminal registration failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "critty codex: terminal registration failed: %v\n", err)
 	}
 	return syscall.Exec(bin, append([]string{bin}, args...), os.Environ())
 }

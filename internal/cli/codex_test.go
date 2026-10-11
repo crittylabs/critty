@@ -18,7 +18,7 @@ func TestCodexWrapperHint(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
-	self := filepath.Join(bin, "tcrit")
+	self := filepath.Join(bin, "critty")
 	other := filepath.Join(dir, "other")
 	if err := os.MkdirAll(other, 0755); err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestCodexWrapperHint(t *testing.T) {
 		t.Fatalf("review error = %v, output: %s", err, out)
 	}
 
-	// Do not mistake an original Codex beside a tcrit-only install for our wrapper.
+	// Do not mistake an original Codex beside a critty-only install for our wrapper.
 	if err := os.WriteFile(filepath.Join(bin, "codex"), []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
 		t.Fatal(err)
 	}

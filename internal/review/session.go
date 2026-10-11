@@ -79,7 +79,7 @@ func AggregateStatus(dataRoot string) (*CodeReviewStatus, error) {
 		return nil, err
 	}
 	if len(s.CJ.Files) == 0 {
-		return nil, fmt.Errorf("no active code review session (run `tcrit review --code` first)")
+		return nil, fmt.Errorf("no active code review session (run `critty review --code` first)")
 	}
 
 	result := &CodeReviewStatus{}

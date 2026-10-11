@@ -47,10 +47,10 @@ func TestDiffReviewSessionAndDetachedCommand(t *testing.T) {
 		t.Fatalf("snapshot = %+v, error = %v", loaded, err)
 	}
 	original := resolveExec
-	resolveExec = func() (string, error) { return "/a path/tcrit", nil }
+	resolveExec = func() (string, error) { return "/a path/critty", nil }
 	t.Cleanup(func() { resolveExec = original })
 	cmd, err := buildTUICommand(mode, "tmux")
-	if err != nil || !strings.Contains(cmd, "'/a path/tcrit' _tui --session '"+sess.Key+"'") {
+	if err != nil || !strings.Contains(cmd, "'/a path/critty' _tui --session '"+sess.Key+"'") {
 		t.Fatalf("detached command = %q, %v", cmd, err)
 	}
 	if got := nextRoundCommand(sess, mode); !strings.Contains(got, "--diff") {

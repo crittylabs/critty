@@ -163,7 +163,7 @@ func captureSpawns(t *testing.T) *[][]string {
 		return []byte("%99\n"), nil
 	}
 	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
-	resolveExec = func() (string, error) { return "/usr/local/bin/tcrit", nil }
+	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
 	t.Cleanup(func() {
 		runCommand, commandOutput, lookPath, resolveExec = origRun, origOutput, origLook, origResolve
 	})
@@ -235,7 +235,7 @@ func TestSpawnTUIPaneRetriesWithoutPercentage(t *testing.T) {
 		return []byte("%99\n"), nil
 	}
 	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
-	resolveExec = func() (string, error) { return "/usr/local/bin/tcrit", nil }
+	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
 	t.Cleanup(func() {
 		runCommand, commandOutput, lookPath, resolveExec = origRun, origOutput, origLook, origResolve
 	})
@@ -381,14 +381,14 @@ func TestBuildFinishPayloadUnresolved(t *testing.T) {
 	if len(payload.Comments) != 2 {
 		t.Errorf("expected all comments, got %+v", payload.Comments)
 	}
-	if want := "tcrit --session " + sess.Key; payload.NextCommand != want {
+	if want := "critty --session " + sess.Key; payload.NextCommand != want {
 		t.Errorf("NextCommand = %q, want %q", payload.NextCommand, want)
 	}
 	for _, want := range []string{
 		"The review finished with 1 unresolved comment.",
 		`"id": "c_1"`,
 		`"id": "c_2"`,
-		"tcrit comment --session " + sess.Key + " --reply-to <comment-id>",
+		"critty comment --session " + sess.Key + " --reply-to <comment-id>",
 		payload.NextCommand,
 	} {
 		if !strings.Contains(payload.Prompt, want) {
@@ -448,11 +448,11 @@ func TestBuildFinishPayloadPlanMode(t *testing.T) {
 
 	payload := buildFinishPayload(cfg, sess, mode, false)
 
-	if want := "tcrit plan --session " + sess.Key + " 'docs/plan.md'"; payload.NextCommand != want {
+	if want := "critty plan --session " + sess.Key + " 'docs/plan.md'"; payload.NextCommand != want {
 		t.Errorf("NextCommand = %q, want %q", payload.NextCommand, want)
 	}
 	for _, want := range []string{
-		"tcrit comment --session " + sess.Key + " --reply-to <comment-id>",
+		"critty comment --session " + sess.Key + " --reply-to <comment-id>",
 		payload.NextCommand,
 	} {
 		if !strings.Contains(payload.Prompt, want) {

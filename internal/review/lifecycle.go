@@ -35,7 +35,7 @@ type SnapshotFile struct {
 	Partial bool   `json:"partial,omitempty"`
 }
 
-// RoundState is TCrit's saved runtime context, separate from CritJSON comments.
+// RoundState is Critty's saved runtime context, separate from CritJSON comments.
 type RoundState struct {
 	Files       map[string]SnapshotFile `json:"files,omitempty"`
 	Diff        string                  `json:"diff,omitempty"`

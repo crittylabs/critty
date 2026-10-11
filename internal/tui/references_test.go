@@ -72,11 +72,11 @@ func TestCommentReferenceNavigation(t *testing.T) {
 			app.tabs[1].state.Comments = []review.Comment{{ID: "c_abcdef", Scope: scope, StartLine: 1, EndLine: 1, Body: "target", Resolved: true}}
 			body := "see `c_abcdef` and c_000000 and xc_abcdef and c_abcdef0"
 			rendered := app.linkFileReferences(body)
-			if ansi.Strip(rendered) != body || strings.Count(rendered, "tcrit://comment") != 1 {
+			if ansi.Strip(rendered) != body || strings.Count(rendered, "critty://comment") != 1 {
 				t.Fatalf("unexpected reference rendering: %q", rendered)
 			}
 			app.hideComments = true
-			if !app.navigateCommentReference("tcrit://comment?id=c_abcdef") {
+			if !app.navigateCommentReference("critty://comment?id=c_abcdef") {
 				t.Fatal("reference did not navigate")
 			}
 			if app.activeTab != 1 || app.hideComments || app.selectedCommentID() != "c_abcdef" || !app.tab().state.Comments[0].Resolved {
@@ -131,7 +131,7 @@ func TestAmbiguousCommentReference(t *testing.T) {
 	for i := range app.tabs {
 		app.tabs[i].state.Comments = []review.Comment{{ID: "c_abcdef", Scope: "file", Body: "same ID"}}
 	}
-	if app.linkFileReferences("c_abcdef") != "c_abcdef" || app.navigateCommentReference("tcrit://comment?id=c_abcdef") {
+	if app.linkFileReferences("c_abcdef") != "c_abcdef" || app.navigateCommentReference("critty://comment?id=c_abcdef") {
 		t.Fatal("ambiguous reference must not select an arbitrary thread")
 	}
 }
@@ -274,7 +274,7 @@ func TestEscapedFileReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, body := range []string{"@prefix\\", "@prefix\\\nnext"} {
-		if strings.Contains(app.linkFileReferences(body), "tcrit://") {
+		if strings.Contains(app.linkFileReferences(body), "critty://") {
 			t.Fatal("incomplete escape linked a shorter filename")
 		}
 	}

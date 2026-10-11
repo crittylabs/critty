@@ -15,7 +15,7 @@ import (
 	"github.com/knu/tcrit/internal/xdg"
 )
 
-//go:embed skill/tcrit/SKILL.md skill/tcrit-cli/SKILL.md
+//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md
 var skillContent embed.FS
 
 var installForce bool
@@ -53,8 +53,8 @@ var skillVariants = map[string]skillVariant{
 	"opencode": {
 		author: "OpenCode",
 		skillRef: func(name string) string {
-			if name == "tcrit" {
-				return "/tcrit" // installed as a command
+			if name == "critty" {
+				return "/critty" // installed as a command
 			}
 			return name
 		},
@@ -69,7 +69,7 @@ var skillVariants = map[string]skillVariant{
 	},
 }
 
-var skillNames = []string{"tcrit", "tcrit-cli"}
+var skillNames = []string{"critty", "critty-cli"}
 
 // renderSkill returns the embedded skill rewritten for the named agent.
 func renderSkill(name, agent string) ([]byte, error) {
@@ -141,38 +141,38 @@ func integrations() map[string][]integrationFile {
 	m := map[string][]integrationFile{}
 
 	m["claude-code"] = []integrationFile{
-		skillFile("tcrit", "claude-code", ".claude"),
-		skillFile("tcrit-cli", "claude-code", ".claude"),
+		skillFile("critty", "claude-code", ".claude"),
+		skillFile("critty-cli", "claude-code", ".claude"),
 	}
 
 	m["codex"] = []integrationFile{
-		skillFile("tcrit", "codex", ".agents"),
-		skillFile("tcrit-cli", "codex", ".agents"),
+		skillFile("critty", "codex", ".agents"),
+		skillFile("critty-cli", "codex", ".agents"),
 	}
 
 	// OpenCode reads project files from .opencode/ but global ones from its
 	// XDG config directory (~/.config/opencode by default).
 	openCodeGlobal := xdg.AppConfigHome("opencode")
-	openCodeCLI := skillFile("tcrit-cli", "opencode", ".opencode")
-	openCodeCLI.globalDest = filepath.Join(openCodeGlobal, "skills", "tcrit-cli", "SKILL.md")
+	openCodeCLI := skillFile("critty-cli", "opencode", ".opencode")
+	openCodeCLI.globalDest = filepath.Join(openCodeGlobal, "skills", "critty-cli", "SKILL.md")
 	m["opencode"] = []integrationFile{
 		{
 			content: func() ([]byte, error) {
-				data, err := renderSkill("tcrit", "opencode")
+				data, err := renderSkill("critty", "opencode")
 				if err != nil {
 					return nil, err
 				}
 				return dropFrontmatterKeys(data, []string{"name"}), nil // commands are named by their file
 			},
-			dest:       filepath.Join(".opencode", "commands", "tcrit.md"),
-			globalDest: filepath.Join(openCodeGlobal, "commands", "tcrit.md"), // absolute
+			dest:       filepath.Join(".opencode", "commands", "critty.md"),
+			globalDest: filepath.Join(openCodeGlobal, "commands", "critty.md"), // absolute
 		},
 		openCodeCLI,
 	}
 
 	m["gemini"] = []integrationFile{
-		skillFile("tcrit", "gemini", ".gemini"),
-		skillFile("tcrit-cli", "gemini", ".gemini"),
+		skillFile("critty", "gemini", ".gemini"),
+		skillFile("critty-cli", "gemini", ".gemini"),
 	}
 
 	var prompts []integrationFile
@@ -223,10 +223,10 @@ Run from your home directory to install globally, or from a repository
 root to install for that project only, following crit's convention.
 
 Targets:
-  claude-code  Claude Code skills (tcrit, tcrit-cli)
-  codex        Codex skills (tcrit, tcrit-cli)
-  opencode     OpenCode command (/tcrit) and skill (tcrit-cli)
-  gemini       Gemini CLI skills (tcrit, tcrit-cli)
+  claude-code  Claude Code skills (critty, critty-cli)
+  codex        Codex skills (critty, critty-cli)
+  opencode     OpenCode command (/critty) and skill (critty-cli)
+  gemini       Gemini CLI skills (critty, critty-cli)
   prompts      Stock finish prompt templates (customize after copying)
   all          claude-code + codex + opencode + gemini`,
 	Args: cobra.ExactArgs(1),
@@ -348,7 +348,7 @@ var checkCmd = &cobra.Command{
 					if bytes.Equal(existing, data) {
 						fmt.Printf("ok:    %s\n", dest)
 					} else {
-						fmt.Printf("stale: %s (reinstall with `tcrit install --force %s`)\n", dest, name)
+						fmt.Printf("stale: %s (reinstall with `critty install --force %s`)\n", dest, name)
 						stale++
 					}
 				}

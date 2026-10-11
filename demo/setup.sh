@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prepare everything the tapes in this directory need under $DEMO_DIR
-# (default: $TMPDIR/tcrit-demo):
-#   bin/tcrit   the tcrit build to record
+# (default: $TMPDIR/critty-demo):
+#   bin/critty  the critty build to record
 #   work        a Git repository with staged changes (code-review.tape)
 #   doc         a Markdown document to review (demo.tape)
 #   state       an isolated XDG_STATE_HOME for review sessions
@@ -16,13 +16,13 @@ cd "$(dirname "$0")"
 assets=$(pwd)/assets
 root=$(cd .. && pwd)
 tmp=${TMPDIR:-/tmp}
-demo=${DEMO_DIR:-${tmp%/}/tcrit-demo}
+demo=${DEMO_DIR:-${tmp%/}/critty-demo}
 work=$demo/work
 
 tmux -L demo kill-server 2>/dev/null || true
 rm -rf "$work" "$demo/doc" "$demo/state"
 mkdir -p "$demo/bin" "$work" "$demo/doc" "$demo/state"
-go build -o "$demo/bin/tcrit" "$root/cmd/tcrit"
+go build -o "$demo/bin/critty" "$root/cmd/critty"
 
 cp "$assets/plan.md" "$demo/doc/plan.md"
 
@@ -39,6 +39,6 @@ git commit -q -m "Greet by name"
 cp -R "$assets"/staged/. .
 git add .
 
-"$demo/bin/tcrit" install claude-code >/dev/null
+"$demo/bin/critty" install claude-code >/dev/null
 printf '{"theme": "dark", "fastMode": false}\n' >.claude/settings.json
 echo "demo fixtures ready under $demo"

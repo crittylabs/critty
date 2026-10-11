@@ -39,8 +39,8 @@ func destinations(t *testing.T, target string) []string {
 func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
 	want := map[string]string{
-		filepath.Join(".opencode", "commands", "tcrit.md"):            filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "tcrit.md"),
-		filepath.Join(".opencode", "skills", "tcrit-cli", "SKILL.md"): filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "tcrit-cli", "SKILL.md"),
+		filepath.Join(".opencode", "commands", "critty.md"):            filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
+		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"): filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
 	for _, f := range integrations()["opencode"] {
 		if f.globalDest != want[f.dest] {
@@ -56,20 +56,20 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 func TestIntegrationLayouts(t *testing.T) {
 	want := map[string][]string{
 		"claude-code": {
-			filepath.Join(".claude", "skills", "tcrit", "SKILL.md"),
-			filepath.Join(".claude", "skills", "tcrit-cli", "SKILL.md"),
+			filepath.Join(".claude", "skills", "critty", "SKILL.md"),
+			filepath.Join(".claude", "skills", "critty-cli", "SKILL.md"),
 		},
 		"codex": {
-			filepath.Join(".agents", "skills", "tcrit", "SKILL.md"),
-			filepath.Join(".agents", "skills", "tcrit-cli", "SKILL.md"),
+			filepath.Join(".agents", "skills", "critty", "SKILL.md"),
+			filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"),
 		},
 		"opencode": {
-			filepath.Join(".opencode", "commands", "tcrit.md"),
-			filepath.Join(".opencode", "skills", "tcrit-cli", "SKILL.md"),
+			filepath.Join(".opencode", "commands", "critty.md"),
+			filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"),
 		},
 		"gemini": {
-			filepath.Join(".gemini", "skills", "tcrit", "SKILL.md"),
-			filepath.Join(".gemini", "skills", "tcrit-cli", "SKILL.md"),
+			filepath.Join(".gemini", "skills", "critty", "SKILL.md"),
+			filepath.Join(".gemini", "skills", "critty-cli", "SKILL.md"),
 		},
 	}
 	for target, dests := range want {
@@ -108,50 +108,50 @@ func TestClaudeSkillsAreVerbatim(t *testing.T) {
 }
 
 func TestCodexSkillsUseCodexConventions(t *testing.T) {
-	skill := integrationContent(t, "codex", filepath.Join(".agents", "skills", "tcrit", "SKILL.md"))
-	cli := integrationContent(t, "codex", filepath.Join(".agents", "skills", "tcrit-cli", "SKILL.md"))
+	skill := integrationContent(t, "codex", filepath.Join(".agents", "skills", "critty", "SKILL.md"))
+	cli := integrationContent(t, "codex", filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"))
 
-	for _, unwanted := range []string{"`/tcrit`", "`/tcrit-cli`", "/tcrit ", "Claude Code", "$ARGUMENTS", "allowed-tools:", "argument-hint:", "user-invocable:"} {
+	for _, unwanted := range []string{"`/critty`", "`/critty-cli`", "/critty ", "Claude Code", "$ARGUMENTS", "allowed-tools:", "argument-hint:", "user-invocable:"} {
 		for _, content := range []string{skill, cli} {
 			if strings.Contains(content, unwanted) {
 				t.Errorf("Codex skill still contains %q", unwanted)
 			}
 		}
 	}
-	for _, wanted := range []string{"`$tcrit-cli`", "'Codex'", "tcrit <arguments>"} {
+	for _, wanted := range []string{"`$critty-cli`", "'Codex'", "critty <arguments>"} {
 		if !strings.Contains(skill, wanted) {
-			t.Errorf("Codex tcrit skill lacks %q", wanted)
+			t.Errorf("Codex critty skill lacks %q", wanted)
 		}
 	}
-	if !strings.Contains(skill, "tcrit --staged") {
-		t.Error("Codex tcrit skill does not document staged-only review")
+	if !strings.Contains(skill, "critty --staged") {
+		t.Error("Codex critty skill does not document staged-only review")
 	}
-	if !strings.Contains(cli, "`$tcrit`") {
-		t.Error("Codex tcrit-cli skill does not point at $tcrit")
+	if !strings.Contains(cli, "`$critty`") {
+		t.Error("Codex critty-cli skill does not point at $critty")
 	}
-	if !strings.HasPrefix(cli, "---\nname: tcrit-cli\ndescription: ") {
-		t.Errorf("Codex tcrit-cli frontmatter is malformed:\n%s", cli[:min(len(cli), 200)])
+	if !strings.HasPrefix(cli, "---\nname: critty-cli\ndescription: ") {
+		t.Errorf("Codex critty-cli frontmatter is malformed:\n%s", cli[:min(len(cli), 200)])
 	}
 }
 
 func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
-	command := integrationContent(t, "opencode", filepath.Join(".opencode", "commands", "tcrit.md"))
-	cli := integrationContent(t, "opencode", filepath.Join(".opencode", "skills", "tcrit-cli", "SKILL.md"))
+	command := integrationContent(t, "opencode", filepath.Join(".opencode", "commands", "critty.md"))
+	cli := integrationContent(t, "opencode", filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"))
 
-	if !strings.Contains(command, "tcrit $ARGUMENTS") {
+	if !strings.Contains(command, "critty $ARGUMENTS") {
 		t.Error("OpenCode command lost $ARGUMENTS")
 	}
-	if !strings.Contains(command, "tcrit --staged") {
+	if !strings.Contains(command, "critty --staged") {
 		t.Error("OpenCode command does not document staged-only review")
 	}
 	if !strings.HasPrefix(command, "---\ndescription: ") {
 		t.Errorf("OpenCode command frontmatter should start with description:\n%s", command[:min(len(command), 120)])
 	}
-	if !strings.Contains(command, "`tcrit-cli`") || strings.Contains(command, "`/tcrit-cli`") {
-		t.Error("OpenCode command must reference the tcrit-cli skill by bare name")
+	if !strings.Contains(command, "`critty-cli`") || strings.Contains(command, "`/critty-cli`") {
+		t.Error("OpenCode command must reference the critty-cli skill by bare name")
 	}
-	if !strings.Contains(cli, "`/tcrit`") {
-		t.Error("OpenCode tcrit-cli must point at the /tcrit command")
+	if !strings.Contains(cli, "`/critty`") {
+		t.Error("OpenCode critty-cli must point at the /critty command")
 	}
 	for _, content := range []string{command, cli} {
 		for _, unwanted := range []string{"Claude Code", "allowed-tools:", "argument-hint:", "user-invocable:"} {
@@ -166,10 +166,10 @@ func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
 }
 
 func TestGeminiIntegration(t *testing.T) {
-	skill := integrationContent(t, "gemini", filepath.Join(".gemini", "skills", "tcrit", "SKILL.md"))
-	cli := integrationContent(t, "gemini", filepath.Join(".gemini", "skills", "tcrit-cli", "SKILL.md"))
+	skill := integrationContent(t, "gemini", filepath.Join(".gemini", "skills", "critty", "SKILL.md"))
+	cli := integrationContent(t, "gemini", filepath.Join(".gemini", "skills", "critty-cli", "SKILL.md"))
 
-	if !strings.HasPrefix(skill, "---\nname: tcrit\n") {
+	if !strings.HasPrefix(skill, "---\nname: critty\n") {
 		t.Error("Gemini skill frontmatter is malformed")
 	}
 	for _, content := range []string{skill, cli} {
@@ -182,7 +182,7 @@ func TestGeminiIntegration(t *testing.T) {
 			t.Error("Gemini skill is not attributed to Gemini")
 		}
 	}
-	if !strings.Contains(skill, "tcrit <arguments>") || strings.Contains(skill, "`/tcrit`") {
+	if !strings.Contains(skill, "critty <arguments>") || strings.Contains(skill, "`/critty`") {
 		t.Error("Gemini skill invocation is not rewritten")
 	}
 }

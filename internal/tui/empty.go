@@ -6,7 +6,7 @@ import (
 )
 
 func (m AppModel) renderEmptyReview() (string, []modalMouseRegion) {
-	body := "TCrit: [" + m.reviewScopeLabel() + "]\n\nNo changes remain in this review.\n\nq: finish review"
+	body := "Critty: [" + m.reviewScopeLabel() + "]\n\nNo changes remain in this review.\n\nq: finish review"
 	body = lipgloss.NewStyle().Width(m.width).Height(m.height).Render(body)
 	if m.modal != noModal {
 		return m.renderWithModalLayout(body)

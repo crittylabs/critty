@@ -19,7 +19,7 @@ import (
 var stockFS embed.FS
 
 // StockTemplates returns the embedded stock template file names and contents,
-// for `tcrit install prompts` and staleness checking.
+// for `critty install prompts` and staleness checking.
 func StockTemplates() map[string][]byte {
 	entries, err := stockFS.ReadDir("stock")
 	if err != nil {
@@ -75,8 +75,8 @@ func (c Context) TemplateData() map[string]any {
 		"comments_json":            c.CommentsJSON,
 		"approved":                 c.Approved,
 		"next_round_cmd":           c.NextRoundCmd,
-		"comments_cmd":             fmt.Sprintf("tcrit comments --json --session %s", c.SessionKey),
-		"comments_all_cmd":         fmt.Sprintf("tcrit comments --json --all --session %s", c.SessionKey),
+		"comments_cmd":             fmt.Sprintf("critty comments --json --session %s", c.SessionKey),
+		"comments_all_cmd":         fmt.Sprintf("critty comments --json --all --session %s", c.SessionKey),
 	}
 }
 

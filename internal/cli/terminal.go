@@ -26,7 +26,7 @@ func init() {
 	})
 	terminal.AddCommand(&cobra.Command{
 		Use: "notify <request-id>", Short: "Report a detected marker from a terminal filter's own environment", Args: cobra.ExactArgs(1),
-		Long: "Called by a terminal filter such as tfil after observing TCRIT-<request-id> in rendered agent output. Inherit the filter's original TMUX/TMUX_PANE or HERDR_* environment and the same XDG_STATE_HOME as TCrit. This command records a destination; it does not open a review.",
+		Long: "Called by a terminal filter such as tfil after observing TCRIT-<request-id> in rendered agent output. Inherit the filter's original TMUX/TMUX_PANE or HERDR_* environment and the same XDG_STATE_HOME as Critty. This command records a destination; it does not open a review.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target, err := terminalbinding.FromEnvironment()
 			if err != nil {

@@ -1,10 +1,13 @@
 <p align="center">
-  <img src="assets/crit_logo.png" alt="tcrit" width="300">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/critty-logo-dark-boxed.svg">
+    <img src="assets/critty-logo-light-boxed.svg" alt="critty" width="400">
+  </picture>
 </p>
 
-# tcrit
+# critty
 
-> **tcrit** is a fork of [kevindutra/crit](https://github.com/kevindutra/crit). It installs the command as `tcrit` and includes fixes and improvements not yet merged upstream; see [docs/upstream-differences.md](docs/upstream-differences.md) for the full list.
+> **critty** continues [kevindutra/crit](https://github.com/kevindutra/crit) under a new name, with the fixes and improvements developed as TCrit; see [docs/upstream-differences.md](docs/upstream-differences.md) for the full list.
 
 TUI for reviewing AI-generated code and plans — built for human-in-the-loop agentic coding workflows.
 
@@ -17,25 +20,25 @@ Your agent writes code or a plan, you review it in the TUI, and the agent reads 
 ## Key Features
 
 - **Review in the terminal** — read plans, documents, and multi-file diffs with syntax highlighting, and comment on a line, a range, a deleted line, or a whole file.
-- **Round trips with your agent** — the agent opens the review in a Herdr tab or a tmux split, waits for you to submit, reads your comments, and comes back with the next round.  `tcrit install` sets this up for Claude Code, Codex, OpenCode, and Gemini CLI.
-- **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | tcrit --diff`, single documents, and versioned plans that carry comment threads across revisions.
+- **Round trips with your agent** — the agent opens the review in a Herdr tab or a tmux split, waits for you to submit, reads your comments, and comes back with the next round.  `critty install` sets this up for Claude Code, Codex, OpenCode, and Gemini CLI.
+- **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | critty --diff`, single documents, and versioned plans that carry comment threads across revisions.
 - **Attached documents and forms** — review notices, commit messages, and approval notes alongside code.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
 - **Comments made for code review** — replies, resolve and reopen, GitHub-style suggestions, clipboard images, `@path L40` and comment-ID references, and editing in `$EDITOR`.  Multi-line comments follow insertions and deletions within the selected range across review rounds.
 - **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
 - **Mouse and keyboard** — vim-style keys throughout, plus clickable tabs, lines, threads, and buttons, gutter drag to select ranges, and wheel scrolling.
-- **Scriptable and Crit-compatible** — [Crit](https://crit.md/)-compatible `review.json`, `tcrit comment` and `tcrit comments` for automation, and sessions that stop and resume by ID.
+- **Scriptable and Crit-compatible** — [Crit](https://crit.md/)-compatible `review.json`, `critty comment` and `critty comments` for automation, and sessions that stop and resume by ID.
 - **Readable on any terminal** — light and dark backgrounds, per-author colors, compact tab paths, and a review bar that names what is under review.
 
 To open a review at a specific file or line:
 
 ```bash
-tcrit notes.md:42
-tcrit --focus internal/tui/app.go
-tcrit review --staged --focus internal/tui/app.go:120
-tcrit --session <id> --focus internal/tui/app.go:120
+critty notes.md:42
+critty --focus internal/tui/app.go
+critty review --staged --focus internal/tui/app.go:120
+critty --session <id> --focus internal/tui/app.go:120
 ```
 
-Use `tcrit FILE[:LINE]` to review a single document, or `--focus PATH[:LINE]` with a file in the review.  Line numbers start at 1.  From round 2 onward, the review automatically focuses the first thread with a new reply from another author, in file and display order.  An explicit file line or `--focus` takes priority; `--focus` wins when both are given.
+Use `critty FILE[:LINE]` to review a single document, or `--focus PATH[:LINE]` with a file in the review.  Line numbers start at 1.  From round 2 onward, the review automatically focuses the first thread with a new reply from another author, in file and display order.  An explicit file line or `--focus` takes priority; `--focus` wins when both are given.
 
 Tabs, the file tree, and the file selector use `A` for new files and `D` for deleted files, alongside line counts: `(A +12)` or `(D -8)`.  Modified text files show counts such as `(+3 -2)`.  Empty files and binary files omit counts; binary changes show `(M)` for modifications or `(R)` for renames.  The binary content placeholder uses the same marker.  Additions are green, deletions red, and binary modifications and renames yellow; parentheses keep their normal color.
 
@@ -43,7 +46,9 @@ File tabs follow the expanded file tree from top to bottom: directories come fir
 
 ## Install
 
-Install the `tcrit` binary, then install the review skills for your agent with `tcrit install`.
+Install the `critty` binary, then install the review skills for your agent with `critty install`.
+
+Critty was called TCrit until v0.17.0.  When switching from TCrit, update scripts to call `critty`, reinstall the skills as `critty` and `critty-cli`, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.
 
 ### Command-line binary
 
@@ -56,7 +61,7 @@ mise install github:knu/tcrit
 With Go:
 
 ```bash
-go install github.com/knu/tcrit/cmd/tcrit@latest
+go install github.com/knu/tcrit/cmd/critty@latest
 ```
 
 Make sure `$GOPATH/bin` (defaults to `~/go/bin`) is in your `PATH`:
@@ -67,79 +72,79 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 ### Review header
 
-The header shows the project name and, for Git reviews, the branch under review.  The project name defaults to the repository directory name, shared across linked worktrees, or the current directory name outside Git.  Use `tcrit --project 'My project'` to replace it.  Use `--topic 'Header display'` to replace the branch label, or `--topic ''` to hide it.  You can also add a topic to a document or plan review.  Saved sessions retain both overrides; pass the option again to change its label.
+The header shows the project name and, for Git reviews, the branch under review.  The project name defaults to the repository directory name, shared across linked worktrees, or the current directory name outside Git.  Use `critty --project 'My project'` to replace it.  Use `--topic 'Header display'` to replace the branch label, or `--topic ''` to hide it.  You can also add a topic to a document or plan review.  Saved sessions retain both overrides; pass the option again to change its label.
 
 ### Codex with a background server
 
 > [!WARNING]
-> [Codex 0.157.0](https://github.com/openai/codex/releases/tag/rust-v0.157.0) enabled automatic background-server startup by default.  Its shell tools no longer share the invoking terminal's process ancestry, so TCrit cannot recover the tmux or Herdr context from that ancestry.  Start Codex through `tcrit codex` or the bundled wrapper when using tmux or Herdr.
+> [Codex 0.157.0](https://github.com/openai/codex/releases/tag/rust-v0.157.0) enabled automatic background-server startup by default.  Its shell tools no longer share the invoking terminal's process ancestry, so Critty cannot recover the tmux or Herdr context from that ancestry.  Start Codex through `critty codex` or the bundled wrapper when using tmux or Herdr.
 
 From your tmux pane or Herdr terminal:
 
 ```bash
-tcrit codex
-tcrit codex resume
+critty codex
+critty codex resume
 ```
 
-Launch Codex through `tcrit codex`, or put TCrit's bundled `codex` wrapper before the original Codex in PATH.  The wrapper records which tmux or Herdr pane Codex runs in, then starts Codex with its arguments and environment unchanged.  `go install github.com/knu/tcrit/cmd/...@latest` installs both binaries; the [mise GitHub backend](https://mise.jdx.dev/dev-tools/backends/github.html#bin_path) exposes both from the release archive when `github:knu/tcrit` comes before the tool providing Codex in `[tools]`.
+Launch Codex through `critty codex`, or put Critty's bundled `codex` wrapper before the original Codex in PATH.  The wrapper records which tmux or Herdr pane Codex runs in, then starts Codex with its arguments and environment unchanged.  `go install github.com/knu/tcrit/cmd/...@latest` installs both binaries; the [mise GitHub backend](https://mise.jdx.dev/dev-tools/backends/github.html#bin_path) exposes both from the release archive when `github:knu/tcrit` comes before the tool providing Codex in `[tools]`.
 
-Before each review round the TCrit skill displays a one-time marker, and TCrit looks for it in the registered panes to find where to open the review, so keep the marker visible.  A terminal filter such as [tfil](https://github.com/knu/tfil) 0.4.0 with `--tcrit-notify` can report the marker directly instead; the protocol is described in [docs/terminal-filter.md](docs/terminal-filter.md).
+Before each review round the Critty skill displays a one-time marker, and Critty looks for it in the registered panes to find where to open the review, so keep the marker visible.  A terminal filter such as [tfil](https://github.com/knu/tfil) 0.4.0 with `--tcrit-notify` can report the marker directly instead; the protocol is described in [docs/terminal-filter.md](docs/terminal-filter.md).
 
 ### Agent skills
 
-The binary embeds the integration for each agent and installs it with `tcrit install`, so the skills always match the installed version. Every target provides two pieces:
+The binary embeds the integration for each agent and installs it with `critty install`, so the skills always match the installed version. Every target provides two pieces:
 
-- `tcrit [file]` — the interactive review loop. It opens the TUI on the git changes (`tcrit`), a document (`tcrit <file>`), or a versioned plan (`tcrit plan <file>`), then has the agent address the comments round by round.
-- `tcrit-cli` — a reference skill the agent loads when it needs `tcrit comment`, `tcrit comments`, session or plan targeting, bulk JSON input, or the review file format.
+- `critty [file]` — the interactive review loop. It opens the TUI on the git changes (`critty`), a document (`critty <file>`), or a versioned plan (`critty plan <file>`), then has the agent address the comments round by round.
+- `critty-cli` — a reference skill the agent loads when it needs `critty comment`, `critty comments`, session or plan targeting, bulk JSON input, or the review file format.
 
-When you submit a round, the agent receives every thread, including resolved ones, so your final instructions reach it even on approval.  It replies only where there is new feedback, and it waits for your submission for 10 minutes by default; if that wait times out, send `hey` after submitting.  `tcrit stop --session <id>` keeps a review for later and `tcrit clear` deletes it.
+When you submit a round, the agent receives every thread, including resolved ones, so your final instructions reach it even on approval.  It replies only where there is new feedback, and it waits for your submission for 10 minutes by default; if that wait times out, send `hey` after submitting.  `critty stop --session <id>` keeps a review for later and `critty clear` deletes it.
 
 Run the installer from your home directory to install globally, or from a repository root to install for that project only.
 
 #### Claude Code
 
 ```bash
-cd ~ && tcrit install claude-code   # ~/.claude/skills/{tcrit,tcrit-cli}/
-tcrit install claude-code           # From a repo root: install for that project
+cd ~ && critty install claude-code   # ~/.claude/skills/{critty,critty-cli}/
+critty install claude-code           # From a repo root: install for that project
 ```
 
-Then use `/tcrit [file]`.
+Then use `/critty [file]`.
 
 #### Codex
 
 ```bash
-cd ~ && tcrit install codex        # ~/.agents/skills/{tcrit,tcrit-cli}/
-tcrit install codex                # From a repo root: install for that project
+cd ~ && critty install codex        # ~/.agents/skills/{critty,critty-cli}/
+critty install codex                # From a repo root: install for that project
 ```
 
-Then use `$tcrit`. The installed skills use Codex invocation syntax and reply attribution.
+Then use `$critty`. The installed skills use Codex invocation syntax and reply attribution.
 
 #### OpenCode
 
 ```bash
-cd ~ && tcrit install opencode     # ~/.config/opencode/commands/tcrit.md and ~/.config/opencode/skills/tcrit-cli/
-tcrit install opencode             # From a repo root: install for that project
+cd ~ && critty install opencode     # ~/.config/opencode/commands/critty.md and ~/.config/opencode/skills/critty-cli/
+critty install opencode             # From a repo root: install for that project
 ```
 
-Then use `/tcrit [file]`.
+Then use `/critty [file]`.
 
 #### Gemini CLI
 
 ```bash
-cd ~ && tcrit install gemini        # ~/.gemini/skills/tcrit/ and ~/.gemini/skills/tcrit-cli/
-tcrit install gemini                # From a repo root: install for that project
+cd ~ && critty install gemini        # ~/.gemini/skills/critty/ and ~/.gemini/skills/critty-cli/
+critty install gemini                # From a repo root: install for that project
 ```
 
-Ask Gemini to use the `tcrit` skill to review your changes or a document. The current agent runs the review loop using the same instructions as the other integrations. Use `/skills reload` if Gemini CLI is already running, and `/skills list` to check discovery.
+Ask Gemini to use the `critty` skill to review your changes or a document. The current agent runs the review loop using the same instructions as the other integrations. Use `/skills reload` if Gemini CLI is already running, and `/skills list` to check discovery.
 
 If you used the earlier `@tcrit` subagent integration, remove the old `.gemini/agents/tcrit.md` yourself; the installer leaves it in place.
 
 #### Prompt templates
 
 ```bash
-cd ~ && tcrit install prompts        # Install global templates under ~/.config/tcrit/prompts/
-tcrit install prompts                # From a repo root: install under .tcrit/prompts/
-tcrit check                         # Report stale installed integrations
+cd ~ && critty install prompts        # Install global templates under ~/.config/tcrit/prompts/
+critty install prompts                # From a repo root: install under .tcrit/prompts/
+critty check                         # Report stale installed integrations
 ```
 
 ### Building a custom flow
@@ -147,12 +152,12 @@ tcrit check                         # Report stale installed integrations
 The skills only run the review loop, so your project instructions can wrap them in a larger flow.  This example has the agent attach the commit message to the code review and commit once the review is approved.  Put something like this in your `CLAUDE.md` or `AGENTS.md`:
 
 ```markdown
-Every implementation request ends with a TCrit review and a commit.  After implementing what was asked:
+Every implementation request ends with a Critty review and a commit.  After implementing what was asked:
 
 1. Stage the source changes for this commit.
 2. Draft the commit message in `.tmp/.review/COMMIT_MESSAGE.md`, keeping it outside the index.
-3. Review with the `tcrit` skill: run `tcrit review --staged --attachment .tmp/.review/COMMIT_MESSAGE.md` and wait for it to exit.
-4. Address new feedback, update the message to match, stage the source changes, and reply on the thread.  Run the next round with `tcrit --session <id> --attachment .tmp/.review/COMMIT_MESSAGE.md` to refresh the attached message.  Repeat until approved.
+3. Review with the `critty` skill: run `critty review --staged --attachment .tmp/.review/COMMIT_MESSAGE.md` and wait for it to exit.
+4. Address new feedback, update the message to match, stage the source changes, and reply on the thread.  Run the next round with `critty --session <id> --attachment .tmp/.review/COMMIT_MESSAGE.md` to refresh the attached message.  Repeat until approved.
 5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F .tmp/.review/COMMIT_MESSAGE.md`.
 ```
 
@@ -171,11 +176,11 @@ In the second round, select the message body from line 3 with `v` and press Ente
 ## Requirements
 
 - **Go 1.25+** for building from source
-- **Herdr or tmux** for automatic agent review workflows. Without either multiplexer, tcrit can run the TUI directly in an interactive terminal.
+- **Herdr or tmux** for automatic agent review workflows. Without either multiplexer, critty can run the TUI directly in an interactive terminal.
 
 ### Starting a multiplexer session
 
-For the most spacious review layout, start the agent inside [Herdr](https://herdr.dev/). Tcrit opens each review in a dedicated tab and returns to the agent tab when the review ends.
+For the most spacious review layout, start the agent inside [Herdr](https://herdr.dev/). Critty opens each review in a dedicated tab and returns to the agent tab when the review ends.
 
 Alternatively, start tmux before launching your agent:
 
@@ -185,52 +190,52 @@ tmux new -s work
 claude
 ```
 
-Without Herdr or tmux, launch tcrit yourself in an interactive terminal when an agent asks you to review.
+Without Herdr or tmux, launch critty yourself in an interactive terminal when an agent asks you to review.
 
 ## CLI overview
 
-Running `tcrit` with no subcommand reviews the current Git changes. Running `tcrit <file>` reviews one document.
+Running `critty` with no subcommand reviews the current Git changes. Running `critty <file>` reviews one document.
 
 | Command | Purpose |
 |---------|---------|
-| `tcrit [file]` | Review current Git changes, or review `file` when given |
-| `tcrit --staged` | Review only changes staged in the index |
-| `tcrit --unstaged` | Review unstaged and untracked changes |
-| `tcrit --scope <scope>` | Select all (default), staged, unstaged, or a committed comparison |
-| `tcrit --diff[=FILE]` | Review a supplied diff; omit FILE or use `-` for stdin |
-| `tcrit review [--scope <scope>] [file]` | Explicit form of the default review command; `--staged` reviews only the index |
-| `tcrit plan [--name <slug>] [file]` | Create an independent versioned plan review; use `--session <id>` to continue one |
-| `tcrit --session <id>` | Resume a saved review after process exit, from its original directory |
-| `tcrit stop --session <id>` | Stop the TUI while keeping saved comments and round context |
-| `tcrit status` | List saved sessions in this directory, including whether each is running |
-| `tcrit clear --session <id>` | Delete one stopped review |
-| `tcrit comment ...` | Add comments or replies, import JSON, or clear the selected review |
-| `tcrit comments [--json] [--all]` | List unresolved comments, optionally including resolved comments |
-| `tcrit clear <file>` | Clear a document review; use `--code` for code review or `--all` for all reviews in the current directory |
-| `tcrit status <file>` / `tcrit status --code` | Print the document or aggregate code-review status as JSON |
-| `tcrit install <target>` | Install `claude-code`, `codex`, `gemini`, or `prompts`; `all` installs every agent integration |
-| `tcrit check` | Report installed integration files that are stale |
-| `tcrit env [all \| tty \| run <command>...]` | Print the variables that identify the current Herdr or tmux pane (`--json` for JSON), only the terminal device, or run a command with them |
-| `tcrit completion <shell>` | Generate completion for Bash, Zsh, Fish, or PowerShell |
+| `critty [file]` | Review current Git changes, or review `file` when given |
+| `critty --staged` | Review only changes staged in the index |
+| `critty --unstaged` | Review unstaged and untracked changes |
+| `critty --scope <scope>` | Select all (default), staged, unstaged, or a committed comparison |
+| `critty --diff[=FILE]` | Review a supplied diff; omit FILE or use `-` for stdin |
+| `critty review [--scope <scope>] [file]` | Explicit form of the default review command; `--staged` reviews only the index |
+| `critty plan [--name <slug>] [file]` | Create an independent versioned plan review; use `--session <id>` to continue one |
+| `critty --session <id>` | Resume a saved review after process exit, from its original directory |
+| `critty stop --session <id>` | Stop the TUI while keeping saved comments and round context |
+| `critty status` | List saved sessions in this directory, including whether each is running |
+| `critty clear --session <id>` | Delete one stopped review |
+| `critty comment ...` | Add comments or replies, import JSON, or clear the selected review |
+| `critty comments [--json] [--all]` | List unresolved comments, optionally including resolved comments |
+| `critty clear <file>` | Clear a document review; use `--code` for code review or `--all` for all reviews in the current directory |
+| `critty status <file>` / `critty status --code` | Print the document or aggregate code-review status as JSON |
+| `critty install <target>` | Install `claude-code`, `codex`, `gemini`, or `prompts`; `all` installs every agent integration |
+| `critty check` | Report installed integration files that are stale |
+| `critty env [all \| tty \| run <command>...]` | Print the variables that identify the current Herdr or tmux pane (`--json` for JSON), only the terminal device, or run a command with them |
+| `critty completion <shell>` | Generate completion for Bash, Zsh, Fish, or PowerShell |
 
-When a tool runs from the terminal's process tree but without its multiplexer variables, `tcrit env` prints the `TMUX`, `TMUX_PANE`, and `TTY` or `HERDR_*` variables that identify the pane, as `NAME=value` lines or with `--json`.  Without a pane, `TTY` is the controlling terminal of the nearest ancestor process, or `SSH_TTY`.  `tcrit env tty` prints only the terminal device, and `tcrit env run <command>` (or `tcrit env -- <command>`) runs a command with those variables set.
+When a tool runs from the terminal's process tree but without its multiplexer variables, `critty env` prints the `TMUX`, `TMUX_PANE`, and `TTY` or `HERDR_*` variables that identify the pane, as `NAME=value` lines or with `--json`.  Without a pane, `TTY` is the controlling terminal of the nearest ancestor process, or `SSH_TTY`.  `critty env tty` prints only the terminal device, and `critty env run <command>` (or `critty env -- <command>`) runs a command with those variables set.
 
 ## Code Review (multi-file)
 
 ```bash
-tcrit
+critty
 # Equivalent explicit form
-tcrit review
+critty review
 # Review only changes staged in the index
-tcrit --staged
+critty --staged
 # Equivalent explicit form
-tcrit review --staged
+critty review --staged
 # Review unstaged and untracked changes
-tcrit --unstaged
+critty --unstaged
 # Review an arbitrary commit range from stdin
-git diff main feature | tcrit --diff
+git diff main feature | critty --diff
 # Equivalent explicit form
-git diff main feature | tcrit review --diff
+git diff main feature | critty review --diff
 ```
 
 Detects changed files in your git repo and opens a tabbed TUI with syntax highlighting, diff markers, and inline commenting across all changed files.
@@ -244,15 +249,15 @@ When the next round takes you to a new agent reply, its unresolved thread opens 
 
 ```bash
 # Get unresolved comments in the agent-facing format
-tcrit comments --json
+critty comments --json
 ```
 
 ### Supplied diffs
 
-`tcrit --diff=changes.diff` reviews one Git unified diff, and bare `--diff` reads it from standard input, even outside a Git repository.  When the pre-change files are in the local Git object database, TCrit reconstructs the complete files; otherwise it shows the supplied context and marks omitted lines.  For another round with updated input, regenerate the diff and pass the saved session:
+`critty --diff=changes.diff` reviews one Git unified diff, and bare `--diff` reads it from standard input, even outside a Git repository.  When the pre-change files are in the local Git object database, Critty reconstructs the complete files; otherwise it shows the supplied context and marks omitted lines.  For another round with updated input, regenerate the diff and pass the saved session:
 
 ```bash
-git diff main feature | tcrit --diff --session <id>
+git diff main feature | critty --diff --session <id>
 ```
 
 ### How code review works
@@ -260,30 +265,30 @@ git diff main feature | tcrit --diff --session <id>
 Choose an explicit scope or a committed comparison:
 
 ```bash
-tcrit --scope=all                 # HEAD versus working tree, including untracked files
-tcrit --scope=staged              # HEAD versus index (--staged remains an alias)
-tcrit --scope=unstaged            # index versus working tree, including untracked files
-tcrit --scope=main..HEAD          # compare the two committed snapshots
-tcrit --scope=main...             # compare the merge base with HEAD (omitted B)
-tcrit --scope=v0.7.0..v0.7.3      # review a historical comparison
+critty --scope=all                 # HEAD versus working tree, including untracked files
+critty --scope=staged              # HEAD versus index (--staged remains an alias)
+critty --scope=unstaged            # index versus working tree, including untracked files
+critty --scope=main..HEAD          # compare the two committed snapshots
+critty --scope=main...             # compare the merge base with HEAD (omitted B)
+critty --scope=v0.7.0..v0.7.3      # review a historical comparison
 ```
 
 An omitted endpoint means HEAD, and committed comparisons show the right endpoint's contents even if the working tree differs.  The scope stays fixed for the session, and every new invocation gets its own session ID, so use `--session <id>` with the comment commands when several reviews exist.
 
-1. An agent (or you) runs `tcrit review --code` — the TUI opens in a Herdr tab or tmux split and the command blocks
+1. An agent (or you) runs `critty review --code` — the TUI opens in a Herdr tab or tmux split and the command blocks
 2. Navigate between files and leave inline comments on the changes
 3. Press `q` or click **Submit** in the top bar — the finish dialog offers **Finish Review** with unresolved comments and **Approve** without any
 4. On finish, the blocked command prints every thread with instructions for the agent and `approved: true|false`
-5. The agent edits the files, replies with `tcrit comment --reply-to`, and runs the printed `tcrit --session <id>` for the next round, where the comments follow the updated code
+5. The agent edits the files, replies with `critty comment --reply-to`, and runs the printed `critty --session <id>` for the next round, where the comments follow the updated code
 6. Resolve comments with `r` and approve to end the loop
 
 ## Stopping and resuming
 
 ```bash
-tcrit status                    # list saved sessions in this working directory
-tcrit stop --session <id>        # stop without deleting or approving
-tcrit --session <id>             # reopen from the original directory
-tcrit clear --session <id>       # explicitly delete a stopped review
+critty status                    # list saved sessions in this working directory
+critty stop --session <id>        # stop without deleting or approving
+critty --session <id>             # reopen from the original directory
+critty clear --session <id>       # explicitly delete a stopped review
 ```
 
 The TUI closes after every submitted round.  Stopping mid-round keeps the comments, replies, and round number; code and document reviews reread their sources when resumed, while plan and supplied-diff reviews reopen the saved input.  The session ID is printed when a review starts and in the finish prompt.  Approval deletes the review data by default (`cleanup_on_approve`).
@@ -291,24 +296,24 @@ The TUI closes after every submitted round.  Stopping mid-round keeps the commen
 ## Plan Review (versioned)
 
 ```bash
-tcrit plan docs/plans/my-plan.md            # slug derived from the first heading
-tcrit plan --name auth docs/plans/plan.md   # pinned slug
+critty plan docs/plans/my-plan.md            # slug derived from the first heading
+critty plan --name auth docs/plans/plan.md   # pinned slug
 ```
 
-Saves numbered versions of the plan in the session directory.  Run `tcrit plan --session <id> <file>` to submit a revised version (stdin works too), or `tcrit --session <id>` to reopen the saved one.  Comments carry forward onto the revised text.
+Saves numbered versions of the plan in the session directory.  Run `critty plan --session <id> <file>` to submit a revised version (stdin works too), or `critty --session <id>` to reopen the saved one.  Comments carry forward onto the revised text.
 
 ### Attached documents
 
 Attach notices, approval notes, or a commit message without staging them:
 
 ```bash
-tcrit review --staged --attachment .tmp/NOTICE.md --attachment .tmp/COMMIT_MESSAGE.md
-tcrit plan design.md --attachment .tmp/APPROVAL.md
+critty review --staged --attachment .tmp/NOTICE.md --attachment .tmp/COMMIT_MESSAGE.md
+critty plan design.md --attachment .tmp/APPROVAL.md
 ```
 
 Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported.
 
-Resuming with `tcrit --session <id>` uses the saved document snapshots.  To revise them, pass the complete list again with `--attachment`; use `--clear-attachments` to remove all of them.  Comments on removed documents remain accessible.  A file can appear both as an attachment and in the diff, with separate comments.  Attachments also allow reviewing a clean Git scope.
+Resuming with `critty --session <id>` uses the saved document snapshots.  To revise them, pass the complete list again with `--attachment`; use `--clear-attachments` to remove all of them.  Comments on removed documents remain accessible.  A file can appear both as an attachment and in the diff, with separate comments.  Attachments also allow reviewing a clean Git scope.
 
 ### Interactive forms
 
@@ -331,32 +336,32 @@ Resuming unchanged input keeps draft answers.  Changing a field's definition res
 Use `--result FILE` to save the self-contained JSON result, including source snapshots, field definitions, answers, human provenance, and the review revision:
 
 ```bash
-tcrit review --staged --attachment .tmp/APPROVAL.md --result .tmp/result.json
+critty review --staged --attachment .tmp/APPROVAL.md --result .tmp/result.json
 ```
 
-Completed form results are also retained as `result-<round>.json` in the session directory and included in the finish prompt.  Only a consent explicitly `true` in an approved result grants its described permission for the exact reviewed target.  Overall approval supplies no individual consent; feedback and stopped reviews grant none.  TCrit records decisions and executes no operations.  Approval retains form reviews until the result has been recorded and the printed `tcrit clear --session <id>` command is run.  The result remains usable after session deletion.
+Completed form results are also retained as `result-<round>.json` in the session directory and included in the finish prompt.  Only a consent explicitly `true` in an approved result grants its described permission for the exact reviewed target.  Overall approval supplies no individual consent; feedback and stopped reviews grant none.  Critty records decisions and executes no operations.  Approval retains form reviews until the result has been recorded and the printed `critty clear --session <id>` command is run.  The result remains usable after session deletion.
 
 ## Document Review (single file)
 
 ```bash
-tcrit review docs/plans/my-plan.md
+critty review docs/plans/my-plan.md
 ```
 
 Opens a full-screen terminal UI with syntax-highlighted markdown, a comment sidebar, and modal overlays for adding/editing comments.
 
 ### Multiplexer mode
 
-When `tcrit review` runs inside Herdr, the TUI automatically opens in a dedicated full-width tab. Inside tmux, it opens in a side-by-side split pane. In both cases the invoking command blocks until you finish the review — the same feedback loop as [crit](https://github.com/tomasz-tomczyk/crit), with a TUI in place of the browser.
+When `critty review` runs inside Herdr, the TUI automatically opens in a dedicated full-width tab. Inside tmux, it opens in a side-by-side split pane. In both cases the invoking command blocks until you finish the review — the same feedback loop as [crit](https://github.com/tomasz-tomczyk/crit), with a TUI in place of the browser.
 
-TCrit finds the pane that ran the command from the process tree, even when the agent's tool runner drops the multiplexer environment variables.  For Codex's background server, use the [Codex wrapper](#codex-with-a-background-server).
+Critty finds the pane that ran the command from the process tree, even when the agent's tool runner drops the multiplexer environment variables.  For Codex's background server, use the [Codex wrapper](#codex-with-a-background-server).
 
 ### How document review works
 
 1. Claude writes a plan (or you open any markdown file)
-2. `tcrit review <path>` opens the TUI — read through and leave inline comments
+2. `critty review <path>` opens the TUI — read through and leave inline comments
 3. Finish the review with `q`; comments are saved as crit-compatible `review.json` under `$XDG_STATE_HOME/tcrit/reviews/` (or `~/.local/state/tcrit/reviews/`)
-4. Claude reads all returned threads for new instructions, including resolved threads, edits the document, and replies where there is new feedback or a substantive update.  Use `tcrit comments --json --all` to retrieve all saved threads separately.
-5. Claude runs the printed `tcrit --session <id>`; a new TUI restores the review with the fixes for the next round
+4. Claude reads all returned threads for new instructions, including resolved threads, edits the document, and replies where there is new feedback or a substantive update.  Use `critty comments --json --all` to retrieve all saved threads separately.
+5. Claude runs the printed `critty --session <id>`; a new TUI restores the review with the fixes for the next round
 
 ## Keybindings
 
@@ -391,7 +396,7 @@ Use `[` / `]` to revisit all threads and `{` / `}` to work through unresolved on
 
 **File references:** `@path/to/file`, optionally followed by ` L40`, in a comment or reply becomes a clickable link to that file and line.  Paths are relative to the review's working directory; escape a space with a backslash.  `alt+w` copies a ready-made reference for the current line, `ctrl+y` pastes it, and typing `@` completes paths, as described below.
 
-A reference without a line opens the file's tab.  When the file or line is not part of the review, a dialog offers to open it in `$EDITOR`, which also serves `alt+e` and `alt+g`; TCrit passes `--goto FILE:LINE` to editors that advertise it and `+LINE FILE` to the rest.
+A reference without a line opens the file's tab.  When the file or line is not part of the review, a dialog offers to open it in `$EDITOR`, which also serves `alt+e` and `alt+g`; Critty passes `--goto FILE:LINE` to editors that advertise it and `+LINE FILE` to the rest.
 
 **Thread references:** A comment ID such as `c_a3f8b2` in a comment or reply links to that thread, even across review rounds; click it to jump there.  `alt+w` copies the focused thread's ID, as it does for source lines.
 
@@ -418,7 +423,7 @@ A reference without a line opens the file's tab.  When the file or line is not p
 
 The kill ring is shared across comment and reply dialogs for the TUI run and is independent of the system clipboard.  `alt` is the terminal's Meta modifier; configure your terminal to send Meta for these shortcuts.
 
-`ctrl+v` pastes an image when the clipboard holds one and text otherwise.  Image paste uses AppKit on macOS and needs `wl-paste` or `xclip` on Linux; over SSH it reads the remote host's clipboard.  Images are saved under the session's `attachments/` directory and referenced from the comment as Markdown, and they survive rounds and stop/resume.  With the default `cleanup_on_approve`, approval defers deletion until the agent has read them and runs the printed `tcrit clear --session <id>`.
+`ctrl+v` pastes an image when the clipboard holds one and text otherwise.  Image paste uses AppKit on macOS and needs `wl-paste` or `xclip` on Linux; over SSH it reads the remote host's clipboard.  Images are saved under the session's `attachments/` directory and referenced from the comment as Markdown, and they survive rounds and stop/resume.  With the default `cleanup_on_approve`, approval defers deletion until the agent has read them and runs the printed `critty clear --session <id>`.
 
 **Code review only:**
 
@@ -445,48 +450,48 @@ Normally, only threads resolved in earlier rounds are folded.  `h` also folds th
 ## Scriptable CLI
 
 The comment CLI follows [crit](https://github.com/tomasz-tomczyk/crit)'s
-syntax, so agent tooling written for crit works against TCrit reviews:
+syntax, so agent tooling written for crit works against Critty reviews:
 
 ```bash
 # Review-level, file-level, and line-level comments
-tcrit comment "Overall this looks good"
-tcrit comment docs/plan.md "Needs a rewrite"
-tcrit comment docs/plan.md:15 "This needs more detail"
-tcrit comment docs/plan.md:10-20 "Rethink this section"
+critty comment "Overall this looks good"
+critty comment docs/plan.md "Needs a rewrite"
+critty comment docs/plan.md:15 "This needs more detail"
+critty comment docs/plan.md:10-20 "Rethink this section"
 
 # Reply to a comment (e.g. an AI explaining how it addressed feedback)
-tcrit comment --reply-to c_a3f8b2 --author 'Claude Code' "Split into two functions"
+critty comment --reply-to c_a3f8b2 --author 'Claude Code' "Split into two functions"
 
 # Bulk import comments and replies from JSON
-tcrit comment --json --file comments.json
+critty comment --json --file comments.json
 
 # List unresolved comments (add --all for resolved ones, --json for JSON)
-tcrit comments
-tcrit comments --json
+critty comments
+critty comments --json
 
 # Clear review state
-tcrit clear docs/plan.md
-tcrit clear --code
-tcrit clear --all
+critty clear docs/plan.md
+critty clear --code
+critty clear --all
 
 # Get review comments as JSON (single file)
-tcrit status docs/plan.md
+critty status docs/plan.md
 
 # Get all code review comments as JSON
-tcrit status --code
+critty status --code
 ```
 
 ## Shell Completions
 
 ```bash
 # Bash
-tcrit completion bash > /etc/bash_completion.d/tcrit
+critty completion bash > /etc/bash_completion.d/critty
 
 # Zsh
-tcrit completion zsh > "${fpath[1]}/_tcrit"
+critty completion zsh > "${fpath[1]}/_critty"
 
 # Fish
-tcrit completion fish > ~/.config/fish/completions/tcrit.fish
+critty completion fish > ~/.config/fish/completions/critty.fish
 ```
 
 ## Development

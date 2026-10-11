@@ -78,8 +78,8 @@ func TestWrapperProcess(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
-	tcrit := filepath.Join(dir, "tcrit")
-	build = exec.Command("go", "build", "-o", tcrit, "../../cmd/tcrit")
+	critty := filepath.Join(dir, "critty")
+	build = exec.Command("go", "build", "-o", critty, "../../cmd/critty")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
@@ -106,15 +106,15 @@ exit 127
 	t.Setenv("XDG_STATE_HOME", filepath.Join(dir, "state"))
 	t.Setenv("TEST_LOG", filepath.Join(dir, "args"))
 	t.Setenv("TEST_ENV", filepath.Join(dir, "env"))
-	for _, entry := range []string{"wrapper", "tcrit", "foreign-first", "foreign-last"} {
+	for _, entry := range []string{"wrapper", "critty", "foreign-first", "foreign-last"} {
 		for _, args := range [][]string{{"resume", "--last"}, {"--add-dir", "/tmp", "--worktree"}, {"--no-daemon"}, {"--remote", "unix://"}, {"-c", "shell_environment_policy.set.X=123"}, {"--help"}, {"exec", "--", "--remote"}, {"--unknown", "a prompt"}} {
 			t.Run(entry+strings.Join(args, " "), func(t *testing.T) {
 				path := filepath.Dir(wrapper) + ":" + filepath.Dir(real)
 				exe := wrapper
 				input := args
 				switch entry {
-				case "tcrit":
-					exe = tcrit
+				case "critty":
+					exe = critty
 					input = append([]string{"codex"}, args...)
 				case "foreign-first":
 					exe = foreign
