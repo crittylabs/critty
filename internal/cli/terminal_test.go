@@ -30,7 +30,7 @@ func TestTerminalNotificationRoutesReview(t *testing.T) {
 	if err := json.Unmarshal(output.Bytes(), &request); err != nil {
 		t.Fatal(err)
 	}
-	if request.ID == "" || request.Marker != "TCRIT-"+request.ID {
+	if request.ID == "" || request.Marker != "CRITTY-"+request.ID {
 		t.Fatalf("invalid prepare response: %s", output.Bytes())
 	}
 	notify, _, err := rootCmd.Find([]string{"terminal", "notify"})

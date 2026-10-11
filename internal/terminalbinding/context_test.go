@@ -42,7 +42,7 @@ func TestSnapshotUsesVisiblePaneAndPinnedSocket(t *testing.T) {
 printf '%s\n' "$@" > "$ARGS_FILE"
 printf '%s' "$HERDR_SOCKET_PATH" > "$SOCKET_FILE"
 `
-			script += "printf 'TCRIT-visible'\n"
+			script += "printf 'CRITTY-visible'\n"
 			if err := os.WriteFile(filepath.Join(dir, kind), []byte(script), 0755); err != nil {
 				t.Fatal(err)
 			}
@@ -57,7 +57,7 @@ printf '%s' "$HERDR_SOCKET_PATH" > "$SOCKET_FILE"
 				want = "pane\nread\nw1:p1\n--source\nvisible\n--format\ntext\n"
 			}
 			text, err := Snapshot(context.Background(), target)
-			if err != nil || text != "TCRIT-visible" {
+			if err != nil || text != "CRITTY-visible" {
 				t.Fatalf("snapshot %q %v", text, err)
 			}
 			args, err := os.ReadFile(filepath.Join(dir, "args"))

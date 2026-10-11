@@ -48,7 +48,7 @@ File tabs follow the expanded file tree from top to bottom: directories come fir
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
 
-Critty was called TCrit until v0.17.0.  When switching from TCrit, update scripts to call `critty`, reinstall the skills as `critty` and `critty-cli`, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.
+Critty was called TCrit until v0.17.0.  When switching from TCrit, update scripts to call `critty`, reinstall the skills as `critty` and `critty-cli`, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
 ### Command-line binary
 
@@ -88,7 +88,7 @@ critty codex resume
 
 Launch Codex through `critty codex`, or put Critty's bundled `codex` wrapper before the original Codex in PATH.  The wrapper records which tmux or Herdr pane Codex runs in, then starts Codex with its arguments and environment unchanged.  `go install github.com/knu/tcrit/cmd/...@latest` installs both binaries; the [mise GitHub backend](https://mise.jdx.dev/dev-tools/backends/github.html#bin_path) exposes both from the release archive when `github:knu/tcrit` comes before the tool providing Codex in `[tools]`.
 
-Before each review round the Critty skill displays a one-time marker, and Critty looks for it in the registered panes to find where to open the review, so keep the marker visible.  A terminal filter such as [tfil](https://github.com/knu/tfil) 0.4.0 with `--tcrit-notify` can report the marker directly instead; the protocol is described in [docs/terminal-filter.md](docs/terminal-filter.md).
+Before each review round the Critty skill displays a one-time marker, and Critty looks for it in the registered panes to find where to open the review, so keep the marker visible.  A terminal filter such as [tfil](https://github.com/knu/tfil) 0.4.1 or later with `--critty-notify` can report the marker directly instead; the protocol is described in [docs/terminal-filter.md](docs/terminal-filter.md).
 
 ### Agent skills
 

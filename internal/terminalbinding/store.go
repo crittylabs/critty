@@ -20,7 +20,7 @@ import (
 )
 
 const requestLifetime = 2 * time.Minute
-const markerPrefix = "TCRIT-"
+const markerPrefix = "CRITTY-"
 
 // Request is the prepare response. Marker must be displayed verbatim before resolving ID.
 type Request struct {
