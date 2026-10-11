@@ -480,7 +480,7 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	for _, want := range []string{
 		"Keyboard Help", "General", "Navigation", "Code review", "Selection and dialogs",
 		"↑/↓,j/k", "PgUp/PgDn", "Home/End,g/G,</>", "TAB/S-TAB", "C-s", "C-PgUp/PgDn", "y/n/ESC", "M-p",
-		"Incremental search", "C-s / C-r", "C-d / C-w", "DEL / C-y", "M-s c/w/r/m", "terminal paste",
+		"Incremental search", "C-s / C-r", "C-d / C-w", "DEL / C-y", "M-s i/c/w/r/m", "terminal paste",
 		"C-: ctrl+, M-: meta/alt+, S-: shift+", "RET: enter", "DEL: backspace",
 	} {
 		if !strings.Contains(rendered+help, want) {
@@ -563,7 +563,7 @@ func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
 			break
 		}
 	}
-	if !strings.Contains(ansi.Strip(app.View().Content), "M-s c/w/r/m") {
+	if !strings.Contains(ansi.Strip(app.View().Content), "M-s i/c/w/r/m") {
 		t.Fatal("Down button did not reveal search mode shortcuts")
 	}
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 40})

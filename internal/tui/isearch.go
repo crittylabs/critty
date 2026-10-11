@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -30,6 +31,115 @@ const (
 	isearchLiteral
 	isearchWord
 )
+
+type isearchMouseAction int
+
+const (
+	isearchStart isearchMouseAction = iota
+	isearchPrevious
+	isearchNext
+	isearchKeep
+	isearchCancel
+	isearchInput
+	isearchCaseFold
+	isearchFiles
+)
+
+type isearchMouseRegion struct {
+	rect   mouseRect
+	action isearchMouseAction
+}
+
+func (m AppModel) searchButton() string {
+	if len(m.tabs) == 0 || m.tab().doc == nil {
+		return ""
+	}
+	button := renderBarButton("Search", "/")
+	if m.width > 0 && lipgloss.Width(button+" "+m.submitButton()+" ") > m.width {
+		button = renderBarButton("Search", "")
+	}
+	return button
+}
+
+func (m AppModel) isearchControls(top int) (string, []isearchMouseRegion) {
+	var b strings.Builder
+	var regions []isearchMouseRegion
+	x, y := 0, top
+	caseLabel := "Case:smart"
+	if m.isearch.caseFold {
+		caseLabel = "Case:ignore"
+	}
+	filesLabel := "Files:current"
+	if m.isearchAllFiles() {
+		filesLabel = "Files:all"
+	}
+	for _, spec := range []struct {
+		label, hint string
+		action      isearchMouseAction
+	}{
+		{"Prev", "C-r", isearchPrevious},
+		{"Next", "C-s", isearchNext},
+		{"Keep", "RET", isearchKeep},
+		{"Cancel", "ESC", isearchCancel},
+		{caseLabel, "M-s i", isearchCaseFold},
+		{filesLabel, "M-s m", isearchFiles},
+	} {
+		hint := spec.hint
+		if m.width < 60 {
+			hint = ""
+		}
+		button := renderBarButton(spec.label, hint)
+		width := lipgloss.Width(button)
+		if x > 0 && x+1+width > m.width {
+			b.WriteByte('\n')
+			x, y = 0, y+1
+		}
+		if x > 0 {
+			b.WriteByte(' ')
+			x++
+		}
+		b.WriteString(button)
+		regions = append(regions, isearchMouseRegion{
+			rect: mouseRect{left: x, right: x + width, top: y, bottom: y + 1}, action: spec.action,
+		})
+		x += width
+	}
+	return b.String(), regions
+}
+
+func (m *AppModel) handleISearchMouse(mouse tea.Mouse) bool {
+	if m.modal != noModal || len(m.tabs) == 0 || mouse.Button != tea.MouseLeft {
+		return false
+	}
+	_, layout := m.renderReviewScreen()
+	for _, region := range layout.isearchRegions {
+		if !region.rect.contains(mouse) {
+			continue
+		}
+		switch region.action {
+		case isearchStart:
+			if !m.isearch.active {
+				m.startISearch(true)
+			}
+		case isearchPrevious:
+			m.isearchRepeat(false)
+		case isearchNext:
+			m.isearchRepeat(true)
+		case isearchKeep:
+			m.exitISearch(false)
+		case isearchCancel:
+			m.exitISearch(true)
+		case isearchCaseFold:
+			m.isearch.prefix = false
+			m.toggleISearch("i")
+		case isearchFiles:
+			m.isearch.prefix = false
+			m.toggleISearch("m")
+		}
+		return true
+	}
+	return false
+}
 
 // isearchOptions persist from one search to the next during a run.
 type isearchOptions struct {
@@ -298,7 +408,7 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
 func (m *AppModel) toggleISearch(key string) {
 	s := &m.isearch
 	switch key {
-	case "c":
+	case "c", "i":
 		s.caseFold = !s.caseFold
 	case "w":
 		s.mode = toggledMode(s.mode, isearchWord)
@@ -309,6 +419,7 @@ func (m *AppModel) toggleISearch(key string) {
 	default:
 		return
 	}
+	m.recalculateLayout()
 	m.isearchFromOrigin()
 }
 
@@ -693,7 +804,7 @@ func (m AppModel) isearchPrompt() (string, int) {
 		status = fmt.Sprintf(" (%d/%d)", s.position, s.count)
 	}
 	if s.prefix {
-		status += " [M-s: c case-fold/smart-case, w word, r regexp, m multi-file]"
+		status += " [M-s: i/c case-fold/smart-case, w word, r regexp, m multi-file]"
 	}
 	// Keep the input end visible and reserve a cell for the real terminal cursor.
 	queryWidth := ansi.StringWidth(s.query)

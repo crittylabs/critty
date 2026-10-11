@@ -340,6 +340,80 @@ func TestISearchUnicodeWordHighlights(t *testing.T) {
 	}
 }
 
+func clickISearchAction(t *testing.T, app AppModel, action isearchMouseAction) AppModel {
+	t.Helper()
+	_, layout := app.renderReviewScreen()
+	for _, region := range layout.isearchRegions {
+		if region.action == action {
+			return clickMouse(app, region.rect.left, region.rect.top)
+		}
+	}
+	t.Fatalf("search action %d is not visible", action)
+	return app
+}
+
+func TestISearchMouseControls(t *testing.T) {
+	for _, width := range []int{18, 40, 100} {
+		app := newISearchApp(t, 1)
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 12})
+		app = clickISearchAction(t, app, isearchStart)
+		if !app.isearch.active {
+			t.Fatal("Search did not start incremental search")
+		}
+		app = typeSearch(app, "alpha")
+		app = clickISearchAction(t, app, isearchCaseFold)
+		app = clickISearchAction(t, app, isearchFiles)
+		if !app.isearch.caseFold || !app.isearch.allFiles {
+			t.Fatal("search option buttons did not toggle their modes")
+		}
+		app = pressAltKey(app, 's')
+		app = typeSearch(app, "i")
+		if app.isearch.caseFold {
+			t.Fatal("M-s i did not restore smart case")
+		}
+		app = clickISearchAction(t, app, isearchNext)
+		assertCursor(t, app, 3)
+		app = clickISearchAction(t, app, isearchPrevious)
+		assertCursor(t, app, 1)
+		app = clickISearchAction(t, app, isearchNext)
+		app = clickISearchAction(t, app, isearchInput)
+		if !app.isearch.active {
+			t.Fatal("clicking the query exited search")
+		}
+		app = clickISearchAction(t, app, isearchKeep)
+		assertCursor(t, app, 3)
+		if app.isearch.active {
+			t.Fatal("Keep did not end search")
+		}
+		app = clickISearchAction(t, app, isearchStart)
+		app = typeSearch(app, "beta")
+		app = clickISearchAction(t, app, isearchCancel)
+		assertCursor(t, app, 3)
+		if app.isearch.active {
+			t.Fatal("Cancel did not end search")
+		}
+	}
+}
+
+func TestISearchMouseControlsAfterResize(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "alpha")
+	for _, width := range []int{100, 18, 40, 100} {
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 12})
+		_, layout := app.renderReviewScreen()
+		for _, region := range layout.isearchRegions {
+			if region.rect.left < 0 || region.rect.right > width || region.rect.top < 0 || region.rect.bottom > app.height {
+				t.Fatalf("width %d: control outside terminal: %+v", width, region)
+			}
+		}
+		app = clickISearchAction(t, app, isearchNext)
+		if !app.isearch.active || app.isearch.query != "alpha" {
+			t.Fatal("resized Next control exited or changed the search")
+		}
+	}
+}
+
 func TestISearchCapturesFollowingText(t *testing.T) {
 	app := setupAppWithDoc(t, "intro\nsee foo.Bar_baz qux\nfoo.bar_baz\n検索する機能\n")
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})

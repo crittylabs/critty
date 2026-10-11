@@ -204,6 +204,7 @@ type renderedScreenLayout struct {
 	hasFooterHelp   bool
 	modalRegions    []modalMouseRegion
 	isearchCursor   *tea.Cursor
+	isearchRegions  []isearchMouseRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -542,7 +543,10 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseClickMsg:
 		m.killRing.interrupt()
-		if m.isearch.active {
+		if m.handleISearchMouse(msg.Mouse()) {
+			return m, nil
+		}
+		if m.isearch.active && m.modal == noModal && msg.Mouse().Button == tea.MouseLeft {
 			m.exitISearch(false)
 		}
 		return m.handleMouseClick(msg)
@@ -2403,6 +2407,9 @@ func (m AppModel) renderReviewBar() string {
 	text += reviewBarStyle.Render(subject)
 	button := m.submitButton()
 	right := button + reviewBarStyle.Render(" ")
+	if search := m.searchButton(); search != "" {
+		right = search + reviewBarStyle.Render(" ") + right
+	}
 	if m.ignoreWhitespace {
 		right = reviewBarStyle.Render("[WS: ignored] ") + right
 	}
@@ -2562,9 +2569,17 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		sections = append(sections, footer)
 	}
 	layout := renderedScreenLayout{}
+	if rect, ok := buttonRect(header, 0, m.searchButton()); ok && m.searchButton() != "" {
+		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
+	}
 	if m.isearch.active && m.modal == noModal {
 		_, x := m.isearchPrompt()
 		layout.isearchCursor = tea.NewCursor(x, footerTop)
+		_, regions := m.isearchControls(footerTop + 1)
+		layout.isearchRegions = append(layout.isearchRegions, regions...)
+		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{
+			rect: mouseRect{left: 0, right: m.width, top: footerTop, bottom: footerTop + 1}, action: isearchInput,
+		})
 	}
 	if !t.selecting {
 		layout.finishButton, layout.hasFinishButton = buttonRect(header, 0, m.submitButton())
@@ -3603,7 +3618,8 @@ const footerMinHeight = 22
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
 	if m.isearch.active {
-		return m.renderISearchPrompt()
+		controls, _ := m.isearchControls(0)
+		return m.renderISearchPrompt() + "\n" + controls
 	}
 	if m.locationError != "" {
 		return footerStyle.Width(m.width).Render(m.locationError)
@@ -3760,7 +3776,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "enter / esc,C-g/c", desc: "keep match / cancel and return"},
 		{keys: "backspace / C-y", desc: "undo input piece / paste kill ring"},
 		{keys: "C-d / C-w", desc: "add following character / word"},
-		{keys: "M-s c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
+		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
 	return columns + "\n\n" + search + "\n\n" + contexts

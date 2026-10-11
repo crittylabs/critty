@@ -4,6 +4,8 @@
 
 ### Features
 
+- Incremental search has clickable Search, Prev, Next, Keep, Cancel, case-fold, and multi-file controls.  Search controls stay available in short terminals and wrap after resizing.  `alt+s i` toggles case folding, alongside `alt+s c`.
+
 - The bundled `critty-approval` skill prepares Markdown approval attachments with YAML frontmatter and interactive confirmations, choices, and consents, then ties execution to the exact human-approved result.  All four agent integrations install it.
 
 - `--null` reviews only attached documents without requiring a Git repository.
