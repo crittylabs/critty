@@ -33,9 +33,16 @@ matching_url() {
 }
 
 load_release() {
-    encoded_tag=$(jq -rn --arg tag "$tag" '$tag | @uri')
-    gh api --hostname github.com "repos/$repo/releases/tags/$encoded_tag" >"$work/release.json"
-    release_id=$(jq -er '.id' "$work/release.json")
+    # The releases/tags endpoint omits drafts whose tag does not exist yet,
+    # so search the release list, which includes drafts for writers.
+    gh api --hostname github.com --paginate --slurp \
+        "repos/$repo/releases?per_page=100" >"$work/releases.json"
+    matches=$(jq --arg tag "$tag" '[add // [] | .[] | select(.tag_name == $tag)]' "$work/releases.json")
+    case $(printf '%s' "$matches" | jq 'length') in
+        1) release_id=$(printf '%s' "$matches" | jq -er '.[0].id') ;;
+        0) fail "no release for tag: $tag" ;;
+        *) fail "more than one release for tag: $tag" ;;
+    esac
 }
 
 upload_asset() {

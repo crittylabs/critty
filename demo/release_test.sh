@@ -34,13 +34,15 @@ for arg in "$@"; do
 done
 
 case $endpoint in
-    */releases/tags/*)
-        [ "$UPLOAD_TEST_CASE" != missing ] || exit 1
-        if [ "$UPLOAD_TEST_CASE" = draft ]; then
-            printf '{"id":42,"draft":true}\n'
-        else
-            printf '{"id":42,"draft":false}\n'
-        fi
+    */releases\?per_page=100)
+        tag=${UPLOAD_TEST_TAG:-demo-assets}
+        case $UPLOAD_TEST_CASE in
+            missing) printf '[[{"id":41,"tag_name":"other","draft":false}]]\n' ;;
+            ambiguous) jq -n --arg tag "$tag" '[[{id:42, tag_name:$tag, draft:true}], [{id:43, tag_name:$tag, draft:false}]]' ;;
+            # The draft is on the second page, as drafts of a new tag would be.
+            draft) jq -n --arg tag "$tag" '[[{id:41, tag_name:"other", draft:false}], [{id:42, tag_name:$tag, draft:true}]]' ;;
+            *) jq -n --arg tag "$tag" '[[{id:42, tag_name:$tag, draft:false}]]' ;;
+        esac
         ;;
     */releases/42/assets\?per_page=100)
         [ "$UPLOAD_TEST_CASE" != list_failure ] || exit 1
@@ -64,7 +66,7 @@ jq -n --arg digest "sha256:$digest" --arg url "$url" --argjson size "$size" \
     '[[{id:7, name:"recording-v0.15.0.gif", state:"uploaded", size:$size,
     digest:$digest, browser_download_url:$url}]]' >"$test_dir/after.json"
 
-for scenario in duplicate new race failure missing draft list_failure repo_failure conflict renamed; do
+for scenario in duplicate new race failure missing ambiguous draft list_failure repo_failure conflict renamed; do
     export UPLOAD_TEST_CASE=$scenario
     : >"$test_dir/calls"
     rm -f "$test_dir/uploaded"
@@ -80,7 +82,7 @@ for scenario in duplicate new race failure missing draft list_failure repo_failu
     result=0
     sh "$root/demo/release.sh" upload "$test_dir/recording.gif" v0.15.0 >"$test_dir/out" 2>"$test_dir/err" || result=$?
     case $scenario in
-        duplicate | new | race | renamed)
+        duplicate | new | race | draft | renamed)
             [ "$result" -eq 0 ]
             [ "$(cat "$test_dir/out")" = "$url" ]
             ;;
@@ -90,7 +92,7 @@ for scenario in duplicate new race failure missing draft list_failure repo_failu
             ;;
     esac
     case $scenario in
-        new | race | failure | renamed) cmp "$test_dir/input" "$test_dir/uploaded" ;;
+        new | race | failure | draft | renamed) cmp "$test_dir/input" "$test_dir/uploaded" ;;
         *) [ ! -e "$test_dir/uploaded" ] ;;
     esac
     printf 'PASS %s\n' "$scenario"
@@ -110,10 +112,12 @@ sh "$root/demo/release.sh" list >"$test_dir/out"
 [ ! -s "$test_dir/out" ]
 printf 'PASS empty list\n'
 
-export UPLOAD_TEST_CASE=repo_failure
+export UPLOAD_TEST_CASE=repo_failure UPLOAD_TEST_TAG=media
 : >"$test_dir/calls"
 sh "$root/demo/release.sh" -r other/project -t media list >"$test_dir/out"
-grep -F 'repos/other/project/releases/tags/media' "$test_dir/calls" >/dev/null
+grep -F 'repos/other/project/releases?per_page=100' "$test_dir/calls" >/dev/null
+grep -F 'repos/other/project/releases/42/assets' "$test_dir/calls" >/dev/null
+unset UPLOAD_TEST_TAG
 printf 'PASS explicit repository and tag\n'
 
 for arguments in '' 'list extra' 'upload' 'unknown'; do
