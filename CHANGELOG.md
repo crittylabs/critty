@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.18.1
+
 ### Features
 
 - The bundled `critty-approval` skill prepares Markdown approval attachments with YAML frontmatter and interactive confirmations, choices, and consents, then ties execution to the exact human-approved result.  All four agent integrations install it.
@@ -14,6 +16,7 @@
 
 - Markdown quotes and italic text use the primary text color to stay readable on diff backgrounds.
 - `n` and `N` stop at added, deleted, and modified binary files even though they have no diff hunks.
+- `demo/release.sh` can upload recordings to a draft release before its tag exists.
 
 ## 0.18.0
 

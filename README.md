@@ -22,7 +22,7 @@ Your agent writes code or a plan, you review it in the TUI, and the agent reads 
 - **Review in the terminal** — read plans, documents, and multi-file diffs with syntax highlighting, and comment on a line, a range, a deleted line, or a whole file.
 - **Round trips with your agent** — the agent opens the review in a Herdr tab or a tmux split, waits for you to submit, reads your comments, and comes back with the next round.  `critty install` sets this up for Claude Code, Codex, OpenCode, and Gemini CLI.
 - **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | critty --diff`, single documents, and versioned plans that carry comment threads across revisions.
-- **Attached documents and forms** — review notices, commit messages, and approval notes alongside code.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
+- **Attached documents and forms** — review notices, commit messages, and approval notes alongside code or on their own, even outside a Git repository.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
 - **Comments made for code review** — replies, resolve and reopen, GitHub-style suggestions, clipboard images, `@path L40` and comment-ID references, and editing in `$EDITOR`.  Multi-line comments follow insertions and deletions within the selected range across review rounds.
 - **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
 - **Mouse and keyboard** — vim-style keys throughout, plus clickable tabs, lines, threads, and buttons, gutter drag to select ranges, and wheel scrolling.
@@ -49,6 +49,8 @@ File tabs follow the expanded file tree from top to bottom: directories come fir
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
 
 Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.  If tfil reports terminal markers, update it to 0.4.1 or later.
+
+After upgrading to v0.18.1, rerun `critty install` for your agent to add the new `critty-approval` skill and update the review instructions.
 
 ### Command-line binary
 
