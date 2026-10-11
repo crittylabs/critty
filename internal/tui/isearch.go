@@ -106,22 +106,51 @@ func (o isearchOptions) compile(query string) (*regexp.Regexp, error) {
 // characters, as Emacs word search does.  The last word may be incomplete
 // until the query ends with a nonword character.
 func wordPattern(query string) string {
-	isWord := func(r rune) bool { return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) }
-	words := strings.FieldsFunc(query, func(r rune) bool { return !isWord(r) })
+	words := strings.FieldsFunc(query, func(r rune) bool { return !isSearchWordRune(r) })
 	if len(words) == 0 {
 		return `[^\x00-\x{10FFFF}]` // matches nothing
 	}
 	for i, word := range words {
 		words[i] = regexp.QuoteMeta(word)
 	}
-	pattern := strings.Join(words, `\W+`)
-	if first, _ := utf8.DecodeRuneInString(query); isWord(first) {
-		pattern = `\b` + pattern
+	return strings.Join(words, `[^\pL\pN\pM_]+`)
+}
+
+func isSearchWordRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsMark(r)
+}
+
+// findMatches applies Unicode word boundaries outside the regexp engine,
+// whose word boundaries only recognize ASCII characters.
+func (s isearchState) findMatches(text string) [][]int {
+	if s.re == nil {
+		return nil
 	}
-	if last, _ := utf8.DecodeLastRuneInString(query); !isWord(last) {
-		pattern += `\b`
+	if s.mode != isearchWord {
+		return findNonEmpty(s.re, text)
 	}
-	return pattern
+	first, _ := utf8.DecodeRuneInString(s.query)
+	last, _ := utf8.DecodeLastRuneInString(s.query)
+	var locs [][]int
+	for offset := 0; offset < len(text); {
+		loc := s.re.FindStringIndex(text[offset:])
+		if loc == nil {
+			break
+		}
+		start, end := offset+loc[0], offset+loc[1]
+		before, _ := utf8.DecodeLastRuneInString(text[:start])
+		after, _ := utf8.DecodeRuneInString(text[end:])
+		if end > start && (!isSearchWordRune(first) || !isSearchWordRune(before)) &&
+			(isSearchWordRune(last) || !isSearchWordRune(after)) {
+			locs = append(locs, []int{start, end})
+			offset = end
+		} else {
+			// A rejected match may overlap a later valid one.
+			_, size := utf8.DecodeRuneInString(text[start:])
+			offset = start + size
+		}
+	}
+	return locs
 }
 
 // findNonEmpty returns the nonempty matches of re in s; empty matches cannot
@@ -168,7 +197,7 @@ func (m *AppModel) isearchMatches() []isearchMatch {
 			if t.selecting && ref.side != t.selectSide {
 				continue
 			}
-			for ordinal, loc := range findNonEmpty(m.isearch.re, text(ref)) {
+			for ordinal, loc := range m.isearch.findMatches(text(ref)) {
 				matches = append(matches, isearchMatch{tab: tab, ref: ref, index: i, start: loc[0], end: loc[1], ordinal: ordinal})
 			}
 		}
@@ -579,16 +608,15 @@ func (m *AppModel) isearchDecorator(ref lineRef) func(string) (string, bool) {
 		current = s.match.ordinal
 	}
 	return func(styled string) (string, bool) {
-		return highlightISearch(styled, s.re, current)
+		return highlightISearch(styled, s.findMatches(ansi.Strip(styled)), current)
 	}
 }
 
-// highlightISearch highlights the matches of re in the visible text of a
+// highlightISearch highlights matches in the visible text of a
 // styled line, keeping the surrounding styles.  The match with the given
 // ordinal is the current one.
-func highlightISearch(styled string, re *regexp.Regexp, current int) (string, bool) {
+func highlightISearch(styled string, locs [][]int, current int) (string, bool) {
 	plain := ansi.Strip(styled)
-	locs := findNonEmpty(re, plain)
 	if len(locs) == 0 {
 		return styled, false
 	}

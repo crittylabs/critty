@@ -200,7 +200,7 @@ func TestISearchHighlightsMatches(t *testing.T) {
 
 func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
 	styled := "\x1b[31mfoo bar baz\x1b[0m"
-	out, ok := highlightISearch(styled, regexp.MustCompile("bar|baz"), 1)
+	out, ok := highlightISearch(styled, findNonEmpty(regexp.MustCompile("bar|baz"), ansi.Strip(styled)), 1)
 	if !ok {
 		t.Fatal("no match reported")
 	}
@@ -298,14 +298,45 @@ func TestISearchWordMode(t *testing.T) {
 		{"foo bar", "xfoo bar", false},
 		{"a.b", "a-b", true},
 		{"!!", "!!", false},
+		{"検索", "検索する", true},
+		{"検索 ", "検索する", false},
+		{"検索 ", "検索、する", true},
+		{"検索", "全文検索", false},
+		{"検索 語", "検索・語", true},
+		{"検索 語", "検索別語", false},
+		{"cafe\u0301 ", "cafe\u0301!", true},
+		{"cafe ", "cafe\u0301!", false},
+		{"é ", "é!", true},
+		{"foo ", "éfoo!", false},
+		{"foo bar", "xfoo bar foo bar", true},
+		{"foo foo", "xfoo foo foo", true},
 	} {
 		re, err := isearchOptions{mode: isearchWord}.compile(tt.query)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := re.MatchString(tt.text); got != tt.want {
+		s := isearchState{isearchOptions: isearchOptions{mode: isearchWord}, query: tt.query, re: re}
+		if got := len(s.findMatches(tt.text)) > 0; got != tt.want {
 			t.Errorf("word %q matches %q = %v, want %v", tt.query, tt.text, got, tt.want)
 		}
+	}
+}
+
+func TestISearchUnicodeWordHighlights(t *testing.T) {
+	app := setupAppWithDoc(t, "全文検索\n検索、検索する\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	app.tab().cursorLine = 1
+	app.isearch.mode = isearchWord
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "検索 ")
+	if app.isearch.count != 1 || app.isearch.match.start != 0 || app.isearch.match.end != len("検索") {
+		t.Fatalf("count=%d match=%+v", app.isearch.count, app.isearch.match)
+	}
+	assertCursor(t, app, 2)
+	decorate := app.isearchDecorator(lineRef{line: 2})
+	text, found := decorate("検索、検索する")
+	if !found || !strings.Contains(text, isearchCurrentStyle.Render("検索")) || strings.Contains(text, isearchMatchStyle.Render("検索")) {
+		t.Fatalf("word highlights disagree with matches: %q", text)
 	}
 }
 

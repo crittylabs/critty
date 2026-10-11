@@ -16,6 +16,8 @@
 
 ### Fixes
 
+- Word search recognizes Unicode letters, numbers, and combining marks in words and their boundaries, including Japanese and accented text.
+
 - Incremental search accepts terminal pastes and `ctrl+y` from the shared kill ring.  Its real terminal cursor follows the input for IME candidate placement, including wide and combining characters, and long queries keep their input end visible.
 
 - Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
