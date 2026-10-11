@@ -39,8 +39,9 @@ func destinations(t *testing.T, target string) []string {
 func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
 	want := map[string]string{
-		filepath.Join(".opencode", "commands", "critty.md"):            filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
-		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"): filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
+		filepath.Join(".opencode", "skills", "critty-approval", "SKILL.md"): filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-approval", "SKILL.md"),
+		filepath.Join(".opencode", "commands", "critty.md"):                 filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
+		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
 	for _, f := range integrations()["opencode"] {
 		if f.globalDest != want[f.dest] {
@@ -58,18 +59,22 @@ func TestIntegrationLayouts(t *testing.T) {
 		"claude-code": {
 			filepath.Join(".claude", "skills", "critty", "SKILL.md"),
 			filepath.Join(".claude", "skills", "critty-cli", "SKILL.md"),
+			filepath.Join(".claude", "skills", "critty-approval", "SKILL.md"),
 		},
 		"codex": {
 			filepath.Join(".agents", "skills", "critty", "SKILL.md"),
 			filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"),
+			filepath.Join(".agents", "skills", "critty-approval", "SKILL.md"),
 		},
 		"opencode": {
 			filepath.Join(".opencode", "commands", "critty.md"),
 			filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"),
+			filepath.Join(".opencode", "skills", "critty-approval", "SKILL.md"),
 		},
 		"gemini": {
 			filepath.Join(".gemini", "skills", "critty", "SKILL.md"),
 			filepath.Join(".gemini", "skills", "critty-cli", "SKILL.md"),
+			filepath.Join(".gemini", "skills", "critty-approval", "SKILL.md"),
 		},
 	}
 	for target, dests := range want {
@@ -196,5 +201,30 @@ func TestDropFrontmatterKeys(t *testing.T) {
 	}
 	if got := dropFrontmatterKeys([]byte("no frontmatter\n"), []string{"name"}); string(got) != "no frontmatter\n" {
 		t.Errorf("content without frontmatter was altered: %q", got)
+	}
+}
+
+func TestApprovalSkillReferencesUseAgentConventions(t *testing.T) {
+	for agent, variant := range skillVariants {
+		t.Run(agent, func(t *testing.T) {
+			data, err := renderSkill("critty-approval", agent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"critty", "critty-cli"} {
+				if !bytes.Contains(data, []byte("`"+variant.skillRef(name)+"`")) {
+					t.Errorf("missing %s reference for %s", name, agent)
+				}
+			}
+			for _, name := range []string{"critty", "critty-cli"} {
+				caller, err := renderSkill(name, agent)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Contains(caller, []byte("`"+variant.skillRef("critty-approval")+"`")) {
+					t.Errorf("%s cannot discover the approval workflow", name)
+				}
+			}
+		})
 	}
 }

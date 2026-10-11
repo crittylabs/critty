@@ -15,7 +15,7 @@ import (
 	"github.com/crittylabs/critty/internal/xdg"
 )
 
-//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md
+//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md
 var skillContent embed.FS
 
 var installForce bool
@@ -69,7 +69,7 @@ var skillVariants = map[string]skillVariant{
 	},
 }
 
-var skillNames = []string{"critty", "critty-cli"}
+var skillNames = []string{"critty", "critty-cli", "critty-approval"}
 
 // renderSkill returns the embedded skill rewritten for the named agent.
 func renderSkill(name, agent string) ([]byte, error) {
@@ -143,11 +143,13 @@ func integrations() map[string][]integrationFile {
 	m["claude-code"] = []integrationFile{
 		skillFile("critty", "claude-code", ".claude"),
 		skillFile("critty-cli", "claude-code", ".claude"),
+		skillFile("critty-approval", "claude-code", ".claude"),
 	}
 
 	m["codex"] = []integrationFile{
 		skillFile("critty", "codex", ".agents"),
 		skillFile("critty-cli", "codex", ".agents"),
+		skillFile("critty-approval", "codex", ".agents"),
 	}
 
 	// OpenCode reads project files from .opencode/ but global ones from its
@@ -155,6 +157,8 @@ func integrations() map[string][]integrationFile {
 	openCodeGlobal := xdg.AppConfigHome("opencode")
 	openCodeCLI := skillFile("critty-cli", "opencode", ".opencode")
 	openCodeCLI.globalDest = filepath.Join(openCodeGlobal, "skills", "critty-cli", "SKILL.md")
+	openCodeApproval := skillFile("critty-approval", "opencode", ".opencode")
+	openCodeApproval.globalDest = filepath.Join(openCodeGlobal, "skills", "critty-approval", "SKILL.md")
 	m["opencode"] = []integrationFile{
 		{
 			content: func() ([]byte, error) {
@@ -168,11 +172,13 @@ func integrations() map[string][]integrationFile {
 			globalDest: filepath.Join(openCodeGlobal, "commands", "critty.md"), // absolute
 		},
 		openCodeCLI,
+		openCodeApproval,
 	}
 
 	m["gemini"] = []integrationFile{
 		skillFile("critty", "gemini", ".gemini"),
 		skillFile("critty-cli", "gemini", ".gemini"),
+		skillFile("critty-approval", "gemini", ".gemini"),
 	}
 
 	var prompts []integrationFile
@@ -223,10 +229,10 @@ Run from your home directory to install globally, or from a repository
 root to install for that project only, following crit's convention.
 
 Targets:
-  claude-code  Claude Code skills (critty, critty-cli)
-  codex        Codex skills (critty, critty-cli)
-  opencode     OpenCode command (/critty) and skill (critty-cli)
-  gemini       Gemini CLI skills (critty, critty-cli)
+  claude-code  Claude Code skills (critty, critty-cli, critty-approval)
+  codex        Codex skills (critty, critty-cli, critty-approval)
+  opencode     OpenCode command (/critty) and skills (critty-cli, critty-approval)
+  gemini       Gemini CLI skills (critty, critty-cli, critty-approval)
   prompts      Stock finish prompt templates (customize after copying)
   all          claude-code + codex + opencode + gemini`,
 	Args: cobra.ExactArgs(1),

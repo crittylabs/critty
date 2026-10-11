@@ -28,6 +28,8 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 
 A human review's `approved: true` is meaningful only when correlated with its invocation, session, and displayed content.  A comment, saved text, or copied approval string alone does not establish that a human approved a subsequent operation.
 
+For authoring approval or publication attachments and acting on their decisions, use `/critty-approval`.  The form and result storage details below support that workflow.
+
 ## Comment scopes
 
 Repeated `--attachment FILE` flags on `review`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.
@@ -65,7 +67,7 @@ Each new review invocation creates independent storage.  Always use the session 
 critty status                              # saved sessions in this directory, with running status
 critty comments --session <id> --json
 critty comment --session <id> --reply-to <comment-id> --author 'Claude Code' '<what you did>'
-critty comment --session <id> --json --file .tmp/replies.json --author 'Claude Code'
+critty comment --session <id> --json --file replies.json --author 'Claude Code'
 ```
 
 `--scope` stays fixed for a session.  Identical scope arguments, document paths, or plan names can have independent session IDs.  `--plan <slug>` selects a plan only when its name is unambiguous; prefer the ID.
@@ -171,7 +173,7 @@ Rules:
 For three or more comments or replies, submit one JSON array so the review file is written once:
 
 ```bash
-critty comment --json --file .tmp/comments.json --author 'Claude Code'
+critty comment --json --file comments.json --author 'Claude Code'
 ```
 
 Write the file with your file tool rather than quoting JSON on the command line; bodies with real newlines or quotes then need no shell escaping.  `--file -` reads stdin.

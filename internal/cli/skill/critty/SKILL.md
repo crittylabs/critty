@@ -1,13 +1,13 @@
 ---
 name: critty
-description: Review code changes or a document with Critty's terminal UI and address the reviewer's inline comments round by round. Use when the user invokes this skill by name or asks for a Critty review; a generic review request does not count.
+description: Review code changes or a document with Critty's terminal UI and address the reviewer's inline comments round by round. Use when the user or an approval workflow selects Critty; a generic review request does not count.
 allowed-tools: Bash(critty *), Read, Edit, Grep, Glob
 argument-hint: "[file]"
 ---
 
 # Review with Critty
 
-Critty opens a terminal UI where a human leaves inline comments, then hands those comments back to you.  Run this loop only when the user invokes `/critty` or explicitly asks for a Critty review.
+Critty opens a terminal UI where a human leaves inline comments, then hands those comments back to you.  Run this loop when the user explicitly selects Critty or a caller invokes `/critty-approval` for a Critty approval review.
 
 ## Local review and approval
 
@@ -53,9 +53,7 @@ Use repeated `--attachment FILE` flags to show text documents before any review,
 
 Use `--null` for attachment-only reviews, including outside a Git repository.  Empty diff input (`--diff=/dev/null`, an empty file, or empty stdin) also works with attachments.  Both require at least one active attachment.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`; pass the complete attachment list to refresh its snapshots.
 
-Attached Markdown task lists are interactive forms.  Add `<!-- form: id=destination required -->` to a required human confirmation, `<!-- form: id=publish consent -->` to an individual operation permission, or repeated IDs with distinct `value=...` attributes for a single choice.  Describe the exact operation and target in the label or surrounding document.  Required, consent, and choice fields need explicit IDs.  Required and consent fields ignore initial `[x]` values; source text never establishes human permission.  Missing required fields allow feedback but block approval.  Revised review targets or attachment sets reset all required confirmations and consents.  Ordinary explicit IDs carry answers only when their definitions stay unchanged.
-
-Pass `--result FILE` to save the self-contained form result as JSON.  Read the mandatory form result in the finish output even when custom prompt templates are used.  Execute an individually gated operation only when the actual approved result has its consent explicitly `true`, bound to the exact `review_revision`, snapshots, definitions, and target.  Answers in feedback are drafts; missing or false consent and stopped reviews grant no permission.  Overall approval does not grant individual consents, and IDs are not commands.  Preserve the result before following the printed cleanup command.  Critty executes no operations.
+For approval documents, publication drafts, confirmations, choices, or per-operation permissions, use `/critty-approval`.  It covers YAML frontmatter, interactive task lists, `--result FILE`, and binding the human result to the exact action before execution.  Use `critty --null --attachment FILE` for attachment-only reviews.
 
 ## Step 2: Launch and wait
 
@@ -122,7 +120,7 @@ Never pass `--resolve`.  Resolving is the reviewer's decision.
 For three or more needed replies, write them to a JSON file and submit once:
 
 ```bash
-critty comment --session <session-id> --json --file .tmp/replies.json --author 'Claude Code'
+critty comment --session <session-id> --json --file replies.json --author 'Claude Code'
 ```
 
 The `/critty-cli` skill documents the JSON format and the other comment commands.  If no thread needs action, proceed to the next round without edits or additional comments.  Only `approved: true` completes the review.

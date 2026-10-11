@@ -48,7 +48,7 @@ File tabs follow the expanded file tree from top to bottom: directories come fir
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
 
-Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the skills as `critty` and `critty-cli`, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.  If tfil reports terminal markers, update it to 0.4.1 or later.
+Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
 ### Command-line binary
 
@@ -92,9 +92,10 @@ Before each review round the Critty skill displays a one-time marker, and Critty
 
 ### Agent skills
 
-The binary embeds the integration for each agent and installs it with `critty install`, so the skills always match the installed version. Every target provides two pieces:
+The binary embeds the integration for each agent and installs it with `critty install`, so the skills always match the installed version. Every target provides three pieces:
 
 - `critty [file]` — the interactive review loop. It opens the TUI on the git changes (`critty`), a document (`critty <file>`), or a versioned plan (`critty plan <file>`), then has the agent address the comments round by round.
+- `critty-approval` — prepares YAML-frontmatter Markdown attachments with confirmations, choices, and operation consents, then binds the human result to the exact approved push, publication, or other action.  Other workflows can delegate approval handling to this skill while keeping their own storage and execution policies.
 - `critty-cli` — a reference skill the agent loads when it needs `critty comment`, `critty comments`, session or plan targeting, bulk JSON input, or the review file format.
 
 When you submit a round, the agent receives every thread, including resolved ones, so your final instructions reach it even on approval.  It replies only where there is new feedback, and it waits for your submission for 10 minutes by default; if that wait times out, send `hey` after submitting.  `critty stop --session <id>` keeps a review for later and `critty clear` deletes it.
@@ -104,7 +105,7 @@ Run the installer from your home directory to install globally, or from a reposi
 #### Claude Code
 
 ```bash
-cd ~ && critty install claude-code   # ~/.claude/skills/{critty,critty-cli}/
+cd ~ && critty install claude-code   # ~/.claude/skills/{critty,critty-cli,critty-approval}/
 critty install claude-code           # From a repo root: install for that project
 ```
 
@@ -113,7 +114,7 @@ Then use `/critty [file]`.
 #### Codex
 
 ```bash
-cd ~ && critty install codex        # ~/.agents/skills/{critty,critty-cli}/
+cd ~ && critty install codex        # ~/.agents/skills/{critty,critty-cli,critty-approval}/
 critty install codex                # From a repo root: install for that project
 ```
 
@@ -122,7 +123,7 @@ Then use `$critty`. The installed skills use Codex invocation syntax and reply a
 #### OpenCode
 
 ```bash
-cd ~ && critty install opencode     # ~/.config/opencode/commands/critty.md and ~/.config/opencode/skills/critty-cli/
+cd ~ && critty install opencode     # ~/.config/opencode/commands/critty.md and ~/.config/opencode/skills/{critty-cli,critty-approval}/
 critty install opencode             # From a repo root: install for that project
 ```
 
@@ -131,7 +132,7 @@ Then use `/critty [file]`.
 #### Gemini CLI
 
 ```bash
-cd ~ && critty install gemini        # ~/.gemini/skills/critty/ and ~/.gemini/skills/critty-cli/
+cd ~ && critty install gemini        # ~/.gemini/skills/{critty,critty-cli,critty-approval}/
 critty install gemini                # From a repo root: install for that project
 ```
 
@@ -147,21 +148,39 @@ critty install prompts                # From a repo root: install under .tcrit/p
 critty check                         # Report stale installed integrations
 ```
 
+### Reviewing actions before execution
+
+Ask your agent to use `critty-approval` when you want to review a push, PR, issue, message, release, or deployment before it happens.  For example:
+
+> Use critty-approval to prepare an issue for example/project.  Let me review its destination, title, and body before publishing it.
+
+In Claude Code, invoke `/critty-approval`; in Codex, use `$critty-approval`.  In OpenCode and Gemini CLI, ask the agent to use the `critty-approval` skill.
+
+The agent prepares Markdown attachments with YAML frontmatter describing the action and destination.  Publication text goes in a separate attachment, so review instructions and checkboxes stay out of the published body.  You can comment on the drafts, answer choices, and grant individual permissions in the same review.  The agent checks the result against the reviewed content before carrying out the authorized actions.  Critty itself does not publish or execute them.
+
+Checkboxes are added when a separate decision is needed; they are not mandatory for every review.  An item marked `required` blocks approval until answered.  A `consent` item can be left unchecked while approving the rest, unless it is also `required`; that operation remains unauthorized.  See [Interactive forms](#interactive-forms) for the controls and [the approval skill](internal/cli/skill/critty-approval/SKILL.md) for the full workflow.
+
 ### Building a custom flow
 
-The skills only run the review loop, so your project instructions can wrap them in a larger flow.  This example has the agent attach the commit message to the code review and commit once the review is approved.  Put something like this in your `CLAUDE.md` or `AGENTS.md`:
+Keep project policy in your instructions and delegate review mechanics to `critty` and approval documents to `critty-approval`.  Your policy decides when approval is required, where drafts are stored, and what happens after approval.  This example has the agent attach the commit message to the code review and commit once the review is approved.  Put something like this in your `CLAUDE.md` or `AGENTS.md`:
 
 ```markdown
 Every implementation request ends with a Critty review and a commit.  After implementing what was asked:
 
 1. Stage the source changes for this commit.
-2. Draft the commit message in `.tmp/.review/COMMIT_MESSAGE.md`, keeping it outside the index.
-3. Review with the `critty` skill: run `critty review --staged --attachment .tmp/.review/COMMIT_MESSAGE.md` and wait for it to exit.
-4. Address new feedback, update the message to match, stage the source changes, and reply on the thread.  Run the next round with `critty --session <id> --attachment .tmp/.review/COMMIT_MESSAGE.md` to refresh the attached message.  Repeat until approved.
-5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F .tmp/.review/COMMIT_MESSAGE.md`.
+2. Draft the exact commit message in a task-owned file outside the index.  The commands below use `COMMIT_MESSAGE.md` as an example path.
+3. Review with the `critty` skill: run `critty review --staged --attachment COMMIT_MESSAGE.md` and wait for it to exit.
+4. Address new feedback, update the message to match, stage the source changes, and reply on the thread.  Run the next round with `critty --session <id> --attachment COMMIT_MESSAGE.md` to refresh the attached message.  Repeat until approved.
+5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F COMMIT_MESSAGE.md`.
 ```
 
-With that in place, an implementation request is all it takes.  The recordings below show the commit message attached to the code review.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
+For external actions, add a policy such as this instead of copying the approval procedure into each workflow:
+
+```markdown
+Before publishing a PR or issue, use the critty-approval skill to review the exact destination and final text.  Keep drafts in our project scratch directory.  Execute only the actions authorized by the matching human result, then report their URLs.
+```
+
+With the review-and-commit policy in place, an implementation request is all it takes.  The recordings below show the commit message attached to the code review.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
 
 In the second round, select the message body from line 3 with `v` and press Enter to comment on the whole paragraph.
 
@@ -199,6 +218,7 @@ Running `critty` with no subcommand reviews the current Git changes. Running `cr
 | Command | Purpose |
 |---------|---------|
 | `critty [file]` | Review current Git changes, or review `file` when given |
+| `critty --null --attachment FILE` | Review only attached documents, without requiring Git |
 | `critty --staged` | Review only changes staged in the index |
 | `critty --unstaged` | Review unstaged and untracked changes |
 | `critty --scope <scope>` | Select all (default), staged, unstaged, or a committed comparison |
@@ -213,7 +233,7 @@ Running `critty` with no subcommand reviews the current Git changes. Running `cr
 | `critty comments [--json] [--all]` | List unresolved comments, optionally including resolved comments |
 | `critty clear <file>` | Clear a document review; use `--code` for code review or `--all` for all reviews in the current directory |
 | `critty status <file>` / `critty status --code` | Print the document or aggregate code-review status as JSON |
-| `critty install <target>` | Install `claude-code`, `codex`, `gemini`, or `prompts`; `all` installs every agent integration |
+| `critty install <target>` | Install `claude-code`, `codex`, `opencode`, `gemini`, or `prompts`; `all` installs every agent integration |
 | `critty check` | Report installed integration files that are stale |
 | `critty env [all \| tty \| run <command>...]` | Print the variables that identify the current Herdr or tmux pane (`--json` for JSON), only the terminal device, or run a command with them |
 | `critty completion <shell>` | Generate completion for Bash, Zsh, Fish, or PowerShell |
@@ -307,10 +327,12 @@ Saves numbered versions of the plan in the session directory.  Run `critty plan 
 Attach notices, approval notes, or a commit message without staging them:
 
 ```bash
-critty review --staged --attachment .tmp/NOTICE.md --attachment .tmp/COMMIT_MESSAGE.md
-critty plan design.md --attachment .tmp/APPROVAL.md
-critty --null --attachment .tmp/APPROVAL.md
+critty review --staged --attachment NOTICE.md --attachment COMMIT_MESSAGE.md
+critty plan design.md --attachment APPROVAL.md
+critty --null --attachment APPROVAL.md
 ```
+
+These filenames are examples; choose paths that fit your project.  Keep review-only drafts outside the index.
 
 Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported.
 
@@ -339,7 +361,7 @@ Resuming unchanged input keeps draft answers.  Changing a field's definition res
 Use `--result FILE` to save the self-contained JSON result, including source snapshots, field definitions, answers, human provenance, and the review revision:
 
 ```bash
-critty review --staged --attachment .tmp/APPROVAL.md --result .tmp/result.json
+critty review --staged --attachment APPROVAL.md --result result.json
 ```
 
 Completed form results are also retained as `result-<round>.json` in the session directory and included in the finish prompt.  Only a consent explicitly `true` in an approved result grants its described permission for the exact reviewed target.  Overall approval supplies no individual consent; feedback and stopped reviews grant none.  Critty records decisions and executes no operations.  Approval retains form reviews until the result has been recorded and the printed `critty clear --session <id>` command is run.  The result remains usable after session deletion.
