@@ -307,3 +307,66 @@ func TestISearchWordMode(t *testing.T) {
 		}
 	}
 }
+
+func TestISearchCapturesFollowingText(t *testing.T) {
+	app := setupAppWithDoc(t, "intro\nsee foo.Bar_baz qux\nfoo.bar_baz\n検索する機能\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	app.tab().cursorLine = 1
+	app = ctrlKey(app, 's')
+	app = ctrlKey(app, 'd') // no current match: ignored
+	app = ctrlKey(app, 'w')
+	if app.isearch.query != "" {
+		t.Fatalf("capture without a match changed the query to %q", app.isearch.query)
+	}
+
+	app = typeSearch(app, "foo")
+	assertCursor(t, app, 2)
+	app = ctrlKey(app, 'd')
+	if app.isearch.query != `foo\.` {
+		t.Fatalf("ctrl+d captured %q, want an escaped dot", app.isearch.query)
+	}
+	app = ctrlKey(app, 'w')
+	if app.isearch.query != `foo\.bar_baz` {
+		t.Fatalf("ctrl+w captured %q, want the lowercased word", app.isearch.query)
+	}
+	assertCursor(t, app, 2) // still on the match the capture extended
+	app = ctrlKey(app, 'w')
+	if app.isearch.query != `foo\.bar_baz ` {
+		t.Fatalf("ctrl+w on a space captured %q, want one character", app.isearch.query)
+	}
+
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	if app.isearch.query != `foo\.` {
+		t.Fatalf("backspace removed %q, want whole captured units", app.isearch.query)
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	if app.isearch.query != "fo" {
+		t.Fatalf("backspace on typed text left %q, want one character removed", app.isearch.query)
+	}
+
+	app = ctrlKey(app, 'g')
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "検")
+	app = ctrlKey(app, 'w')
+	app = ctrlKey(app, 'w')
+	if app.isearch.query != "検索す" {
+		t.Fatalf("ctrl+w on kanji and kana captured %q, want one character each", app.isearch.query)
+	}
+}
+
+func TestNextWord(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"bar_baz qux", "bar_baz"},
+		{"Ünïcode9 x", "Ünïcode9"},
+		{" x", " "},
+		{".x", "."},
+		{"機能", "機"},
+		{"カタカナ", "カ"},
+	} {
+		if got := nextWord(tt.in); got != tt.want {
+			t.Errorf("nextWord(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}

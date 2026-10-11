@@ -18,6 +18,7 @@ type isearchMatch struct {
 	ref     lineRef
 	index   int // position in visualLines
 	start   int // byte offset in the line text with tabs expanded
+	end     int
 	ordinal int // position among the matches on the same line
 }
 
@@ -46,6 +47,7 @@ type isearchState struct {
 	forward  bool
 	prefix   bool // M-s was pressed and awaits a toggle key
 	query    string
+	history  []string       // queries before each typed or captured unit
 	re       *regexp.Regexp // nil while the query is empty or invalid
 	invalid  bool
 	failing  bool
@@ -137,26 +139,34 @@ func (m *AppModel) isearchMatches() []isearchMatch {
 	if m.isearch.re == nil || t.doc == nil {
 		return nil
 	}
+	text := isearchLineText(t)
+	var matches []isearchMatch
+	for i, ref := range m.visualLines(t) {
+		if t.selecting && ref.side != t.selectSide {
+			continue
+		}
+		for ordinal, loc := range findNonEmpty(m.isearch.re, text(ref)) {
+			matches = append(matches, isearchMatch{ref: ref, index: i, start: loc[0], end: loc[1], ordinal: ordinal})
+		}
+	}
+	return matches
+}
+
+// isearchLineText returns a lookup for the searched text of a tab's lines,
+// with tabs expanded as displayed.
+func isearchLineText(t *FileTab) func(lineRef) string {
 	deleted := make(map[int]string)
 	for _, dels := range t.deletedAfter {
 		for _, del := range dels {
 			deleted[del.OldLineNum] = del.Content
 		}
 	}
-	var matches []isearchMatch
-	for i, ref := range m.visualLines(t) {
-		if t.selecting && ref.side != t.selectSide {
-			continue
-		}
-		text := deleted[ref.line]
+	return func(ref lineRef) string {
 		if ref.side == "" {
-			text = t.doc.LineAt(ref.line)
+			return expandDisplayTabs(t.doc.LineAt(ref.line))
 		}
-		for ordinal, loc := range findNonEmpty(m.isearch.re, expandDisplayTabs(text)) {
-			matches = append(matches, isearchMatch{ref: ref, index: i, start: loc[0], ordinal: ordinal})
-		}
+		return expandDisplayTabs(deleted[ref.line])
 	}
-	return matches
 }
 
 func (a isearchMatch) before(b isearchMatch) bool {
@@ -209,11 +219,11 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
 	case "ctrl+g", "ctrl+c", "esc":
 		m.exitISearch(true)
 	case "backspace", "ctrl+h":
-		if m.isearch.query != "" {
-			_, size := utf8.DecodeLastRuneInString(m.isearch.query)
-			m.isearch.query = m.isearch.query[:len(m.isearch.query)-size]
-			m.isearchFromOrigin()
-		}
+		m.isearchDeleteUnit()
+	case "ctrl+d":
+		m.isearchCapture(false)
+	case "ctrl+w":
+		m.isearchCapture(true)
 	default:
 		if msg.Text == "" || msg.Mod&(tea.ModCtrl|tea.ModAlt|tea.ModSuper) != 0 {
 			m.exitISearch(false)
@@ -250,8 +260,94 @@ func toggledMode(current, mode isearchMode) isearchMode {
 }
 
 func (m *AppModel) isearchAppend(text string) {
+	m.isearch.history = append(m.isearch.history, m.isearch.query)
 	m.isearch.query += text
 	m.isearchFromOrigin()
+}
+
+// isearchDeleteUnit removes the last typed or captured unit, as Emacs does
+// on DEL, and searches again from the origin.
+func (m *AppModel) isearchDeleteUnit() {
+	s := &m.isearch
+	switch {
+	case len(s.history) > 0:
+		s.query = s.history[len(s.history)-1]
+		s.history = s.history[:len(s.history)-1]
+	case s.query != "":
+		_, size := utf8.DecodeLastRuneInString(s.query)
+		s.query = s.query[:len(s.query)-size]
+	default:
+		return
+	}
+	m.isearchFromOrigin()
+}
+
+// isearchCapture appends the character or word following the current match
+// to the query and keeps the cursor on that match.  Without a current match
+// it does nothing.
+func (m *AppModel) isearchCapture(word bool) {
+	s := &m.isearch
+	if !s.found || s.re == nil {
+		return
+	}
+	rest := isearchLineText(m.tab())(s.match.ref)[s.match.end:]
+	if rest == "" {
+		return
+	}
+	_, size := utf8.DecodeRuneInString(rest)
+	if word {
+		size = len(nextWord(rest))
+	}
+	piece := rest[:size]
+	if !s.caseSensitive(s.query) {
+		// Captured text keeps a case-insensitive search insensitive.
+		piece = strings.ToLower(piece)
+	}
+	if s.mode == isearchRegexp {
+		piece = regexp.QuoteMeta(piece)
+	}
+	s.history = append(s.history, s.query)
+	s.query += piece
+	re, err := s.compile(s.query)
+	if err != nil {
+		m.isearchFromOrigin()
+		return
+	}
+	s.re, s.invalid, s.failing = re, false, false
+	for _, match := range m.isearchMatches() {
+		if match.index == s.match.index && match.start == s.match.start {
+			m.isearchLand(match, true)
+			return
+		}
+	}
+	m.isearchFromOrigin()
+}
+
+// isWordRune reports whether r forms words in a script that separates words
+// with spaces.  CJKV ideographs and kana have no word separators, so they
+// are taken one character at a time.
+func isWordRune(r rune) bool {
+	if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) {
+		return false
+	}
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// nextWord returns the word at the start of s, or its first character when
+// that does not start a word.
+func nextWord(s string) string {
+	end := 0
+	for end < len(s) {
+		r, n := utf8.DecodeRuneInString(s[end:])
+		if !isWordRune(r) {
+			break
+		}
+		end += n
+	}
+	if end == 0 {
+		_, end = utf8.DecodeRuneInString(s)
+	}
+	return s[:end]
 }
 
 // isearchFromOrigin searches for the edited query from the origin.
@@ -298,6 +394,7 @@ func (m *AppModel) isearchRepeat(forward bool) {
 		if s.lastQuery == "" {
 			return
 		}
+		s.history = append(s.history, s.query)
 		s.query = s.lastQuery
 		m.isearchFromOrigin()
 		return
