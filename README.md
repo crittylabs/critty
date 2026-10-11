@@ -12,7 +12,7 @@ Read a plan or review code changes across multiple files, leave inline comments,
 
 Your agent writes code or a plan, you review it in the TUI, and the agent reads your comments and makes changes for the next round.
 
-<video controls src="https://github.com/user-attachments/assets/4e62b68e-6532-4716-a5ad-d15a3d994f5b"></video>
+<video controls src="https://github.com/user-attachments/assets/0b3207b1-baa9-4984-8807-eab096ed8602"></video>
 
 ## Key Features
 
@@ -156,17 +156,17 @@ Every implementation request ends with a TCrit review and a commit.  After imple
 5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F .tmp/.review/COMMIT_MESSAGE.md`.
 ```
 
-With that in place, an implementation request is all it takes.  The recording below shows an earlier flow that staged the message, with the same review and feedback loop.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
+With that in place, an implementation request is all it takes.  The v0.17.0 recordings below show the commit message attached to the code review.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
 
 In the second round, select the message body from line 3 with `v` and press Enter to comment on the whole paragraph.
 
 **Claude Code**
 
-<video controls src="https://github.com/user-attachments/assets/116b604b-3af0-4c53-9978-2eff82a6bda0"></video>
+<video controls src="https://github.com/user-attachments/assets/7a2f8536-3223-4a8f-93ba-fd71fc5b523f"></video>
 
 **Codex**
 
-<video controls src="https://github.com/user-attachments/assets/66ab9a17-03f5-445c-a97c-834221c36b0c"></video>
+<video controls src="https://github.com/user-attachments/assets/af114a4c-5123-4a9b-8e1e-33bf3ee1e6bd"></video>
 
 ## Requirements
 

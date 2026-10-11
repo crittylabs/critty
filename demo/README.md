@@ -23,20 +23,20 @@ Use an existing draft or published release to host recordings without adding the
 For an upcoming release, create a draft with both its tag and title set to the version, such as `v0.17.0`.  Upload the recordings before pushing the release tag.  After tag CI passes, GoReleaser reuses the draft, keeps its attached recordings, replaces its notes with the matching `CHANGELOG.md` section, and publishes it.  If no matching draft exists, it creates a new release.
 
 ```sh
-./demo/release.sh -t v0.16.0 list
-./demo/release.sh -t v0.16.0 upload demo/review-flow-codex.mp4 v0.16.0
+./demo/release.sh -t v0.17.0 list
+./demo/release.sh -t v0.17.0 upload demo/review-flow-codex.mp4 v0.17.0
 ```
 
 The script requires `gh`, `jq`, and `sha256sum` or `shasum`.  Authenticate `gh` with write access to the repository first.  The repository defaults to the current repository reported by `gh repo view`.  The default release tag is `demo-assets`.  Use `-r OWNER/REPO` and `-t TAG` to select another repository or release.  The release must already exist; the script does not create tags or releases.
 
-`list` prints tab-separated asset names, SHA-256 digests, and download URLs.  `upload FILE VERSION` accepts GIF or MP4 and preserves the extension, for example `review-flow-codex-v0.16.0.mp4`.  The version must have the form `v0.xx.x`.  An existing asset with that name is reused only when its SHA-256 and size match; different content under the same name is rejected.  Existing assets are never overwritten.  Draft releases are supported; their download links become public when the release is published.
+`list` prints tab-separated asset names, SHA-256 digests, and download URLs.  `upload FILE VERSION` accepts GIF or MP4 and preserves the extension, for example `review-flow-codex-v0.17.0.mp4`.  The version must have the form `v0.xx.x`.  An existing asset with that name is reused only when its SHA-256 and size match; different content under the same name is rejected.  Existing assets are never overwritten.  Draft releases are supported; their download links become public when the release is published.
 
-v0.16.0 recordings (available after the release is published):
+v0.17.0 recordings:
 
-- [Code review](https://github.com/knu/tcrit/releases/download/v0.16.0/code-review-claude-v0.16.0.mp4)
-- [Document review](https://github.com/knu/tcrit/releases/download/v0.16.0/demo-v0.16.0.mp4)
-- [Review and commit with Claude Code](https://github.com/knu/tcrit/releases/download/v0.16.0/review-flow-claude-v0.16.0.mp4)
-- [Review and commit with Codex](https://github.com/knu/tcrit/releases/download/v0.16.0/review-flow-codex-v0.16.0.mp4)
+- [Code review](https://github.com/knu/tcrit/releases/download/v0.17.0/code-review-claude-v0.17.0.mp4)
+- [Document review](https://github.com/knu/tcrit/releases/download/v0.17.0/demo-v0.17.0.mp4)
+- [Review and commit with Claude Code](https://github.com/knu/tcrit/releases/download/v0.17.0/review-flow-claude-v0.17.0.mp4)
+- [Review and commit with Codex](https://github.com/knu/tcrit/releases/download/v0.17.0/review-flow-codex-v0.17.0.mp4)
 
 ## Sending Alt keys and mouse events from a tape
 
