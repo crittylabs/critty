@@ -8,7 +8,7 @@
 
 - `--null` reviews only attached documents without requiring a Git repository.
 
-- Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, or `r` toggles case folding, word search, and regular expressions, and the prompt names the active modes.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.
+- Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, `r`, or `m` toggles case folding, word search, regular expressions, and searching across files, and the prompt names the active modes.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.
 
 ### Changed
 

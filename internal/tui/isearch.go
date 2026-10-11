@@ -12,9 +12,10 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// isearchMatch locates a match among the active tab's visual lines.  Matches
-// stay within one line.
+// isearchMatch locates a match among a tab's visual lines.  Matches stay
+// within one line.
 type isearchMatch struct {
+	tab     int
 	ref     lineRef
 	index   int // position in visualLines
 	start   int // byte offset in the line text with tabs expanded
@@ -36,6 +37,7 @@ type isearchOptions struct {
 	lastQuery string
 	mode      isearchMode
 	caseFold  bool // ignore case always instead of smart case
+	allFiles  bool // search every tab, as Emacs multi-file isearch does
 }
 
 // isearchState holds an incremental search modeled on Emacs isearch: each
@@ -54,9 +56,12 @@ type isearchState struct {
 	wrapped  bool
 	found    bool
 	match    isearchMatch
-	count    int // matches in the tab
+	count    int // matches in the searched tabs
 	position int // 1-based position of the current match, or 0
+	files    int // tabs with matches
+	file     int // 1-based position of the current match's tab among them
 
+	originTab          int
 	origin             lineRef
 	originOnAnnotation bool
 	originAnnoIdx      int
@@ -132,21 +137,41 @@ func findNonEmpty(re *regexp.Regexp, s string) [][]int {
 	return locs
 }
 
-// isearchMatches lists every match in the active tab in display order.
-// While lines are selected, only lines on the selected side are searched.
+// isearchAllFiles reports whether the search covers every tab.  A selection
+// cannot leave its file, so selecting confines the search to the origin.
+func (m *AppModel) isearchAllFiles() bool {
+	s := &m.isearch
+	return s.allFiles && !m.tabs[s.originTab].selecting
+}
+
+// isearchMatches lists every match in display order: in the origin tab, or
+// in every tab in tab order when searching all files.  While lines are
+// selected, only lines on the selected side are searched.
 func (m *AppModel) isearchMatches() []isearchMatch {
-	t := m.tab()
-	if m.isearch.re == nil || t.doc == nil {
+	if m.isearch.re == nil {
 		return nil
 	}
-	text := isearchLineText(t)
+	tabs := []int{m.isearch.originTab}
+	if m.isearchAllFiles() {
+		tabs = make([]int, len(m.tabs))
+		for i := range tabs {
+			tabs[i] = i
+		}
+	}
 	var matches []isearchMatch
-	for i, ref := range m.visualLines(t) {
-		if t.selecting && ref.side != t.selectSide {
+	for _, tab := range tabs {
+		t := &m.tabs[tab]
+		if t.doc == nil {
 			continue
 		}
-		for ordinal, loc := range findNonEmpty(m.isearch.re, text(ref)) {
-			matches = append(matches, isearchMatch{ref: ref, index: i, start: loc[0], end: loc[1], ordinal: ordinal})
+		text := isearchLineText(t)
+		for i, ref := range m.visualLines(t) {
+			if t.selecting && ref.side != t.selectSide {
+				continue
+			}
+			for ordinal, loc := range findNonEmpty(m.isearch.re, text(ref)) {
+				matches = append(matches, isearchMatch{tab: tab, ref: ref, index: i, start: loc[0], end: loc[1], ordinal: ordinal})
+			}
 		}
 	}
 	return matches
@@ -170,13 +195,16 @@ func isearchLineText(t *FileTab) func(lineRef) string {
 }
 
 func (a isearchMatch) before(b isearchMatch) bool {
+	if a.tab != b.tab {
+		return a.tab < b.tab
+	}
 	return a.index < b.index || a.index == b.index && a.start < b.start
 }
 
-// originIndex returns the visual position of the search origin, or -1 before
-// the first line.
+// originIndex returns the visual position of the search origin in its tab,
+// or -1 before the first line.
 func (m *AppModel) originIndex() int {
-	for i, ref := range m.visualLines(m.tab()) {
+	for i, ref := range m.visualLines(&m.tabs[m.isearch.originTab]) {
 		if ref == m.isearch.origin {
 			return i
 		}
@@ -191,6 +219,7 @@ func (m *AppModel) startISearch(forward bool) {
 		isearchOptions:     m.isearch.isearchOptions,
 		active:             true,
 		forward:            forward,
+		originTab:          m.activeTab,
 		origin:             lineRef{side: t.cursorSide, line: t.cursorLine},
 		originOnAnnotation: t.cursorOnAnnotation,
 		originAnnoIdx:      t.cursorAnnoIdx,
@@ -245,6 +274,8 @@ func (m *AppModel) toggleISearch(key string) {
 		s.mode = toggledMode(s.mode, isearchWord)
 	case "r":
 		s.mode = toggledMode(s.mode, isearchRegexp)
+	case "m":
+		s.allFiles = !s.allFiles
 	default:
 		return
 	}
@@ -290,7 +321,7 @@ func (m *AppModel) isearchCapture(word bool) {
 	if !s.found || s.re == nil {
 		return
 	}
-	rest := isearchLineText(m.tab())(s.match.ref)[s.match.end:]
+	rest := isearchLineText(&m.tabs[s.match.tab])(s.match.ref)[s.match.end:]
 	if rest == "" {
 		return
 	}
@@ -315,7 +346,7 @@ func (m *AppModel) isearchCapture(word bool) {
 	}
 	s.re, s.invalid, s.failing = re, false, false
 	for _, match := range m.isearchMatches() {
-		if match.index == s.match.index && match.start == s.match.start {
+		if match.tab == s.match.tab && match.index == s.match.index && match.start == s.match.start {
 			m.isearchLand(match, true)
 			return
 		}
@@ -365,19 +396,22 @@ func (m *AppModel) isearchFromOrigin() {
 		return
 	}
 	s.re = re
-	m.isearchLand(firstFromOrigin(m.isearchMatches(), m.originIndex(), s.forward))
+	m.isearchLand(m.firstFromOrigin(m.isearchMatches(), s.forward))
 }
 
 // firstFromOrigin finds the first match from the origin line in the search
 // direction, including matches on that line.
-func firstFromOrigin(matches []isearchMatch, origin int, forward bool) (isearchMatch, bool) {
+func (m *AppModel) firstFromOrigin(matches []isearchMatch, forward bool) (isearchMatch, bool) {
+	origin := isearchMatch{tab: m.isearch.originTab, index: m.originIndex()}
 	var match isearchMatch
 	ok := false
 	for _, candidate := range matches {
-		if forward && candidate.index >= origin {
+		atOrAfter := candidate.tab > origin.tab || candidate.tab == origin.tab && candidate.index >= origin.index
+		atOrBefore := candidate.tab < origin.tab || candidate.tab == origin.tab && candidate.index <= origin.index
+		if forward && atOrAfter {
 			return candidate, true
 		}
-		if !forward && candidate.index <= origin {
+		if !forward && atOrBefore {
 			match, ok = candidate, true
 		}
 	}
@@ -419,7 +453,7 @@ func (m *AppModel) isearchRepeat(forward bool) {
 		match, ok = matches[len(matches)-1], true
 	case !s.found:
 		// Turning around after a failure searches from the origin again.
-		match, ok = firstFromOrigin(matches, m.originIndex(), forward)
+		match, ok = m.firstFromOrigin(matches, forward)
 	case forward:
 		for _, candidate := range matches {
 			if s.match.before(candidate) {
@@ -455,9 +489,15 @@ func (m *AppModel) isearchLand(match isearchMatch, ok bool) {
 	}
 	m.countISearch()
 	if !ok {
+		if m.activeTab != s.originTab && !m.isearchAllFiles() {
+			// The search no longer covers this file; fail at the origin.
+			m.restoreISearchOrigin()
+			return
+		}
 		m.rebuildContent()
 		return
 	}
+	m.selectTab(match.tab)
 	t := m.tab()
 	t.cursorLine, t.cursorSide = match.ref.line, match.ref.side
 	t.cursorOnAnnotation, t.cursorAnnoIdx = false, 0
@@ -470,16 +510,20 @@ func (m *AppModel) isearchLand(match isearchMatch, ok bool) {
 func (m *AppModel) countISearch() {
 	s := &m.isearch
 	matches := m.isearchMatches()
-	s.count, s.position = len(matches), 0
+	s.count, s.position, s.files, s.file = len(matches), 0, 0, 0
 	for i, match := range matches {
+		if i == 0 || match.tab != matches[i-1].tab {
+			s.files++
+		}
 		if s.found && match == s.match {
-			s.position = i + 1
+			s.position, s.file = i+1, s.files
 		}
 	}
 }
 
 func (m *AppModel) restoreISearchOrigin() {
 	s := &m.isearch
+	m.selectTab(s.originTab)
 	t := m.tab()
 	t.cursorLine, t.cursorSide = s.origin.line, s.origin.side
 	t.cursorOnAnnotation, t.cursorAnnoIdx = s.originOnAnnotation, s.originAnnoIdx
@@ -512,7 +556,7 @@ func (m *AppModel) isearchDecorator(ref lineRef) func(string) (string, bool) {
 		return nil
 	}
 	current := -1
-	if s.found && s.match.ref == ref {
+	if s.found && s.match.tab == m.activeTab && s.match.ref == ref {
 		current = s.match.ordinal
 	}
 	return func(styled string) (string, bool) {
@@ -569,6 +613,10 @@ func (m AppModel) renderISearchPrompt() string {
 	case isearchWord:
 		words = append(words, "word")
 	}
+	allFiles := m.isearchAllFiles()
+	if allFiles {
+		words = append(words, "multi-file")
+	}
 	words = append(words, "I-search")
 	if !s.forward {
 		words = append(words, "backward")
@@ -583,11 +631,13 @@ func (m AppModel) renderISearchPrompt() string {
 	switch {
 	case s.invalid:
 		status = " [incomplete input]"
+	case s.re != nil && allFiles:
+		status = fmt.Sprintf(" (%d/%d, file %d/%d)", s.position, s.count, s.file, s.files)
 	case s.re != nil:
 		status = fmt.Sprintf(" (%d/%d)", s.position, s.count)
 	}
 	if s.prefix {
-		status += " [M-s: c case-fold/smart-case, w word, r regexp]"
+		status += " [M-s: c case-fold/smart-case, w word, r regexp, m multi-file]"
 	}
 	cursor := lipgloss.NewStyle().Reverse(true).Render(" ")
 	// Keep the prompt on one row; the layout reserves exactly one.

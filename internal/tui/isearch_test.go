@@ -370,3 +370,93 @@ func TestNextWord(t *testing.T) {
 		}
 	}
 }
+
+func assertTabCursor(t *testing.T, app AppModel, tab, line int) {
+	t.Helper()
+	if app.activeTab != tab || app.tab().cursorLine != line {
+		t.Fatalf("at tab %d line %d, want tab %d line %d", app.activeTab, app.tab().cursorLine, tab, line)
+	}
+}
+
+func TestISearchAcrossFiles(t *testing.T) {
+	app := newCommentNavigationTestApp()
+	app.width = 120
+	prompt := func() string { return ansi.Strip(app.renderFooter()) }
+
+	app = ctrlKey(app, 's')
+	app = pressAltKey(app, 's')
+	app = typeSearch(app, "m")
+	app = typeSearch(app, "three")
+	assertTabCursor(t, app, 0, 3)
+	if p := prompt(); !strings.HasPrefix(p, "Regexp multi-file I-search: three") || !strings.Contains(p, "(1/3, file 1/3)") {
+		t.Fatalf("prompt = %q", p)
+	}
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 1, 3)
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 2, 3)
+	if p := prompt(); !strings.Contains(p, "(3/3, file 3/3)") {
+		t.Fatalf("prompt = %q", p)
+	}
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 2, 3)
+	if !app.isearch.failing {
+		t.Fatal("stepping past the last file did not fail")
+	}
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 0, 3)
+	app = ctrlKey(app, 'r')
+	app = ctrlKey(app, 'r')
+	assertTabCursor(t, app, 2, 3)
+	app = ctrlKey(app, 'r')
+	assertTabCursor(t, app, 1, 3)
+
+	// Turning the mode off searches the origin file again; backward from its
+	// first line, the search fails there.
+	app = pressAltKey(app, 's')
+	app = typeSearch(app, "m")
+	assertTabCursor(t, app, 0, 1)
+	if p := prompt(); !strings.HasPrefix(p, "Failing regexp I-search backward: three") || !strings.Contains(p, "(0/1)") {
+		t.Fatalf("prompt = %q", p)
+	}
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 0, 3)
+
+	app = pressAltKey(app, 's')
+	app = typeSearch(app, "m")
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 1, 3)
+	app = ctrlKey(app, 'g')
+	assertTabCursor(t, app, 0, 1)
+	if !app.isearch.allFiles {
+		t.Fatal("multi-file mode did not persist")
+	}
+}
+
+func TestISearchAcrossFilesStartsInLaterFile(t *testing.T) {
+	app := newCommentNavigationTestApp()
+	app.isearch.allFiles = true
+	app.tab().cursorLine = 4
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "two")
+	assertTabCursor(t, app, 1, 2)
+	app = ctrlKey(app, 'g')
+	app = ctrlKey(app, 'r')
+	app = typeSearch(app, "four")
+	assertTabCursor(t, app, 0, 4) // the origin line itself
+}
+
+func TestISearchSelectionStaysInFile(t *testing.T) {
+	app := newCommentNavigationTestApp()
+	app.width = 120
+	app.isearch.allFiles = true
+	app = pressKey(app, 'v')
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "four")
+	assertTabCursor(t, app, 0, 4)
+	app = ctrlKey(app, 's')
+	assertTabCursor(t, app, 0, 4)
+	if p := ansi.Strip(app.renderFooter()); strings.Contains(p, "multi-file") {
+		t.Fatalf("a selection searched other files: %q", p)
+	}
+}
