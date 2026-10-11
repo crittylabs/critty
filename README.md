@@ -7,7 +7,7 @@
 
 # critty
 
-> **critty** is the new name of crit, originally published as `kevindutra/crit`, with the fixes and improvements developed as TCrit; see [docs/crit-to-critty.md](docs/crit-to-critty.md) for the full list.
+> **critty** is the new name of crit, originally published as `kevindutra/crit`, with the fixes and improvements developed as TCrit; see [CHANGELOG.md](CHANGELOG.md) for every change since crit 0.2.2.
 
 TUI for reviewing AI-generated code and plans — built for human-in-the-loop agentic coding workflows.
 
@@ -15,7 +15,7 @@ Read a plan or review code changes across multiple files, leave inline comments,
 
 Your agent writes code or a plan, you review it in the TUI, and the agent reads your comments and makes changes for the next round.
 
-<video controls src="https://github.com/user-attachments/assets/0b3207b1-baa9-4984-8807-eab096ed8602"></video>
+<video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
 
 ## Key Features
 
@@ -161,17 +161,17 @@ Every implementation request ends with a Critty review and a commit.  After impl
 5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F .tmp/.review/COMMIT_MESSAGE.md`.
 ```
 
-With that in place, an implementation request is all it takes.  The v0.17.0 recordings below show the commit message attached to the code review.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
+With that in place, an implementation request is all it takes.  The recordings below show the commit message attached to the code review.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
 
 In the second round, select the message body from line 3 with `v` and press Enter to comment on the whole paragraph.
 
 **Claude Code**
 
-<video controls src="https://github.com/user-attachments/assets/7a2f8536-3223-4a8f-93ba-fd71fc5b523f"></video>
+<video controls src="https://github.com/user-attachments/assets/a8c68b3f-e569-4290-b314-0923f3572dd6"></video>
 
 **Codex**
 
-<video controls src="https://github.com/user-attachments/assets/af114a4c-5123-4a9b-8e1e-33bf3ee1e6bd"></video>
+<video controls src="https://github.com/user-attachments/assets/9927c5f6-c7a6-4190-90dd-b20fef75f1e1"></video>
 
 ## Requirements
 

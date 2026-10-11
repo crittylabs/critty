@@ -1,6 +1,66 @@
 # Changelog
 
-## 0.17.0
+## 0.18.0
+
+Critty is the new name of crit.  This first release from `crittylabs/critty`, the original crit repository, brings in everything developed as the TCrit fork since crit 0.2.2.  The [changelog](https://github.com/crittylabs/critty/blob/main/CHANGELOG.md) lists every change in detail under TCrit 0.3.0 through 0.17.0.
+
+### Moving to Critty
+
+- Install from the new repository and Go module path, `github.com/crittylabs/critty`: `go install github.com/crittylabs/critty/cmd/critty@latest` or `mise install github:crittylabs/critty`.  Release archives are named `critty_*`.
+- The command and the bundled agent skills are `critty` and `critty-cli`.  Old `tcrit` commands and skills are not aliases: update scripts, reinstall the skills with `critty install`, and remove the old `tcrit` and `tcrit-cli` skills.
+- Reviews, configuration, and custom prompts saved by TCrit stay available.  Their paths, `.tcrit.config.json`, the `tcrit_state` field, and `TCRIT_HOST` are unchanged.
+- Codex terminal markers start with `CRITTY-`.  tfil 0.4.1 and later report them with `--critty-notify`; `--tcrit-notify` remains an alias.
+- TCrit releases remain available as the `tcrit-v0.3.0` through `tcrit-v0.17.0` tags.
+- Critty has its own logo and icon.
+
+### Agent workflow
+
+- Review commands follow the [Crit](https://crit.md/) workflow: they block until the reviewer finishes, print a result for the agent, and continue in later rounds with `critty --session <id>`.  Reviews keep [Crit](https://crit.md/)-compatible `review.json` data, and `critty comment` and `critty comments` script them.
+- `critty install` adds the shared `critty` review loop and `critty-cli` reference to Claude Code, Codex, OpenCode, and Gemini CLI.  `critty check` reports stale integrations, and finish prompts can be customized.  The skills describe local effects and the scope of a human approval.
+- Reviews open in a full-width Herdr tab or a tmux split, found from process ancestry when the multiplexer environment is missing.  Each round closes its pane or tab.
+- Codex reviews find their pane through the bundled `codex` wrapper or `critty codex`, a one-time marker shown by the skill, and optional notifications from terminal filters such as tfil.
+- `critty env` prints the terminal variables of the pane a review would use, as `NAME=value` lines or JSON.  `critty env tty` prints only the terminal device, and `critty env run <command>` runs a command with those variables.
+
+### What to review
+
+- `--scope` selects `all`, `staged`, `unstaged`, or a committed comparison such as `main..HEAD` or `main...`; `--staged` and `--unstaged` are shortcuts.  Each scope keeps its own session, shown in the header.
+- `git diff <base> <head> | critty --diff` reviews any Git unified diff, including outside a repository.
+- `critty plan` saves each revision of a plan and carries comment threads forward.
+- Repeated `--attachment FILE` flags show documents such as commit messages before the reviewed files.  Task lists in attached Markdown become forms for required confirmations, choices, and individual permissions, and `--result FILE` exports the approved answers.
+- Every review gets its own session ID.  `critty stop --session <id>` keeps it, and `critty --session <id>` resumes it.
+- `--focus PATH[:LINE]` and `critty FILE:LINE` start at a file or line.
+- The header names the project and the Git branch under review; `--project` and `--topic` replace them.
+
+### Comments
+
+- Threads support replies, resolution, and reopening.  `r` toggles resolution in place, and `R` resolves and moves to the next unresolved thread, or opens the finish dialog after the last one.
+- `f` comments on the whole file, and removed lines can be commented on too.
+- `ctrl+v` pastes clipboard images into comments as Markdown attachments.
+- The comment editor has a kill ring (`ctrl+y`, `alt+y`), GitHub-style suggestions (`alt+s`), `$EDITOR` editing (`ctrl+o`), and `@path` completion.  `alt+w` copies a source or thread reference, and clicking `@path L40` or a comment ID jumps to it.
+- Comments follow edits between rounds: anchors match moved text, multi-line ranges resize with insertions and deletions, and comments without a matching line fold into markers at the right edge of the code.
+- `h` folds all resolved threads and `H` hides comment boxes for reading the diff.
+- A new round focuses the first thread with a fresh reply from another author.
+- Each author has a color, unfocused threads shrink to the latest message, and the focused thread has a bright border.
+
+### Navigation and display
+
+- The sidebar has a **Files** tab with a foldable tree that follows the active file.  File tabs use compact paths, follow the tree order, and mark new and deleted files as `(A +12)` and `(D -8)`.
+- `n` / `N` visit changes and unresolved comments across files; `[` / `]` and `{` / `}` move between all or unresolved threads.  `alt+p` switches files by fuzzy search.
+- The top line names what is under review and ends with a **Submit** button.  The mouse can click tabs, lines, threads, and buttons, scroll, and drag the gutter to select lines.
+- `w` ignores whitespace in diffs.
+- Text adapts to light terminal backgrounds, approval dialogs are light green, and editors place the real terminal cursor for input methods.
+
+### Diffs
+
+- Inline replacements keep whitespace, long highlighted lines wrap, and syntax highlighting starts faster.
+- Paths with spaces or special characters work, and binary files keep their added, deleted, modified, or renamed status.
+
+### Fixed
+
+- Tab-indented code quoted in comment and reply dialogs stays inside the preview border when it wraps.
+- The second click of a double-click that opens a dialog no longer activates a control under the pointer.
+
+## TCrit 0.17.0
 
 ### Added
 
@@ -13,7 +73,7 @@
 
 - File tabs follow the expanded file tree: directories first, then names within each directory.  Attached documents stay together before project files, including removed documents with saved comments.
 
-## 0.16.5
+## TCrit 0.16.5
 
 ### Changed
 
@@ -24,7 +84,7 @@
 
 - Binary detection preserves whether a file was added, deleted, modified, or renamed across review scopes and supplied diffs.
 
-## 0.16.4
+## TCrit 0.16.4
 
 ### Added
 
@@ -34,7 +94,7 @@
 
 - The file tree starts fully expanded under the project name.  Folding or unfolding a folder cascades through single-child directory chains.
 
-## 0.16.3
+## TCrit 0.16.3
 
 ### Added
 
@@ -46,7 +106,7 @@
 - Submit dialogs for Approve and Resolve All & Approve use light green borders, titles, and messages.
 - Update Go dependencies.
 
-## 0.16.2
+## TCrit 0.16.2
 
 ### Added
 
@@ -57,7 +117,7 @@
 
 - When no Herdr or tmux pane reports a terminal, `tcrit env` takes `TTY` from the controlling terminal of the process or its nearest ancestor, then from `SSH_TTY`, and succeeds with `TTY` alone outside a multiplexer.
 
-## 0.16.1
+## TCrit 0.16.1
 
 ### Added
 
@@ -68,7 +128,7 @@
 - The README embeds the demo recordings as inline video players.
 - Automated releases publish an existing draft release, keeping its attached recordings and replacing its notes with the matching `CHANGELOG.md` section.
 
-## 0.16.0
+## TCrit 0.16.0
 
 ### Added
 
@@ -90,7 +150,7 @@
 - Double-clicking a marker cannot accidentally toggle a dialog control that appears beneath the pointer.
 - Displaced threads and reply dialogs start at the latest message, with the original quote available by scrolling up.
 
-## 0.15.0
+## TCrit 0.15.0
 
 ### Added
 
@@ -117,7 +177,7 @@
 
 - The Claude Code plugin.  Use `tcrit install claude-code` to install the bundled review skills.
 
-## 0.14.0
+## TCrit 0.14.0
 
 ### Added
 
@@ -138,7 +198,7 @@
 - Renamed files are diffed against their previous path, so a rename no longer counts every line as added.
 - The last file tab joins the pane border when the tabs fill the width exactly.
 
-## 0.13.0
+## TCrit 0.13.0
 
 ### Added
 
@@ -153,7 +213,7 @@
 - Focused comment boxes, the sidebar, and dialogs keep rounded borders; focus is shown by a brighter border color instead of thick borders.
 - Footer key hints use bold cyan keys on a gray background with normal-colored descriptions, separated by middle dots, so they are readable and distinct from the clickable buttons.
 
-## 0.12.0
+## TCrit 0.12.0
 
 ### Changed
 
@@ -164,7 +224,7 @@
 - One-time terminal markers for Codex reviews.  The skill displays a fresh marker before each round; TCrit searches only the visible text in registered live panes and rejects missing or ambiguous matches.
 - `tcrit terminal prepare`, `tcrit terminal notify <id>`, and `--terminal-request <id>`.  [tfil](https://github.com/knu/tfil) 0.4.0 supports marker detection and notification with `--tcrit-notify`, letting TCrit skip pane text searches.  Requests expire and are consumed once; Herdr operations retain the selected server socket.
 
-## 0.11.1
+## TCrit 0.11.1
 
 ### Added
 
@@ -175,7 +235,7 @@
 
 - Forward terminal context when reconnecting through an explicit `--remote unix://` or `--remote unix://PATH`, including Codex's printed reconnect commands.  Preserve the selected socket without starting a daemon.  Document that running tasks may retain their previous terminal context until Codex accepts configuration overrides.
 
-## 0.11.0
+## TCrit 0.11.0
 
 ### Added
 
@@ -191,7 +251,7 @@
 
 - The `/` tab search.  The key is reserved for a future in-source search.
 
-## 0.10.0
+## TCrit 0.10.0
 
 ### Added
 
@@ -204,7 +264,7 @@
 - CI runs formatting checks, vet, and tests on both Linux and macOS, including the AppKit clipboard tests.  The required `test` check succeeds only when both platforms pass.
 - Updated Go to 1.27.1, Go dependencies, and Harden-Runner.
 
-## 0.9.5
+## TCrit 0.9.5
 
 ### Added
 
@@ -219,7 +279,7 @@
 
 - Reply editors omit the reply being edited from the reference thread, so its saved body is not duplicated above the input field.  Other replies and their original numbering remain visible.
 
-## 0.9.4
+## TCrit 0.9.4
 
 ### Changed
 
@@ -228,7 +288,7 @@
 - Syntax highlighting reuses the lexer, style, and formatter within each file, substantially reducing startup time for diffs with many deleted lines while preserving rendered output.
 - Refactored TUI internals and consolidated overlapping tests without changing their intended behavior.
 
-## 0.9.3
+## TCrit 0.9.3
 
 ### Added
 
@@ -242,7 +302,7 @@
 
 - Suggestion insertion moves from `ctrl+y` to `alt+s` (`M-s`).  `ctrl+y` now yanks from the kill ring; the Suggest button remains available.
 
-## 0.9.2
+## TCrit 0.9.2
 
 ### Changed
 
@@ -256,7 +316,7 @@
 
 - Keep the right outer frame visible when the comment sidebar is open, with mouse targets aligned to the pane layout.
 
-## 0.9.1
+## TCrit 0.9.1
 
 ### Added
 
@@ -267,7 +327,7 @@
 - `n` / `N` visits change hunks and unresolved comment threads in display order from either pane, including file comments, deleted-line comments, and multiple threads on one line.  Selecting a hidden comment reveals it; resolved threads are skipped.
 - `Tab` / `Shift+Tab` switches file tabs from the sidebar as well as the content pane, preserving pane focus.
 
-## 0.9.0
+## TCrit 0.9.0
 
 ### Added
 
@@ -288,13 +348,13 @@
 - Plan revisions are stored inside their review session directory.  Submit revised plans with `tcrit plan --session <id> <file>`; plain `tcrit --session <id>` reopens saved plan or supplied-diff input.
 - `tcrit clear` refuses active reviews.  Stop the review before deleting its saved state.
 
-## 0.8.2
+## TCrit 0.8.2
 
 ### Changed
 
 - Resolving a thread with `r` now moves focus to the next unresolved thread, wrapping across files and skipping resolved threads even when unfolded with `h`.  When none remain, focus returns to the source.  Reopening a thread keeps its focus.
 
-## 0.8.1
+## TCrit 0.8.1
 
 ### Fixed
 
@@ -304,7 +364,7 @@
 
 - Clarified comment editing shortcuts, suggestion replacement, and scrolling through code context and thread history
 
-## 0.8.0
+## TCrit 0.8.0
 
 ### Added
 
@@ -328,20 +388,20 @@
 - Removed `--base`, `--base-branch`, the `base_branch` setting, and automatic base-branch fallback; use `--scope` instead
 - Existing installations of the old Gemini subagent may retain `.gemini/agents/tcrit.md`; check for customizations before removing it and reinstall the shared skills with `tcrit install gemini`
 
-## 0.7.3
+## TCrit 0.7.3
 
 ### Added
 
 - **Staged-only reviews** — `tcrit --staged` and `tcrit review --staged` read the file list, content, and diffs exclusively from the Git index; bundled agent integrations document the safer scope
 - **Visible review scope** — the code-review header always identifies staged changes, the working tree, or the active base ref
 
-## 0.7.2
+## TCrit 0.7.2
 
 ### Fixed
 
 - `tcrit install opencode` run from the home directory now installs into OpenCode's global config directory (`$XDG_CONFIG_HOME/opencode`, `~/.config/opencode` by default) instead of `~/.opencode`
 
-## 0.7.1
+## TCrit 0.7.1
 
 ### Added
 
@@ -364,7 +424,7 @@
 
 - The `tcrit-review`, `tcrit-code-review`, and `tcrit-plan-review` skills, the `tcrit:review`, `tcrit:code-review`, and `tcrit:plan-review` plugin commands, and the legacy root-level plugin manifest inherited from upstream
 
-## 0.7.0
+## TCrit 0.7.0
 
 ### Added
 
@@ -374,7 +434,7 @@
 
 - Multiplexer discovery now supports Herdr and tmux together and selects whichever context is nearest in the process ancestry when they are nested
 
-## 0.6.3
+## TCrit 0.6.3
 
 ### Added
 
@@ -388,7 +448,7 @@
 
 - A reviewer can edit only their latest reply when it is also the thread's latest reply, preventing an earlier response from being overwritten after another participant replies
 
-## 0.6.2
+## TCrit 0.6.2
 
 ### Changed
 
@@ -401,7 +461,7 @@
 
 - Inserting a suggestion leaves the cursor at the end of the final suggested code line and scrolls it into view
 
-## 0.6.1
+## TCrit 0.6.1
 
 ### Added
 
@@ -413,13 +473,13 @@
 - Application headers consistently use TCrit branding
 - The code header remains stable while dragging a mouse selection beyond the viewport
 
-## 0.6.0
+## TCrit 0.6.0
 
 ### Added
 
 - **Mouse-first TUI controls** — click file tabs, code lines, comment threads, sidebar items, dialog buttons, and the review-finish button; scroll with the mouse wheel, and drag the gutter to select line ranges
 
-## 0.5.1
+## TCrit 0.5.1
 
 ### Added
 
@@ -430,7 +490,7 @@
 
 - Changed-line backgrounds remain continuous across Markdown bold and code spans
 
-## 0.5.0
+## TCrit 0.5.0
 
 ### Added
 
@@ -450,7 +510,7 @@
 - Long syntax-highlighted source lines wrap instead of being truncated
 - Nested Markdown styles preserve ANSI colors and backgrounds correctly
 
-## 0.4.0
+## TCrit 0.4.0
 
 ### Changed
 
@@ -469,7 +529,7 @@
 - Comments retain their intended location across edited review rounds, including drift detection when the original text disappears
 - Inline replacement diffs preserve whitespace and highlight only the words that actually changed
 
-## 0.3.1
+## TCrit 0.3.1
 
 ### Added
 
@@ -480,7 +540,7 @@
 - **Release automation** — GoReleaser still pointed at the pre-rebrand `cmd/crit` path, so tagged releases failed to build; releases now ship `tcrit` binaries again
 - Release builds are now gated behind a passing CI run (gofmt, `go vet`, `go test`) with hardened, SHA-pinned workflows, and Renovate keeps dependencies and action refs up to date
 
-## 0.3.0
+## TCrit 0.3.0
 
 Forked from [crit](https://github.com/kevindutra/crit) and rebranded to **tcrit**.
 
