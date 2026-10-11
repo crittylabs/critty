@@ -212,7 +212,7 @@ var (
 
 	mdItalicStyle = lipgloss.NewStyle().
 			Italic(true).
-			Foreground(muted)
+			Foreground(textPrimary)
 
 	mdCodeStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.BrightYellow)
@@ -237,7 +237,7 @@ var (
 			Bold(true)
 
 	mdBlockquoteStyle = lipgloss.NewStyle().
-				Foreground(subtle).
+				Foreground(textPrimary).
 				Italic(true)
 
 	mdHrStyle = lipgloss.NewStyle().
@@ -373,7 +373,8 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	helpDescriptionStyle = helpDescriptionStyle.Foreground(textPrimary)
 	inlineCommentBox = inlineCommentBox.Foreground(textSecondary)
 	mdBoldStyle = mdBoldStyle.Foreground(textPrimary)
-	mdItalicStyle = mdItalicStyle.Foreground(textSecondary)
+	mdItalicStyle = mdItalicStyle.Foreground(textPrimary)
+	mdBlockquoteStyle = mdBlockquoteStyle.Foreground(textPrimary)
 	mdTableCellStyle = mdTableCellStyle.Foreground(textSecondary)
 	modalBtnLabel = modalBtnLabel.Foreground(textPrimary)
 	modalBtnNormalLabel = modalBtnLabel.PaddingLeft(1)

@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- Markdown quotes and italic text use the primary text color to stay readable on diff backgrounds.
 - `n` and `N` stop at added, deleted, and modified binary files even though they have no diff hunks.
 
 ## 0.18.0
