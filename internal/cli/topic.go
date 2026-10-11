@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 var reviewTopic string

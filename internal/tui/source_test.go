@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	gitpkg "github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestRangeReviewUsesCommittedContentAcrossRounds(t *testing.T) {

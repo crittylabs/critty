@@ -10,8 +10,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/knu/tcrit/internal/document"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestSaveTextModalWithoutFeedback(t *testing.T) {

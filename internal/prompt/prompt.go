@@ -12,7 +12,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/knu/tcrit/internal/xdg"
+	"github.com/crittylabs/critty/internal/xdg"
 )
 
 //go:embed stock/*.md

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 var ErrNoImage = errors.New("no image on clipboard")

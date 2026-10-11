@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/knu/tcrit/internal/xdg"
+	"github.com/crittylabs/critty/internal/xdg"
 )
 
 // Config is the resolved (merged) configuration.

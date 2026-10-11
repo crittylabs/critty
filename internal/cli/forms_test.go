@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/knu/tcrit/internal/config"
-	"github.com/knu/tcrit/internal/form"
-	"github.com/knu/tcrit/internal/ipc"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestFormFinishContractAndCleanup(t *testing.T) {

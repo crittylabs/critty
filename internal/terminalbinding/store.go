@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/crittylabs/critty/internal/xdg"
 	"github.com/gofrs/flock"
-	"github.com/knu/tcrit/internal/xdg"
 )
 
 const requestLifetime = 2 * time.Minute

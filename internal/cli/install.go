@@ -11,8 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/knu/tcrit/internal/prompt"
-	"github.com/knu/tcrit/internal/xdg"
+	"github.com/crittylabs/critty/internal/prompt"
+	"github.com/crittylabs/critty/internal/xdg"
 )
 
 //go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md

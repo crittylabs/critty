@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/knu/tcrit/internal/codexwrapper"
+	"github.com/crittylabs/critty/internal/codexwrapper"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +39,7 @@ func codexWrapperHint(self, path string) string {
 	wrapper := filepath.Join(filepath.Dir(self), "codex")
 	// A critty-only Go install may sit beside the original Codex instead.
 	bi, err := buildinfo.ReadFile(wrapper)
-	if err != nil || bi.Path != "github.com/knu/tcrit/cmd/codex" {
+	if err != nil || bi.Path != "github.com/crittylabs/critty/cmd/codex" {
 		return ""
 	}
 	info, err := os.Stat(wrapper)
@@ -57,7 +57,7 @@ func codexWrapperHint(self, path string) string {
 			if first == "" {
 				return ""
 			}
-			return fmt.Sprintf("Critty provides a Codex wrapper that registers the invoking terminal for marker lookup. If this review was launched from Codex, use that wrapper and the Critty skill to locate your tmux or Herdr pane. Currently %q precedes the wrapper %q in PATH; move the wrapper directory earlier. With mise, place github:knu/tcrit before the Codex tool in [tools] and reactivate the shell. Then resume Codex from the intended terminal (or run `critty codex resume`).", first, candidate)
+			return fmt.Sprintf("Critty provides a Codex wrapper that registers the invoking terminal for marker lookup. If this review was launched from Codex, use that wrapper and the Critty skill to locate your tmux or Herdr pane. Currently %q precedes the wrapper %q in PATH; move the wrapper directory earlier. With mise, place github:crittylabs/critty before the Codex tool in [tools] and reactivate the shell. Then resume Codex from the intended terminal (or run `critty codex resume`).", first, candidate)
 		}
 		if first == "" {
 			first = candidate

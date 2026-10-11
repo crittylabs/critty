@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/knu/tcrit/internal/terminalbinding"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/spf13/cobra"
 )
 

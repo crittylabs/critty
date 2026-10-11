@@ -5,10 +5,10 @@ import (
 	"sort"
 	"strings"
 
-	gitpkg "github.com/knu/tcrit/internal/git"
+	gitpkg "github.com/crittylabs/critty/internal/git"
 
-	"github.com/knu/tcrit/internal/document"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 // fileReview holds the in-memory comments for one tab; they are written

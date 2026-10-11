@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/knu/tcrit/internal/form"
-	"github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/git"
 )
 
 type ReviewInput struct {

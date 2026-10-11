@@ -7,7 +7,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/knu/tcrit/internal/clipboard"
+	"github.com/crittylabs/critty/internal/clipboard"
 )
 
 type clipboardImageMsg struct {

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
-	gitpkg "github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func patchApp(t *testing.T, raw string) AppModel {

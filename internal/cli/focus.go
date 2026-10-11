@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/knu/tcrit/internal/document"
-	"github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/git"
 )
 
 var reviewFocus string

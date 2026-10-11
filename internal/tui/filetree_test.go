@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/knu/tcrit/internal/document"
-	gitpkg "github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/document"
+	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {

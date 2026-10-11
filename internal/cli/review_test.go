@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/knu/tcrit/internal/config"
-	"github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestShellEscape(t *testing.T) {

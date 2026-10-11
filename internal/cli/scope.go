@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/git"
 )
 
 func validateScopeFlags(cmd *cobra.Command, _ []string) error {

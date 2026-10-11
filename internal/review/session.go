@@ -5,7 +5,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/git"
 )
 
 // OpenCodeSession opens the git-mode review session for the current working

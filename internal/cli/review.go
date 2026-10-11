@@ -14,11 +14,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/knu/tcrit/internal/config"
-	"github.com/knu/tcrit/internal/document"
-	"github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/ipc"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 var reviewCode bool

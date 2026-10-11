@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestRunClearAll(t *testing.T) {

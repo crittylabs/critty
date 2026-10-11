@@ -6,7 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 // commentLocation is a display location only; saved coordinates and scope stay intact.

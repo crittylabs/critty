@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/knu/tcrit/internal/document"
-	gitpkg "github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/document"
+	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
 func TestCodeHighlighterKeepsInputsIndependent(t *testing.T) {

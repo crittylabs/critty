@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/knu/tcrit/internal/xdg"
+	"github.com/crittylabs/critty/internal/xdg"
 )
 
 // SessionKey derives the stable 12-hex-char review session key, matching

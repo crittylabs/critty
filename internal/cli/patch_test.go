@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/knu/tcrit/internal/config"
-	"github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 const addedPatch = "diff --git a/a.txt b/a.txt\nnew file mode 100644\n--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+snapshot\n"

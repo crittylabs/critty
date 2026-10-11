@@ -22,7 +22,7 @@ A successful review's `approved: true` reports the human's decision about the di
 The `critty` binary must be on PATH.  If it is missing:
 
 ```bash
-go install github.com/knu/tcrit/cmd/critty@latest
+go install github.com/crittylabs/critty/cmd/critty@latest
 ```
 
 ## Step 1: Choose the command from the arguments

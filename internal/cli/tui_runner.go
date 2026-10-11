@@ -13,11 +13,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/knu/tcrit/internal/config"
-	"github.com/knu/tcrit/internal/ipc"
-	"github.com/knu/tcrit/internal/prompt"
-	"github.com/knu/tcrit/internal/review"
-	"github.com/knu/tcrit/internal/tui"
+	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/internal/prompt"
+	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/tui"
 )
 
 // runTUISession runs the review TUI in this process.  When serving, it

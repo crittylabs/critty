@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/git"
 )
 
 // OpenDiffSession keeps piped reviews separate from Git and document reviews.

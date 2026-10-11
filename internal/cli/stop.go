@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/knu/tcrit/internal/ipc"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/internal/review"
 	"github.com/spf13/cobra"
 )
 

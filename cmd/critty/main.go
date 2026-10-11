@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/knu/tcrit/internal/cli"
+	"github.com/crittylabs/critty/internal/cli"
 )
 
 func main() {

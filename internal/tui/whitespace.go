@@ -3,7 +3,7 @@ package tui
 import (
 	"sort"
 
-	gitpkg "github.com/knu/tcrit/internal/git"
+	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
 func (m *AppModel) toggleWhitespace() {

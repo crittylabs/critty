@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/knu/tcrit/internal/terminalbinding"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 )
 
 type herdrContext struct {

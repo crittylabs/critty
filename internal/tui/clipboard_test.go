@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/knu/tcrit/internal/clipboard"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/clipboard"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestClipboardImageInTextModals(t *testing.T) {

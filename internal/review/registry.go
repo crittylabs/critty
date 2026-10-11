@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/knu/tcrit/internal/xdg"
+	"github.com/crittylabs/critty/internal/xdg"
 )
 
 // SessionEntry records where a review session's data lives, so commands run

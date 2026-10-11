@@ -1,4 +1,4 @@
-module github.com/knu/tcrit
+module github.com/crittylabs/critty
 
 go 1.27.1
 

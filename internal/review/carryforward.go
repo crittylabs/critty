@@ -3,7 +3,7 @@ package review
 import (
 	"strings"
 
-	"github.com/knu/tcrit/internal/diff"
+	"github.com/crittylabs/critty/internal/diff"
 )
 
 // This file ports crit's round carry-forward: when a new round starts,

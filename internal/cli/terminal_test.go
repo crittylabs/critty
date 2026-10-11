@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/knu/tcrit/internal/terminalbinding"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 )
 
 func TestTerminalNotificationRoutesReview(t *testing.T) {

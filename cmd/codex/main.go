@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/knu/tcrit/internal/codexwrapper"
+	"github.com/crittylabs/critty/internal/codexwrapper"
 )
 
 func main() {

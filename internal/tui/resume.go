@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/knu/tcrit/internal/review"
+import "github.com/crittylabs/critty/internal/review"
 
 func (m *AppModel) replyIDs() []string {
 	ids := []string{}

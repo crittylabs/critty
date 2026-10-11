@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/knu/tcrit/internal/config"
+	"github.com/crittylabs/critty/internal/config"
 	"github.com/spf13/cobra"
 )
 

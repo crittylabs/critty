@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/knu/tcrit/internal/git"
+	"github.com/crittylabs/critty/internal/git"
 	"github.com/mattn/go-shellwords"
 )
 

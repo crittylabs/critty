@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/knu/tcrit/internal/terminalbinding"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 )
 
 // Run keeps Codex arguments, environment, working directory and exit status unchanged.

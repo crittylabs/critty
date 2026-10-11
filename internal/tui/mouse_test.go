@@ -10,8 +10,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	gitpkg "github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestMouseClickSelectsFileTab(t *testing.T) {

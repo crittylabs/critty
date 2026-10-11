@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/knu/tcrit/internal/xdg"
+	"github.com/crittylabs/critty/internal/xdg"
 )
 
 // Plan reviews mirror crit's layout: each plan lives under a slug-named

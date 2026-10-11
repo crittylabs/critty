@@ -8,9 +8,9 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/knu/tcrit/internal/form"
-	gitpkg "github.com/knu/tcrit/internal/git"
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/form"
+	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 type formControl struct {

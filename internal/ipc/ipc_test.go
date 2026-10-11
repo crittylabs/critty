@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/knu/tcrit/internal/review"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestReviewCycleRoundTrip(t *testing.T) {
