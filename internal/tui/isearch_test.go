@@ -49,7 +49,7 @@ func TestISearchSmartCase(t *testing.T) {
 		{`\w+`, "ALPHA", true},
 		{`\W`, "x", false},
 	} {
-		re, err := compileISearch(tt.query)
+		re, err := isearchOptions{}.compile(tt.query)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,12 +85,12 @@ func TestISearchStepsFailsAndWraps(t *testing.T) {
 	assertCursor(t, app, 5)
 	app = ctrlKey(app, 's')
 	assertCursor(t, app, 5)
-	if !app.isearch.failing || !strings.Contains(ansi.Strip(app.renderFooter()), "Failing I-search: alpha") {
+	if !app.isearch.failing || !strings.Contains(ansi.Strip(app.renderFooter()), "Failing regexp I-search: alpha") {
 		t.Fatalf("stepping past the last match did not fail: %q", ansi.Strip(app.renderFooter()))
 	}
 	app = ctrlKey(app, 's')
 	assertCursor(t, app, 1)
-	if prompt := ansi.Strip(app.renderFooter()); !strings.Contains(prompt, "Wrapped I-search: alpha") || !strings.Contains(prompt, "(1/3)") {
+	if prompt := ansi.Strip(app.renderFooter()); !strings.Contains(prompt, "Wrapped regexp I-search: alpha") || !strings.Contains(prompt, "(1/3)") {
 		t.Fatalf("wrapped prompt = %q", ansi.Strip(app.renderFooter()))
 	}
 	app = ctrlKey(app, 'r')
@@ -111,7 +111,7 @@ func TestISearchBackwardIncludesOriginLine(t *testing.T) {
 	assertCursor(t, app, 4) // "gamma" on the origin line
 	app = typeSearch(app, "lp")
 	assertCursor(t, app, 3)
-	if !strings.Contains(ansi.Strip(app.renderFooter()), "I-search backward: alp") {
+	if !strings.Contains(ansi.Strip(app.renderFooter()), "Regexp I-search backward: alp") {
 		t.Fatalf("prompt = %q", ansi.Strip(app.renderFooter()))
 	}
 }
@@ -146,6 +146,15 @@ func TestISearchExitKeepsOrRestoresPosition(t *testing.T) {
 		t.Fatal("ctrl+c did not leave the search")
 	}
 	assertCursor(t, app, 4)
+
+	app = ctrlKey(app, 'r')
+	app = typeSearch(app, "beta")
+	assertCursor(t, app, 2)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if app.isearch.active {
+		t.Fatal("esc did not leave the search")
+	}
+	assertCursor(t, app, 4)
 }
 
 func TestISearchOtherKeyLeavesAndActs(t *testing.T) {
@@ -164,7 +173,7 @@ func TestISearchInvalidRegexpKeepsPosition(t *testing.T) {
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "beta(")
 	assertCursor(t, app, 2)
-	if prompt := ansi.Strip(app.renderFooter()); !strings.Contains(prompt, "[incomplete regexp]") {
+	if prompt := ansi.Strip(app.renderFooter()); !strings.Contains(prompt, "[incomplete input]") {
 		t.Fatalf("prompt = %q", prompt)
 	}
 	app = typeSearch(app, ")")
@@ -202,5 +211,99 @@ func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
 	}
 	if !strings.HasPrefix(out, "\x1b[31mfoo ") {
 		t.Fatalf("leading style lost: %q", out)
+	}
+}
+
+func TestISearchSlashAndQuestionMarkStartSearches(t *testing.T) {
+	app := newISearchApp(t, 3)
+	app = pressKey(app, '/')
+	if !app.isearch.active || !app.isearch.forward {
+		t.Fatal("/ did not start a forward search")
+	}
+	app = typeSearch(app, "alpha")
+	assertCursor(t, app, 3)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	app = pressKey(app, '?')
+	if !app.isearch.active || app.isearch.forward {
+		t.Fatal("? did not start a backward search")
+	}
+	if app.modal == helpModal {
+		t.Fatal("? opened help")
+	}
+	app = ctrlKey(app, 'r') // an empty query resumes the last one
+	assertCursor(t, app, 3)
+	app = typeSearch(app, "/?")
+	if app.isearch.query != "alpha/?" {
+		t.Fatalf("/ and ? in a search were not typed: %q", app.isearch.query)
+	}
+}
+
+func TestISearchToggles(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app = ctrlKey(app, 's')
+	prompt := func() string { return ansi.Strip(app.renderFooter()) }
+
+	app = pressAltKey(app, 's')
+	if !strings.Contains(prompt(), "[M-s:") {
+		t.Fatalf("M-s did not show its menu: %q", prompt())
+	}
+	app = typeSearch(app, "r")
+	if app.isearch.mode != isearchLiteral || app.isearch.query != "" || !strings.HasPrefix(prompt(), "I-search: ") {
+		t.Fatalf("M-s r did not turn off regexp mode: %q", prompt())
+	}
+	app = typeSearch(app, "a.p")
+	if app.isearch.found {
+		t.Fatal("literal search matched a regexp")
+	}
+
+	app = pressAltKey(app, 's')
+	app = typeSearch(app, "w")
+	if app.isearch.mode != isearchWord || !strings.HasPrefix(prompt(), "Failing word I-search: a.p") {
+		t.Fatalf("M-s w did not turn on word mode: %q", prompt())
+	}
+	app = pressAltKey(app, 's')
+	app = typeSearch(app, "r")
+	if app.isearch.mode != isearchRegexp || !app.isearch.found || !strings.HasPrefix(prompt(), "Regexp I-search: a.p") {
+		t.Fatalf("M-s r did not switch word mode to regexp mode: %q", prompt())
+	}
+
+	app = typeSearch(app, "H")
+	if !strings.HasPrefix(prompt(), "Failing case-sensitive regexp I-search: a.pH") {
+		t.Fatalf("an uppercase letter did not make the search case sensitive: %q", prompt())
+	}
+	app = pressAltKey(app, 's')
+	app = typeSearch(app, "c")
+	if !app.isearch.found || !strings.HasPrefix(prompt(), "Case-insensitive regexp I-search: a.pH") {
+		t.Fatalf("M-s c did not fold case: %q", prompt())
+	}
+
+	app = ctrlKey(app, 'g')
+	app = ctrlKey(app, 's')
+	if !app.isearch.caseFold || app.isearch.mode != isearchRegexp {
+		t.Fatal("search options did not persist to the next search")
+	}
+}
+
+func TestISearchWordMode(t *testing.T) {
+	for _, tt := range []struct {
+		query, text string
+		want        bool
+	}{
+		{"alpha", "alphabet", true}, // the last word may be incomplete
+		{"alpha ", "alphabet", false},
+		{"alpha ", "alpha bet", true},
+		{"foo bar", "foo, bar", true},
+		{"foo bar", "xfoo bar", false},
+		{"a.b", "a-b", true},
+		{"!!", "!!", false},
+	} {
+		re, err := isearchOptions{mode: isearchWord}.compile(tt.query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := re.MatchString(tt.text); got != tt.want {
+			t.Errorf("word %q matches %q = %v, want %v", tt.query, tt.text, got, tt.want)
+		}
 	}
 }

@@ -24,7 +24,7 @@ Your agent writes code or a plan, you review it in the TUI, and the agent reads 
 - **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | critty --diff`, single documents, and versioned plans that carry comment threads across revisions.
 - **Attached documents and forms** — review notices, commit messages, and approval notes alongside code.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
 - **Comments made for code review** — replies, resolve and reopen, GitHub-style suggestions, clipboard images, `@path L40` and comment-ID references, and editing in `$EDITOR`.  Multi-line comments follow insertions and deletions within the selected range across review rounds.
-- **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, search the current file incrementally with `ctrl+s` / `ctrl+r`, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
+- **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, search the current file incrementally with `/` / `?`, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
 - **Mouse and keyboard** — vim-style keys throughout, plus clickable tabs, lines, threads, and buttons, gutter drag to select ranges, and wheel scrolling.
 - **Scriptable and Crit-compatible** — [Crit](https://crit.md/)-compatible `review.json`, `critty comment` and `critty comments` for automation, and sessions that stop and resume by ID.
 - **Readable on any terminal** — light and dark backgrounds, per-author colors, compact tab paths, and a review bar that names what is under review.
@@ -395,7 +395,7 @@ Critty finds the pane that ran the command from the process tree, even when the 
 | `j` / `k`                             | Move down / up through current and deleted lines |
 | `ctrl+d` / `ctrl+u` / `PgDn` / `PgUp` | Half page down / up                      |
 | `g` / `G` / `Home` / `End`            | Jump to top / bottom                     |
-| `ctrl+s` / `ctrl+r`                   | Search the current file forward / backward as you type |
+| `/` / `?`, `ctrl+s` / `ctrl+r`        | Search the current file forward / backward as you type |
 | `alt+e` (`M-e`)                       | Open the current file at the cursor line in `$EDITOR`, if it exists on disk |
 | `alt+w` (`M-w`)                       | Copy the current source reference or focused thread's ID to the kill ring |
 | `alt+g` (`M-g`)                       | Enter a line number; jump there or confirm opening it in `$EDITOR` if absent from the review |
@@ -413,12 +413,14 @@ Critty finds the pane that ran the command from the process tree, even when the 
 | `R`                                   | Resolve the focused comment and jump to the next unresolved thread, or open the finish dialog if none remain |
 | `d`                                   | Delete the selected comment after confirmation |
 | `ctrl+PgUp` / `ctrl+PgDn`               | Scroll the selected inline or sidebar thread |
-| `?`                                   | Show all keyboard shortcuts              |
+| `alt+?` (`M-?`)                       | Show all keyboard shortcuts              |
 | `q`                                   | Finish review (Approve when no unresolved comments remain) |
 
 Ignore whitespace (`w`) hides changes in spaces and tabs within a line, including LF and CRLF differences, while still showing added or deleted blank lines.
 
-**Incremental search:** `ctrl+s` and `ctrl+r` search the current file forward and backward as you type, as in Emacs.  Type a regular expression at the prompt on the bottom line; matches stay within a line and ignore case unless the query contains an uppercase letter.  Each edit searches again from where the search started, and `ctrl+s` / `ctrl+r` move to the next or previous match.  When no match remains in that direction, the prompt shows "Failing"; press the key again to wrap around.  Visible matches are highlighted, the current one in orange.  `enter` ends the search at the match, `ctrl+g` or `ctrl+c` returns to where it started, and any other key ends the search and acts as usual.  `ctrl+s` or `ctrl+r` on an empty query searches for the previous query.
+**Incremental search:** `/` or `ctrl+s` searches the current file forward as you type, and `?` or `ctrl+r` backward, as in Emacs.  Type a regular expression at the prompt on the bottom line; matches stay within a line and ignore case unless the query contains an uppercase letter.  Each edit searches again from where the search started, and `ctrl+s` / `ctrl+r` move to the next or previous match.  When no match remains in that direction, the prompt shows "Failing"; press the key again to wrap around.  Visible matches are highlighted, the current one in orange.  `enter` ends the search at the match, `esc`, `ctrl+g`, or `ctrl+c` returns to where it started, and any other key ends the search and acts as usual.  `ctrl+s` or `ctrl+r` on an empty query searches for the previous query.
+
+During a search, `alt+s` (`M-s`) followed by a key toggles how the query matches: `c` switches between smart case and always ignoring case, `w` turns word search on or off, and `r` turns regular expressions on or off.  Word search matches the query's words separated by any punctuation or spaces.  Word and regular expression search exclude each other, and turning either off searches the literal text.  The prompt names the active modes as Emacs does, for example `Case-insensitive word I-search backward:`, and the choices persist for later searches.
 
 Use `[` / `]` to revisit all threads and `{` / `}` to work through unresolved ones.  Press `enter` on a resolved thread to read it in the comment editor.  Comments displaced by source edits appear as `💬` markers; click one to open its threads together, or focus it and press `enter` to see the selected thread's original context.
 

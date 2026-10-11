@@ -71,7 +71,7 @@ func TestWhitespaceKeyInInput(t *testing.T) {
 			case "search":
 				m, _ = updateApp(m, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
 			case "help":
-				m = pressKey(m, '?')
+				m = pressAltKey(m, '?')
 			}
 			updated, _ := m.Update(tea.KeyPressMsg{Code: 'w', Text: "w"})
 			switch v := updated.(type) {

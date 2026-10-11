@@ -240,6 +240,11 @@ func updateApp(app AppModel, msg tea.Msg) (AppModel, tea.Cmd) {
 	}
 }
 
+func pressAltKey(app AppModel, code rune) AppModel {
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: code, Mod: tea.ModAlt})
+	return app
+}
+
 func pressKeyCmd(app AppModel, code rune) (AppModel, tea.Cmd) {
 	return updateApp(app, tea.KeyPressMsg{Code: code})
 }

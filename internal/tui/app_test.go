@@ -469,7 +469,7 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	app.width = 80
 	app.height = 24
 
-	app = pressKey(app, '?')
+	app = pressAltKey(app, '?')
 	if app.modal != helpModal {
 		t.Fatalf("? opened modal %v, want help modal", app.modal)
 	}
@@ -506,14 +506,14 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 		t.Fatalf("clicking x left modal %v, want closed (found=%t)", app.modal, closed)
 	}
 
-	app = pressKey(app, '?')
+	app = pressAltKey(app, '?')
 	app = pressKey(app, tea.KeyEscape)
 	if app.modal != noModal {
 		t.Fatalf("esc left modal %v open", app.modal)
 	}
 
-	app = pressKey(app, '?')
-	app = pressKey(app, '?')
+	app = pressAltKey(app, '?')
+	app = pressAltKey(app, '?')
 	if app.modal != noModal {
 		t.Fatalf("second ? left modal %v open", app.modal)
 	}
@@ -984,7 +984,7 @@ func TestModalCloseButtonAndOutsideClickDismiss(t *testing.T) {
 	open := map[string]func(AppModel) AppModel{
 		"comment": func(app AppModel) AppModel { return pressKey(app, tea.KeyEnter) },
 		"finish":  func(app AppModel) AppModel { return pressKey(app, 'q') },
-		"help":    func(app AppModel) AppModel { return pressKey(app, '?') },
+		"help":    func(app AppModel) AppModel { return pressAltKey(app, '?') },
 	}
 	for name, openModal := range open {
 		for _, via := range []string{"x", "outside"} {
@@ -1218,7 +1218,7 @@ func TestFooterHiddenOnShortTerminals(t *testing.T) {
 		if len(rows) != tc.height {
 			t.Fatalf("height %d: rendered %d rows, want the terminal filled with no spare row", tc.height, len(rows))
 		}
-		if shown := strings.Contains(content, "Help ?"); shown != tc.shown {
+		if shown := strings.Contains(content, "Help M-?"); shown != tc.shown {
 			t.Fatalf("height %d: footer shown = %t, want %t: %q", tc.height, shown, tc.shown, content)
 		}
 		last := rows[len(rows)-1]

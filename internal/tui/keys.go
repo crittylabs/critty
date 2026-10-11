@@ -60,6 +60,6 @@ var keys = keyMap{
 	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),
-	Help:             key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
+	Help:             key.NewBinding(key.WithKeys("alt+?"), key.WithHelp("M-?", "help")),
 	FileTree:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "switch sidebar view")),
 }

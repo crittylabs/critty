@@ -21,22 +21,39 @@ type isearchMatch struct {
 	ordinal int // position among the matches on the same line
 }
 
+// isearchMode selects how a query is matched.  The zero value is regexp.
+type isearchMode int
+
+const (
+	isearchRegexp isearchMode = iota
+	isearchLiteral
+	isearchWord
+)
+
+// isearchOptions persist from one search to the next during a run.
+type isearchOptions struct {
+	lastQuery string
+	mode      isearchMode
+	caseFold  bool // ignore case always instead of smart case
+}
+
 // isearchState holds an incremental search modeled on Emacs isearch: each
 // edit searches again from the origin, and ctrl+s/ctrl+r step from the
 // current match.
 type isearchState struct {
-	active    bool
-	forward   bool
-	query     string
-	lastQuery string
-	re        *regexp.Regexp // nil while the query is empty or invalid
-	invalid   bool
-	failing   bool
-	wrapped   bool
-	found     bool
-	match     isearchMatch
-	count     int // matches in the tab
-	position  int // 1-based position of the current match, or 0
+	isearchOptions
+	active   bool
+	forward  bool
+	prefix   bool // M-s was pressed and awaits a toggle key
+	query    string
+	re       *regexp.Regexp // nil while the query is empty or invalid
+	invalid  bool
+	failing  bool
+	wrapped  bool
+	found    bool
+	match    isearchMatch
+	count    int // matches in the tab
+	position int // 1-based position of the current match, or 0
 
 	origin             lineRef
 	originOnAnnotation bool
@@ -44,29 +61,61 @@ type isearchState struct {
 	originOffset       int
 }
 
-// compileISearch compiles a query with smart case: it matches case
-// sensitively only when the query contains an uppercase letter outside an
-// escape sequence.
-func compileISearch(query string) (*regexp.Regexp, error) {
-	if !hasUnescapedUpper(query) {
-		query = "(?i)" + query
+// caseSensitive reports whether a query matches case sensitively: with smart
+// case, only when it contains an uppercase letter outside a regexp escape.
+func (o isearchOptions) caseSensitive(query string) bool {
+	if o.caseFold {
+		return false
 	}
-	return regexp.Compile(query)
-}
-
-func hasUnescapedUpper(s string) bool {
 	escaped := false
-	for _, r := range s {
+	for _, r := range query {
 		switch {
 		case escaped:
 			escaped = false
-		case r == '\\':
+		case r == '\\' && o.mode == isearchRegexp:
 			escaped = true
 		case unicode.IsUpper(r):
 			return true
 		}
 	}
 	return false
+}
+
+// compile builds the pattern for a query in the current mode.
+func (o isearchOptions) compile(query string) (*regexp.Regexp, error) {
+	pattern := query
+	switch o.mode {
+	case isearchLiteral:
+		pattern = regexp.QuoteMeta(query)
+	case isearchWord:
+		pattern = wordPattern(query)
+	}
+	if !o.caseSensitive(query) {
+		pattern = "(?i)" + pattern
+	}
+	return regexp.Compile(pattern)
+}
+
+// wordPattern matches the words of a query separated by any nonword
+// characters, as Emacs word search does.  The last word may be incomplete
+// until the query ends with a nonword character.
+func wordPattern(query string) string {
+	isWord := func(r rune) bool { return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r) }
+	words := strings.FieldsFunc(query, func(r rune) bool { return !isWord(r) })
+	if len(words) == 0 {
+		return `[^\x00-\x{10FFFF}]` // matches nothing
+	}
+	for i, word := range words {
+		words[i] = regexp.QuoteMeta(word)
+	}
+	pattern := strings.Join(words, `\W+`)
+	if first, _ := utf8.DecodeRuneInString(query); isWord(first) {
+		pattern = `\b` + pattern
+	}
+	if last, _ := utf8.DecodeLastRuneInString(query); !isWord(last) {
+		pattern += `\b`
+	}
+	return pattern
 }
 
 // findNonEmpty returns the nonempty matches of re in s; empty matches cannot
@@ -129,9 +178,9 @@ func (m *AppModel) originIndex() int {
 func (m *AppModel) startISearch(forward bool) {
 	t := m.tab()
 	m.isearch = isearchState{
+		isearchOptions:     m.isearch.isearchOptions,
 		active:             true,
 		forward:            forward,
-		lastQuery:          m.isearch.lastQuery,
 		origin:             lineRef{side: t.cursorSide, line: t.cursorLine},
 		originOnAnnotation: t.cursorOnAnnotation,
 		originAnnoIdx:      t.cursorAnnoIdx,
@@ -145,12 +194,19 @@ func (m *AppModel) startISearch(forward bool) {
 // handleISearchKey handles a key in search mode.  It reports false after
 // leaving the mode for a key that the review should handle instead.
 func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
+	if m.isearch.prefix {
+		m.isearch.prefix = false
+		m.toggleISearch(msg.String())
+		return true
+	}
 	switch msg.String() {
 	case "ctrl+s", "ctrl+r":
 		m.isearchRepeat(msg.String() == "ctrl+s")
+	case "alt+s":
+		m.isearch.prefix = true
 	case "enter":
 		m.exitISearch(false)
-	case "ctrl+g", "ctrl+c":
+	case "ctrl+g", "ctrl+c", "esc":
 		m.exitISearch(true)
 	case "backspace", "ctrl+h":
 		if m.isearch.query != "" {
@@ -168,6 +224,31 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
 	return true
 }
 
+// toggleISearch applies a toggle key typed after M-s and searches again.
+// Word and regexp modes exclude each other, as in Emacs.
+func (m *AppModel) toggleISearch(key string) {
+	s := &m.isearch
+	switch key {
+	case "c":
+		s.caseFold = !s.caseFold
+	case "w":
+		s.mode = toggledMode(s.mode, isearchWord)
+	case "r":
+		s.mode = toggledMode(s.mode, isearchRegexp)
+	default:
+		return
+	}
+	m.isearchFromOrigin()
+}
+
+// toggledMode turns mode on, or back to literal search when it is already on.
+func toggledMode(current, mode isearchMode) isearchMode {
+	if current == mode {
+		return isearchLiteral
+	}
+	return mode
+}
+
 func (m *AppModel) isearchAppend(text string) {
 	m.isearch.query += text
 	m.isearchFromOrigin()
@@ -181,7 +262,7 @@ func (m *AppModel) isearchFromOrigin() {
 		m.restoreISearchOrigin()
 		return
 	}
-	re, err := compileISearch(s.query)
+	re, err := s.compile(s.query)
 	if err != nil {
 		s.invalid = true
 		m.rebuildContent()
@@ -370,26 +451,46 @@ func highlightISearch(styled string, re *regexp.Regexp, current int) (string, bo
 // renderISearchPrompt renders the search prompt shown in place of the footer.
 func (m AppModel) renderISearchPrompt() string {
 	s := m.isearch
-	label := "I-search"
-	if !s.forward {
-		label += " backward"
+	// Describe the search as Emacs isearch-message-prefix does.
+	failing := s.failing && s.re != nil
+	var words []string
+	if failing {
+		words = append(words, "failing")
+	}
+	if s.wrapped {
+		words = append(words, "wrapped")
 	}
 	switch {
-	case s.failing && s.re != nil:
-		label = "Failing " + label
-	case s.wrapped:
-		label = "Wrapped " + label
+	case s.caseSensitive(s.query):
+		words = append(words, "case-sensitive")
+	case s.caseFold:
+		words = append(words, "case-insensitive")
 	}
+	switch s.mode {
+	case isearchRegexp:
+		words = append(words, "regexp")
+	case isearchWord:
+		words = append(words, "word")
+	}
+	words = append(words, "I-search")
+	if !s.forward {
+		words = append(words, "backward")
+	}
+	label := strings.Join(words, " ")
+	label = strings.ToUpper(label[:1]) + label[1:]
 	labelStyle := isearchPromptStyle
-	if s.failing && s.re != nil {
+	if failing {
 		labelStyle = isearchFailingStyle
 	}
 	var status string
 	switch {
 	case s.invalid:
-		status = " [incomplete regexp]"
+		status = " [incomplete input]"
 	case s.re != nil:
 		status = fmt.Sprintf(" (%d/%d)", s.position, s.count)
+	}
+	if s.prefix {
+		status += " [M-s: c case-fold/smart-case, w word, r regexp]"
 	}
 	cursor := lipgloss.NewStyle().Reverse(true).Render(" ")
 	// Keep the prompt on one row; the layout reserves exactly one.

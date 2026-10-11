@@ -650,9 +650,12 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.isearch.active && m.handleISearchKey(msg) {
 		return m, nil
 	}
-	if (msg.String() == "ctrl+s" || msg.String() == "ctrl+r") && t.doc != nil {
-		m.startISearch(msg.String() == "ctrl+s")
-		return m, nil
+	switch msg.String() {
+	case "ctrl+s", "/", "ctrl+r", "?":
+		if t.doc != nil {
+			m.startISearch(msg.String() == "ctrl+s" || msg.String() == "/")
+			return m, nil
+		}
 	}
 	if msg.String() == "space" || msg.String() == " " {
 		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
@@ -3607,7 +3610,7 @@ func (m AppModel) renderFooter() string {
 }
 
 func (m AppModel) footerHelpButton() string {
-	return renderBarButton("Help", "?")
+	return renderBarButton("Help", "M-?")
 }
 
 // buttonRect locates a rendered button in a block that starts at screen row
@@ -3682,7 +3685,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, columnWidth)
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
 		{keys: "{/}", desc: "unresolved"},
-		{keys: "ctrl+s/r", desc: "search text"},
+		{keys: "/ ?", desc: "search text"},
 		{keys: "alt+e/g", desc: "editor/line"},
 		{keys: "alt+w", desc: "copy ref"},
 		{keys: "alt+p", desc: "open file"},
@@ -3952,7 +3955,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		modalContent = frameStyle.Width(modalWidth).Render(content)
 
 	case helpModal:
-		title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (? / esc to close)"), innerWidth)
+		title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (M-? / esc to close)"), innerWidth)
 		regions = append(regions, closeRegion)
 		modalContent = frameStyle.Width(modalWidth).Render(
 			title + "\n" + m.renderHelp(innerWidth))

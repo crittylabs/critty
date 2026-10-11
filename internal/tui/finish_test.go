@@ -40,7 +40,7 @@ func TestMouseClickFooterHelpButtonOpensHelp(t *testing.T) {
 		if !ok {
 			t.Fatalf("width %d: footer Help button not found", width)
 		}
-		assertRegionContainsRenderedText(t, app, rect, "Help ?")
+		assertRegionContainsRenderedText(t, app, rect, "Help M-?")
 
 		app = clickMouse(app, rect.left, rect.top)
 
