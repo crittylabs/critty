@@ -171,7 +171,7 @@ Watch the [Claude Code](#review-round-trips-with-claude-code) and [Codex](#revie
 
 ## Requirements
 
-- **Go 1.25+** for building from source
+- **Go 1.27.2+** for building from source
 - **Herdr or tmux** for automatic agent review workflows. Without either multiplexer, critty can run the TUI directly in an interactive terminal.
 
 ### Starting a multiplexer session

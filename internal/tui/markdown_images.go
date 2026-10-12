@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"html"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,10 +12,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/text"
-	"github.com/yuin/goldmark/util"
+	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/parser"
 	nethtml "golang.org/x/net/html"
 )
 
@@ -40,7 +37,7 @@ type markdownImageRef struct {
 
 func markdownImageRefs(source string) []markdownImageRef {
 	data := []byte(source)
-	root := goldmark.New().Parser().Parse(text.NewReader(data))
+	root := parser.New().Parse(data)
 	var refs []markdownImageRef
 	add := func(offset int, destination string) {
 		if offset >= 0 && offset <= len(source) {
@@ -79,18 +76,16 @@ func markdownImageRefs(source string) []markdownImageRef {
 		}
 		switch n := n.(type) {
 		case *ast.Image:
-			add(n.Pos(), html.UnescapeString(string(util.UnescapePunctuations(n.Destination))))
+			add(n.Pos(), n.Destination.Str(data))
 		case *ast.RawHTML:
-			if n.Segments.Len() > 0 {
-				readHTML(n.Segments.At(0).Start, n.Segments.At(n.Segments.Len()-1).Stop)
+			segments := n.Value.Indices()
+			if len(segments) > 0 {
+				readHTML(segments[0].Start, segments[len(segments)-1].Stop)
 			}
 		case *ast.HTMLBlock:
-			if n.Lines().Len() > 0 {
-				end := n.Lines().At(n.Lines().Len() - 1).Stop
-				if n.HasClosure() {
-					end = n.ClosureLine.Stop
-				}
-				readHTML(n.Lines().At(0).Start, end)
+			segments := n.Value.Segments()
+			if len(segments) > 0 {
+				readHTML(segments[0].Start, segments[len(segments)-1].Stop)
 			}
 		}
 		return ast.WalkContinue, nil

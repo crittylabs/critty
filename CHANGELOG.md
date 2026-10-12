@@ -17,6 +17,8 @@
 
 ### Changed
 
+- Building from source requires Go 1.27.2 or later.
+
 - Bundled skills separate the interactive review loop, CLI contracts, and approval handling, with detailed input and display rules in the CLI reference.
 
 - The keyboard help moves from `?` to `alt+?`, since `?` now starts a backward search.

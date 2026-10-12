@@ -8,11 +8,10 @@ import (
 	"strings"
 
 	"github.com/mattn/go-shellwords"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/extension"
-	extast "github.com/yuin/goldmark/extension/ast"
-	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/extension"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/text"
 )
 
 type Span struct {
@@ -47,10 +46,10 @@ type Answer struct {
 // Parse uses the Markdown AST so examples, escaped lists, and quotations are inert.
 func Parse(source string) ([]Item, error) {
 	data := []byte(source)
-	root := goldmark.New(goldmark.WithExtensions(extension.TaskList)).Parser().Parse(text.NewReader(data))
+	root := parser.New(parser.WithExtensions(extension.TaskListItemParser)).Parse(data)
 	var items []Item
 	err := ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		checkbox, ok := n.(*extast.TaskCheckBox)
+		status, ok := extension.TaskStatusOf(n)
 		if !entering || !ok {
 			return ast.WalkContinue, nil
 		}
@@ -59,30 +58,24 @@ func Parse(source string) ([]Item, error) {
 				return ast.WalkContinue, nil
 			}
 		}
-		block := n.Parent()
-		start := block.Lines().At(0).Start
-		item := Item{Line: strings.Count(source[:start], "\n") + 1, Offset: start, Initial: checkbox.IsChecked}
-		end := block.Lines().At(block.Lines().Len() - 1).Stop
+		block := n.FirstChild()
+		segments := block.(ast.BlockNode).Source()
+		start := segments[0].Start
+		item := Item{Line: strings.Count(source[:start], "\n") + 1, Offset: start, Initial: status == extension.TaskStatusCompleted}
+		end := segments[len(segments)-1].Stop
 		for end > start && (source[end-1] == '\n' || source[end-1] == '\r') {
 			end--
 		}
 		item.EndLine = strings.Count(source[:end], "\n") + 1
 		var label strings.Builder
-		for i := 0; i < block.Lines().Len(); i++ {
-			segment := block.Lines().At(i)
-			label.Write(segment.Value(data))
-		}
+		label.Write(text.NewLines(segments).Bytes(data))
 		err := ast.Walk(block, func(child ast.Node, enter bool) (ast.WalkStatus, error) {
 			html, ok := child.(*ast.RawHTML)
 			if !enter || !ok {
 				return ast.WalkContinue, nil
 			}
-			var raw strings.Builder
-			for i := 0; i < html.Segments.Len(); i++ {
-				seg := html.Segments.At(i)
-				raw.Write(seg.Value(data))
-			}
-			comment := strings.TrimSpace(raw.String())
+			raw := html.Value.Str(data)
+			comment := strings.TrimSpace(raw)
 			if !strings.HasPrefix(comment, "<!--") || !strings.HasSuffix(comment, "-->") {
 				return ast.WalkContinue, nil
 			}
@@ -96,13 +89,12 @@ func Parse(source string) ([]Item, error) {
 			if err := attributes(&item, strings.TrimPrefix(body, "form:")); err != nil {
 				return ast.WalkStop, fmt.Errorf("line %d: %w", item.Line, err)
 			}
-			for i := 0; i < html.Segments.Len(); i++ {
-				seg := html.Segments.At(i)
+			for _, seg := range html.Value.Indices() {
 				item.Metadata = append(item.Metadata, Span{Start: seg.Start, End: seg.Stop})
 			}
 			labelText := label.String()
 			label.Reset()
-			label.WriteString(strings.Replace(labelText, raw.String(), "", 1))
+			label.WriteString(strings.Replace(labelText, raw, "", 1))
 			return ast.WalkContinue, nil
 		})
 		if err != nil {
@@ -117,11 +109,15 @@ func Parse(source string) ([]Item, error) {
 			if _, nested := child.(*ast.List); nested {
 				return ast.WalkSkipChildren, nil
 			}
-			if child.Type() == ast.TypeBlock {
-				for i := 0; i < child.Lines().Len(); i++ {
-					segment := child.Lines().At(i)
-					definition.Write(segment.Value(data))
+			if block, ok := child.(ast.BlockNode); ok {
+				segments := block.Source()
+				switch block := block.(type) {
+				case *ast.CodeBlock:
+					segments = block.Value.Segments()
+				case *ast.HTMLBlock:
+					segments = block.Value.Segments()
 				}
+				definition.Write(text.NewLines(segments).Bytes(data))
 			}
 			return ast.WalkContinue, nil
 		}); err != nil {
