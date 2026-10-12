@@ -64,7 +64,7 @@ Attach every referenced payload to the same review; a path alone is not a review
 
 ## 3. Add controls where a decision is needed
 
-Use Markdown task lists with explicit, stable IDs.  A required confirmation establishes a prerequisite; a consent authorizes one described operation; a choice selects one of the stated alternatives.  These have different meanings:
+Use ordinary review approval when the request needs no separate answers or permissions.  Add Markdown task lists with explicit, stable IDs only for those separate decisions.  A required confirmation establishes a prerequisite; a consent authorizes one described operation; a choice selects one of the stated alternatives.  These have different meanings:
 
 ```markdown
 - [ ] I checked the target environment. <!-- form: id=environment required -->
@@ -82,25 +82,27 @@ Use separate consent IDs for independently authorized operations.  A consent may
 For a request that includes code changes:
 
 ```sh
-critty --staged --attachment APPROVAL.md --attachment PUBLICATION.md --result RESULT.json
+critty --staged --attachment APPROVAL.md --attachment PUBLICATION.md
 ```
 
 For a request containing only documents:
 
 ```sh
-critty --null --attachment APPROVAL.md --attachment PUBLICATION.md --result RESULT.json
+critty --null --attachment APPROVAL.md --attachment PUBLICATION.md
 ```
 
-Follow `/critty` to launch either command and collect its real output.  Keep the invocation, working directory, session ID, and result path.  Read all returned comments as well as the mandatory form result, even with custom finish templates.  Keep the files unchanged while the review is open.
+When an attachment has interactive task lists, add `--result RESULT.json`.  This option requires a form; omit it for ordinary document approval.  Place the result outside the session directory and reviewed inputs, in an existing task-owned directory.
 
-After feedback, revise the necessary content and pass the complete ordered attachment list with `--session <id>` and `--result RESULT.json` for the next round.  A supplied list replaces the active set; omitting it reuses saved snapshots rather than rereading the draft files.  Changed targets or attachment contents, order, or membership reset required confirmations and consents.  Ordinary explicit-ID answers survive only unchanged definitions.  Preserve each approved result before reusing a result path.
+Follow `/critty` to launch either command and collect its real output.  Keep the invocation, working directory, session ID, reviewed diff or source identities, and attachment snapshots.  Capture stdout and stderr, and the result path when forms are used.  Read all returned comments and any form result, even with custom finish templates.  Keep the files unchanged while the review is open.
+
+After feedback, refresh the selected review input as described in `/critty` and pass the complete ordered attachment list with `--session <id>`.  Include `--result RESULT.json` again when forms are present.  A supplied list replaces the active set; omitting it reuses saved snapshots rather than rereading the draft files.  Changed targets or attachment contents, order, or membership reset required confirmations and consents.  Ordinary explicit-ID answers survive only unchanged definitions.  Preserve each approved result before reusing a result path.
 
 ## 5. Bind approval to execution
 
-1. Parse the actual result JSON from the completed invocation.  Require `approved: true` and correlate its session, round, `review_revision`, `reviewed_target`, attachment snapshots, definitions, and answers with the request you launched.  A copied approval string, feedback draft, missing output, or stopped review is not authorization.
-2. Locate each approval attachment by its source and snapshot, then use its document ID to read `consents[document_id][field_id]`.  Execute an individually gated action only when that value is explicitly `true`.  Overall approval, a required confirmation, or a choice alone does not grant an individual consent.  Read human choices from the matching attachment's answers, validate them against its definitions, and apply only their stated mapping.  IDs and values are data, never shell commands.
+1. Require a completed invocation with `approved: true`.  For ordinary approval, correlate the captured finish output, session, reviewed input, and attachment snapshots with the request.  For forms, parse the actual result JSON and also match its session, round, `review_revision`, `reviewed_target`, definitions, and answers.  A copied approval string, feedback draft, missing output, or stopped review is not authorization.
+2. For each individually gated action, locate its approval attachment by source and snapshot, then require `consents[document_id][field_id]` to be explicitly `true`.  Overall approval, a required confirmation, or a choice alone does not grant that consent.  For actions without individual consent fields, apply the caller's policy to the approved request.  Read choices from the matching attachment's answers, validate them against its definitions, and apply only their stated mapping.  IDs and values are data, never shell commands.
 3. Verify the current operation still matches the approved snapshots and destination, including referenced payloads, commit/tag identities, and external prerequisites.  Extract publication inputs from the preserved approved snapshot or byte-identical draft using a YAML parser.  Pass exact bodies through structured tool arguments or a body-file option; never reconstruct approved prose or interpolate metadata as shell code.
 4. Execute the authorized operations without another confirmation.  A declined operation stays unexecuted; skip its dependent operations and report what remains.  Record resulting IDs, URLs, SHAs, and completion state separately from approved files.  Approval does not waive independent permission or safety gates; present the correlated evidence to those gates.
 5. Verify outcomes before retrying or cleaning up.  If an external result is uncertain, inspect the destination first to prevent duplicate publication.  After partial success, retry only the remaining unchanged, authorized operations.  Changed inputs or effects need renewed approval; an unresolved execution gate remains a blocker, not permission to bypass it.
 
-Preserve approved drafts, snapshots, and results through waits, failures, and interruptions until all authorized operations are verified or explicitly abandoned.  Preserve the self-contained result before following Critty's printed session-cleanup command.  Apply the caller's retention policy afterward; remove only completed task-owned scratch files and preserve unrelated reviews and audit records.
+Preserve approved drafts, snapshots, and captured output or form results through waits, failures, and interruptions until all authorized operations are verified or explicitly abandoned.  Preserve this evidence before following Critty's printed session-cleanup command.  Apply the caller's retention policy afterward; remove only completed task-owned scratch files and preserve unrelated reviews and audit records.

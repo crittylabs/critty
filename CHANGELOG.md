@@ -21,6 +21,10 @@
 
 - Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
 
+### Fixes
+
+- Bundled skills refresh the selected review input after edits, distinguish ordinary approval from interactive forms, and preserve complete output for manually launched reviews.  Comment examples consistently target a session and handle bodies that need JSON input.
+
 ## 0.18.1
 
 ### Features

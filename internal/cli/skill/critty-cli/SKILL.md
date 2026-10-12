@@ -38,11 +38,17 @@ Repeated `--attachment FILE` flags on `review`, `plan`, or the default command s
 
 Attached Markdown task lists support boolean answers, required confirmations (`<!-- form: id=check required -->`), single choices (one `id`, distinct `value=...` attributes), and individual consents (`<!-- form: id=publish consent -->`).  `forms.json` version 1 stores separate drafts, definitions, and human author/revision/round provenance.  Comments retain Crit's schema.  Changed definitions reset their answers; changed target snapshots or attachment content/order/membership reset all required confirmations and consents.
 
-`--result FILE` on a review invocation writes the self-contained result JSON atomically before printing approval.  Completed form results also remain in the session as `result-<round>.json`, appear in IPC's `result` field, and are appended to finish output regardless of templates.  The result includes `version`, `review_revision`, `reviewed_target`, ordered `attachments` with source snapshots/definitions/answers, `approved`, and `round`.  `consents` maps document IDs and field IDs to booleans only on approval.  An operation requires an explicitly true consent in the actual approved result and must match its exact target and revision.  Feedback answers are drafts; overall approval, initial source checkmarks, and stopped reviews grant no individual consent.  IDs are never executable commands.  Form review cleanup is deferred until the result has been preserved; follow the printed clear command after reading all comments and attachments.  Failed export or output preserves the session.
+`--result FILE` requires an interactive attachment form and writes its self-contained result JSON atomically before printing approval.  Omit it for ordinary document approval.  The destination's parent directory must exist; the file must be outside the session directory and must not overwrite reviewed input.  Completed form results also remain in the session as `result-<round>.json`, appear in IPC's `result` field, and are appended to finish output regardless of templates.  The result includes `version`, `session`, `review_revision`, `reviewed_target`, ordered `attachments` with source snapshots/definitions/answers, `approved`, and `round`.  `consents` maps document IDs and field IDs to booleans only on approval.  An individually gated operation requires an explicitly true consent in the actual approved result and must match its exact target and revision.  Feedback answers are drafts; overall approval, initial source checkmarks, and stopped reviews grant no individual consent.  IDs are never executable commands.  Form review cleanup is deferred until the result has been preserved; follow the printed clear command after reading all comments and attachments.  Failed export or output preserves the session.
 
 - **Line** (`scope: "line"`): attached to a line range of one file.  Stored under `files.<path>.comments`.
 - **File** (`scope: "file"`): about one file as a whole.  Stored under `files.<path>.comments` with `start_line: 0`.
 - **Review** (`scope: "review"`): general feedback.  Stored in the top-level `review_comments` array.
+
+## Review command output
+
+On submission, stdout contains the finish prompt, threads, and attached document snapshots; stderr contains `approved: true|false` and diagnostics.  Capture both streams and the exit status.  Exit 0 can mean either approval or submitted feedback, so inspect the verdict and all threads.  A nonzero exit does not grant approval.  Export or output failures retain session data; a pre-existing result file may be from an earlier round.  Correlate any recovered result with its invocation before using it.
+
+Ordinary approved reviews may be cleaned up immediately.  Preserve the finish output; the session ID alone is insufficient to recover it later.  Form results and comment images defer cleanup as described in their finish output.  Use `/critty` for launch, wait, and recovery decisions.
 
 ## Listing comments
 
@@ -152,28 +158,28 @@ Field rules:
 ## Adding and replying to comments
 
 ```bash
-critty comment --author 'Claude Code' '<body>'                       # review-level
-critty comment --author 'Claude Code' <path> '<body>'                # file-level
-critty comment --author 'Claude Code' <path>:<line> '<body>'         # one line
-critty comment --author 'Claude Code' <path>:<start>-<end> '<body>'  # line range
-critty comment --reply-to <id> --author 'Claude Code' '<body>'       # reply
+critty comment --session <id> --author 'Claude Code' '<body>'                     # review-level
+critty comment --session <id> --author 'Claude Code' <path> '<body>'              # file-level
+critty comment --session <id> --author 'Claude Code' <path>:<line> '<body>'       # one line
+critty comment --session <id> --author 'Claude Code' <path>:<start>-<end> '<body>' # line range
+critty comment --session <id> --reply-to <comment-id> --author 'Claude Code' '<body>'
 ```
 
 Rules:
 
 - Always pass `--author` with your agent name so the thread shows who wrote what.
 - Read the whole thread before replying.  Reply once to new reviewer feedback or with a material correction or additional result; leave an unanswered agent comment or completion reply unchanged.  An unresolved flag or a new round alone does not call for another reply.  The interactive skill's "Address new feedback" step defines the review loop.
-- Single-quote the body.  Double quotes let the shell interpret backticks and `$`.
+- Use a single-quoted argument for a short body without apostrophes.  For bodies containing apostrophes, multiple lines, or complex quoting, use a JSON file even for one comment.  Double quotes let the shell interpret backticks and `$`.
 - Line numbers are 1-indexed source coordinates, not positions in the diff text.  Staged reviews use index contents, committed comparisons use the right endpoint, and supplied diffs use the saved snapshot.  Files on disk may differ or be absent.  Use comment anchors when content changes between rounds.
 - Bodies are Markdown; code fences and inline code render in the TUI.
 - Do not pass `--resolve` unless the user explicitly asks for it.  The same applies to the `resolve` field in bulk JSON.
 
 ## Bulk comments
 
-For three or more comments or replies, submit one JSON array so the review file is written once:
+Use a JSON array for three or more comments or replies, or for any body that is awkward to quote safely:
 
 ```bash
-critty comment --json --file comments.json --author 'Claude Code'
+critty comment --session <id> --json --file comments.json --author 'Claude Code'
 ```
 
 Write the file with your file tool rather than quoting JSON on the command line; bodies with real newlines or quotes then need no shell escaping.  `--file -` reads stdin.
