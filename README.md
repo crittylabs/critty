@@ -11,9 +11,9 @@
 
 > **critty** is the new name of crit, originally published as `kevindutra/crit`, with the fixes and improvements developed as TCrit; see [CHANGELOG.md](CHANGELOG.md) for every change since crit 0.2.2.
 
-TUI for reviewing AI-generated code and plans — built for human-in-the-loop agentic coding workflows.
+A terminal UI for reviewing code and documents, approving actions, and making choices with your coding agent.
 
-Read a plan or review code changes across multiple files, leave inline comments, and let your coding agent address the feedback automatically.
+Give inline feedback, approve a proposed action, or choose between alternatives.  Handle these decisions on their own or alongside code and document reviews, then let your agent continue from your feedback and answers.
 
 <video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
 
@@ -22,9 +22,9 @@ Read a plan or review code changes across multiple files, leave inline comments,
 ## Key Features
 
 - **Review in the terminal** — read documents and multi-file diffs with syntax highlighting and inline comments.
+- **Approvals and choices** — approve proposed actions, complete required confirmations, and choose between alternatives in the same session as a review or on their own.
 - **Round trips with your agent** — review, send feedback, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Gemini CLI.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
-- **Attached documents and forms** — review commit messages and approval notes alongside code, with checkboxes and choices for human decisions.
 - **Inline image previews** — compare image changes and view local images in Markdown and comments on supported terminals.  [See an image review](#reviewing-an-image-replacement).
 - **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
@@ -152,7 +152,7 @@ In Claude Code, invoke `/critty-approval`; in Codex, use `$critty-approval`.  In
 
 The agent prepares drafts for you to comment on and approve, then carries out the authorized actions.  You can answer choices and grant individual permissions in the same review.  Critty records the decisions; the agent executes the actions.
 
-See [Interactive forms](#interactive-forms) for basic controls and [the approval skill](internal/cli/skill/critty-approval/SKILL.md) for the full workflow.
+See [Approvals and choices](#approvals-and-choices) for basic controls and [the approval skill](internal/cli/skill/critty-approval/SKILL.md) for the full workflow.
 
 ### Building a custom flow
 
@@ -262,9 +262,11 @@ Keep review-only drafts outside the index.  Attachments appear before the main r
 
 Resuming uses saved snapshots.  To update the attachments, pass the complete list again with `--attachment`; use `--clear-attachments` to remove them.
 
-### Interactive forms
+### Approvals and choices
 
-In attached Markdown, press `Space` or click a checkbox to answer.  Answers are saved separately from the source document.  [See an attached checklist with an inline image](#attached-checklist-with-an-inline-image).
+Review a proposed action and its supporting documents together with the changes it would publish or apply.  For example, review a diff and commit message, then approve pushing them; or review a plan and choose the next step.  Use the same workflow for a standalone approval or choice with `--null`.
+
+Attached Markdown can include checkboxes for confirmations and permissions, and choices between alternatives.  Press `Space` or click to answer.  Answers are saved separately from the source document.  [See an attached checklist with an inline image](#attached-checklist-with-an-inline-image).
 
 Required confirmations must be answered before approval.  Permission checkboxes apply to specific operations; approving the review leaves unchecked operations unauthorized.
 

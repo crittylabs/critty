@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+Critty brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.
+
 ### Features
 
 - Submit an optional overall review comment with Approve, Reject, or Comment radio choices and a Submit button.  The dialog color follows the selection, and Enter submits it; the default is Approve when remaining threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the round open.  The first character in an empty overall comment selects Comment immediately; Ctrl+S only focuses Submit without sending.  Abort asks before exiting without submitting.  Drafts survive returning to the review and stopping or resuming the session.  Previous overall comments are available in their own tab for navigation, replies, and resolution.  Finish output and form results include the decision and overall comment.
