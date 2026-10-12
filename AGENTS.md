@@ -8,13 +8,19 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## How we work
 
-- Describe new features in `README.md` at the level of how to use them, not their internal rules, and record every user-visible change, including small fixes, in `CHANGELOG.md` for the next release.  A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
+- Describe new features in `README.md` at the level of how to use them, not their internal rules.
 - Keep README Key Features focused on benefits for first-time readers.  Put detailed usage in the relevant instructions.
 - Update `README.md` for a release in the release preparation commit.
 - When preparing a release with major visual changes or headline features, propose recording new demo videos to show them.
 - When changing CLI behavior or review workflows, update the affected bundled skills under `internal/cli/skill/` in the same change so agents receive the current usage and constraints.
 - Follow [crit](https://github.com/tomasz-tomczyk/crit) for specification and compatibility decisions, and check its current implementation and documentation when a change touches the review format or workflow.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.
+
+## Changelog maintenance
+
+- Record user-visible differences from the latest published release under `Unreleased`, including small fixes.  Describe the final behavior that will ship, and move entries to a versioned section during release preparation.
+- Omit fixes for problems introduced and resolved between releases.  Fold refinements of unreleased features into their feature entries, and keep fixes for problems that existed in a published release, including prereleases.  Verify release tags and publication history before removing a past fix.
+- A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
 
 ## TUI design
 

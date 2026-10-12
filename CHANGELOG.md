@@ -2,31 +2,29 @@
 
 ## Unreleased
 
-## 0.18.1
-
 ### Features
 
 - Incremental search has clickable Search, Prev, Next, Keep, Cancel, case-fold, and multi-file controls.  Search controls stay available in short terminals and wrap after resizing.  `alt+s i` toggles case folding, alongside `alt+s c`.
 
-- The bundled `critty-approval` skill prepares Markdown approval attachments with YAML frontmatter and interactive confirmations, choices, and consents, then ties execution to the exact human-approved result.  All four agent integrations install it.
+- Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, `r`, or `m` toggles case folding, word search, regular expressions, and searching across files, and the prompt names the active modes.  Word search recognizes Unicode letters, numbers, and combining marks, including Japanese and accented text.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.
 
-- `--null` reviews only attached documents without requiring a Git repository.
-
-- Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, `r`, or `m` toggles case folding, word search, regular expressions, and searching across files, and the prompt names the active modes.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.
+- Incremental search accepts terminal pastes and `ctrl+y` from the shared kill ring.  Its real terminal cursor follows the input for IME candidate placement, including wide and combining characters, and long queries keep their input end visible.
 
 ### Changed
 
 - The keyboard help moves from `?` to `alt+?`, since `?` now starts a backward search.
 
-### Fixes
-
-- Word search recognizes Unicode letters, numbers, and combining marks in words and their boundaries, including Japanese and accented text.
-
-- Incremental search accepts terminal pastes and `ctrl+y` from the shared kill ring.  Its real terminal cursor follows the input for IME candidate placement, including wide and combining characters, and long queries keep their input end visible.
-
 - Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
 
-- Opening the finish dialog refreshes the layout so changes in footer height do not push it beyond the terminal.
+## 0.18.1
+
+### Features
+
+- The bundled `critty-approval` skill prepares Markdown approval attachments with YAML frontmatter and interactive confirmations, choices, and consents, then ties execution to the exact human-approved result.  All four agent integrations install it.
+
+- `--null` reviews only attached documents without requiring a Git repository.
+
+### Fixes
 
 - Empty diff input, including `--diff=/dev/null`, can be reviewed with attachments and resumed from its saved session.
 
@@ -181,7 +179,6 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 ### Fixed
 
 - Unresolved displaced threads expand when a new round focuses a fresh agent reply.
-- Double-clicking a marker cannot accidentally toggle a dialog control that appears beneath the pointer.
 - Displaced threads and reply dialogs start at the latest message, with the original quote available by scrolling up.
 
 ## TCrit 0.15.0
@@ -262,12 +259,8 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **Codex launch wrappers** — `tcrit codex` and the bundled `codex` binary preserve tmux and Herdr context through per-thread shell settings.  [Codex 0.157.0](https://github.com/openai/codex/releases/tag/rust-v0.157.0) enabled automatic background-server startup by default, separating shell tools from the terminal process ancestry TCrit used for detection.  The wrappers start and connect to the local daemon when supported, pass through older CLIs, and chain with forward-searching PATH wrappers such as tfil.
+- **Codex launch wrappers** — `tcrit codex` and the bundled `codex` binary preserve tmux and Herdr context through per-thread shell settings.  [Codex 0.157.0](https://github.com/openai/codex/releases/tag/rust-v0.157.0) enabled automatic background-server startup by default, separating shell tools from the terminal process ancestry TCrit used for detection.  The wrappers start and connect to the local daemon when supported, pass through older CLIs, and chain with forward-searching PATH wrappers such as tfil.  Explicit local `--remote` reconnects preserve the selected Unix socket and terminal context.
 - When terminal detection fails, suggest correcting PATH order if another `codex` precedes TCrit's bundled wrapper, including `[tools]` ordering for mise.
-
-### Fixed
-
-- Forward terminal context when reconnecting through an explicit `--remote unix://` or `--remote unix://PATH`, including Codex's printed reconnect commands.  Preserve the selected socket without starting a daemon.  Document that running tasks may retain their previous terminal context until Codex accepts configuration overrides.
 
 ## TCrit 0.11.0
 
