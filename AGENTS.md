@@ -9,6 +9,7 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 ## How we work
 
 - Keep `README.md` focused on feature benefits, installation, basic workflows and controls, and important limitations for human users.  Link to bundled skills under `internal/cli/skill/` and built-in help for details; update affected skills alongside CLI or workflow changes.
+- Keep bundled skills focused on agent workflows and CLI contracts.  Document human TUI controls in built-in help and `README.md`.
 - Update `README.md` in the release preparation commit.  For major visual changes or headline features, propose recording new demos.
 - Research [Crit](https://github.com/tomasz-tomczyk/crit)'s current implementation and documentation when changing the review format or workflow, and use the findings to inform specification and compatibility decisions.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.
