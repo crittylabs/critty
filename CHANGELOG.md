@@ -19,6 +19,8 @@
 
 ### Changed
 
+- `n` / `N` also stop on whole-file reviews, attachments, and files whose diffs have disappeared, even without unresolved comments.
+
 - Buttons without a background now use the same subtle gray background as the Submit dialog, including close, comment navigation, and resolution controls.
 
 - Keyboard Help shows the running build's version beside a colored logo.  Help and the review banner share the logo, with a terminal prompt and green accents.  Help keeps its scroll controls on the bottom row, beside the version when space allows.

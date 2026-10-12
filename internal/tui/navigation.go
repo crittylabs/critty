@@ -282,9 +282,11 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 		positions[line] = i
 	}
 	var targets []changeTarget
+	hasStop := len(t.changeChunks) > 0
 	if t.isBinary && !t.outsideChanges {
 		// Binary changes have no source lines, but still need a navigation stop.
 		targets = append(targets, changeTarget{position: 0})
+		hasStop = true
 	}
 	for _, chunk := range t.changeChunks {
 		position, ok := positions[m.changeCursor(t, chunk)]
@@ -303,6 +305,14 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 			}
 		}
 		targets = append(targets, changeTarget{position: position, comment: comment})
+		hasStop = hasStop || !comment.resolved
+	}
+	if !hasStop {
+		chunk := changeChunk{}
+		if t.doc != nil && t.doc.HasLine(1) {
+			chunk = changeChunk{startLine: 1, endLine: 1}
+		}
+		targets = append(targets, changeTarget{position: 0, chunk: chunk})
 	}
 	sort.SliceStable(targets, func(i, j int) bool {
 		return targets[i].position < targets[j].position
@@ -317,6 +327,9 @@ func (m *AppModel) jumpToChange(step int) bool {
 	t := m.tab()
 	cursor := m.visualLineIndex(t, lineRef{side: t.cursorSide, line: t.cursorLine})
 	if t.isBinary && !t.cursorOnAnnotation {
+		cursor = 0
+	}
+	if cursor < 0 && !t.cursorOnAnnotation && t.cursorLine == 0 && len(t.changeChunks) == 0 {
 		cursor = 0
 	}
 	if cursor < 0 && t.cursorSide == "" && t.doc != nil && t.cursorLine > t.doc.LineCount() {

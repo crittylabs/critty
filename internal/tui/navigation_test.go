@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -149,10 +150,18 @@ func TestChangeNavigationCrossesFilesWithoutWrapping(t *testing.T) {
 	app.tabs[0].cursorLine = 4
 
 	app = pressKey(app, 'n')
+	if app.activeTab != 1 || app.tab().cursorLine != 1 {
+		t.Fatalf("next tab = %d, line %d; want unchanged tab 1, line 1", app.activeTab, app.tab().cursorLine)
+	}
+	app = pressKey(app, 'n')
 	if app.activeTab != 2 || app.tab().cursorLine != 1 {
 		t.Fatalf("next change = tab %d, line %d; want tab 2, line 1", app.activeTab, app.tab().cursorLine)
 	}
 
+	app = pressKey(app, 'N')
+	if app.activeTab != 1 || app.tab().cursorLine != 1 {
+		t.Fatalf("previous tab = %d, line %d; want unchanged tab 1, line 1", app.activeTab, app.tab().cursorLine)
+	}
 	app = pressKey(app, 'N')
 	if app.activeTab != 0 || app.tab().cursorLine != 4 {
 		t.Fatalf("previous change = tab %d, line %d; want tab 0, line 4", app.activeTab, app.tab().cursorLine)
@@ -170,6 +179,57 @@ func TestChangeNavigationCrossesFilesWithoutWrapping(t *testing.T) {
 	app = pressKey(app, 'N')
 	if app.activeTab != 0 || app.tab().cursorLine != 2 {
 		t.Fatalf("previous change wrapped to tab %d, line %d", app.activeTab, app.tab().cursorLine)
+	}
+}
+
+func TestChangeNavigationVisitsTabsWithoutChanges(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		setup func(*FileTab)
+	}{
+		{name: "whole file"},
+		{name: "attachment", setup: func(tab *FileTab) { tab.attachment = &review.AttachedDocument{Name: "note.md"} }},
+		{name: "overall", setup: func(tab *FileTab) { tab.path, tab.doc = overallCommentsPath, overallCommentsDocument() }},
+		{name: "removed diff", setup: func(tab *FileTab) { tab.outsideChanges = true }},
+		{name: "retained binary", setup: func(tab *FileTab) { tab.doc, tab.isBinary, tab.outsideChanges = nil, true, true }},
+		{name: "empty", setup: func(tab *FileTab) { tab.doc = document.FromContent(tab.path, nil) }},
+		{name: "deleted", setup: func(tab *FileTab) { tab.doc, tab.isDeleted, tab.outsideChanges = nil, true, true }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app := newChangeNavigationTestApp()
+			for i := range app.tabs {
+				app.tabs[i].state.Comments = nil
+			}
+			if tt.setup != nil {
+				tt.setup(&app.tabs[1])
+			}
+			app.tabs[1].state.Comments = []review.Comment{{ID: "resolved", Scope: "file", Resolved: true}}
+			app.tabs[0].cursorLine = 4
+			for _, step := range []struct {
+				key rune
+				tab int
+			}{{'n', 1}, {'n', 2}, {'N', 1}, {'N', 0}} {
+				app = pressKey(app, step.key)
+				if app.activeTab != step.tab || app.tab().cursorOnAnnotation || app.focused != contentPane {
+					t.Fatalf("key %c: tab=%d annotation=%t focus=%v, want tab=%d with content focus", step.key, app.activeTab, app.tab().cursorOnAnnotation, app.focused, step.tab)
+				}
+			}
+			app.tabs = app.tabs[1:2]
+			app.activeTab = 0
+			for _, step := range []int{1, -1} {
+				if app.jumpToChange(step) {
+					t.Fatal("navigation revisited the only tab instead of stopping")
+				}
+			}
+			if app.tab().doc == nil && !app.tab().isBinary {
+				app.tab().state.Comments[0].Resolved = false
+				app.tab().cursorLine = 1
+				app = pressKey(app, 'n')
+				if app.selectedCommentID() != "resolved" {
+					t.Fatal("navigation skipped an unresolved comment on a deleted file")
+				}
+			}
+		})
 	}
 }
 
