@@ -187,6 +187,34 @@ func TestImagePlaceholderSurvivesRendering(t *testing.T) {
 	}
 }
 
+func TestImagesUseDistinctPlacementIDs(t *testing.T) {
+	images := []inlineImage{
+		{id: 0x123456, columns: 32, rows: 16},
+		{id: 0x654321, columns: 40, rows: 6},
+	}
+	for _, img := range images {
+		placement := fmt.Sprintf("p=%d", img.id)
+		if !strings.Contains(img.placement(), placement+",") {
+			t.Fatalf("image %d has no distinct placement ID: %q", img.id, img.placement())
+		}
+		for _, line := range uv.NewStyledString(img.placeholder()).Lines(ansi.GraphemeWidth) {
+			for _, cell := range line {
+				if !strings.ContainsRune(cell.Content, kitty.Placeholder) {
+					continue
+				}
+				if cell.Style.UnderlineColor == nil {
+					t.Fatal("placeholder has no placement ID")
+				}
+				r, g, b, _ := cell.Style.UnderlineColor.RGBA()
+				id := int(r>>8)<<16 | int(g>>8)<<8 | int(b>>8)
+				if id != img.id {
+					t.Fatalf("placeholder placement ID=%d want=%d", id, img.id)
+				}
+			}
+		}
+	}
+}
+
 func TestPreviewReadsReviewedImage(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

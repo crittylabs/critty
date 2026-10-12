@@ -283,14 +283,16 @@ func (img inlineImage) size(width, height int) (int, int) {
 }
 
 func (img inlineImage) placement() string {
-	return ansi.KittyGraphics(nil, "a=p", "U=1", "q=2", "p=1",
+	return ansi.KittyGraphics(nil, "a=p", "U=1", "q=2", fmt.Sprintf("p=%d", img.id),
 		fmt.Sprintf("i=%d", img.id), fmt.Sprintf("c=%d", img.columns), fmt.Sprintf("r=%d", img.rows))
 }
 
 func (img inlineImage) placeholder() string {
 	var b strings.Builder
 	for row := range img.rows {
-		fmt.Fprintf(&b, "  \x1b[38;2;%d;%d;%dm\x1b[58;2;0;0;1m", img.id>>16&255, img.id>>8&255, img.id&255)
+		fmt.Fprintf(&b, "  \x1b[38;2;%d;%d;%dm\x1b[58;2;%d;%d;%dm",
+			img.id>>16&255, img.id>>8&255, img.id&255,
+			img.id>>16&255, img.id>>8&255, img.id&255)
 		for col := range img.columns {
 			b.WriteRune(kitty.Placeholder)
 			b.WriteRune(kitty.Diacritic(row))
