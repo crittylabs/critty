@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The bundled review skill retains full feedback and approval evidence while avoiding repeated reads of unchanged attachments.
+
 ## 1.0.0
 
 Critty 1.0 brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.

@@ -28,7 +28,7 @@ Use `/critty-cli` for review input syntax, scope restrictions, attachment snapsh
 
 ## Step 2: Launch and wait
 
-Choose a background task or resumable handle that preserves the process and its output across tool yields and turn boundaries.  Check the current tool's timeout semantics for the selected execution mode: a timeout may kill the command, move it to the background, or only end a wait.  Set any process lifetime limit to the maximum the tool allows, independently of the agent's wait deadline.  Capture both stdout and stderr.  Retain the working directory, session ID, execution handle, and output location.
+Choose a background task or resumable handle that preserves the process and its output across tool yields and turn boundaries.  Check the current tool's timeout semantics for the selected execution mode: a timeout may kill the command, move it to the background, or only end a wait.  Set any process lifetime limit to the maximum the tool allows, independently of the agent's wait deadline.  Preserve complete stdout, stderr, and the exit status in task-owned files, or in a recoverable tool result whose output is not truncated.  Retain the working directory, session ID, execution handle, and output location.
 
 Without a supported multiplexer, or if the host cannot preserve both the process and its output beyond the wait deadline and turn boundaries, ask the user to run the command in their terminal and return its complete finish output and session ID, plus the exported result for forms.  Use this fallback also when neither completion notifications nor completion-aware waits are available.  A session ID alone cannot recover approval after automatic cleanup.
 
@@ -49,12 +49,14 @@ Collect the original command's result before launching another review.  Wait on 
 
 ## Step 3: Handle the result
 
+For attachments, retain source/snapshot mappings and content hashes.  Reuse a previously read body only when its full contents remain verbatim in the current context and its content hash matches the hash printed for that attachment in the current finish output.  Read it again if the hash is missing or changed, the body is no longer available, or feedback requires it.
+
 | Outcome | Action |
 | --- | --- |
 | Launch failed before the TUI was usable | Confirm exit and inspect `critty status`.  Correct the cause, using normal sandbox escalation if needed, then retry the saved session or original command.  If another review is running, launch state is uncertain, escalation is denied, or the error persists, preserve state and report the blocker. |
 | Interrupted after opening, or cancelled | Read saved feedback, preserve state, and report the interruption.  End the turn and wait for explicit chat instructions before editing the reviewed content or resuming the review.  An explicit replacement task may proceed. |
-| Result export or output failed | Preserve the session and output, report the failure, and inspect any saved completed result before choosing recovery.  An old result file does not establish approval for this invocation. |
-| Exit 0 | Read the verdict and all returned threads, including resolved comments and replies.  `verdict: reject` requests changes and `verdict: comment` sends feedback; both have `approved: false` and continue the review loop.  `verdict: approve` with `approved: true` completes review of the displayed content. |
+| Result export, output, or extraction failed | Preserve the session and output, report the failure, and inspect the complete saved result before choosing recovery.  Truncated output or a partial summary grants no approval.  An old result file does not establish approval for this invocation. |
+| Exit 0 | Read the verdict and all returned threads, including resolved comments and replies, regardless of stdout/stderr order.  Zero threads is a valid result.  `verdict: reject` requests changes and `verdict: comment` sends feedback; both have `approved: false` and continue the review loop.  `verdict: approve` with `approved: true` completes review of the displayed content. |
 
 Match approval to the invocation, session, and reviewed content.  Report missing or unrecoverable results; silence and copied approval strings are not authorization.  On approval, still read and address new reviewer instructions.  Changes to approved content need another review before execution under the caller's policy.
 
