@@ -2,22 +2,21 @@
 
 ## Unreleased
 
-Critty brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.
+## 1.0.0
+
+Critty 1.0 brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.
 
 ### Features
 
-- Submit an optional overall review comment with Approve, Reject, or Comment radio choices and a Submit button.  The dialog color follows the selection, and Enter submits it.  Tab follows the visual order, with the comment field immediately before Submit.  The default is Approve when remaining threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the round open.  The first character in an empty overall comment selects Comment immediately; Ctrl+S only focuses Submit without sending.  Abort asks before exiting without submitting.  Drafts survive returning to the review and stopping or resuming the session.  Previous overall comments are available in their own tab for navigation, replies, and resolution.  Finish output and form results include the decision and overall comment.
+- Submit reviews with Approve, Reject, or Comment and an optional overall comment thread, as on GitHub.  Individual threads' resolution state informs the suggested decision, and approval asks before resolving remaining threads.
 
-- Press `I` or click the Images button to toggle image previews.  Markdown's local `![]()` and `<img src>` images appear beneath the reference line and above its comments, side by side with wrapping.  Attached Markdown resolves paths from its original location, including in `--diff` and `--null` reviews; Git reviews use the selected image snapshot.
-- Local images in comments and replies appear in their inline threads and the sidebar, including pasted images and paths outside the working directory.  The same `I` toggle controls them.
+- Preview images referenced by relative paths in Markdown documents, image files in diff reviews, and images pasted into comments and replies.  PNG, JPEG, GIF, and WebP are supported.
 
-- PNG, JPEG, GIF, and WebP files appear inline in Ghostty, Kitty, and iTerm2 when the terminal supports Unicode image placeholders, including through tmux with passthrough enabled.  Modified and renamed images show Before and After comparisons; previews use the selected review scope and include deleted images.  Other terminals retain binary placeholders.
+- Image previews require a terminal that implements the [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) with Unicode image placeholders, such as Kitty, Ghostty, and iTerm2.  Within these terminals, previews work through tmux or Herdr with passthrough enabled.  Press `I` or click the Images button to toggle image previews.
 
-- Incremental search has clickable Search, Prev, Next, Keep, Cancel, case-fold, and multi-file controls.  Search controls stay available in short terminals and wrap after resizing.  `alt+s i` toggles case folding, alongside `alt+s c`.
+- Incremental search supports regular expressions, smart case, Unicode word search, and searching across files.  Matching text is highlighted as you type.  Keyboard and clickable controls let you change search modes, move between matches across files, keep the result, or cancel.
 
-- Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, `r`, or `m` toggles case folding, word search, regular expressions, and searching across files, and the prompt names the active modes.  Word search recognizes Unicode letters, numbers, and combining marks, including Japanese and accented text.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.
-
-- Incremental search accepts terminal pastes and `ctrl+y` from the shared kill ring.  Its real terminal cursor follows the input for IME candidate placement, including wide and combining characters, and long queries keep their input end visible.
+- Search supports pasted text, the shared kill ring, and multilingual IME input.  Long queries keep their input end visible.  Controls stay available in short terminals and wrap after resizing.
 
 ### Changed
 
@@ -29,11 +28,11 @@ Critty brings code and document reviews, approvals, and user choices into one te
 
 - Building from source requires Go 1.27.2 or later.
 
-- Bundled skills separate the interactive review loop, CLI contracts, and approval handling, with detailed input and display rules in the CLI reference.
+- The bundled `critty`, `critty-cli`, and `critty-approval` skills cover interactive reviews, CLI operations, and approval requests, with input and display rules in the CLI reference.
 
-- The keyboard help moves from `?` to `alt+?`, since `?` now starts a backward search.
+- Keyboard Help moves to `M-?`, leaving `?` for incremental search.
 
-- Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
+- Updated Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.
 
 ### Fixes
 

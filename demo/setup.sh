@@ -22,7 +22,7 @@ work=$demo/work
 tmux -L demo kill-server 2>/dev/null || true
 rm -rf "$work" "$demo/doc" "$demo/state"
 mkdir -p "$demo/bin" "$work" "$demo/doc" "$demo/state"
-go build -o "$demo/bin/critty" "$root/cmd/critty"
+go build -ldflags "-X github.com/crittylabs/critty/internal/cli.version=${DEMO_VERSION:-}" -o "$demo/bin/critty" "$root/cmd/critty"
 
 cp "$assets/plan.md" "$demo/doc/plan.md"
 

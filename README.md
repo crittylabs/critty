@@ -15,7 +15,7 @@ A terminal UI for reviewing code and documents, approving actions, and making ch
 
 Give inline feedback, approve a proposed action, or choose between alternatives.  Handle these decisions on their own or alongside code and document reviews, then let your agent continue from your feedback and answers.
 
-<video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
+<video controls src="https://github.com/user-attachments/assets/ce50713a-ae3a-4112-9d1a-3948cb1f4e42"></video>
 
 [More videos and screenshots](#gallery).
 
@@ -32,7 +32,7 @@ Give inline feedback, approve a proposed action, or choose between alternatives.
 
 ### Image previews
 
-PNG, JPEG, GIF, and WebP previews work on supported terminals, including Ghostty, Kitty, and iTerm2.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.  GIF previews use the first frame; animated WebP and images over 5 MiB or 16 megapixels keep a text placeholder, as do unsupported terminals.  Supplied diffs show changed images as text placeholders; local images in attached Markdown and comments can still appear.
+PNG, JPEG, GIF, and WebP previews work in terminals that implement the [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) with Unicode image placeholders, such as Kitty, Ghostty, and iTerm2.  Within these terminals, previews work through tmux or Herdr with passthrough enabled.  For tmux, enable forwarding with `tmux set -g allow-passthrough on`.  GIF previews use the first frame; animated WebP and images over 5 MiB or 16 megapixels keep a text placeholder, as do unsupported terminals.  Supplied diffs show changed images as text placeholders; local images in attached Markdown and comments can still appear.
 
 Press `I` or click **Images** to toggle previews.  Markdown and comment previews use local images; remote URLs are not fetched.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
 
@@ -42,7 +42,7 @@ Install the `critty` binary, then install the review skills for your agent with 
 
 Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
-After upgrading to v0.18.1, rerun `critty install` for your agent to add the new `critty-approval` skill and update the review instructions.
+After upgrading to v1.0.0, rerun `critty install` for your agent to update the bundled review, CLI reference, and approval skills.
 
 ### Command-line binary
 
@@ -331,27 +331,27 @@ Shell completions are available through `critty completion <shell>` for Bash, Zs
 
 ### Code review with inline comments
 
-<video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
+<video controls src="https://github.com/user-attachments/assets/ce50713a-ae3a-4112-9d1a-3948cb1f4e42"></video>
 
 ### Review round trips with Claude Code
 
-<video controls src="https://github.com/user-attachments/assets/a8c68b3f-e569-4290-b314-0923f3572dd6"></video>
+<video controls src="https://github.com/user-attachments/assets/13f3b6de-be99-404e-810c-1f75ade27286"></video>
 
 ### Review round trips with Codex
 
-<video controls src="https://github.com/user-attachments/assets/9927c5f6-c7a6-4190-90dd-b20fef75f1e1"></video>
+<video controls src="https://github.com/user-attachments/assets/c92e291a-afbb-4ae9-b6ae-b0118adf40ba"></video>
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/664a9bee-4d88-4467-8326-8360da97a078)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/a9b28b8f-f999-4779-8f94-68c16f15d703)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/94076412-3b6d-47e0-a885-dee636686925)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/cd3084ea-ab94-4d10-b4ee-7da5725474a6)
 
 ### Incremental search
 
-![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/bfd140a0-3631-4b61-a6b0-ea690ffafd7f)
+![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/35168aa2-7349-4123-b28a-1ad393f714fc)
 
 ## Development
 
