@@ -479,7 +479,7 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	help := app.renderHelp(app.modalInnerWidth())
 	for _, want := range []string{
 		"Keyboard Help", "General", "Navigation", "Code review", "Selection and dialogs",
-		"↑/↓,j/k", "PgUp/PgDn", "Home/End,g/G,</>", "TAB/S-TAB", "C-s", "C-PgUp/PgDn", "y/n/ESC", "M-p",
+		"↑/↓,j/k", "PgUp/PgDn", "Home/End,g/G,</>", "TAB/S-TAB", "C-s", "C-PgUp/PgDn", "a/r/c", "M-p",
 		"Incremental search", "C-s / C-r", "C-d / C-w", "DEL / C-y", "M-s i/c/w/r/m", "terminal paste",
 		"C-: ctrl+, M-: meta/alt+, S-: shift+", "RET: enter", "DEL: backspace",
 	} {

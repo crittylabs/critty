@@ -65,7 +65,7 @@ func TestEmptyReviewCanFinishByMouse(t *testing.T) {
 	app.openFinishModal()
 	_, regions := app.renderEmptyReview()
 	for _, region := range regions {
-		if region.action.focus != 0 {
+		if region.action.focus != finishSubmit || region.action.dialog || region.action.textarea || region.action.close {
 			continue
 		}
 		_, cmd := app.handleMouseClick(tea.MouseClickMsg{X: region.rect.left, Y: region.rect.top, Button: tea.MouseLeft})
@@ -78,4 +78,43 @@ func TestEmptyReviewCanFinishByMouse(t *testing.T) {
 		return
 	}
 	t.Fatal("approve button missing")
+}
+
+func TestEmptyReviewRadioClickSelectsWithoutSubmitting(t *testing.T) {
+	app := NewCodeReviewApp(nil, "HEAD", AppConfig{Staged: true})
+	app.width, app.height = 100, 24
+	app.openFinishModal()
+	for _, region := range app.modalMouseRegions() {
+		if region.action.pick && region.action.focus == finishReject {
+			var cmd tea.Cmd
+			app, cmd = clickMouseCmd(app, region.rect.left, region.rect.top)
+			if isQuit(cmd) || app.modal != finishModal || app.finishVerdict != review.VerdictReject {
+				t.Fatal("radio click submitted or selected the wrong verdict")
+			}
+			return
+		}
+	}
+	t.Fatal("Reject radio missing")
+}
+
+func TestEmptyReviewSubmissionInputCursor(t *testing.T) {
+	app := NewCodeReviewApp(nil, "HEAD", AppConfig{Staged: true})
+	app.width, app.height = 40, 12
+	app.openFinishModal()
+	app.modalFocus = finishText
+	app.modalTextarea.Focus()
+	app.modalTextarea.SetValue("Review summary")
+	v := app.View()
+	if v.Cursor == nil {
+		t.Fatal("submission input cursor missing")
+	}
+	for _, region := range app.modalMouseRegions() {
+		if region.action.textarea {
+			if !region.rect.contains(tea.Mouse{X: v.Cursor.X, Y: v.Cursor.Y}) {
+				t.Fatal("cursor outside submission input")
+			}
+			return
+		}
+	}
+	t.Fatal("submission input missing")
 }

@@ -215,7 +215,7 @@ critty --unstaged                  # unstaged and untracked changes
 critty --scope=main...             # changes since the merge base with main
 ```
 
-Browse the changed files, leave comments, and press `q` or click **Submit** to finish.  Submit feedback for another round, or approve when the comments are resolved.  The agent reads your feedback, updates the code, and reopens the saved session.
+Browse the changed files, leave comments, and press `q` or click **Submit** to finish.  Add an optional overall comment, then select **Approve**, **Reject** to request changes, or **Comment** to send feedback.  The dialog color follows the selection; click **Submit** to send it.  Approve resolves remaining comments; required form confirmations must be complete.  The default selection is Approve when remaining unresolved threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the dialog open.  Press `enter` to submit or use `tab` / `shift+tab` to focus and edit the overall comment.  In that editor, `ctrl+s` moves focus to Submit without sending.  Typing the first character into an empty editor changes Approve to Comment immediately; further typing or deletion preserves your selection, and you can select Approve again.  Previous overall comments appear in **Overall comments**, where you can navigate, reply, and resolve them like other threads.  **Back** keeps the draft, and **Abort** asks before exiting without submitting; declining returns to the dialog.  The agent reads your feedback, updates the code, and reopens the saved session.
 
 Comments follow source edits across rounds.  If a comment can no longer be matched, a `💬` marker keeps its original context accessible.
 

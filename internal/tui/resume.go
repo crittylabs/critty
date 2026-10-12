@@ -26,7 +26,7 @@ func (m *AppModel) restoreRound() error {
 	}
 	files := make(map[string]review.SnapshotFile, len(m.tabs))
 	for _, tab := range m.tabs {
-		if tab.isBinary || tab.outsideChanges {
+		if tab.isBinary || tab.outsideChanges || tab.path == overallCommentsPath {
 			continue
 		}
 		if tab.isDeleted {
@@ -78,7 +78,7 @@ func (m *AppModel) focusNewReply() {
 				if seen[reply.ID] || reply.Author == m.author {
 					continue
 				}
-				if target.scope != "file" && m.visualLineIndex(tab, lineRef{line: target.line, side: target.side}) < 0 {
+				if !isGeneralCommentScope(target.scope) && m.visualLineIndex(tab, lineRef{line: target.line, side: target.side}) < 0 {
 					break
 				}
 				if m.threadScrolls == nil {

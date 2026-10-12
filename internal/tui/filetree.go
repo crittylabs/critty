@@ -138,9 +138,12 @@ func visibleTreeRows(root *treeNode, collapsed map[string]bool) []treeRow {
 func (m *AppModel) reviewFileTree() *treeNode {
 	var paths []string
 	var indices []int
+	var overall *treeNode
 	attachments := &treeNode{name: "attachments", path: "\x00attachments", isDir: true}
 	for i, t := range m.tabs {
-		if t.attachment != nil {
+		if t.path == overallCommentsPath {
+			overall = &treeNode{name: t.displayPath(), path: t.path, tabIndex: i}
+		} else if t.attachment != nil {
 			name := t.attachment.Name
 			if t.attachment.Removed {
 				name += " (removed)"
@@ -167,6 +170,9 @@ func (m *AppModel) reviewFileTree() *treeNode {
 		root.name = "Files"
 	}
 	forest := &treeNode{isDir: true, path: "\x00root"}
+	if overall != nil {
+		forest.children = append(forest.children, overall)
+	}
 	if len(attachments.children) > 0 {
 		forest.children = append(forest.children, attachments)
 	}

@@ -98,7 +98,7 @@ func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff stri
 		input.Scope, input.Source, input.Diff = resolved.Scope, &resolved, diff
 	}
 	for _, tab := range m.tabs {
-		if tab.outsideChanges || tab.attachment != nil {
+		if tab.outsideChanges || tab.attachment != nil || tab.path == overallCommentsPath {
 			continue
 		}
 		file := review.ReviewedFile{SnapshotFile: files[tab.path], Status: tab.status, Binary: tab.isBinary, Diff: tab.diff}
@@ -216,7 +216,7 @@ func (m *AppModel) formDisplayLine(line int, raw string) (string, int, bool) {
 	return indent + style.Bold(true).Render(symbol) + " " + label, lipgloss.Width(indent), true
 }
 
-func (m *AppModel) formSummary(width, height int) string {
+func (m *AppModel) formSummary(width int) string {
 	if m.forms == nil || !m.forms.HasForms() {
 		return ""
 	}
@@ -228,7 +228,7 @@ func (m *AppModel) formSummary(width, height int) string {
 		for _, item := range d.Items {
 			if item.Consent {
 				status := "Not allowed"
-				if form.Satisfied(item, d.Answers[item.ID]) && len(m.missingForms()) == 0 && (m.unresolvedTotal() == 0 || m.resolvesAllOnFinish()) {
+				if form.Satisfied(item, d.Answers[item.ID]) && len(m.missingForms()) == 0 {
 					status = "Allow on approval"
 				}
 				lines = append(lines, status+": "+d.Name+" / "+item.ID+" — "+item.Label)
@@ -238,12 +238,5 @@ func (m *AppModel) formSummary(width, height int) string {
 	if len(lines) == 0 {
 		return ""
 	}
-	rows := strings.Split(lipgloss.Wrap(strings.Join(lines, "\n"), width, ""), "\n")
-	limit := max(1, height)
-	offset := min(max(0, m.modalReferenceOffset), max(0, len(rows)-limit))
-	text := strings.Join(rows[offset:min(len(rows), offset+limit)], "\n")
-	if len(rows) > limit {
-		text += fmt.Sprintf("\n↑/↓: details (%d–%d/%d)", offset+1, min(len(rows), offset+limit), len(rows))
-	}
-	return "\n\n" + text
+	return lipgloss.Wrap(strings.Join(lines, "\n"), width, "")
 }

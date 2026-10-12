@@ -68,7 +68,7 @@ Feedback answers are drafts; overall approval and initial checkmarks supply no i
 
 ## Review command output
 
-On submission, stdout contains the finish prompt, threads, and attached document snapshots; stderr contains `approved: true|false` and diagnostics.  Capture both streams and the exit status.  Exit 0 can mean either approval or submitted feedback, so inspect the verdict and all threads.  A nonzero exit does not grant approval.  Export or output failures retain session data; a pre-existing result file may be from an earlier round.  Correlate any recovered result with its invocation before using it.
+On submission, stdout contains the finish prompt, threads, and attached document snapshots; stderr contains `verdict: approve|reject|comment`, `approved: true|false`, and diagnostics.  Capture both streams and the exit status.  Only `approve` sets `approved: true`; `reject` requests changes and `comment` sends feedback.  Exit 0 can mean any of these submissions, so inspect the verdict and all threads.  A nonzero exit does not grant approval.  Export or output failures retain session data; a pre-existing result file may be from an earlier round.  Correlate any recovered result with its invocation before using it.
 
 Ordinary approved reviews may be cleaned up immediately.  Preserve the finish output; the session ID alone is insufficient to recover it later.  Form results and comment images defer cleanup as described in their finish output.  Use `/critty` for launch, wait, and recovery decisions.
 
@@ -85,7 +85,7 @@ critty comments <review-path>    # an explicit review.json or its directory
 
 Review-level comments come first, then files in path order with file-level comments before line-level ones.  Each JSON entry adds `scope` and `path` to the stored comment fields.
 
-The finish prompt contains all comments and replies, including resolved threads on approval.  Read new reviewer instructions before continuing; approval cleanup may already have removed the saved review.  Use `critty comments --all` when inspecting a saved review headlessly.
+The finish prompt contains all comments and replies, including resolved threads on approval.  The current overall comment and verdict are appended even with a custom prompt.  Its body uses Crit-compatible `review_comments` with `scope: "review"`; the explicit verdict is a Critty extension stored in `tcrit_state.verdict`.  IPC and form results also expose `verdict` and optional `review_comment`.  Unsubmitted drafts stay in `tcrit_state.review_comment_draft` and are not submitted comments.  Read new reviewer instructions before continuing; approval cleanup may already have removed the saved review.  Use `critty comments --all` when inspecting a saved review headlessly.
 
 ## Targeting a session or plan
 

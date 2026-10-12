@@ -523,12 +523,12 @@ func TestHInputAndDialogs(t *testing.T) {
 		app.modalTextarea.Focus()
 		updated, _ := app.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 		app = *updated.(*AppModel)
-		if modal == commentModal || modal == fileCommentModal || modal == replyModal || modal == editModal {
+		if modal == commentModal || modal == fileCommentModal || modal == replyModal || modal == editModal || modal == finishModal {
 			if app.modalTextarea.Value() != "h" {
 				t.Fatalf("modal %v swallowed input", modal)
 			}
 		}
-		if modal == finishModal || modal == discardChangesModal || modal == deleteConfirmModal {
+		if modal == discardChangesModal || modal == deleteConfirmModal {
 			if app.modalFocus != 1 {
 				t.Fatalf("modal %v did not move button focus", modal)
 			}

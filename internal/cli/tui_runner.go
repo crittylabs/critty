@@ -111,7 +111,17 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		}
 	}()
 
-	_, runErr := p.Run()
+	finalModel, runErr := p.Run()
+	switch app := finalModel.(type) {
+	case tui.AppModel:
+		if err := app.SaveUnsubmittedDraft(); err != nil {
+			runErr = errors.Join(runErr, err)
+		}
+	case *tui.AppModel:
+		if err := app.SaveUnsubmittedDraft(); err != nil {
+			runErr = errors.Join(runErr, err)
+		}
+	}
 	close(finishCh)
 	<-done
 	if err := listener.Close(); err != nil {
@@ -275,7 +285,22 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 		NextRoundCmd:      nextCmd,
 	}
 
+	verdict := sess.CJ.RoundState.Verdict
+	if !verdict.Valid() {
+		verdict = review.VerdictComment
+		if approved {
+			verdict = review.VerdictApprove
+		}
+	}
+	comment := sess.SubmissionComment()
 	finishPrompt := prompt.RenderFinish(cfg.Prompts, cfg.ProjectRoot, ctx)
+	finishPrompt += fmt.Sprintf("\n\nReview verdict: %s.", verdict)
+	if verdict == review.VerdictReject {
+		finishPrompt += " The reviewer requests changes. Address the feedback and return for another review."
+	}
+	if comment != nil {
+		finishPrompt += "\n\nOverall review comment:\n" + comment.Body
+	}
 	if mode.code() && len(mode.files) == 0 {
 		finishPrompt += "\n\nThe selected review scope contains no file changes."
 	}
@@ -297,11 +322,13 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 		}
 	}
 	return ipc.FinishPayload{
-		Type:        "finish",
-		Approved:    approved,
-		Prompt:      finishPrompt,
-		Comments:    all,
-		NextCommand: nextCmd,
+		Type:          "finish",
+		Verdict:       verdict,
+		ReviewComment: comment,
+		Approved:      approved,
+		Prompt:        finishPrompt,
+		Comments:      all,
+		NextCommand:   nextCmd,
 	}
 }
 

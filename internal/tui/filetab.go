@@ -117,6 +117,9 @@ func (ft *FileTab) ensureHighlightCache() {
 }
 
 func (t *FileTab) displayPath() string {
+	if t.path == overallCommentsPath {
+		return "Overall comments"
+	}
 	if t.attachment != nil {
 		return "attachments/" + t.attachment.Name
 	}

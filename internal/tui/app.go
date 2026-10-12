@@ -45,6 +45,8 @@ const (
 	discardChangesModal
 	deleteConfirmModal
 	finishModal
+	finishResolveModal
+	finishAbortModal
 	helpModal
 	gotoLineModal
 	openSourceModal
@@ -152,6 +154,8 @@ type AppModel struct {
 	modalFocus           int  // focus index within the active modal
 	newFeedback          bool // true after adding or editing a comment in this round
 	finishSaveFailed     bool
+	finishDraft          string
+	finishVerdict        review.Verdict
 	lineInput            textinput.Model
 	pendingLocation      sourceLocation
 	locationError        string
@@ -280,6 +284,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		modalTextarea:   ta,
 	}
 	m.addDocuments(cfg.Documents)
+	m.ensureOverallCommentsTab()
 	m.orderTabsByTree()
 	return m
 }
@@ -358,6 +363,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		modalTextarea:   ta,
 	}
 	m.addDocuments(cfg.Documents)
+	m.ensureOverallCommentsTab()
 	m.orderTabsByTree()
 	return m
 }
@@ -404,6 +410,9 @@ func (m AppModel) loadDocuments() tea.Cmd {
 }
 
 func (m AppModel) loadDocument(path string) (*document.Document, error) {
+	if path == overallCommentsPath {
+		return overallCommentsDocument(), nil
+	}
 	if d, ok := m.attachments[path]; ok {
 		return document.FromContent(path, []byte(d.Content)), nil
 	}
@@ -440,12 +449,15 @@ func codeDiff(path, oldPath, ref string, staged bool) (*gitpkg.DiffInfo, error) 
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	emptyBefore := m.modal == finishModal && m.modalFocus == finishText && m.modalTextarea.Value() == ""
 	model, cmd := m.update(msg)
 	switch app := model.(type) {
 	case AppModel:
+		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	case *AppModel:
+		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	}
@@ -655,7 +667,7 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshFileSelect()
 		return m, cmd
 	}
-	if m.modal == commentModal || m.modal == fileCommentModal || m.modal == replyModal || m.modal == editModal {
+	if m.isTextModal() && m.modalFocus == 0 {
 		before := m.modalTextarea.Value()
 		m.modalTextarea, cmd = m.modalTextarea.Update(msg)
 		if _, pasted := msg.(tea.PasteMsg); pasted || m.modalTextarea.Value() != before {
@@ -735,6 +747,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.modal == finishModal {
 		return m.handleFinishModal(msg)
+	}
+	if m.modal == finishResolveModal || m.modal == finishAbortModal {
+		return m.handleFinishConfirmationKey(msg)
 	}
 
 	if len(m.tabs) == 0 {
@@ -898,7 +913,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.FileComment):
 		if !t.selecting && t.state != nil {
 			for _, c := range t.state.Comments {
-				if c.Scope == "file" {
+				if isGeneralCommentScope(c.Scope) {
 					m.editingID = c.ID
 					m.editingReplyID = ""
 					m.modalReferenceOffset = -1
@@ -1161,7 +1176,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.scrollToSidebarCursor()
 			m.rebuildContent()
 			sel := t.sidebarItems[t.sidebarCursor]
-			if sel.scope != "file" {
+			if !isGeneralCommentScope(sel.scope) {
 				t.cursorLine, t.cursorSide = sel.line, sel.side
 				m.scrollToAnnotation(sel.side, sel.line, sel.endLine)
 			}
@@ -1272,6 +1287,9 @@ func (m *AppModel) openCommentDelete(id string) {
 }
 
 func (m *AppModel) openLineComment() {
+	if m.tab().path == overallCommentsPath {
+		return
+	}
 	if m.tab().cursorLine == 0 {
 		m.moveCursorBy(m.tab(), 1, 1)
 		if m.tab().cursorLine == 0 {
@@ -1339,6 +1357,7 @@ func (m *AppModel) modalSubmit() {
 				}
 			}
 			c.UpdatedAt = review.Now()
+			m.noteFinishFeedback(t.path, c.ID)
 			break
 		}
 	case replyModal:
@@ -1356,6 +1375,7 @@ func (m *AppModel) modalSubmit() {
 				ReviewRound: m.reviewRound(),
 			})
 			c.UpdatedAt = now
+			m.noteFinishFeedback(t.path, c.ID)
 			break
 		}
 	case commentModal:
@@ -1381,6 +1401,7 @@ func (m *AppModel) modalSubmit() {
 			line: endLine, side: side, annoIdx: len(m.annotationsAfterLine(endLine, side)),
 		}
 		t.state.Comments = append(t.state.Comments, c)
+		m.noteFinishFeedback(t.path, c.ID)
 	case fileCommentModal:
 		now := review.Now()
 		c := review.Comment{
@@ -1394,8 +1415,12 @@ func (m *AppModel) modalSubmit() {
 		if m.session != nil {
 			c.ReviewRound = m.session.CJ.ReviewRound
 		}
+		if t.path == overallCommentsPath {
+			c.Scope = "review"
+		}
 		addedFileCommentID = c.ID
 		t.state.Comments = append(t.state.Comments, c)
+		m.noteFinishFeedback(t.path, c.ID)
 	}
 	m.newFeedback = true
 	m.editingID = ""
@@ -1660,6 +1685,9 @@ func (m *AppModel) sessionComments(path string) []review.Comment {
 		return []review.Comment{}
 	}
 	comments := m.session.FileComments(path)
+	if path == overallCommentsPath {
+		comments = m.session.CJ.ReviewComments
+	}
 	if comments == nil {
 		comments = []review.Comment{}
 	}
@@ -1748,7 +1776,7 @@ func (m *AppModel) suggestionRange() (int, int, bool) {
 		return 0, 0, false
 	}
 	for _, c := range t.state.Comments {
-		if c.ID == m.editingID && c.Scope != "file" && c.Side != "old" && c.StartLine > 0 {
+		if c.ID == m.editingID && !isGeneralCommentScope(c.Scope) && c.Side != "old" && c.StartLine > 0 {
 			return c.StartLine, c.EndAt(), true
 		}
 	}
@@ -1786,7 +1814,11 @@ func (m *AppModel) persist() {
 		if m.tabs[i].state == nil {
 			continue
 		}
-		m.session.SetFileComments(m.tabs[i].path, "", m.tabs[i].state.Comments)
+		if m.tabs[i].path == overallCommentsPath {
+			m.session.CJ.ReviewComments = m.tabs[i].state.Comments
+		} else {
+			m.session.SetFileComments(m.tabs[i].path, "", m.tabs[i].state.Comments)
+		}
 	}
 	m.session.CJ.RoundState.NewFeedback = m.newFeedback
 	if err := m.session.Save(); err != nil {
@@ -1797,69 +1829,11 @@ func (m *AppModel) persist() {
 }
 
 func (m *AppModel) refreshSavedComments() {
+	m.ensureOverallCommentsTab()
 	for i := range m.tabs {
 		if m.tabs[i].state != nil {
-			m.tabs[i].state.Comments = m.session.FileComments(m.tabs[i].path)
+			m.tabs[i].state.Comments = m.sessionComments(m.tabs[i].path)
 		}
-	}
-}
-
-// handleFinishModal processes keys for the finish-review confirmation.
-// Confirming emits the finish event; q abandons the session without
-// finishing (blocked clients see the connection close).
-func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, keys.Cancel) {
-		m.modal = noModal
-		return m, nil
-	}
-
-	switch msg.String() {
-	case "up", "k":
-		m.modalReferenceOffset = max(0, m.modalReferenceOffset-1)
-		return m, nil
-	case "down", "j":
-		m.modalReferenceOffset++
-		return m, nil
-	case "y", "Y":
-		return m.doFinish()
-	case "n", "N":
-		m.modal = noModal
-		return m, nil
-	case "q", "ctrl+c":
-		return m, tea.Quit
-	case "left", "right", "h", "l", "tab", "shift+tab":
-		m.modalFocus = 1 - m.modalFocus
-		return m, nil
-	case "enter":
-		if m.modalFocus == 0 {
-			return m.doFinish()
-		}
-		m.modal = noModal
-		return m, nil
-	}
-	return m, nil
-}
-
-func (m *AppModel) openFinishModal() {
-	m.persist()
-	m.recalculateLayout()
-	m.modal = finishModal
-	m.modalFocus = 0
-	m.modalReferenceOffset = 0
-}
-
-func (m *AppModel) finishActionLabel() string {
-	if len(m.missingForms()) > 0 {
-		return "Finish Review"
-	}
-	unresolved := m.unresolvedTotal()
-	switch {
-	case unresolved == 0:
-		return "Approve"
-	case !m.newFeedback:
-		return "Resolve All & Approve"
-	default:
-		return "Finish Review"
 	}
 }
 
@@ -1868,7 +1842,7 @@ func (m *AppModel) finishActionLabel() string {
 func (m *AppModel) unresolvedTotal() int {
 	n := 0
 	for i := range m.tabs {
-		if m.tabs[i].state == nil {
+		if m.tabs[i].state == nil || m.tabs[i].path == overallCommentsPath {
 			continue
 		}
 		for _, c := range m.tabs[i].state.Comments {
@@ -1887,21 +1861,70 @@ func (m *AppModel) unresolvedTotal() int {
 	return n
 }
 
-func (m *AppModel) resolvesAllOnFinish() bool {
-	return len(m.missingForms()) == 0 && !m.newFeedback && m.unresolvedTotal() > 0
-}
-
 // doFinish saves the completed round before closing the TUI.
 func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 	if m.finishSaveFailed {
 		m.err, m.finishSaveFailed = nil, false
 	}
-	if m.resolvesAllOnFinish() {
+	verdict := m.finishVerdict
+	if !verdict.Valid() {
+		verdict = m.defaultFinishVerdict()
+	}
+	if verdict == review.VerdictApprove && len(m.missingForms()) == 0 {
+		if m.modal == finishModal {
+			m.saveFinishDraft()
+		} else {
+			m.persist()
+		}
+		if m.err != nil {
+			m.finishSaveFailed = true
+			return m, nil
+		}
+		if m.unresolvedTotal() > 0 {
+			m.finishVerdict = verdict
+			m.modal, m.modalFocus = finishResolveModal, 0
+			m.modalTextarea.Blur()
+			return m, nil
+		}
+	}
+	return m.submitReview(verdict)
+}
+
+func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
+	if !verdict.Valid() {
+		m.err = fmt.Errorf("invalid review verdict: %q", verdict)
+		return m, nil
+	}
+	if verdict == review.VerdictApprove && len(m.missingForms()) > 0 {
+		m.clipboardStatus = "Complete required confirmations before approving."
+		return m, nil
+	}
+	m.finishVerdict = verdict
+	if m.modal == finishModal {
+		m.finishDraft = m.modalTextarea.Value()
+	}
+	if m.session != nil {
+		m.persist()
+		if m.err != nil {
+			m.finishSaveFailed = true
+			return m, nil
+		}
+		m.session.SetSubmission(verdict, m.finishDraft, m.author)
+		m.refreshSavedComments()
+		m.session.CJ.RoundState.ReviewCommentDraft = m.finishDraft
+	}
+	if verdict == review.VerdictApprove {
 		m.resolveAll()
 	} else {
 		m.persist()
 	}
 	if m.err != nil {
+		m.finishSaveFailed = true
+		return m, nil
+	}
+	if verdict == review.VerdictApprove && m.unresolvedTotal() > 0 {
+		m.err = fmt.Errorf("new feedback arrived while approving; review it before retrying")
+		m.finishSaveFailed = true
 		return m, nil
 	}
 	if m.session != nil {
@@ -1914,19 +1937,20 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.refreshSavedComments()
+		if verdict == review.VerdictApprove && m.unresolvedTotal() > 0 {
+			m.failSubmission(fmt.Errorf("new feedback arrived while approving; review it before retrying"))
+			return m, nil
+		}
 	}
-	approved := m.unresolvedTotal() == 0 && len(m.missingForms()) == 0
+	approved := verdict == review.VerdictApprove
 	var result *review.FormResult
 	if m.forms != nil && m.forms.HasForms() {
 		value := m.forms.Result(approved, m.session.CJ.ReviewRound)
 		value.Session = m.session.Key
+		value.Verdict = verdict
+		value.ReviewComment = m.session.SubmissionComment()
 		if err := m.session.SaveFormResult(value); err != nil {
-			m.session.CJ.RoundState.Finished = false
-			m.session.CJ.RoundState.SubmittedReplies = nil
-			if rollbackErr := m.session.Save(); rollbackErr != nil {
-				err = fmt.Errorf("%w; restoring unfinished round: %v", err, rollbackErr)
-			}
-			m.err, m.finishSaveFailed = err, true
+			m.failSubmission(err)
 			return m, nil
 		}
 		result = &value
@@ -2172,6 +2196,9 @@ func (m *AppModel) recalculateLayout() {
 	}
 	m.modalTextarea.SetWidth(modalWidth - 10)
 	m.modalTextarea.SetHeight(6)
+	if m.modal == finishModal {
+		m.modalTextarea.SetHeight(m.finishTextareaHeight())
+	}
 }
 
 // annotationsAfterLine returns annotations that render after the given line
@@ -2259,13 +2286,13 @@ func (m *AppModel) updateCommentSidebar() {
 		})
 	}
 	sort.SliceStable(t.sidebarItems, func(i, j int) bool {
-		if t.sidebarItems[i].scope == "file" {
-			if t.sidebarItems[j].scope != "file" {
+		if isGeneralCommentScope(t.sidebarItems[i].scope) {
+			if !isGeneralCommentScope(t.sidebarItems[j].scope) {
 				return true
 			}
 			return !t.sidebarItems[i].resolved && t.sidebarItems[j].resolved
 		}
-		if t.sidebarItems[j].scope == "file" {
+		if isGeneralCommentScope(t.sidebarItems[j].scope) {
 			return false
 		}
 		return t.sidebarItems[i].line < t.sidebarItems[j].line
@@ -2303,8 +2330,11 @@ func (m *AppModel) updateCommentSidebar() {
 		var item strings.Builder
 
 		var lineInfo string
-		if it.scope == "file" {
+		if isGeneralCommentScope(it.scope) {
 			lineInfo = "File"
+			if it.scope == "review" {
+				lineInfo = "Review"
+			}
 		} else if it.endLine > it.line {
 			lineInfo = fmt.Sprintf("L%d-%d", it.line, it.endLine)
 		} else {
@@ -2422,13 +2452,13 @@ func (m AppModel) renderHeader() string {
 	if t.state != nil {
 		commentCount = unresolvedCommentCount(t.state.Comments)
 	}
-	displayPath := t.path
+	displayPath := t.displayPath()
 	if t.attachment != nil {
 		displayPath = t.attachment.Source
 		if t.attachment.Removed {
 			displayPath += " (removed attachment)"
 		}
-	} else if m.filePath != "" {
+	} else if m.filePath != "" && t.path != overallCommentsPath {
 		displayPath = m.filePath
 	}
 
@@ -2584,10 +2614,11 @@ func (m AppModel) View() tea.View {
 	}
 
 	if m.multiFile && len(m.tabs) == 0 && m.width > 0 {
-		body, _ := m.renderEmptyReview()
+		body, regions := m.renderEmptyReview()
 		v := tea.NewView(body)
 		v.AltScreen = true
 		v.MouseMode = tea.MouseModeAllMotion
+		m.placeModalCursor(&v, regions)
 		return v
 	}
 	if m.width == 0 || len(m.tabs) == 0 || m.tab().state == nil {
@@ -2603,6 +2634,11 @@ func (m AppModel) View() tea.View {
 	if c := layout.isearchCursor; c != nil && c.X >= 0 && c.X < m.width && c.Y >= 0 && c.Y < m.height {
 		v.Cursor = c
 	}
+	m.placeModalCursor(&v, layout.modalRegions)
+	return v
+}
+
+func (m AppModel) placeModalCursor(v *tea.View, regions []modalMouseRegion) {
 	cursor := m.modalTextarea.Cursor()
 	switch m.modal {
 	case gotoLineModal:
@@ -2611,7 +2647,7 @@ func (m AppModel) View() tea.View {
 		cursor = m.fileSelect.input.Cursor()
 	}
 	if c := cursor; c != nil {
-		for _, region := range layout.modalRegions {
+		for _, region := range regions {
 			if !region.action.textarea && !region.action.lineInput {
 				continue
 			}
@@ -2624,7 +2660,6 @@ func (m AppModel) View() tea.View {
 			break
 		}
 	}
-	return v
 }
 
 func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
@@ -2804,9 +2839,6 @@ func (m *AppModel) visibleTabWindow(labels []tabLabel) (int, int) {
 }
 
 func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
-	if len(m.tabs) == 0 {
-		return m.handleEmptyReviewClick(msg)
-	}
 	mouse := msg.Mouse()
 	if mouse.Button != tea.MouseLeft {
 		return m, nil
@@ -2824,6 +2856,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 			m.modalOpeningClick = mouse
 		}
 	}()
+	if len(m.tabs) == 0 {
+		return m.handleEmptyReviewClick(msg)
+	}
 	m.hoveredGutterLine = 0
 	m.hoveredGutterSide = ""
 	if m.modal != noModal && m.clickedModalDismiss(mouse) {
@@ -2844,6 +2879,12 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		}
 		return m, nil
 	}
+	if m.modal == finishResolveModal || m.modal == finishAbortModal {
+		return m.handleFinishConfirmationMouse(mouse)
+	}
+	if m.modal == finishModal {
+		return m.handleFinishModalMouse(mouse)
+	}
 	if m.isTextModal() {
 		return m.handleTextModalMouse(mouse)
 	}
@@ -2852,9 +2893,6 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	}
 	if m.modal == deleteConfirmModal {
 		return m.handleDeleteConfirmModalMouse(mouse)
-	}
-	if m.modal == finishModal {
-		return m.handleFinishModalMouse(mouse)
 	}
 	if m.modal != noModal {
 		return m, nil
@@ -3080,7 +3118,7 @@ type modalButtonSpec struct {
 
 func (m *AppModel) isTextModal() bool {
 	return m.modal == commentModal || m.modal == fileCommentModal ||
-		m.modal == replyModal || m.modal == editModal
+		m.modal == replyModal || m.modal == editModal || m.modal == finishModal
 }
 
 func (m *AppModel) hasModalResolution() bool {
@@ -3143,21 +3181,6 @@ func (m *AppModel) focusTextareaAt(mouse tea.Mouse, rect mouseRect) {
 	m.modalTextarea.SetCursorColumn(column)
 	m.modalFocus = 0
 	m.modalTextarea.Focus()
-}
-
-func (m *AppModel) handleFinishModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
-	for _, region := range m.modalMouseRegions() {
-		if !region.rect.contains(mouse) {
-			continue
-		}
-		m.modalFocus = region.action.focus
-		if region.action.focus == 0 {
-			return m.doFinish()
-		}
-		m.modal = noModal
-		return m, nil
-	}
-	return m, nil
 }
 
 func (m *AppModel) handleDiscardChangesModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
@@ -3328,7 +3351,7 @@ func (m AppModel) gutterComment(row int) string {
 		}
 	}
 	for _, c := range m.tab().state.Comments {
-		if !commentDrifted(m.tab(), c) && c.Scope != "file" && c.Side == target.side && c.StartLine <= target.line && target.line <= c.EndLine {
+		if !commentDrifted(m.tab(), c) && !isGeneralCommentScope(c.Scope) && c.Side == target.side && c.StartLine <= target.line && target.line <= c.EndLine {
 			return c.ID
 		}
 	}
@@ -3499,7 +3522,7 @@ func (m *AppModel) selectSidebarItem(i int) {
 	t := m.tab()
 	item := t.sidebarItems[i]
 	t.sidebarCursor = i
-	if item.scope != "file" {
+	if !isGeneralCommentScope(item.scope) {
 		t.cursorLine, t.cursorSide = item.line, item.side
 		t.cursorOnAnnotation = false
 		t.cursorAnnoIdx = 0
@@ -3557,15 +3580,6 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 			m.scrollHelp(-3)
 		case tea.MouseWheelDown:
 			m.scrollHelp(3)
-		}
-		return m, nil
-	}
-	if m.modal == finishModal {
-		if msg.Mouse().Button == tea.MouseWheelUp {
-			m.modalReferenceOffset = max(0, m.modalReferenceOffset-3)
-		}
-		if msg.Mouse().Button == tea.MouseWheelDown {
-			m.modalReferenceOffset += 3
 		}
 		return m, nil
 	}
@@ -3836,7 +3850,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "h/H", desc: "fold/hide"},
 		{keys: "w / I", desc: "WS / images"},
 		{keys: "d", desc: "delete comment"},
-		{keys: "q/C-c", desc: "finish"},
+		{keys: "q/C-c", desc: "submit review"},
 	}, columnWidth)
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
@@ -3864,7 +3878,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
-		{keys: "y/n/esc · ←/→,h/l,tab/shift+tab · enter", desc: "confirm/cancel · focus · activate finish dialog"},
+		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
 	}, innerWidth)
 
 	search := renderHelpGroup("Incremental search", []helpItem{
@@ -4015,8 +4029,14 @@ func renderModalBoxAt(content string, width, maxHeight, offset, initialOffset in
 // modalMouseRegions returns the clickable regions inside the open dialog,
 // excluding the dialog frame itself.
 func (m AppModel) modalMouseRegions() []modalMouseRegion {
-	_, layout := m.renderReviewScreen()
-	return slices.DeleteFunc(slices.Clone(layout.modalRegions), func(r modalMouseRegion) bool { return r.action.dialog })
+	var regions []modalMouseRegion
+	if len(m.tabs) == 0 {
+		_, regions = m.renderEmptyReview()
+	} else {
+		_, layout := m.renderReviewScreen()
+		regions = layout.modalRegions
+	}
+	return slices.DeleteFunc(slices.Clone(regions), func(r modalMouseRegion) bool { return r.action.dialog })
 }
 
 // clickedModalDismiss reports whether mouse hit the dialog's close button or
@@ -4210,7 +4230,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 
 	case fileCommentModal:
 		title, closeRegion := modalTitle("Add File Comment", innerWidth)
-		path := contextBoxStyle.Width(innerWidth - 2).Render(m.tab().path)
+		path := contextBoxStyle.Width(innerWidth - 2).Render(m.tab().displayPath())
 		prefix, textareaRegion := layoutModalTextarea(
 			title+"\n"+path+"\n\n", m.clipboardTextareaView(), innerWidth)
 		regions = append(regions, textareaRegion)
@@ -4249,8 +4269,8 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			if c.ID == m.editingID {
 				if commentDrifted(m.tab(), c) {
 					referenceContent = driftedContext(c)
-				} else if c.Scope == "file" {
-					referenceContent = m.tab().path
+				} else if isGeneralCommentScope(c.Scope) {
+					referenceContent = m.tab().displayPath()
 				} else {
 					start := c.StartLine
 					end := c.EndAt()
@@ -4361,41 +4381,21 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		regions = append(regions, closeRegion)
 		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons)
 
+	case finishAbortModal:
+		frameStyle = frameStyle.BorderForeground(finishColor(review.VerdictReject))
+		content, abortRegions := m.finishAbortContent(innerWidth)
+		regions = append(regions, abortRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(content)
+	case finishResolveModal:
+		frameStyle = frameStyle.BorderForeground(success)
+		content, resolveRegions := m.finishResolveContent(innerWidth)
+		regions = append(regions, resolveRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(content)
 	case finishModal:
-		unresolved := m.unresolvedTotal()
-		titleStyle := modalTitleStyle
-		var titleText, info string
-		if len(m.missingForms()) > 0 {
-			titleText = "Finish review with missing confirmations?"
-			info = "Approval is blocked. Draft answers and feedback will be sent."
-		} else if unresolved == 0 {
-			titleText = "Approve review?"
-			info = "No unresolved comments — approving ends the review."
-		} else if !m.newFeedback {
-			titleText = "Resolve all & Approve?"
-			info = fmt.Sprintf("%d unresolved comment(s) will be resolved.", unresolved)
-		} else {
-			titleText = "Finish review?"
-			info = fmt.Sprintf("%d unresolved comment(s) will be sent to the agent.", unresolved)
-		}
-		if len(m.missingForms()) == 0 && (unresolved == 0 || !m.newFeedback) {
-			frameStyle = frameStyle.BorderForeground(lipgloss.BrightGreen)
-			titleStyle = titleStyle.Foreground(lipgloss.BrightGreen)
-			info = lipgloss.NewStyle().Foreground(lipgloss.BrightGreen).Render(info)
-		}
-		title, closeRegion := modalTitleRow(titleStyle.MarginBottom(0).Render(titleText), innerWidth)
-
-		prefix := title + "\n\n" + info + m.formSummary(innerWidth, m.height-15) + "\n\n"
-		prefix = lipgloss.Wrap(prefix, innerWidth, "")
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
-			{rendered: m.renderModalButton(m.finishActionLabel(), "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
-			{rendered: m.renderModalButton("Close", "n", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-		}, innerWidth, strings.Count(prefix, "\n"))
-		regions = append(regions, buttonRegions...)
-		regions = append(regions, closeRegion)
-		hint := footerStyle.Render("ESC: back to review · q: quit without finishing")
-
-		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons + "\n" + hint)
+		frameStyle = frameStyle.BorderForeground(finishColor(m.finishVerdict))
+		content, finishRegions := m.finishModalContent(innerWidth)
+		regions = append(regions, finishRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(content)
 	}
 
 	modalW := lipgloss.Width(modalContent)
@@ -4441,7 +4441,7 @@ func (m AppModel) modalWidth() int {
 	if m.modal == helpModal {
 		width = m.width - 4
 	}
-	return max(50, min(width, m.width-4))
+	return max(10, min(max(50, width), m.width-4))
 }
 
 func (m AppModel) modalInnerWidth() int {

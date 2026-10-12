@@ -111,7 +111,7 @@ func TestMissingFormFinishesAsFeedbackWithoutResolving(t *testing.T) {
 	app.tab().state.Comments = []review.Comment{testComment()}
 	app.newFeedback = false
 	app.toggleForm(5)
-	if app.finishActionLabel() != "Finish Review" || app.resolvesAllOnFinish() {
+	if app.defaultFinishVerdict() != review.VerdictComment {
 		t.Fatal("missing confirmation allows approval")
 	}
 	_, cmd := app.doFinish()
@@ -216,4 +216,39 @@ func TestFormAppearanceAndFinishDetailsFit(t *testing.T) {
 		}
 	}
 	initAdaptiveStyles(true)
+}
+
+func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
+	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictReject, review.VerdictComment} {
+		t.Run(string(verdict), func(t *testing.T) {
+			app, ch := formTestApp(t)
+			app.toggleForm(2)
+			app.toggleForm(5)
+			app.openFinishModal()
+			app.modalTextarea.SetValue("Overall comment retained on retry.")
+			blocker := filepath.Join(app.session.Dir, "result-1.json")
+			if err := os.Mkdir(blocker, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			_, cmd := app.submitReview(verdict)
+			if isQuit(cmd) || !app.finishSaveFailed || app.session.CJ.RoundState.Finished {
+				t.Fatal("save failure submitted review")
+			}
+			id := app.session.CJ.RoundState.ReviewCommentID
+			if err := os.Remove(blocker); err != nil {
+				t.Fatal(err)
+			}
+			_, cmd = app.doFinish()
+			if !isQuit(cmd) {
+				t.Fatal(app.err)
+			}
+			ev := takeEvent(t, ch)
+			if ev.Result.Verdict != verdict || ev.Result.ReviewComment.ID != id || len(app.session.CJ.ReviewComments) != 1 {
+				t.Fatalf("retry changed submission: %+v", ev.Result)
+			}
+			if ev.Approved != (verdict == review.VerdictApprove) || ev.Result.Consents["a"]["publish"] != ev.Approved {
+				t.Fatalf("incorrect approval or consent: %+v", ev.Result)
+			}
+		})
+	}
 }

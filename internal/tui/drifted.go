@@ -11,7 +11,7 @@ import (
 
 // commentLocation is a display location only; saved coordinates and scope stay intact.
 func commentLocation(t *FileTab, c review.Comment) lineRef {
-	if c.Scope == "file" || t.doc == nil || t.isBinary {
+	if isGeneralCommentScope(c.Scope) || t.doc == nil || t.isBinary {
 		return lineRef{}
 	}
 	if c.Side == "old" {
@@ -29,7 +29,7 @@ func commentLocation(t *FileTab, c review.Comment) lineRef {
 }
 
 func commentDrifted(t *FileTab, c review.Comment) bool {
-	return c.Scope != "file" && (c.Drifted || commentLocation(t, c).line == 0)
+	return !isGeneralCommentScope(c.Scope) && (c.Drifted || commentLocation(t, c).line == 0)
 }
 
 func tabAnnotation(t *FileTab, c review.Comment) annotation {

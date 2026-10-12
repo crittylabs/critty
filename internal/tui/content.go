@@ -37,7 +37,7 @@ func (m *AppModel) rebuildContent() {
 	oldAnnosByEndLine := make(map[int][]annotation)
 	if t.state != nil {
 		for _, c := range t.state.Comments {
-			if c.Scope == "file" {
+			if isGeneralCommentScope(c.Scope) {
 				continue
 			}
 			ref := commentLocation(t, c)
@@ -58,7 +58,7 @@ func (m *AppModel) rebuildContent() {
 	oldAnnotatedLines := make(map[int]int)
 	if t.state != nil {
 		for _, c := range t.state.Comments {
-			if c.Scope == "file" || commentDrifted(t, c) {
+			if isGeneralCommentScope(c.Scope) || commentDrifted(t, c) {
 				continue
 			}
 			lines := annotatedLines
@@ -397,8 +397,11 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 		collapsed = false
 	}
 	var lineLabel string
-	if ann.scope == "file" {
+	if isGeneralCommentScope(ann.scope) {
 		lineLabel = "File"
+		if ann.scope == "review" {
+			lineLabel = "Review"
+		}
 	} else if ann.endLine > ann.line {
 		lineLabel = fmt.Sprintf("L%d-%d", ann.line, ann.endLine)
 	} else {

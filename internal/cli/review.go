@@ -419,6 +419,11 @@ func printFinish(payload *ipc.FinishPayload, sess *review.Session) error {
 			return err
 		}
 	}
+	if payload.Verdict.Valid() {
+		if _, err := fmt.Fprintf(os.Stderr, "verdict: %s\n", payload.Verdict); err != nil {
+			return err
+		}
+	}
 	_, err := fmt.Fprintf(os.Stderr, "approved: %t\n", payload.Approved)
 	return err
 }

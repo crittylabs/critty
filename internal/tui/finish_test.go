@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/review"
 )
@@ -73,13 +75,28 @@ func TestFinishModalConfirmation(t *testing.T) {
 	}{
 		{name: "no comments", approved: true},
 		{name: "resolved comments", comments: []review.Comment{resolved}, approved: true},
+		{name: "existing unresolved feedback", comments: []review.Comment{testComment()}, approved: true},
 		{name: "new feedback", comments: []review.Comment{testComment()}, newFeedback: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app, ch := newFinishTestApp(t, tt.comments)
 			app.newFeedback = tt.newFeedback
 			app = pressKey(app, 'q')
-			app, cmd := pressKeyCmd(app, 'y')
+			wantFocus := finishSubmit
+			wantVerdict := review.VerdictComment
+			if tt.approved {
+				wantVerdict = review.VerdictApprove
+			}
+			if app.finishVerdict != wantVerdict {
+				t.Fatalf("default verdict = %s, want %s", app.finishVerdict, wantVerdict)
+			}
+			if app.modalFocus != wantFocus || app.modalTextarea.Focused() {
+				t.Fatalf("default focus = %d, want %d, input focused = %t", app.modalFocus, wantFocus, app.modalTextarea.Focused())
+			}
+			app, cmd := pressKeyCmd(app, tea.KeyEnter)
+			if app.modal == finishResolveModal {
+				app, cmd = pressKeyCmd(app, 'y')
+			}
 			if !isQuit(cmd) || app.modal != noModal {
 				t.Fatal("confirmation did not close the modal and quit")
 			}
@@ -116,13 +133,13 @@ func TestMouseClickFinishModalCloseReturnsToReview(t *testing.T) {
 	app.recalculateLayout()
 	app, _ = pressKeyCmd(app, 'q')
 	for _, region := range app.modalMouseRegions() {
-		if region.action.focus == 1 {
-			assertRegionContainsRenderedText(t, app, region.rect, "Close n")
+		if region.action.focus == finishBack {
+			assertRegionContainsRenderedText(t, app, region.rect, "Back ESC")
 			break
 		}
 	}
 
-	app = clickModalAction(t, app, "Close n")
+	app = clickModalAction(t, app, "Back ESC")
 
 	if app.modal != noModal {
 		t.Fatalf("modal = %v, want no modal", app.modal)
@@ -143,13 +160,14 @@ func TestMouseClickFinishModalConfirmActions(t *testing.T) {
 		approved    bool
 	}{
 		{name: "approve", label: "Approve", approved: true},
+		{name: "reject", label: "Reject", approved: false},
 		{
 			name: "resolve all and approve", comments: []review.Comment{testComment()},
-			label: "Resolve All & Approve", approved: true,
+			label: "Approve", approved: true,
 		},
 		{
 			name: "finish review", comments: []review.Comment{testComment()}, newFeedback: true,
-			label: "Finish Review", approved: false,
+			label: "Comment", approved: false,
 		},
 	}
 
@@ -164,7 +182,14 @@ func TestMouseClickFinishModalConfirmActions(t *testing.T) {
 			var actionRect mouseRect
 			found := false
 			for _, region := range app.modalMouseRegions() {
-				if region.action.focus == 0 {
+				focus := finishApprove
+				if tt.label == "Comment" {
+					focus = finishComment
+				}
+				if tt.label == "Reject" {
+					focus = finishReject
+				}
+				if region.action.focus == focus && !region.action.dialog && !region.action.close && !region.action.textarea {
 					actionRect = region.rect
 					found = true
 					break
@@ -173,10 +198,32 @@ func TestMouseClickFinishModalConfirmActions(t *testing.T) {
 			if !found {
 				t.Fatalf("finish action %q not found", tt.label)
 			}
-			assertRegionContainsRenderedText(t, app, actionRect, tt.label+" y")
+			assertRegionContainsRenderedText(t, app, actionRect, tt.label)
 
 			app, cmd := clickMouseCmd(app, actionRect.left, actionRect.top)
+			if isQuit(cmd) || app.modal != finishModal {
+				t.Fatal("radio selection submitted review")
+			}
+			select {
+			case <-ch:
+				t.Fatal("radio selection emitted a result")
+			default:
+			}
+			for _, region := range app.modalMouseRegions() {
+				if region.action.focus == finishSubmit && !region.action.dialog {
+					app, cmd = clickMouseCmd(app, region.rect.right-1, region.rect.top)
+					break
+				}
+			}
 
+			if app.modal == finishResolveModal {
+				for _, region := range app.modalMouseRegions() {
+					if region.action.focus == 0 && !region.action.close && !region.action.dialog {
+						app, cmd = clickMouseCmd(app, region.rect.right-1, region.rect.top)
+						break
+					}
+				}
+			}
 			if !isQuit(cmd) {
 				t.Error("finish action did not quit inline review")
 			}
@@ -190,7 +237,7 @@ func TestMouseClickFinishModalConfirmActions(t *testing.T) {
 	}
 }
 
-func TestFinishModal_NoNewFeedbackResolvesAllAndApproves(t *testing.T) {
+func TestFinishModal_ExplicitApprovalResolvesAll(t *testing.T) {
 	comment := testComment()
 	app, ch := newFinishTestApp(t, []review.Comment{comment})
 	app.session.CJ.ReviewComments = []review.Comment{{
@@ -200,12 +247,12 @@ func TestFinishModal_NoNewFeedbackResolvesAllAndApproves(t *testing.T) {
 	app.width = 80
 	app.height = 24
 
-	rendered := app.renderWithModal(strings.Repeat(" ", 80))
-	if !strings.Contains(rendered, "Resolve all & Approve?") {
-		t.Fatalf("expected resolve-all prompt, got:\n%s", rendered)
+	app = pressKey(app, 'a')
+	app, cmd := pressKeyCmd(app, tea.KeyEnter)
+	if app.modal != finishResolveModal || isQuit(cmd) {
+		t.Fatal("approval did not request resolve-all confirmation")
 	}
-
-	app, cmd := pressKeyCmd(app, 'y')
+	app, cmd = pressKeyCmd(app, 'y')
 
 	if !isQuit(cmd) {
 		t.Fatal("expected approval to quit")
@@ -224,11 +271,15 @@ func TestFinishModal_NoNewFeedbackResolvesAllAndApproves(t *testing.T) {
 	}
 }
 
-func TestFinishModal_QuitWithoutFinishing(t *testing.T) {
+func TestFinishModal_AbortWithoutFinishing(t *testing.T) {
 	app, ch := newFinishTestApp(t, []review.Comment{testComment()})
 	app, _ = pressKeyCmd(app, 'q')
 
-	_, cmd := pressKeyCmd(app, 'q')
+	app, cmd := pressKeyCmd(app, 'q')
+	if isQuit(cmd) || app.modal != finishAbortModal {
+		t.Fatal("abort did not request confirmation")
+	}
+	_, cmd = pressKeyCmd(app, 'y')
 
 	if !isQuit(cmd) {
 		t.Fatal("expected q in the modal to quit without finishing")
@@ -237,5 +288,429 @@ func TestFinishModal_QuitWithoutFinishing(t *testing.T) {
 	case <-ch:
 		t.Error("expected no finish event when quitting without finishing")
 	default:
+	}
+}
+
+func TestExplicitSubmissionOutcomes(t *testing.T) {
+	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictReject, review.VerdictComment} {
+		for _, body := range []string{"", "Overall feedback.\nAnother line."} {
+			t.Run(string(verdict)+"/"+body, func(t *testing.T) {
+				app, ch := newFinishTestApp(t, []review.Comment{testComment()})
+				app.newFeedback = true
+				app.openFinishModal()
+				app.modalTextarea.SetValue(body)
+				_, cmd := app.submitReview(verdict)
+				if !isQuit(cmd) {
+					t.Fatalf("submission failed: %v", app.err)
+				}
+				if takeEvent(t, ch).Approved != (verdict == review.VerdictApprove) {
+					t.Fatal("incorrect approval")
+				}
+				saved, err := review.OpenSession("", app.session.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !saved.CJ.RoundState.Finished || saved.CJ.RoundState.Verdict != verdict {
+					t.Fatalf("incorrect saved submission: %+v", saved.CJ.RoundState)
+				}
+				comment := saved.SubmissionComment()
+				if body == "" {
+					if comment != nil {
+						t.Fatal("empty comment was created")
+					}
+				} else if comment == nil || comment.Body != body || comment.Scope != "review" || comment.Resolved != (verdict == review.VerdictApprove) {
+					t.Fatalf("wrong overall comment: %+v", comment)
+				}
+			})
+		}
+	}
+}
+
+func TestSubmissionDraftAndAbort(t *testing.T) {
+	app, ch := newFinishTestApp(t, nil)
+	app.openFinishModal()
+	app.modalTextarea.SetValue("Unsubmitted draft.")
+	app.closeFinishModal()
+	if len(app.session.CJ.ReviewComments) != 0 {
+		t.Fatal("draft was submitted")
+	}
+	app.openFinishModal()
+	if app.modalTextarea.Value() != "Unsubmitted draft." {
+		t.Fatal("draft was lost")
+	}
+	_, cmd := app.requestFinishAbort()
+	if isQuit(cmd) || app.modal != finishAbortModal {
+		t.Fatal("abort did not request confirmation")
+	}
+	_, cmd = pressKeyCmd(app, 'y')
+	if !isQuit(cmd) || app.session.CJ.RoundState.Finished {
+		t.Fatal("abort submitted the review")
+	}
+	select {
+	case <-ch:
+		t.Fatal("abort emitted a submission")
+	default:
+	}
+}
+
+func TestSubmissionUnicodeInputAndLayout(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		for _, size := range [][2]int{{100, 24}, {60, 16}, {40, 12}} {
+			app, _ := newFinishTestApp(t, nil)
+			app.width, app.height = size[0], size[1]
+			app.openFinishModal()
+			rect := modalTextareaRect(t, app)
+			app = clickMouse(app, rect.left, rect.top)
+			app, _ = updateApp(app, tea.PasteMsg{Content: "日本語e\u0301\n" + strings.Repeat("長文", 30)})
+			view := app.View()
+			if view.Cursor == nil || !rect.contains(tea.Mouse{X: view.Cursor.X, Y: view.Cursor.Y}) {
+				t.Fatalf("cursor outside textarea: %+v %+v", view.Cursor, rect)
+			}
+			if strings.Count(view.Content, "\n")+1 > size[1] {
+				t.Fatalf("dialog exceeds terminal: %v", size)
+			}
+			for _, region := range app.modalMouseRegions() {
+				if region.action.focus >= finishApprove && !region.action.dialog && !region.action.close && !region.action.scrollable {
+					if region.rect.top < 0 || region.rect.bottom > size[1] {
+						t.Fatalf("button unreachable: %+v in %v", region, size)
+					}
+				}
+			}
+			before := app.modalTextarea.Value()
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'q', Text: "q"})
+			if app.modalTextarea.Value() != before+"q" {
+				t.Fatal("input shortcut swallowed q")
+			}
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestExplicitApprovalRequiresConfirmations(t *testing.T) {
+	app, ch := formTestApp(t)
+	app.openFinishModal()
+	app.modalTextarea.SetValue("Approval comment")
+	_, cmd := app.submitReview(review.VerdictApprove)
+	if isQuit(cmd) || app.session.CJ.RoundState.Finished {
+		t.Fatal("approved missing confirmations")
+	}
+	select {
+	case <-ch:
+		t.Fatal("approval event emitted")
+	default:
+	}
+	app.modalTextarea.SetValue("Please complete the required confirmations.")
+	_, cmd = app.submitReview(review.VerdictReject)
+	if !isQuit(cmd) {
+		t.Fatalf("reject failed: %v", app.err)
+	}
+	ev := takeEvent(t, ch)
+	if ev.Approved || ev.Result.Verdict != review.VerdictReject || ev.Result.ReviewComment == nil || len(ev.Result.Consents) != 0 {
+		t.Fatalf("wrong result: %+v", ev.Result)
+	}
+}
+
+func TestFinishRadioSelectionChangesColorWithoutSubmitting(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		app, ch := newFinishTestApp(t, nil)
+		app.width, app.height = 100, 24
+		app.openFinishModal()
+		background := lipgloss.NewStyle().Width(app.width).Height(app.height).Render("")
+		frames := make(map[string]bool)
+		plainFrame := ""
+		for _, key := range []rune{'a', 'A', 'r', 'R', 'c', 'C'} {
+			var cmd tea.Cmd
+			app, cmd = pressKeyCmd(app, key)
+			if isQuit(cmd) || app.modal != finishModal {
+				t.Fatal("selection submitted the review")
+			}
+			select {
+			case <-ch:
+				t.Fatal("selection emitted a result")
+			default:
+			}
+			view := app.renderWithModal(background)
+			for _, line := range strings.Split(view, "\n") {
+				plain := ansi.Strip(line)
+				if !strings.Contains(plain, "╭") {
+					continue
+				}
+				if plainFrame != "" && plain != plainFrame {
+					t.Fatal("selection changed frame geometry")
+				}
+				plainFrame = plain
+				frames[line] = true
+				break
+			}
+		}
+		if len(frames) != 3 {
+			t.Fatal("radio selections did not produce three frame colors")
+		}
+		app.modalFocus = finishReject
+		app, cmd := pressKeyCmd(app, ' ')
+		if isQuit(cmd) || app.finishVerdict != review.VerdictReject {
+			t.Fatal("Space did not select the focused radio")
+		}
+		app, cmd = pressKeyCmd(app, tea.KeyEnter)
+		if !isQuit(cmd) || takeEvent(t, ch).Approved || app.session.CJ.RoundState.Verdict != review.VerdictReject {
+			t.Fatal("Enter did not submit the selected verdict")
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestResolveAllConfirmationCanBeDeclined(t *testing.T) {
+	for _, cancel := range []rune{'n', tea.KeyEscape} {
+		app, ch := newFinishTestApp(t, []review.Comment{testComment()})
+		app.width, app.height = 80, 24
+		app.openFinishModal()
+		app.modalTextarea.SetValue("Preserved draft.")
+		_, cmd := app.doFinish()
+		if isQuit(cmd) || app.modal != finishResolveModal {
+			t.Fatal("missing resolve-all confirmation")
+		}
+		app, cmd = pressKeyCmd(app, cancel)
+		if isQuit(cmd) || app.modal != finishModal || app.modalTextarea.Value() != "Preserved draft." {
+			t.Fatal("declining did not return with the draft")
+		}
+		if app.tab().state.Comments[0].Resolved || app.session.CJ.RoundState.Finished || len(app.session.CJ.ReviewComments) != 0 {
+			t.Fatal("declining resolved or submitted feedback")
+		}
+		select {
+		case <-ch:
+			t.Fatal("declining emitted a finish event")
+		default:
+		}
+		_, cmd = app.doFinish()
+		if isQuit(cmd) || app.modal != finishResolveModal {
+			t.Fatal("retry skipped confirmation")
+		}
+		app, cmd = pressKeyCmd(app, 'y')
+		if !isQuit(cmd) || !takeEvent(t, ch).Approved || !app.tab().state.Comments[0].Resolved {
+			t.Fatal("confirmation did not resolve and approve")
+		}
+	}
+}
+
+func TestDefaultVerdictConsidersOnlyUnresolvedFeedback(t *testing.T) {
+	for _, scenario := range []string{"untouched", "resolve and unresolve", "resolved new comment", "new unresolved comment", "new reply", "edited comment"} {
+		t.Run(scenario, func(t *testing.T) {
+			old := testComment()
+			old.Author = "Tester"
+			app, _ := newFinishTestApp(t, []review.Comment{old})
+			want := review.VerdictApprove
+			switch scenario {
+			case "resolve and unresolve":
+				app.toggleResolve(old.ID)
+				app.toggleResolve(old.ID)
+			case "resolved new comment", "new unresolved comment":
+				fresh := review.Comment{ID: "c_fresh", Author: app.author, Body: "New feedback.", ReviewRound: app.reviewRound(), Resolved: scenario == "resolved new comment"}
+				app.tab().state.Comments = append(app.tab().state.Comments, fresh)
+				app.noteFinishFeedback(app.tab().path, fresh.ID)
+				app.newFeedback = true
+				if !fresh.Resolved {
+					want = review.VerdictComment
+				}
+			case "new reply":
+				app.tab().state.Comments[0].Replies = []review.Reply{{ID: "rp_new", Author: app.author, Body: "More feedback.", ReviewRound: app.reviewRound()}}
+				want = review.VerdictComment
+			case "edited comment":
+				app.modal, app.editingID = editModal, old.ID
+				app.modalInitial = old.Body
+				app.modalTextarea.SetValue("Changed feedback.")
+				app.modalSubmit()
+				want = review.VerdictComment
+			}
+			if got := app.defaultFinishVerdict(); got != want {
+				t.Fatalf("default = %s, want %s", got, want)
+			}
+		})
+	}
+}
+
+func TestResolveAllConfirmationFitsAndBackWorksByMouse(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		app, ch := newFinishTestApp(t, []review.Comment{testComment()})
+		app.width, app.height = 40, 12
+		app.openFinishModal()
+		app.doFinish()
+		if app.modal != finishResolveModal {
+			t.Fatal("missing confirmation")
+		}
+		for _, region := range app.modalMouseRegions() {
+			if region.action.dialog || region.action.close {
+				continue
+			}
+			if region.rect.top < 0 || region.rect.bottom > app.height {
+				t.Fatalf("unreachable confirmation action: %+v", region)
+			}
+			if region.action.focus == 1 {
+				app = clickMouse(app, region.rect.left, region.rect.top)
+				break
+			}
+		}
+		if app.modal != finishModal {
+			t.Fatal("Back did not return to Submit")
+		}
+		select {
+		case <-ch:
+			t.Fatal("Back emitted approval")
+		default:
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestFinishAbortDeclineKeepsReviewOpen(t *testing.T) {
+	for _, key := range []rune{'n', tea.KeyEscape, tea.KeyEnter, 'q'} {
+		app, ch := newFinishTestApp(t, []review.Comment{testComment()})
+		app.openFinishModal()
+		app.modalTextarea.SetValue("Preserve this draft.")
+		app, cmd := pressKeyCmd(app, 'q')
+		if isQuit(cmd) || app.modal != finishAbortModal {
+			t.Fatal("abort did not ask")
+		}
+		app, cmd = pressKeyCmd(app, key)
+		if isQuit(cmd) || app.modal != finishModal || app.modalTextarea.Value() != "Preserve this draft." || app.tab().state.Comments[0].Resolved || app.session.CJ.RoundState.Finished {
+			t.Fatal("declining abort changed the review")
+		}
+		select {
+		case <-ch:
+			t.Fatal("declining abort emitted submission")
+		default:
+		}
+	}
+}
+
+func TestFinishAbortConfirmationMouseAndSmallTerminal(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		app, ch := newFinishTestApp(t, nil)
+		app.width, app.height = 40, 12
+		app.openFinishModal()
+		app.requestFinishAbort()
+		found := false
+		for _, region := range app.modalMouseRegions() {
+			if region.action.close || region.action.dialog {
+				continue
+			}
+			if region.rect.top < 0 || region.rect.bottom > app.height {
+				t.Fatal("unreachable abort action")
+			}
+			if region.action.focus == 0 {
+				_, cmd := clickMouseCmd(app, region.rect.right-1, region.rect.top)
+				if !isQuit(cmd) || app.session.CJ.RoundState.Finished {
+					t.Fatal("Abort click submitted or did not quit")
+				}
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("Abort button missing")
+		}
+		select {
+		case <-ch:
+			t.Fatal("abort emitted submission")
+		default:
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestFinishOverallHistoryStartsAtLatestComment(t *testing.T) {
+	app, _ := newFinishTestApp(t, nil)
+	app.width, app.height = 80, 30
+	app.session.CJ.ReviewComments = []review.Comment{
+		{ID: "r_first", Scope: "review", Body: strings.Repeat("Older feedback.\n", 20)},
+		{ID: "r_latest", Scope: "review", Body: "Latest overall feedback.\n" + strings.Repeat("More latest feedback.\n", 20)},
+	}
+	app.openFinishModal()
+	content, regions := app.finishModalContent(50)
+	if !strings.Contains(content, "Latest overall feedback.") {
+		t.Fatal("latest overall feedback not visible on opening")
+	}
+	for _, region := range regions {
+		if region.action.scrollable && (region.action.scrollOffset == 0 || region.action.scrollOffset == region.action.scrollMaxOffset) {
+			t.Fatal("history did not start at the latest comment")
+		}
+	}
+	app.scrollFinishReference(-1)
+	if app.modalReferenceOffset < 0 {
+		t.Fatal("history did not scroll from actual initial offset")
+	}
+}
+
+func TestFinishCtrlSOnlyFocusesSubmitFromEditor(t *testing.T) {
+	app, ch := newFinishTestApp(t, nil)
+	app.openFinishModal()
+	for _, focus := range []int{finishApprove, finishReject, finishComment, finishSubmit, finishBack, finishAbort} {
+		app.modalFocus = focus
+		var cmd tea.Cmd
+		app, cmd = updateApp(app, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+		if isQuit(cmd) || app.modal != finishModal || app.modalFocus != focus {
+			t.Fatal("C-s acted outside the overall editor")
+		}
+	}
+	app.modalFocus = finishText
+	app.modalTextarea.Focus()
+	app, _ = updateApp(app, tea.PasteMsg{Content: "Overall summary"})
+	app, cmd := updateApp(app, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+	if isQuit(cmd) || app.modal != finishModal || app.modalFocus != finishSubmit || app.modalTextarea.Focused() || app.modalTextarea.Value() != "Overall summary" {
+		t.Fatal("C-s did not focus Submit without sending")
+	}
+	select {
+	case <-ch:
+		t.Fatal("C-s emitted submission")
+	default:
+	}
+	_, cmd = pressKeyCmd(app, tea.KeyEnter)
+	if !isQuit(cmd) || takeEvent(t, ch).Approved || app.session.CJ.RoundState.Verdict != review.VerdictComment {
+		t.Fatal("Enter did not send the automatic Comment verdict after C-s")
+	}
+}
+
+func TestFinishInputAutoCommentPreservesExplicitChoices(t *testing.T) {
+	for _, scenario := range []string{"first character", "paste", "reject", "approve again", "existing draft", "delete"} {
+		app, _ := newFinishTestApp(t, nil)
+		if scenario == "existing draft" {
+			app.session.CJ.RoundState.ReviewCommentDraft = "Existing draft"
+		}
+		app.openFinishModal()
+		if scenario == "reject" {
+			app.finishVerdict = review.VerdictReject
+		}
+		app.modalFocus = finishText
+		app.modalTextarea.Focus()
+		if scenario == "paste" {
+			app, _ = updateApp(app, tea.PasteMsg{Content: "Pasted overall feedback"})
+		} else {
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'x', Text: "x"})
+		}
+		want := review.VerdictComment
+		if scenario == "reject" {
+			want = review.VerdictReject
+		}
+		if scenario == "existing draft" {
+			want = review.VerdictApprove
+		}
+		if scenario == "approve again" || scenario == "delete" {
+			app.finishVerdict = review.VerdictApprove
+			if scenario == "delete" {
+				app = pressKey(app, tea.KeyBackspace)
+			} else {
+				app, _ = updateApp(app, tea.KeyPressMsg{Code: 'y', Text: "y"})
+			}
+			want = review.VerdictApprove
+		}
+		if app.finishVerdict != want {
+			t.Fatalf("%s: verdict after input = %s, want %s", scenario, app.finishVerdict, want)
+		}
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
+		if app.finishVerdict != want {
+			t.Fatalf("%s: C-s changed verdict", scenario)
+		}
 	}
 }

@@ -294,7 +294,7 @@ func TestCommentTerminalCursor(t *testing.T) {
 					t.Fatal("blurred textarea still has a terminal cursor")
 				}
 				app.modalTextarea.Focus()
-				app.modal = finishModal
+				app.modal = deleteConfirmModal
 				if app.View().Cursor != nil {
 					t.Fatal("dialog without textarea has a terminal cursor")
 				}

@@ -406,7 +406,7 @@ func TestBuildFinishPayloadApproved(t *testing.T) {
 	if !payload.Approved || len(payload.Comments) != 0 || payload.NextCommand != "" {
 		t.Errorf("unexpected payload: %+v", payload)
 	}
-	if payload.Prompt != "Review approved with no comments — no changes requested." {
+	if payload.Prompt != "Review approved with no comments — no changes requested.\n\nReview verdict: approve." {
 		t.Errorf("prompt = %q", payload.Prompt)
 	}
 
@@ -432,7 +432,7 @@ func TestBuildFinishPayloadUsesConfigPromptOverride(t *testing.T) {
 	}}
 
 	payload := buildFinishPayload(cfg, sess, &reviewMode{docPath: "doc.md"}, true)
-	if want := "Custom approved for " + sess.Key; payload.Prompt != want {
+	if want := "Custom approved for " + sess.Key + "\n\nReview verdict: approve."; payload.Prompt != want {
 		t.Errorf("prompt = %q, want %q", payload.Prompt, want)
 	}
 }
@@ -465,5 +465,28 @@ func TestReviewArgSuffixEscapesDocumentPath(t *testing.T) {
 	mode := &reviewMode{docPath: "plans/it's a plan.md"}
 	if got, want := reviewArgSuffix(mode), " 'plans/it'\\''s a plan.md'"; got != want {
 		t.Fatalf("reviewArgSuffix = %q, want %q", got, want)
+	}
+}
+
+func TestOverallSubmissionSurvivesCustomPrompts(t *testing.T) {
+	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictReject, review.VerdictComment} {
+		t.Run(string(verdict), func(t *testing.T) {
+			sess := newPayloadSession(t)
+			sess.SetSubmission(verdict, "Overall instructions.", "Human")
+			cfg := &config.Config{Prompts: map[string]string{
+				"on_finish_approved":   "inline:Custom approval",
+				"on_finish_unresolved": "inline:Custom feedback",
+			}}
+			payload := buildFinishPayload(cfg, sess, &reviewMode{docPath: "doc.md"}, verdict == review.VerdictApprove)
+			if payload.Verdict != verdict || payload.ReviewComment == nil || payload.ReviewComment.Body != "Overall instructions." {
+				t.Fatalf("submission missing: %+v", payload)
+			}
+			if !strings.HasPrefix(payload.Prompt, "Custom ") || !strings.Contains(payload.Prompt, "Overall instructions.") || !strings.Contains(payload.Prompt, "Review verdict: "+string(verdict)) {
+				t.Fatalf("custom prompt hid the submission: %s", payload.Prompt)
+			}
+			if (payload.NextCommand == "") != (verdict == review.VerdictApprove) {
+				t.Fatalf("wrong continuation: %+v", payload)
+			}
+		})
 	}
 }

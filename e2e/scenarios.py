@@ -167,8 +167,19 @@ class Round:
         )
 
     def finish(self, approved: bool) -> dict[str, int]:
+        needs_confirmation = approved and any(
+            not c.get("resolved") for c in self.comments()
+        )
         self.keys("q")
-        self.keys("y")
+        if approved:
+            self.keys("a")
+        self.keys("Enter")
+        if needs_confirmation:
+            wait_until(
+                lambda: "Resolve all & approve?" in self.screen(),
+                "resolve-all confirmation",
+            )
+            self.keys("y")
         return self.completed(approved)
 
     def completed(self, approved: bool | None) -> dict[str, int]:
@@ -226,7 +237,7 @@ def scenarios() -> None:
         json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": False})
     )
     (WORK / "plan.md").write_text(
-        "# Release plan\n\nDeploy the application.\n確認します。\n"
+        "# Release plan\n\nDeploy the application.\nConfirm deployment.\n"
     )
     tmux(
         "-f",
@@ -242,6 +253,125 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
+        default_approval = Round("default-approval", ["plan.md"])
+        default_approval.keys("q", "Enter")
+        default_approval.completed(True)
+        report(
+            "Submit defaults to Approve when no comments are unresolved; Enter sends it"
+        )
+
+        unchanged = Round("unchanged-feedback", ["plan.md"])
+        cli(
+            "comment",
+            "--session",
+            unchanged.session,
+            "--author",
+            "Scenario Agent",
+            "plan.md",
+            "Existing feedback.",
+        )
+        unchanged.keys("q", "Tab", "Tab", "Tab")
+        unchanged.text("Preserve draft.")
+        unchanged.keys("Tab", "a", "Enter")
+        wait_until(
+            lambda: "Resolve all & approve?" in unchanged.screen(),
+            "existing feedback confirmation",
+        )
+        unchanged.keys("n")
+        assert not unchanged.result.exists(), (
+            "declining resolve-all submitted the round"
+        )
+        assert not any(c.get("resolved") for c in unchanged.comments()), (
+            "declining resolved feedback"
+        )
+        assert "Preserve draft" in unchanged.screen(), "declining discarded the draft"
+        unchanged.keys("Enter", "y")
+        unchanged.completed(True)
+        assert all(c.get("resolved") for c in unchanged.comments())
+        report(
+            "existing feedback defaults to Approve; declining resolve-all keeps the draft; confirming approves"
+        )
+
+        for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:
+            submission = Round(f"submit-{verdict}", ["plan.md"])
+            submission.keys("q", "Tab", "Tab", "Tab")
+            body = f"Overall comment: {verdict}."
+            submission.text(body)
+            assert "● Comment" in submission.screen(), (
+                "first input did not select Comment"
+            )
+            submission.keys("C-s")
+            assert not submission.result.exists(), "C-s submitted the overall comment"
+            assert "● Comment" in submission.screen(), (
+                "new overall feedback did not select Comment"
+            )
+            if verdict != "comment":
+                submission.keys(action)
+            assert not submission.result.exists(), (
+                "selecting a verdict submitted the review"
+            )
+            submission.keys("Enter")
+            submission.completed(verdict == "approve")
+            assert f"verdict: {verdict}" in submission.err.read_text()
+            assert body in submission.out.read_text()
+            saved = json.loads((submission.directory() / "review.json").read_text())
+            comments = saved["review_comments"]
+            assert len(comments) == 1 and comments[0]["body"] == body, saved
+            assert comments[0].get("resolved", False) == (verdict == "approve"), saved
+        report(
+            "radio selections require Submit and send overall feedback with distinct verdicts"
+        )
+
+        overall = Round("overall-resumed", ["--session", submission.session])
+        overall.keys("}")
+        wait_until(
+            lambda: "Overall review comments" in overall.screen(),
+            "overall thread navigation",
+        )
+        overall.keys("r")
+        wait_until(
+            lambda: all(c.get("resolved") for c in overall.comments()),
+            "overall thread resolution",
+        )
+        overall.finish(True)
+        report(
+            "previous overall feedback is visible, reachable with }, and individually resolvable"
+        )
+
+        draft = Round("submit-draft", ["plan.md"])
+        draft.keys("q", "Tab", "Tab", "Tab")
+        draft.text("Saved draft.")
+        draft.keys("Escape")
+        draft.keys("q", "q")
+        wait_until(lambda: "Abort review?" in draft.screen(), "abort confirmation")
+        draft.keys("n")
+        assert not draft.result.exists(), "declining abort ended the review"
+        wait_until(
+            lambda: "Saved draft" in draft.screen(), "draft after declining abort"
+        )
+        draft.keys("q", "y")
+        draft.completed(None)
+        assert draft.comments() == [], "draft became submitted feedback"
+        resumed_draft = Round("draft-resumed", ["--session", draft.session])
+        resumed_draft.keys("q")
+        wait_until(
+            lambda: "Saved draft" in resumed_draft.screen(), "restored overall draft"
+        )
+        resumed_draft.keys("Tab", "Tab", "Tab")
+        resumed_draft.text(" Updated draft.")
+        cli("stop", "--session", draft.session)
+        resumed_draft.completed(None)
+        externally_resumed = Round("draft-after-stop", ["--session", draft.session])
+        externally_resumed.keys("q")
+        wait_until(
+            lambda: "Updated draft" in externally_resumed.screen(),
+            "draft after CLI stop",
+        )
+        externally_resumed.keys("c", "Enter")
+        externally_resumed.completed(False)
+        assert "Saved draft. Updated draft." in externally_resumed.out.read_text()
+        report("overall comment draft survives Back, stop, and same-session resume")
+
         first = Round("round1", ["plan.md"])
         first.comment("Add rollback instructions.")
         comment = first.comments()[0]
@@ -267,9 +397,9 @@ def scenarios() -> None:
                 future.result()
         assert len(first.comments()[0]["replies"]) == 2, first.comments()
         first.comment(
-            "Keep the Japanese explanation.",
+            "Keep the deployment explanation.",
             file=False,
-            expected="Add rollback instructions.Keep the Japanese explanation.",
+            expected="Add rollback instructions.Keep the deployment explanation.",
         )
         comments = first.comments()
         assert len(comments) == 1 and len(comments[0]["replies"]) == 2, comments
@@ -279,7 +409,7 @@ def scenarios() -> None:
         )
 
         (WORK / "plan.md").write_text(
-            "# Release plan\n\nDeploy the application.\n確認します。\n\nRollback to the previous release if deployment fails.\n"
+            "# Release plan\n\nDeploy the application.\nConfirm deployment.\n\nRollback to the previous release if deployment fails.\n"
         )
         second = Round("round2", ["--session", first.session])
         assert second.session == first.session

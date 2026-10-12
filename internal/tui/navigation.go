@@ -129,7 +129,7 @@ func (m *AppModel) commentTargets(tabIndex int) []commentTarget {
 // sit before the first line.
 func (m *AppModel) targetPosition(t *FileTab, target commentTarget) int {
 	if target.line == 0 {
-		if target.scope == "file" && m.hideComments {
+		if isGeneralCommentScope(target.scope) && m.hideComments {
 			m.hideComments = false
 			m.recalculateLayout()
 		}
@@ -255,7 +255,7 @@ func (m *AppModel) findAdjacentComment(step int, includeResolved, wrap bool) (in
 func (m *AppModel) selectComment(tabIndex int, target commentTarget) {
 	m.activeTab = tabIndex
 	t := m.tab()
-	if target.scope == "file" && m.hideComments {
+	if isGeneralCommentScope(target.scope) && m.hideComments {
 		m.hideComments = false
 		m.recalculateLayout()
 	}

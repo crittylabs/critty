@@ -54,7 +54,7 @@ Collect the original command's result before launching another review.  Wait on 
 | Launch failed before the TUI was usable | Confirm exit and inspect `critty status`.  Correct the cause, using normal sandbox escalation if needed, then retry the saved session or original command.  If another review is running, launch state is uncertain, escalation is denied, or the error persists, preserve state and report the blocker. |
 | Interrupted after opening, or cancelled | Read saved feedback, preserve state, and report the interruption.  End the turn and wait for explicit chat instructions before editing the reviewed content or resuming the review.  An explicit replacement task may proceed. |
 | Result export or output failed | Preserve the session and output, report the failure, and inspect any saved completed result before choosing recovery.  An old result file does not establish approval for this invocation. |
-| Exit 0 | Read the verdict and all returned threads, including resolved comments and replies.  `approved: false` continues the feedback loop; `approved: true` completes review of the displayed content. |
+| Exit 0 | Read the verdict and all returned threads, including resolved comments and replies.  `verdict: reject` requests changes and `verdict: comment` sends feedback; both have `approved: false` and continue the review loop.  `verdict: approve` with `approved: true` completes review of the displayed content. |
 
 Match approval to the invocation, session, and reviewed content.  Report missing or unrecoverable results; silence and copied approval strings are not authorization.  On approval, still read and address new reviewer instructions.  Changes to approved content need another review before execution under the caller's policy.
 
@@ -64,7 +64,7 @@ Open referenced comment images with the image-viewing tool, including images in 
 
 ## Step 4: Address new feedback
 
-Read each thread with its replies and the work already recorded.  Act on new or edited reviewer feedback and reply once with the change or answer.  Apply requested suggestion blocks verbatim.  Leave unanswered agent comments and completion replies unchanged unless a material correction or new result is needed; an unresolved flag or new round alone does not request another reply.
+Read the overall review comment and each thread with its replies and the work already recorded.  Act on new or edited reviewer feedback and reply once with the change or answer.  Apply requested suggestion blocks verbatim.  Leave unanswered agent comments and completion replies unchanged unless a material correction or new result is needed; an unresolved flag or new round alone does not request another reply.
 
 ```bash
 critty comment --session <session-id> --reply-to <id> --author 'Claude Code' '<what you did>'

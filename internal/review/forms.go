@@ -43,10 +43,12 @@ type FormState struct {
 // FormResult is self-contained, including the exact inputs to each consent.
 type FormResult struct {
 	FormState
-	Session  string                     `json:"session,omitempty"`
-	Approved bool                       `json:"approved"`
-	Round    int                        `json:"round"`
-	Consents map[string]map[string]bool `json:"consents,omitempty"`
+	Session       string                     `json:"session,omitempty"`
+	Approved      bool                       `json:"approved"`
+	Verdict       Verdict                    `json:"verdict,omitempty"`
+	ReviewComment *Comment                   `json:"review_comment,omitempty"`
+	Round         int                        `json:"round"`
+	Consents      map[string]map[string]bool `json:"consents,omitempty"`
 }
 
 func ParseDocumentForm(d AttachedDocument) ([]form.Item, error) {

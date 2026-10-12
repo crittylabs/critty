@@ -37,10 +37,14 @@ type SnapshotFile struct {
 
 // RoundState is Critty's saved runtime context, separate from CritJSON comments.
 type RoundState struct {
-	Files       map[string]SnapshotFile `json:"files,omitempty"`
-	Diff        string                  `json:"diff,omitempty"`
-	Finished    bool                    `json:"finished,omitempty"`
-	NewFeedback bool                    `json:"new_feedback,omitempty"`
+	Files              map[string]SnapshotFile    `json:"files,omitempty"`
+	Diff               string                     `json:"diff,omitempty"`
+	Finished           bool                       `json:"finished,omitempty"`
+	NewFeedback        bool                       `json:"new_feedback,omitempty"`
+	Verdict            Verdict                    `json:"verdict,omitempty"`
+	ReviewCommentID    string                     `json:"review_comment_id,omitempty"`
+	FeedbackComments   map[string]map[string]bool `json:"feedback_comments,omitempty"`
+	ReviewCommentDraft string                     `json:"review_comment_draft,omitempty"`
 	// Nil means no baseline was recorded; an empty array means no replies
 	// existed at submission.  Preserve that distinction in saved sessions.
 	SubmittedReplies []string `json:"submitted_replies"`
@@ -82,7 +86,14 @@ func (s *Session) BeginRound(files map[string]SnapshotFile, rawDiff string) erro
 				files[path] = prev
 			}
 		}
-		current.CJ.RoundState = RoundState{Files: files, Diff: rawDiff, NewFeedback: previous.NewFeedback}
+		state := RoundState{Files: files, Diff: rawDiff, NewFeedback: previous.NewFeedback}
+		if !previous.Finished {
+			state.Verdict = previous.Verdict
+			state.ReviewCommentID = previous.ReviewCommentID
+			state.ReviewCommentDraft = previous.ReviewCommentDraft
+			state.FeedbackComments = previous.FeedbackComments
+		}
+		current.CJ.RoundState = state
 		return nil
 	})
 }
