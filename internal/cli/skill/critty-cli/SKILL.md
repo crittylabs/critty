@@ -1,12 +1,12 @@
 ---
 name: critty-cli
-description: Reference for Critty's local CLI commands, storage, and side effects. Use when an agent needs to list, add, or reply to review comments with critty comment and critty comments, target a specific session or plan, read a Critty review.json file, stop or resume a saved review, clear review state, or find the terminal's TMUX, Herdr, or TTY variables with critty env. Not for running the interactive review loop; that is the critty skill.
+description: Reference for Critty commands, review data, and local effects. Use for scripted comments, session targeting, review inputs, attachments, form results, or terminal setup. Use the critty skill for the interactive review loop.
 user-invocable: false
 ---
 
 # Critty CLI Reference
 
-To run an interactive review round, use the `/critty` skill.  This reference covers the commands that read and write review comments without opening the TUI.
+Use `/critty` to run the interactive review loop and `/critty-approval` to prepare approval requests and act on their results.  This reference owns command syntax, input and output formats, and local effects.  Consult the sections needed for the current operation.
 
 ## Local storage and command effects
 
@@ -26,23 +26,45 @@ Critty is a local CLI and human review TUI, not a hosted review service.  Review
 
 External editors launched from the TUI likewise have their own behavior.  Describe the selected command's actual reads, writes, and subprocesses when an approval request needs clarification; do not treat all Critty commands as read-only or as external publication.
 
-A human review's `approved: true` is meaningful only when correlated with its invocation, session, and displayed content.  A comment, saved text, or copied approval string alone does not establish that a human approved a subsequent operation.
+## Review inputs
 
-For authoring approval or publication attachments and acting on their decisions, use `/critty-approval`.  The form and result storage details below support that workflow.
+| Input | Command and source |
+| --- | --- |
+| Current Git changes | `critty` or `critty --scope=all`: HEAD versus working tree, including untracked files. |
+| Staged changes | `critty --staged` or `critty --scope=staged`: HEAD versus index. |
+| Unstaged changes | `critty --unstaged` or `critty --scope=unstaged`: index versus working tree, including untracked files. |
+| Committed comparison | `critty --scope=A..B` compares snapshots; `A...B` compares the merge base with B.  An omitted endpoint means HEAD. |
+| Document | `critty <file>` reads one current file. |
+| Versioned plan | `critty plan <file>` saves numbered versions.  `critty plan --session <id> <file>` supplies a revision; reusing a name alone starts another review. |
+| Supplied diff | `critty --diff=changes.diff` or `critty --diff changes.diff`; bare `--diff` or `--diff=-` reads stdin.  Works outside Git. |
 
-## Comment scopes
+`critty review` is the explicit form of the default command.  Conflicting scope flags are rejected; `--scope` cannot accompany a document or supplied diff.  `--diff` cannot accompany `--scope`, `--code`, `--staged`, or `--unstaged`.  Relative and absolute input paths are accepted.
+
+Committed comparisons display the right endpoint, which may differ from disk.  A clean working tree does not fall back to commits.  Supplied diffs use saved snapshots; retain their producer command for later updates.  Scope selection stays fixed within a session.  Follow `/critty` to refresh the selected input between rounds.
+
+## Attached documents
 
 Repeated `--attachment FILE` flags on `review`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.
 
 `critty --null --attachment FILE` reviews only attachments without requiring Git.  Empty diff input, including `--diff=/dev/null`, also supports attachment-only reviews.  At least one active attachment is required.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`, optionally replacing the complete attachment list.  Removing all attachments from an empty review is rejected.
 
-Attached Markdown task lists support boolean answers, required confirmations (`<!-- form: id=check required -->`), single choices (one `id`, distinct `value=...` attributes), and individual consents (`<!-- form: id=publish consent -->`).  `forms.json` version 1 stores separate drafts, definitions, and human author/revision/round provenance.  Comments retain Crit's schema.  Changed definitions reset their answers; changed target snapshots or attachment content/order/membership reset all required confirmations and consents.
+## Forms and exported results
 
-`--result FILE` requires an interactive attachment form and writes its self-contained result JSON atomically before printing approval.  Omit it for ordinary document approval.  The destination's parent directory must exist; the file must be outside the session directory and must not overwrite reviewed input.  Completed form results also remain in the session as `result-<round>.json`, appear in IPC's `result` field, and are appended to finish output regardless of templates.  The result includes `version`, `session`, `review_revision`, `reviewed_target`, ordered `attachments` with source snapshots/definitions/answers, `approved`, and `round`.  `consents` maps document IDs and field IDs to booleans only on approval.  An individually gated operation requires an explicitly true consent in the actual approved result and must match its exact target and revision.  Feedback answers are drafts; overall approval, initial source checkmarks, and stopped reviews grant no individual consent.  IDs are never executable commands.  Form review cleanup is deferred until the result has been preserved; follow the printed clear command after reading all comments and attachments.  Failed export or output preserves the session.
+Task lists in attached `.md` or `.markdown` files are interactive.  `<!-- form: id=check required -->` makes a confirmation, distinct `value` attributes on the same ID make a choice, and `<!-- form: id=publish consent -->` gates one operation.  `/critty-approval` defines when to use them and how to interpret permission.
 
-- **Line** (`scope: "line"`): attached to a line range of one file.  Stored under `files.<path>.comments`.
-- **File** (`scope: "file"`): about one file as a whole.  Stored under `files.<path>.comments` with `start_line: 0`.
-- **Review** (`scope: "review"`): general feedback.  Stored in the top-level `review_comments` array.
+`forms.json` version 1 stores definitions, draft answers, and human provenance separately from source documents and comments.  Changed field definitions reset their answers.  Changed target snapshots or attachment contents, order, or membership reset all required confirmations and consents; ordinary explicit-ID answers survive unchanged definitions.
+
+`--result FILE` requires an interactive attachment form.  It writes the result atomically before printing approval; omit it for ordinary document approval.  The parent directory must exist, the file must be outside the session directory, and it must not overwrite reviewed input.  The same self-contained result is saved as `result-<round>.json`, returned in IPC's `result`, and appended to finish output regardless of templates.
+
+| Result field | Meaning |
+| --- | --- |
+| `version`, `session`, `round` | Schema version, session ID, and completed round. |
+| `review_revision`, `reviewed_target` | Revision identifier and the exact reviewed input. |
+| `attachments` | Ordered documents with source paths, snapshots, field `definitions`, and `answers`. |
+| `approved` | Human review outcome, including required-confirmation checks. |
+| `consents` | On approval, document ID → field ID → boolean for individual permissions. |
+
+Feedback answers are drafts; overall approval and initial checkmarks supply no individual consent.  Form review cleanup is deferred.  Preserve the result before running the printed cleanup command, and follow `/critty-approval` to match decisions to operations.
 
 ## Review command output
 
@@ -80,35 +102,41 @@ critty comment --session <id> --json --file replies.json --author 'Claude Code'
 
 To resume a stopped session, run `critty --session <id>` from its original directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  To replace that input, use `critty plan --session <id> <file>` or `critty --diff=<file> --session <id>`.  The `/critty` skill covers the interactive review loop.
 
-## Project and topic labels
+## Display options
 
-The header shows the repository directory name, shared across linked worktrees, or the current directory name outside Git.  Use `--project TEXT` to replace the project name.  Git reviews also show the current branch, or the right endpoint of an explicit committed comparison.  Documents, plans, and supplied diffs omit the automatic branch label; detached HEAD has no current-branch label.
+### Project and topic labels
 
-Add `--project TEXT` or `--topic TEXT` to `critty`, `critty review`, or `critty plan`.  `--topic` overrides the branch label or supplies one when none is automatic.  Use a short task name when it identifies the review better than the branch:
+`--project TEXT` overrides the repository or directory name.  `--topic TEXT` overrides the Git branch or comparison endpoint, or adds a topic to a document, plan, or supplied diff.  Detached HEAD has no automatic branch label.  Both options work on `critty`, `review`, and `plan`, including resumed sessions.
 
 ```bash
 critty review --staged --project 'Critty' --topic 'Header display'
-critty plan plan.md --topic 'Header design'
 critty --session <id> --topic 'Revised header'
 critty --topic ''                          # hide the topic label
 ```
 
-Both overrides are saved with the session and retained on later rounds.  Pass either option again to replace its label; omitting it preserves the saved choice.  An empty value hides that label.  These options change only the header labels, leaving review scope and session selection intact.
+Overrides persist in the session until replaced; an empty value hides the label.  They do not change scope or session selection.
 
-## Startup focus
+### Startup focus
 
-For a single document, use `critty FILE:LINE` or `critty review FILE:LINE`.  Add `--focus PATH[:LINE]` to `critty`, `critty review`, or `critty plan`, including `--session` invocations, to select the initial file and optionally scroll to a line:
+`critty FILE:LINE` starts a document at a line; `--focus PATH[:LINE]` selects an initial file in any review, including resumed sessions.  Paths may be relative or absolute and must belong to the review; plans also accept their original path.  Lines are positive, 1-indexed new-side source coordinates.  Missing files and unavailable lines are rejected; omit the line for binary or deleted files.
 
-```bash
-critty review --staged --focus 'path/to/file'
-critty --session <id> --focus 'path/to/file:42'
-```
+Explicit focus applies only to that invocation.  `--focus` wins over a document's line suffix; otherwise later rounds focus the first visible thread, in file and display order, with a new reply from another author.  Scope and tab order remain unchanged.
 
-Paths may be relative or absolute and must belong to the review.  Plan reviews also accept the original plan path.  Line numbers are positive, 1-indexed new-side source coordinates in the reviewed content: index contents for staged reviews, the right endpoint for committed comparisons, and the saved snapshot for supplied diffs.  Missing files and unavailable lines are rejected; omit the line for binary or deleted files.  From round 2 onward, automatic focus selects the first visible thread, in file and display order, with a reply added since the previous submission by an author other than the reviewer.  An explicit document line or `--focus` takes priority; `--focus` wins when both are given.  Explicit focus leaves tab order and review scope unchanged and applies only to that invocation.
+### Images
+
+Supported terminals preview PNG, JPEG, GIF, and WebP, with Before and After views for modified or renamed images.  Detection is automatic; tmux needs `allow-passthrough on`.  GIF uses its first frame.  Animated WebP, images over 5 MiB or 16 megapixels, and unsupported terminals retain placeholders.  Images accept file comments without adding source lines or changing anchors.
+
+Git previews read the selected snapshot, including deleted images.  Markdown image paths resolve from the document or attachment's original location; Git references must stay inside the repository.  Supplied diffs remain text-only.  Remote URLs are not fetched.
+
+Comment images read current local files: ordinary relative paths use the review's working directory, `attachments/` paths use the session directory, and absolute paths may be outside the repository.  Follow the finish output's base directory when reading them.  `/critty` covers reading images before approval cleanup.
 
 ## Review file format
 
-Critty stores each review as a `review.json` that follows crit's CritJSON layout, so tooling written for either works on both.
+Critty stores comments in Crit-compatible `review.json`:
+
+- **Line** (`scope: "line"`): a range in one file, stored in `files.<path>.comments`.
+- **File** (`scope: "file"`): a whole file, in the same array with `start_line: 0`.
+- **Review** (`scope: "review"`): the review as a whole, in `review_comments`.
 
 ```json
 {
@@ -168,7 +196,7 @@ critty comment --session <id> --reply-to <comment-id> --author 'Claude Code' '<b
 Rules:
 
 - Always pass `--author` with your agent name so the thread shows who wrote what.
-- Read the whole thread before replying.  Reply once to new reviewer feedback or with a material correction or additional result; leave an unanswered agent comment or completion reply unchanged.  An unresolved flag or a new round alone does not call for another reply.  The interactive skill's "Address new feedback" step defines the review loop.
+- Read the whole thread before replying; `/critty` defines how to identify new feedback and avoid repeated replies.
 - Use a single-quoted argument for a short body without apostrophes.  For bodies containing apostrophes, multiple lines, or complex quoting, use a JSON file even for one comment.  Double quotes let the shell interpret backticks and `$`.
 - Line numbers are 1-indexed source coordinates, not positions in the diff text.  Staged reviews use index contents, committed comparisons use the right endpoint, and supplied diffs use the saved snapshot.  Files on disk may differ or be absent.  Use comment anchors when content changes between rounds.
 - Bodies are Markdown; code fences and inline code render in the TUI.
@@ -212,10 +240,6 @@ Scope is inferred as follows: `reply_to` makes a reply; no path and no line make
 ## Duplicate comment IDs
 
 Line and file comment IDs are unique within one file, so the same ID can exist in two files.  If `critty comment` reports that a reply target was found in multiple files, add `--path <file>`; in bulk JSON, set `file` on that entry.  Review-level IDs (`r_…`) never collide.
-
-## Plan reviews
-
-`critty plan <file>` starts an independent plan review and stores its numbered versions inside the session directory.  Continue it with `critty plan --session <id> <file>`.  Reusing a plan name alone creates another review.
 
 ## Stopping and deleting reviews
 

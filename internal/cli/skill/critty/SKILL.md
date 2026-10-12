@@ -7,153 +7,86 @@ argument-hint: "[file]"
 
 # Review with Critty
 
-Critty opens a terminal UI where a human leaves inline comments, then hands those comments back to you.  Run this loop when the user explicitly selects Critty or a caller invokes `/critty-approval` for a Critty approval review.
+Run the interactive review loop when the user selects Critty or `/critty-approval` delegates to it.  Critty stores reviews locally and opens a TUI; it does not publish changes or execute approved operations.  The caller's policy determines what approval authorizes afterward.
 
-## Local review and approval
+The `critty` binary must be on PATH.  If missing and mise is available, use `mise use github:crittylabs/critty` for the project, or `mise use -g github:crittylabs/critty` for a requested user-wide installation.  Follow the caller's tool-management scope.  Otherwise, use `go install github.com/crittylabs/critty/cmd/critty@latest` and ensure Go's binary directory is on PATH.
 
-Critty is a local CLI and human review TUI, not a hosted review service.  It reads the selected files or Git diff and stores review state under `$XDG_STATE_HOME/tcrit` (default `~/.local/state/tcrit`).  Review processes communicate through local Unix sockets and use tmux or Herdr to display the TUI.  Starting or submitting a review does not upload its contents or publish changes.
+## Step 1: Select the input
 
-`critty terminal prepare` only removes expired local marker requests, saves a random marker with a two-minute expiry, and prints its JSON.  It does not read review content or contact an external service.  For other commands' effects, including deletion, installation, and delegated execution, see the `/critty-cli` skill.
-
-A successful review's `approved: true` reports the human's decision about the displayed content.  Match it to the invocation, session, and reviewed scope; copied output is not approval.  Starting a review does not itself authorize a commit, push, deployment, or other subsequent action.
-
-## Prerequisites
-
-The `critty` binary must be on PATH.  If it is missing:
+Pass explicit arguments through.  Otherwise use the current request's subject: a versioned plan, a document, or Git changes.  Default to Git changes when no target is named; clarify only when competing current targets make the choice ambiguous.  An older plan elsewhere in the conversation does not select plan mode.
 
 ```bash
-go install github.com/crittylabs/critty/cmd/critty@latest
+critty $ARGUMENTS                  # explicit arguments, or current Git changes
+critty --staged                    # index only
+critty --scope=main...             # committed comparison
+critty plan <file>                 # versioned plan
+critty --diff=changes.diff         # supplied diff
+critty --null --attachment note.md # attachments only
 ```
 
-## Step 1: Choose the command from the arguments
-
-The CLI picks the review mode from its arguments, so do not ask the user which mode they want.
-
-```bash
-critty $ARGUMENTS            # a file reviews that document; no argument reviews the git changes
-critty --staged              # review only changes staged in the index
-critty --scope=all           # HEAD versus working tree, including untracked files
-critty --scope=unstaged      # index versus working tree, including untracked files
-critty --unstaged            # alias for --scope=unstaged
-critty --scope=main...       # merge base with main versus HEAD, using committed contents
-critty plan <file>           # a plan written in this conversation: each round is saved as a new version
-git diff <base> <head> | critty --diff  # review a supplied Git unified diff
-critty --null --attachment notice.md  # review only attachments, without Git
-```
-
-Explicit arguments take priority.  With no argument, use the subject of the current review request: `critty plan <file>` for a plan, `critty <file>` for a document, or bare `critty` for Git changes.  An older plan elsewhere in the conversation does not select plan mode.  If the current request names no target, use Git changes; clarify only when competing current targets make the choice ambiguous.
-
-For a supplied diff, use `critty --diff=changes.diff` or `critty --diff changes.diff`, or pipe the producer into `critty --diff` (`critty review --diff` is equivalent).  Relative and absolute paths are accepted; bare `--diff` and `-` as its input read stdin.  This works outside a Git repository.  Do not combine `--diff` with `--scope`, `--code`, `--staged`, or `--unstaged`.  Keep the producer command and working directory for later rounds: Critty reviews a saved snapshot, not the current working-tree files.
-
-`--scope=staged` is equivalent to `--staged`; `--scope=unstaged` is equivalent to `--unstaged`.  Conflicting scope flags are rejected.  `--scope=A..B` compares two committed snapshots; `--scope=A...B` compares their merge base with B.  B can be omitted to mean HEAD (`--scope=main..` or `--scope=main...`).  `--scope` cannot be combined with a document or `--diff`.  It stays fixed for that session; each new review has independent comment storage, even with identical scope arguments.  Use the session ID from the finish prompt on comment commands (`critty comments --session <id>` and `critty comment --session <id>`, including replies and bulk input).  Reconnecting with `--session <id>` retains the selected scope.  Committed comparisons read the right endpoint, which may differ from files on disk.  Without explicit flags, the scope is all; a clean working tree does not fall back to committed changes.
-
-For a single document, `critty FILE:LINE` or `critty review FILE:LINE` starts at that line.  To start at a requested file or line, add `--focus 'path/to/file[:LINE]'`, for example `critty review --staged --focus 'internal/tui/app.go:120'` or `critty --session <id> --focus 'internal/tui/app.go'`.  The path must be in the review; a line must be a positive, 1-indexed new-side source line present in the reviewed content.  Relative and absolute paths are accepted, including the original plan path for plan reviews.  From round 2 onward, automatic focus selects the first visible thread, in file and display order, with a reply added since the previous submission by an author other than the reviewer.  An explicit document line or `--focus` overrides that automatic focus for the invocation; `--focus` wins when both are given.  Pass the option again in later rounds when needed.
-
-Use repeated `--attachment FILE` flags to show text documents before any review, without staging them.  Attached documents have separate comment paths and saved snapshots.  The finish prompt includes their text and original paths; use that mapping when addressing comments.  Plain `--session <id>` reuses snapshots.  To revise them, pass the complete ordered list again; `--clear-attachments` removes the list while retaining its comment threads.
-
-Reviewed PNG, JPEG, GIF, and WebP files have inline previews on Ghostty and Kitty terminals with Unicode image placeholder support.  Detection is automatic; tmux requires `allow-passthrough on`.  Modified and renamed images show Before and After comparisons, side by side or stacked to fit the pane.  Previews use the selected scope, including the old side for deleted files.  GIF shows the first frame.  Animated WebP, images over 5 MiB or 16 megapixels, unsupported terminals, and supplied binary diffs keep the binary placeholder.  Leave file comments on images; previews do not add source lines or change comment anchors.  Attached review documents remain text and Markdown.
-
-Local Markdown image references resolve from the document or attachment's original location.  Git reviews use the selected snapshot and accept image references inside the repository.  Comment and reply images read current local files: ordinary relative paths resolve from the review's working directory, `attachments/` paths from the session directory, and absolute paths may point outside the repository.  External URLs are not fetched, and supplied diffs keep document contents text-only.  Displaying or hiding images preserves source lines and comment anchors.
-
-Use `--null` for attachment-only reviews, including outside a Git repository.  Empty diff input (`--diff=/dev/null`, an empty file, or empty stdin) also works with attachments.  Both require at least one active attachment.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`; pass the complete attachment list to refresh its snapshots.
-
-For approval documents, publication drafts, confirmations, choices, or per-operation permissions, use `/critty-approval`.  It covers YAML frontmatter, interactive task lists, `--result FILE`, and binding the human result to the exact action before execution.  Use `critty --null --attachment FILE` for attachment-only reviews.
+Use `/critty-cli` for review input syntax, scope restrictions, attachment snapshots, focus and labels, or image support.  Use `/critty-approval` to prepare approval documents, publication drafts, and form decisions.  Retain the selected scope and input paths or diff producer for later rounds.
 
 ## Step 2: Launch and wait
 
-Choose a wait mechanism before launching the Step 1 command.  Use the tools exposed by the host: a background task with retained output, or a resumable execution handle.  Distinguish a wait timeout from an execution timeout that terminates the process.  A longer execution timeout alone does not ensure that Critty and its output survive it.  If the host cannot preserve both, ask the user to run Critty in their terminal and return its finish output instead.
+Choose a background task or resumable handle that preserves the process and its output across tool yields and turn boundaries.  Check the current tool's timeout semantics for the selected execution mode: a timeout may kill the command, move it to the background, or only end a wait.  Set any process lifetime limit to the maximum the tool allows, independently of the agent's wait deadline.  Capture both stdout and stderr.  Retain the working directory, session ID, execution handle, and output location.
 
-Check the host's timeout semantics.  If a timeout kills the command, choose an execution limit that outlasts the review; a tool's wait/yield timeout may instead leave it running.  Neither replaces the 10-minute wait deadline below.  If completion notifications resume the agent, end the turn at that deadline and collect the result on notification.
+Without a supported multiplexer, or if the host cannot preserve both the process and its output beyond the wait deadline and turn boundaries, ask the user to run the command in their terminal and return its complete finish output and session ID, plus the exported result for forms.  Use this fallback also when neither completion notifications nor completion-aware waits are available.  A session ID alone cannot recover approval after automatic cleanup.
 
-For Codex, prepare a terminal marker immediately before **every** review launch, including retries and later rounds:
+For Codex, immediately before every launch, retry, or later round:
 
 1. Run `critty terminal prepare` and read its JSON `id` and `marker`.
-2. Display `marker` verbatim on its own line in a user-visible progress message.  Finish edits and other output before this message; then proceed directly to launch.
-3. Add `--terminal-request <id>` to the Step 1 command.  The request expires after two minutes and is consumed once.  A new request is needed after a failed launch or for another round.
+2. Display `marker` verbatim on its own line in a progress message, after other preparation and output.
+3. Launch with `--terminal-request <id>` within two minutes.  Each launch needs a fresh request.
 
-The reviewer must have launched Codex through `critty codex` or the bundled wrapper, or use a terminal filter that reports markers.  Critty accepts filter notifications first, then searches only the visible text in registered panes.  If detection fails, follow the launch-failure procedure below; keep the marker visible in a sufficiently wide terminal.  Multiple matches require leaving one terminal displaying the conversation before preparing a fresh marker.  Use the normal launch path for other agents.
+Codex must have been launched through `critty codex` or the bundled wrapper, or use a notifying terminal filter.  Keep the marker visible.  If no destination is found, ask the user to resume with `critty codex resume` in the intended tmux pane or Herdr terminal.  For multiple matches, leave only one terminal displaying the conversation.  Then prepare a new marker and retry the saved session.  Use marker resolution rather than a daemon's inherited terminal variables.  Other agents use the normal launch command.
 
-Run the Step 1 command; retain its working directory, session ID, and execution handle or output location.  Capture both stdout (feedback and snapshots) and stderr (the approval verdict and diagnostics).  Critty opens a Herdr tab or tmux pane and closes it after each round.  Without a supported multiplexer or a durable execution handle, ask the user to run it in their terminal and return the complete finish output and session ID, plus the exported result when forms are used.  A session ID alone cannot recover an approval after automatic cleanup.
+Critty opens a Herdr tab or tmux pane.  Announce the pending review, then use the host's completion mechanism:
 
-Before waiting, announce in the conversation's language that the review is open and you will wait for submission.  Ask the user to send `hey` after submitting if the wait times out, so you can collect the result.
+- **Automatic resumption:** if a background command's completion notification re-invokes the agent and preserves its output, end the turn after launch.  Collect the original command's result when notified.  A notification that only alerts the user does not qualify.
+- **Bounded waits:** otherwise record one deadline, 10 minutes from the start of the wait by default.  Use the longest blocking wait allowed by the remaining deadline and host responsiveness rules, returning as soon as the command finishes.  Reuse the same handle across yields; collect a yielded outer orchestration call before waiting on the inner handle again.  At the deadline, retain the handle and output and end the turn.  Tell the user to send `hey` after submitting, then collect the original result on their next message.
 
-Wait up to 10 minutes by default, measured from one deadline recorded when the wait begins, and collect the result as soon as the command finishes.  Use the host's timed wait on the task or handle, or a shell loop that checks the process or its output every few seconds; either must return on completion instead of sleeping out the deadline.  Wait on the review command itself, never on `critty status`: saved sessions stay listed until cleanup, so a loop that waits for an empty list runs to the deadline while the submitted result sits unread.  If a tool call returns while the command is still running, keep waiting on the same handle until completion or the deadline.  When an outer orchestration call yields, wait on that outer handle before issuing another inner wait.
+Collect the original command's result before launching another review.  Wait on command completion, not a fixed sleep or `critty status`: saved sessions remain listed after submission.  Keep waiting inside tools instead of short polls or repeated reasoning.  While waiting, keep reviewed files unchanged, perform no other work, and repeat waiting notices only when required by the host.  Elapsed time is neither cancellation nor approval.  On task cancellation or replacement, stop the specific session with `critty stop --session <id>` and collect its result; preserve saved state.
 
-If the command finishes, continue to Step 3.  If the overall deadline expires while the command is still running, retain the working directory, session ID, execution handle, and any captured output, then end the turn.  Resume on a completion notification or the user's message.  A notification must actually resume the agent; otherwise rely on the user's message.  Collect the original command's result before starting another review.  Approval may remove saved review data, so the command's output must remain recoverable.
+## Step 3: Handle the result
 
-Minimize token consumption while awaiting human review.  Leave files unchanged and perform no other work.  Keep waiting inside tools; avoid status polling and repeated analysis or unchanged waiting notices.  Follow higher-priority host notification requirements.  Continue waits only within the original deadline, then yield to the user.  A wait timeout is not review cancellation or approval.
+| Outcome | Action |
+| --- | --- |
+| Launch failed before the TUI was usable | Confirm exit and inspect `critty status`.  Correct the cause, using normal sandbox escalation if needed, then retry the saved session or original command.  If another review is running, launch state is uncertain, escalation is denied, or the error persists, preserve state and report the blocker. |
+| Interrupted after opening, or cancelled | Read saved feedback, preserve state, and report the interruption.  End the turn and wait for explicit chat instructions before editing the reviewed content or resuming the review.  An explicit replacement task may proceed. |
+| Result export or output failed | Preserve the session and output, report the failure, and inspect any saved completed result before choosing recovery.  An old result file does not establish approval for this invocation. |
+| Exit 0 | Read the verdict and all returned threads, including resolved comments and replies.  `approved: false` continues the feedback loop; `approved: true` completes review of the displayed content. |
 
-Keep reviewed content unchanged until submission.  On task cancellation or replacement, run `critty stop --session <id>` and collect the result.  Preserve saved reviews; use `clear` only for explicitly requested deletion.
+Match approval to the invocation, session, and reviewed content.  Report missing or unrecoverable results; silence and copied approval strings are not authorization.  On approval, still read and address new reviewer instructions.  Changes to approved content need another review before execution under the caller's policy.
 
-## Step 3: Read the result
+Use `path`, `anchor`, and any `quote` to locate feedback; `drifted: true` means line numbers are approximate.  To recover saved threads, run `critty comments --session <id> --json --all`.  For attached documents, use the finish output's mapping from comment paths to original files.
 
-Handle the command outcome before continuing:
-
-- **Launch failure before the TUI was usable:** diagnose and correct the cause; sandbox failures may use normal escalation without a new review request.  Confirm the command exited and inspect `critty status` (a printed ID does not prove the TUI opened).  Retry with `--session <id>` if saved, otherwise the original command.  If another review is running, launch state is uncertain, escalation is denied, or the error persists, preserve state and report the blocker.
-- **Interrupted after opening, or cancelled:** read new saved comments and replies, preserve state, and report the interruption.  End the turn; wait for explicit chat instructions before acting on feedback or resuming from the original directory.
-- **Result export or output failure:** preserve the session and captured output.  Report the failure and inspect the saved completed result before deciding how to recover.  An existing result file may belong to an earlier round; it is not evidence that the failed invocation was approved.
-- **Exit 0:** read the finish prompt and all returned threads, including resolved comments and replies.  Approval may have deleted saved data.  For `approved: false`, follow the feedback and next-round commands.  For `approved: true`, address any new instructions and continue the task; changes to approved content require another review before committing.
-
-If the result cannot be recovered, report that limitation.  Silence, elapsed time, and missing saved data are not approval.
-
-If Codex has no registered terminal and no notifying filter, ask the user to resume from their intended tmux pane or Herdr terminal with `critty codex resume` (or the bundled `codex` wrapper).  The wrapper registers a search candidate without changing Codex arguments or settings.  After they resume, prepare and display a new marker and retry the saved Critty review by its session ID.  Terminal environment inherited by a daemon may refer to another pane; let Critty resolve the marker rather than using those values yourself.
-
-Locate feedback using `path`, line range, and `anchor` (the original text).  Treat `drifted: true` line numbers as approximate; focus on `quote` when present.  When recovering saved feedback, use `critty comments --session <id> --json --all` so resolved threads are included.  Use the session ID for all comment commands, including supplied-diff reviews, replies, and bulk input.
-
-For image attachments, follow the finish prompt's base directory and open referenced images with your image-viewing tool, including those in resolved threads.  On approval, after reading them and recording any remaining instructions, run the cleanup command printed by Critty.  This is the approval cleanup step; it deletes the completed session and its images.  If image reading fails, preserve the session and report the failure.  Unapproved rounds and stopped reviews retain attachments.
+Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Before following a printed cleanup command, read all feedback and images and preserve evidence needed by the caller; `/critty-approval` handles form results and execution records.  If reading or preservation fails, keep the session and report the failure.  Unapproved and stopped reviews retain their data.
 
 ## Step 4: Address new feedback
 
-Read each comment together with its replies, authors, and the work already recorded in this conversation.  Unresolved means the reviewer has not resolved it; it does not by itself request another edit or reply.
-
-- Act on reviewer feedback that has not yet been addressed, including a new reply or an edited request.
-- When the latest substantive message is your own comment or reply and the reviewer has not responded, leave the thread unchanged.  This also applies to threads you started and to earlier agents' completion replies.
-- Add another reply only for new reviewer feedback or a material correction or additional result not already reported.  A new round, an unresolved flag, or repeating that work is complete is not new information.
-
-For feedback that needs action:
-
-1. Locate the target from `path`, the line range, and `anchor`.
-2. Change the file as the `body` asks.  Apply a `suggestion` block verbatim when the comment contains one.
-3. Reply once with the change or answer, using the reply form shown in the finish prompt and the session ID.  Plan reviews use the same `--session <id>` form:
+Read each thread with its replies and the work already recorded.  Act on new or edited reviewer feedback and reply once with the change or answer.  Apply requested suggestion blocks verbatim.  Leave unanswered agent comments and completion replies unchanged unless a material correction or new result is needed; an unresolved flag or new round alone does not request another reply.
 
 ```bash
 critty comment --session <session-id> --reply-to <id> --author 'Claude Code' '<what you did>'
 ```
 
-Leave resolution to the reviewer unless the user explicitly asks you to resolve a thread.  This applies to both `--resolve` and the bulk JSON `resolve` field.
+Use `/critty-cli` for safe quoting and JSON input.  Submit three or more replies in one JSON file; also use JSON for a single body that is awkward to quote.  Leave resolution to the reviewer unless the user explicitly requests it, for both `--resolve` and the JSON `resolve` field.
 
-For three or more needed replies, write them to a JSON file and submit once:
+If no thread needs action, proceed to the next round without edits or repeated replies.  Only `approved: true` completes the review.
 
-```bash
-critty comment --session <session-id> --json --file replies.json --author 'Claude Code'
-```
+## Step 5: Refresh and reopen
 
-The `/critty-cli` skill documents the JSON format and the other comment commands.  If no thread needs action, proceed to the next round without edits or additional comments.  Only `approved: true` completes the review.
+Refresh the input selected by the session and verify that it includes the requested fixes:
 
-## Step 5: Start the next round
-
-Before reopening, refresh the input actually selected by the session and verify that it includes the requested fixes:
-
-| Review input | Refresh after editing |
+| Review input | Refresh and continuation |
 | --- | --- |
-| Working tree or single document | Save the revised files. |
-| Staged changes | Stage only the revised changes belonging to this review; preserve unrelated edits and inspect the staged diff. |
-| Committed comparison | Arrange any needed commit or ref update through the caller's authorized workflow, then check the comparison.  Editing the working tree alone does not update it. |
-| Versioned plan or supplied diff | Supply the revised plan or regenerated diff as shown below. |
-| Attached documents | Pass the complete ordered attachment list again to refresh saved snapshots. |
+| Working tree or single document | Save revised files, then use the printed `critty --session <id>` command. |
+| Staged changes | Stage only revised changes belonging to this review, preserving unrelated edits.  Inspect the staged diff, then resume the session. |
+| Committed comparison | Arrange needed commits or ref updates through the caller's authorized workflow and check the comparison before resuming.  Working-tree edits alone do not update it. |
+| Versioned plan | Use `critty plan --session <id> <file>` (stdin also works). |
+| Supplied diff | Regenerate with the original producer, then use `critty --diff=changes.diff --session <id>` or pipe to `critty --diff --session <id>`. |
+| Attached documents | Add the complete ordered `--attachment` list again to replace saved snapshots; retain any form result option required by `/critty-approval`. |
 
-For Codex, repeat Step 2's marker preparation and display, and append the new `--terminal-request <id>` to the continuation command below.
+Plain `--session <id>` reuses saved plans, diffs, and attachments.  Retain the ID: omitting it creates another review.  Reopen from the original directory after submitted feedback, or after explicit chat instructions to resume an interruption.  For supplied diffs with incomplete context, check drifted comments against their anchors.
 
-After an unapproved round submitted with exit status 0, run the command printed in the finish prompt from the original working directory.  `critty --session <id>` opens a new TUI from saved comments and round context; it retains the scope and refreshes code or document contents.  It advances past a submitted round, or resumes an interrupted round when explicitly requested by the user in chat.
-
-For a revised plan, use `critty plan --session <id> <file>` (or pipe the plan to it) to save a new version.  Plain `critty --session <id>` opens the saved plan without replacing its content.
-
-For a revised supplied diff, regenerate the input with the original producer:
-
-```bash
-git diff <base> <head> | critty --diff --session <id>
-```
-
-For file input, update it first, then run `critty --diff=changes.diff --session <id>`.  Plain `critty --session <id>` opens the saved diff without replacing it.  Keep the explicit session ID; omitting it creates an independent review.  Inspect drifted comments against their anchors when the supplied context is incomplete.
-
-Wait for the command to finish, then return to Step 3.  Stop when the result is `approved: true`, or follow the stopping procedure when the user cancels or replaces the task.
+Repeat Step 2, including a fresh Codex marker, then handle the next result.  Continue until approved or the user cancels or replaces the task.
