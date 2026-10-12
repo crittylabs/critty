@@ -70,6 +70,10 @@ Feedback answers are drafts; overall approval and initial checkmarks supply no i
 
 On submission, stdout contains the finish prompt, threads, and attached document snapshots; stderr contains `verdict: approve|reject|comment`, `approved: true|false`, and diagnostics.  Capture both streams and the exit status.  Only `approve` sets `approved: true`; `reject` requests changes and `comment` sends feedback.  Exit 0 can mean any of these submissions, so inspect the verdict and all threads.  A nonzero exit does not grant approval.  Export or output failures retain session data; a pre-existing result file may be from an earlier round.  Correlate any recovered result with its invocation before using it.
 
+`--summary FILE` on `critty`, `review`, or `plan` saves a compact JSON index before printing approval.  It works with or without forms and custom finish prompts.  Version 1 contains `session`, `round`, `cwd`, `verdict`, `approved`, optional `review_comment`, all `comments` with resolved threads and replies, ordered `attachments` with `path`, `source`, `revision` (content hash), and optional `removed`, `image_base` for comment images, and optional `next_command`.  Empty comment and attachment lists are arrays.  Attachment bodies remain in complete stdout rather than the summary.
+
+Use a fresh path for each invocation and verify exit 0, session, round, and the reviewed inputs before acting.  The parent directory must exist; the file must be outside the session directory and must not overwrite reviewed input or the `--result` file.  Summary export failure returns nonzero without printing approval or cleaning up the review.  Keep full finish output for additional instructions and evidence; a summary does not contain form answers or individual consents.  Use `--result` and `/critty-approval` for those decisions.
+
 Ordinary approved reviews may be cleaned up immediately.  Preserve the finish output; the session ID alone is insufficient to recover it later.  Form results and comment images defer cleanup as described in their finish output.  Use `/critty` for launch, wait, and recovery decisions.
 
 ## Listing comments

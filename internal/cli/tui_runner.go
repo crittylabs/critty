@@ -323,6 +323,7 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 		}
 	}
 	return ipc.FinishPayload{
+		Round:         sess.CJ.ReviewRound,
 		Type:          "finish",
 		Verdict:       verdict,
 		ReviewComment: comment,

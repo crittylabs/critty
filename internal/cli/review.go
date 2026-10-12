@@ -174,6 +174,9 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 	if err := validateResultPath(mode, sess); err != nil {
 		return err
 	}
+	if err := validateSummaryPath(mode, sess); err != nil {
+		return err
+	}
 	if err := resolveFocus(mode); err != nil {
 		return err
 	}
@@ -412,6 +415,11 @@ func printFinish(payload *ipc.FinishPayload, sess *review.Session) error {
 		}
 		if err := review.WriteJSON(resultPath, payload.Result); err != nil {
 			return fmt.Errorf("saving form result: %w", err)
+		}
+	}
+	if summaryPath != "" {
+		if err := writeFinishSummary(payload, sess); err != nil {
+			return fmt.Errorf("saving finish summary: %w", err)
 		}
 	}
 	if payload.Prompt != "" {

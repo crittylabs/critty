@@ -23,6 +23,7 @@ type Request struct {
 // FinishPayload is the TUI-to-client message emitted when the human
 // finishes a review round.
 type FinishPayload struct {
+	Round         int                    `json:"round,omitempty"`
 	Result        *review.FormResult     `json:"result,omitempty"`
 	Type          string                 `json:"type"` // "finish"
 	Approved      bool                   `json:"approved"`

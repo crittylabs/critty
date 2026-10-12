@@ -84,6 +84,8 @@ def wait_until(
 class Round:
     def __init__(self, name: str, args: list[str]) -> None:
         self.name = name
+        self.summary = ROOT / f"{name}.summary.json"
+        args = [*args, "--summary", str(self.summary)]
         self.job = ROOT / f"{name}.job.json"
         self.job.write_text(
             json.dumps(
@@ -204,6 +206,12 @@ class Round:
         if approved is not None:
             assert code["code"] == 0, (code, err)
             assert f"approved: {str(approved).lower()}" in err, err
+            summary = json.loads(self.summary.read_text())
+            assert summary["session"] == self.session and summary["round"] >= 1
+            assert summary["approved"] == approved
+            assert summary["verdict"] in ("approve", "reject", "comment")
+            assert summary["comments"] == self.comments()
+            assert all("content" not in d for d in summary["attachments"])
         return code
 
     def directory(self) -> Path:
@@ -434,6 +442,7 @@ def scenarios() -> None:
         assert "Rollback" in second.screen(), second.screen()
         second.finish(True)
         assert all(c.get("resolved") for c in second.comments()), second.comments()
+        assert json.loads(second.summary.read_text())["round"] == 2
         report(
             "same-session source refresh and approval preserve threads and resolve them"
         )
@@ -570,6 +579,23 @@ def scenarios() -> None:
         assert saved_result["attachments"][0]["answers"]["confirm"]["human"]
         report(
             "failed result export returns nonzero without printing approval and retains the completed result"
+        )
+        summary_failure = Round("summary-failure", ["plan.md"])
+        directory = summary_failure.directory()
+        summary_failure.summary.mkdir()
+        summary_failure.keys("q", "Enter")
+        code = summary_failure.completed(None)
+        assert (
+            code["code"] != 0
+            and "approved: true" not in summary_failure.err.read_text()
+        )
+        assert directory.exists(), "summary failure cleaned up the review"
+        retry = Round("summary-retry", ["--session", summary_failure.session])
+        retry.keys("q", "Enter")
+        retry.completed(True)
+        assert json.loads(retry.summary.read_text())["round"] == 2
+        report(
+            "failed summary export grants no approval; same-session retry saves a fresh result"
         )
     finally:
         tmux("kill-server")

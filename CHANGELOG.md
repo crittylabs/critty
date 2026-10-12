@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-### Changed
+### Features
 
-- The bundled review skill retains full feedback and approval evidence while avoiding repeated reads of unchanged attachments.
+- Save review verdicts, all feedback threads, and attachment identities with `--summary FILE`, so agents can read a compact JSON result without parsing finish messages or repeatedly loading unchanged attachment bodies.  The bundled review skill uses this result while retaining complete feedback and approval evidence.
 
 ## 1.0.0
 
