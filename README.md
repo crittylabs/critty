@@ -362,6 +362,10 @@ go vet ./...
 
 The README animation and the MP4 clips are recorded with VHS from the tapes in `demo/`.  See [demo/README.md](demo/README.md) for the requirements and the `make -C demo` targets.
 
+### End-to-end scenarios
+
+With Python 3.10+ and tmux on PATH, run `python3 e2e/scenarios.py` to build the current checkout and test review rounds, concurrent CLI replies, stopping and resuming, forms, and save/export failures.  It uses an isolated tmux server and temporary state, records no video, and requires no agent accounts.  Use `--binary PATH` to test an existing binary, `--tmux PATH` to select tmux, or `--keep` to retain fixtures and logs.
+
 ## License
 
 MIT

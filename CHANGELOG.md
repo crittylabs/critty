@@ -27,6 +27,8 @@
 
 ### Fixes
 
+- TUI saves preserve comments and replies added or changed by concurrent CLI commands.  Conflicting edits to the same field report a save error instead of overwriting another writer's changes.
+
 - Demo recordings select the build prepared by `demo/setup.sh`, even when a tmux pane's login shell changes PATH.
 
 - Bundled skills refresh the selected review input after edits, distinguish ordinary approval from interactive forms, and preserve complete output for manually launched reviews.  Comment examples consistently target a session and handle bodies that need JSON input.

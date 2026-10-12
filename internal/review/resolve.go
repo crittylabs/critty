@@ -161,6 +161,10 @@ func openSessionAt(key, dir string) (*Session, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			s.CJ = NewCritJSON()
+			s.saved, err = json.Marshal(s.CJ)
+			if err != nil {
+				return nil, err
+			}
 			return s, nil
 		}
 		return nil, fmt.Errorf("reading review: %w", err)
@@ -173,6 +177,10 @@ func openSessionAt(key, dir string) (*Session, error) {
 	}
 	if s.CJ.ReviewRound == 0 {
 		s.CJ.ReviewRound = 1
+	}
+	s.saved, err = json.Marshal(s.CJ)
+	if err != nil {
+		return nil, err
 	}
 	return s, nil
 }

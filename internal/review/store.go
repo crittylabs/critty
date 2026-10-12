@@ -14,10 +14,11 @@ import (
 
 // Session binds a review folder on disk to its loaded CritJSON document.
 type Session struct {
-	Key  string
-	Dir  string
-	CJ   CritJSON
-	Meta SessionEntry
+	Key   string
+	Dir   string
+	CJ    CritJSON
+	Meta  SessionEntry
+	saved []byte
 }
 
 // NormalizePath cleans a user-supplied file path into the forward-slash
@@ -71,9 +72,21 @@ func (s *Session) SetFileComments(path, status string, comments []Comment) {
 	s.CJ.Files[key] = f
 }
 
-// Save writes the in-memory review state atomically under an advisory file lock.
+// Save merges local edits with updates since the last load or save, then
+// writes the result atomically under an advisory file lock.
 func (s *Session) Save() error {
-	return s.withLock(s.saveLocked)
+	return s.withLock(func() error {
+		fresh, err := openSessionAt(s.Key, s.Dir)
+		if err != nil {
+			return err
+		}
+		merged, err := mergeReview(s.saved, s.CJ, fresh.CJ)
+		if err != nil {
+			return err
+		}
+		s.CJ = merged
+		return s.saveLocked()
+	})
 }
 
 // Update reloads the latest review state and applies fn while holding the
@@ -86,6 +99,7 @@ func (s *Session) Update(fn func(*Session) error) error {
 			return err
 		}
 		s.CJ = fresh.CJ
+		s.saved = fresh.saved
 		if err := fn(s); err != nil {
 			return err
 		}
@@ -131,6 +145,7 @@ func (s *Session) saveLocked() error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("renaming temp file: %w", err)
 	}
+	s.saved = data
 
 	if s.Meta.Key != "" {
 		if s.Meta.StartedAt == "" {

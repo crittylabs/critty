@@ -51,6 +51,21 @@ jobs:
 
       - run: go test ./...
 
+      - name: Install tmux for E2E scenarios
+        run: |
+          set -euo pipefail
+          if ! command -v tmux >/dev/null 2>&1; then
+            if [ "$RUNNER_OS" = "Linux" ]; then
+              sudo apt-get update
+              sudo apt-get install -y tmux
+            else
+              brew install tmux
+            fi
+          fi
+
+      - name: Test CLI and TUI review scenarios
+        run: python3 e2e/scenarios.py
+
       - name: Test demo release script
         run: sh demo/release_test.sh
 

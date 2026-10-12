@@ -1791,6 +1791,16 @@ func (m *AppModel) persist() {
 	m.session.CJ.RoundState.NewFeedback = m.newFeedback
 	if err := m.session.Save(); err != nil {
 		m.err = err
+		return
+	}
+	m.refreshSavedComments()
+}
+
+func (m *AppModel) refreshSavedComments() {
+	for i := range m.tabs {
+		if m.tabs[i].state != nil {
+			m.tabs[i].state.Comments = m.session.FileComments(m.tabs[i].path)
+		}
 	}
 }
 
@@ -1903,6 +1913,7 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 			m.err, m.finishSaveFailed = err, true
 			return m, nil
 		}
+		m.refreshSavedComments()
 	}
 	approved := m.unresolvedTotal() == 0 && len(m.missingForms()) == 0
 	var result *review.FormResult
