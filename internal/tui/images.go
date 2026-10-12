@@ -141,7 +141,9 @@ func (m *AppModel) prepareImage() tea.Cmd {
 		return nil
 	}
 	t := m.tab()
-	if t.isMarkdown && !t.isBinary && !t.outsideChanges && m.patch == nil {
+	// Supplied diffs carry no files to resolve against, but attachments
+	// keep their original location.
+	if t.isMarkdown && !t.isBinary && !t.outsideChanges && (m.patch == nil || t.attachment != nil) {
 		return m.prepareMarkdownImages()
 	}
 	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil {

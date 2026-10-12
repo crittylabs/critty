@@ -4,7 +4,7 @@
 
 ### Features
 
-- Press `I` or click the Images button to toggle image previews.  Markdown's local `![]()` and `<img src>` images appear beneath the reference line and above its comments, side by side with wrapping.  Attached Markdown resolves paths from its original location; Git reviews use the selected image snapshot.
+- Press `I` or click the Images button to toggle image previews.  Markdown's local `![]()` and `<img src>` images appear beneath the reference line and above its comments, side by side with wrapping.  Attached Markdown resolves paths from its original location, including in `--diff` and `--null` reviews; Git reviews use the selected image snapshot.
 - Local images in comments and replies appear in their inline threads and the sidebar, including pasted images and paths outside the working directory.  The same `I` toggle controls them.
 
 - PNG, JPEG, GIF, and WebP files appear inline in Ghostty and Kitty when the terminal supports Unicode image placeholders, including through tmux with passthrough enabled.  Modified and renamed images show Before and After comparisons; previews use the selected review scope and include deleted images.  Other terminals retain binary placeholders.

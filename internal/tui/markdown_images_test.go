@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -133,6 +134,75 @@ func TestMarkdownImagesUseDocumentLocationAndScope(t *testing.T) {
 	msg = app.loadMarkdownImage(0)().(imageLoadedMsg)
 	if msg.err != nil || msg.width != 6 {
 		t.Fatalf("attachment location: %+v", msg)
+	}
+}
+
+func TestMarkdownImagesInAttachmentsWithoutGit(t *testing.T) {
+	docs := filepath.Join(t.TempDir(), "docs")
+	if err := os.MkdirAll(filepath.Join(docs, "assets"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docs, "assets", "shot.png"), previewPNG(t, 5, 2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Relative paths must resolve from the attachment, not the working directory.
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("changed.png", previewPNG(t, 7, 2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	supplied, err := gitpkg.ParsePatch(strings.NewReader("diff --git a/changed.md b/changed.md\n--- a/changed.md\n+++ b/changed.md\n@@ -1 +1 @@\n-old\n+![changed](changed.png)\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, patch := range map[string]*gitpkg.Patch{"supplied diff": supplied, "attachment only": {}} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("XDG_STATE_HOME", t.TempDir())
+			doc := review.AttachedDocument{ID: "a_plan", Source: filepath.Join(docs, "plan.md"), Name: "plan.md", Content: "# Plan\n![shot](assets/shot.png)\n"}
+			app := NewCodeReviewApp(patch.Changes(), "", AppConfig{Patch: patch, Documents: []review.AttachedDocument{doc}})
+			updated, _ := app.Update(docRenderedMsg{})
+			app = updated.(AppModel)
+			app.images.enabled = true
+			app.contentViewport.SetWidth(80)
+			app.contentViewport.SetHeight(20)
+			if app.tab().attachment == nil {
+				t.Fatalf("active tab %q is not the attachment", app.tab().path)
+			}
+			cmd := app.prepareImage()
+			if cmd == nil {
+				t.Fatal("attachment images were not requested")
+			}
+			refs := cmd().(markdownImagesMsg)
+			want := filepath.Join(docs, "assets", "shot.png")
+			if len(refs.images) != 1 || refs.images[0].line != 2 || refs.images[0].path != want || !refs.images[0].local {
+				t.Fatalf("refs=%+v, want %s", refs.images, want)
+			}
+			updated, _ = app.Update(refs)
+			app = updated.(AppModel)
+			loaded := app.loadMarkdownImage(0)().(imageLoadedMsg)
+			if loaded.err != nil || loaded.width != 5 {
+				t.Fatalf("loaded=%+v", loaded)
+			}
+			updated, _ = app.Update(imageTransmittedMsg{loaded})
+			app = updated.(AppModel)
+			if cmd := app.prepareImage(); cmd != nil {
+				cmd()
+			}
+			img := app.tab().markdownImages[0].image
+			if img == nil {
+				t.Fatal("image was not placed")
+			}
+			updated, _ = app.Update(imageReadyMsg{path: app.tab().path, markdown: 1, columns: img.columns, rows: img.rows})
+			app = updated.(AppModel)
+			if preview := app.renderMarkdownImages(2, false); !strings.ContainsRune(preview, kitty.Placeholder) {
+				t.Fatalf("image not rendered: %q", preview)
+			}
+			if len(patch.Files) > 0 {
+				app.activeTab = slices.IndexFunc(app.tabs, func(tab FileTab) bool { return tab.path == "changed.md" })
+				if cmd := app.prepareImage(); cmd != nil {
+					t.Fatal("supplied diff resolved images from the working directory")
+				}
+			}
+		})
 	}
 }
 
