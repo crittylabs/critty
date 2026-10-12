@@ -61,8 +61,9 @@ var (
 	// textPrimary and textSecondary are the foregrounds of emphasized and
 	// regular text on the terminal background.  initAdaptiveStyles swaps
 	// them for dark colors on a light background.
-	textPrimary   color.Color = lipgloss.BrightWhite
-	textSecondary color.Color = muted
+	textPrimary      color.Color = lipgloss.BrightWhite
+	textSecondary    color.Color = muted
+	buttonBackground color.Color = lipgloss.Color("#3a3a3a")
 
 	// terminalIsDark records the background probe's answer for inputs that
 	// are created later and pick their default styles from it.
@@ -136,10 +137,12 @@ var (
 			Width(60)
 
 	closeButtonStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Red)
+				Foreground(lipgloss.Red).
+				Background(buttonBackground)
 
 	commentNavButtonStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Cyan).
+				Background(buttonBackground).
 				Bold(true)
 
 	modalTitleStyle = lipgloss.NewStyle().
@@ -286,6 +289,7 @@ var (
 			Foreground(lipgloss.BrightWhite)
 
 	modalBtnNormal = lipgloss.NewStyle().
+			Background(buttonBackground).
 			Padding(0, 1)
 
 	modalBtnFocusedLabel = lipgloss.NewStyle().
@@ -294,6 +298,7 @@ var (
 				PaddingLeft(1)
 
 	modalBtnNormalLabel = modalBtnLabel.
+				Background(buttonBackground).
 				PaddingLeft(1)
 
 	modalBtnFocusedKey = lipgloss.NewStyle().
@@ -308,6 +313,7 @@ var (
 
 	modalDeleteBtnLabel = lipgloss.NewStyle().
 				Bold(true).
+				Background(buttonBackground).
 				Foreground(lipgloss.Red)
 
 	modalDeleteBtnFocused = lipgloss.NewStyle().
@@ -388,6 +394,11 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	terminalIsDark = hasDarkBG
 	textPrimary = ld(lipgloss.Black, lipgloss.BrightWhite)
 	textSecondary = ld(lipgloss.BrightBlack, muted)
+	buttonBackground = ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#3a3a3a"))
+	closeButtonStyle = closeButtonStyle.Background(buttonBackground)
+	commentNavButtonStyle = commentNavButtonStyle.Background(buttonBackground)
+	modalBtnNormal = modalBtnNormal.Background(buttonBackground)
+	modalDeleteBtnLabel = modalDeleteBtnLabel.Background(buttonBackground)
 	commentStyle = commentStyle.Foreground(textSecondary)
 	footerDescStyle = footerDescStyle.Foreground(textSecondary)
 	helpDescriptionStyle = helpDescriptionStyle.Foreground(textPrimary)
@@ -398,7 +409,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	mdBlockquoteStyle = mdBlockquoteStyle.Foreground(textPrimary)
 	mdTableCellStyle = mdTableCellStyle.Foreground(textSecondary)
 	modalBtnLabel = modalBtnLabel.Foreground(textPrimary)
-	modalBtnNormalLabel = modalBtnLabel.PaddingLeft(1)
+	modalBtnNormalLabel = modalBtnLabel.PaddingLeft(1).Background(buttonBackground)
 	inactiveTabStyle = inactiveTabStyle.Foreground(textSecondary)
 	activeTabStyle = activeTabStyle.Foreground(textPrimary)
 	tabCountDelimiter = tabCountDelimiter.Foreground(textSecondary)

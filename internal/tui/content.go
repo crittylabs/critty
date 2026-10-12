@@ -464,7 +464,7 @@ func renderResolution(resolved bool, label string) string {
 	if label != "" {
 		checkbox += " " + label
 	}
-	return style.Render(checkbox)
+	return style.Background(buttonBackground).Render(checkbox)
 }
 
 // renderCommentHeader appends the right-aligned action group

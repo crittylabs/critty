@@ -318,9 +318,9 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 
 func (m AppModel) finishButtons(width, top int) (string, []modalMouseRegion) {
 	return layoutModalButtonRow([]modalButtonSpec{
-		{rendered: m.finishButton("Submit", "enter", m.modalFocus == finishSubmit), action: modalMouseAction{focus: finishSubmit}},
-		{rendered: m.finishButton("Back", "esc", m.modalFocus == finishBack), action: modalMouseAction{focus: finishBack}},
-		{rendered: m.finishButton("Abort", "q", m.modalFocus == finishAbort), action: modalMouseAction{focus: finishAbort}},
+		{rendered: m.renderModalButton("Submit", "enter", m.modalFocus == finishSubmit), action: modalMouseAction{focus: finishSubmit}},
+		{rendered: m.renderModalButton("Back", "esc", m.modalFocus == finishBack), action: modalMouseAction{focus: finishBack}},
+		{rendered: m.renderModalButton("Abort", "q", m.modalFocus == finishAbort), action: modalMouseAction{focus: finishAbort}},
 	}, width, top)
 }
 
@@ -370,7 +370,7 @@ func (m AppModel) finishChoices(width, top int) (string, []modalMouseRegion) {
 		if selected {
 			symbol = "●"
 		}
-		style := lipgloss.NewStyle().Foreground(finishColor(option.verdict)).Bold(selected).Underline(m.modalFocus == finishApprove+i)
+		style := lipgloss.NewStyle().Foreground(finishColor(option.verdict)).Background(buttonBackground).Bold(selected).Underline(m.modalFocus == finishApprove+i)
 		keyStyle := style.Underline(true)
 		choices = append(choices, modalButtonSpec{
 			rendered: style.Render(symbol+" ") + keyStyle.Render(option.label[:1]) + style.Render(option.label[1:]),
@@ -378,13 +378,6 @@ func (m AppModel) finishChoices(width, top int) (string, []modalMouseRegion) {
 		})
 	}
 	return layoutModalButtonRow(choices, width, top)
-}
-
-func (m AppModel) finishButton(label, hint string, focused bool) string {
-	if focused {
-		return m.renderModalButton(label, hint, true)
-	}
-	return renderButton(label, hint, modalBtnNormalLabel.Background(mdCodeStyle.GetBackground()), modalBtnNormalKey)
 }
 
 func (m *AppModel) backFromFinishConfirmation() {
@@ -452,8 +445,8 @@ func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
 	info := fmt.Sprintf("Resolve all %d unresolved thread(s) before approving?", m.unresolvedTotal())
 	prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", width, "")
 	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
-		{rendered: m.finishButton("Resolve All", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
-		{rendered: m.finishButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+		{rendered: m.renderModalButton("Resolve All", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
 	return prefix + buttons, append(regions, closeRegion)
 }
@@ -462,8 +455,8 @@ func (m AppModel) finishAbortContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(finishColor(review.VerdictReject)).Render("Abort review?"), width)
 	prefix := lipgloss.Wrap(title+"\nExit without submitting?  Your comments and draft will be kept.\n\n", width, "")
 	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
-		{rendered: m.finishButton("Abort", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
-		{rendered: m.finishButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+		{rendered: m.renderModalButton("Abort", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
 	return prefix + buttons, append(regions, closeRegion)
 }
