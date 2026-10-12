@@ -52,6 +52,8 @@ go test ./...
 go vet ./...
 ```
 
+Run `python3 e2e/scenarios.py` before pushing to test the final changes together.  Also run it when a change is known to affect its scenarios.  Reuse a passing result while the tested code remains unchanged.
+
 See the README for installing the binary and the agent skills, and `CHANGELOG.md` for changes by release.
 
 When recording demos, verify that the recording runs the intended binary.  Login shells may reorder PATH, so setting PATH in the launcher alone does not establish which build runs in the recording pane.
