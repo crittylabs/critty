@@ -31,7 +31,7 @@ Sleep 1s
 
 # Open the document review; Critty opens the TUI in a split pane, which the
 # tmux zoom (prefix z) expands to the whole window for the recording.
-Type "critty plan.md"
+Type "\"$DEMO_DIR/bin/critty\" plan.md"
 Enter
 Wait+Screen@30s /Comments \(\d+\)/
 Ctrl+B

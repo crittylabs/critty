@@ -54,7 +54,7 @@ Sleep 1s
 Show
 
 # Ask for a review; the critty skill opens the TUI in a tmux split pane.
-Type@40ms "Review the staged changes with Critty."
+Type@40ms "Review the staged changes with Critty. Use \"$DEMO_DIR/bin/critty\" for every Critty command."
 Sleep 500ms
 Enter
 Wait+Screen@300s /Comments \(\d+\)/
