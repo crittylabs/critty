@@ -369,4 +369,4 @@ With Python 3.10+ and tmux on PATH, run `python3 e2e/scenarios.py` to build the 
 
 ## License
 
-MIT
+[MIT](LICENSE)
