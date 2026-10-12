@@ -32,7 +32,7 @@ Read a plan or review code changes across multiple files, leave inline comments,
 
 ### Image previews
 
-PNG, JPEG, GIF, and WebP previews work on supported terminals, including Ghostty, Kitty, and iTerm2.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.  Unsupported images and terminals keep a text placeholder; supplied diffs remain text-only.
+PNG, JPEG, GIF, and WebP previews work on supported terminals, including Ghostty, Kitty, and iTerm2.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.  GIF previews use the first frame; animated WebP and images over 5 MiB or 16 megapixels keep a text placeholder, as do unsupported terminals.  Supplied diffs show changed images as text placeholders; local images in attached Markdown and comments can still appear.
 
 Press `I` or click **Images** to toggle previews.  Markdown and comment previews use local images; remote URLs are not fetched.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
 
@@ -172,6 +172,7 @@ Watch the [Claude Code](#review-round-trips-with-claude-code) and [Codex](#revie
 ## Requirements
 
 - **Go 1.27.2+** for building from source
+- **macOS or Linux**; release binaries are available for amd64 and arm64
 - **Herdr or tmux** for automatic agent review workflows. Without either multiplexer, critty can run the TUI directly in an interactive terminal.
 
 ### Starting a multiplexer session
