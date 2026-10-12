@@ -19,6 +19,7 @@ require (
 	github.com/tklauser/ps v0.0.4
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/image v0.47.0
+	golang.org/x/net v0.60.0
 	golang.org/x/term v0.46.0
 )
 

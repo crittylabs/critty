@@ -16,7 +16,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
-	gitpkg "github.com/crittylabs/critty/internal/git"
 	_ "golang.org/x/image/webp"
 )
 
@@ -26,6 +25,7 @@ const maxPreviewPixels = 16 << 20
 type imageDisplay struct {
 	probeID int
 	enabled bool
+	hidden  bool
 	tmux    bool
 }
 
@@ -65,6 +65,8 @@ func (t *FileTab) previewSides() []bool {
 
 type imageLoadedMsg struct {
 	path          string
+	comment       *commentImageKey
+	markdown      int
 	before        bool
 	sequence      string
 	id            int
@@ -76,8 +78,10 @@ type imageTransmittedMsg struct{ imageLoadedMsg }
 
 type imageReadyMsg struct {
 	path          string
+	comment       *commentImageKey
 	before        bool
 	columns, rows int
+	markdown      int
 }
 
 func newImageDisplay() imageDisplay {
@@ -133,10 +137,13 @@ func decodePreview(data []byte) (image.Image, error) {
 }
 
 func (m *AppModel) prepareImage() tea.Cmd {
-	if !m.images.enabled || len(m.tabs) == 0 || m.tab().state == nil {
+	if !m.images.enabled || m.images.hidden || len(m.tabs) == 0 || m.tab().state == nil {
 		return nil
 	}
 	t := m.tab()
+	if t.isMarkdown && !t.isBinary && !t.outsideChanges && m.patch == nil {
+		return m.prepareMarkdownImages()
+	}
 	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil {
 		return nil
 	}
@@ -152,7 +159,7 @@ func (m *AppModel) prepareImage() tea.Cmd {
 			img.columns, img.rows, img.ready = cols, rows, false
 			path := t.path
 			cmds = append(cmds, tea.Sequence(tea.Raw(m.images.wrap(img.placement())),
-				func() tea.Msg { return imageReadyMsg{path, before, cols, rows} }))
+				func() tea.Msg { return imageReadyMsg{path: path, before: before, columns: cols, rows: rows} }))
 		} else if !side.attempted {
 			side.attempted = true
 			cmds = append(cmds, m.loadImage(before))
@@ -172,39 +179,42 @@ func (m AppModel) loadImage(before bool) tea.Cmd {
 		sourcePath = t.oldPath
 	}
 	return func() tea.Msg {
-		source := m.source
-		if source == nil {
-			source = &gitpkg.ReviewSource{Base: m.baseRef}
-			if m.staged {
-				source.Scope = "staged"
-			}
-		}
+		source := m.imageSource()
 		data, err := source.PreviewContent(sourcePath, before, maxPreviewBytes)
-		msg := imageLoadedMsg{path: path, before: before, err: err}
-		if err == nil {
-			img, decodeErr := decodePreview(data)
-			msg.err = decodeErr
-			if decodeErr == nil {
-				msg.id = newImageID()
-				msg.width, msg.height = img.Bounds().Dx(), img.Bounds().Dy()
-				var out bytes.Buffer
-				msg.err = kitty.EncodeGraphics(&out, img, &kitty.Options{
-					ID: msg.id, Action: kitty.Transmit, Format: kitty.PNG,
-					Transmission: kitty.Direct,
-					Quiet:        2, Chunk: true, ChunkFormatter: m.images.wrap,
-				})
-				msg.sequence = out.String()
-			}
-		}
+		return m.images.encode(data, imageLoadedMsg{path: path, before: before, err: err})
+	}
+}
+
+func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
+	if msg.err != nil {
 		return msg
 	}
+	img, err := decodePreview(data)
+	msg.err = err
+	if err != nil {
+		return msg
+	}
+	msg.id = newImageID()
+	msg.width, msg.height = img.Bounds().Dx(), img.Bounds().Dy()
+	var out bytes.Buffer
+	msg.err = kitty.EncodeGraphics(&out, img, &kitty.Options{ID: msg.id, Action: kitty.Transmit, Format: kitty.PNG, Transmission: kitty.Direct, Quiet: 2, Chunk: true, ChunkFormatter: d.wrap})
+	msg.sequence = out.String()
+	return msg
 }
 
 func (m AppModel) finishImageLoad(msg imageLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
+		if msg.comment != nil {
+			if side := m.commentImages[*msg.comment]; side != nil {
+				side.failed = true
+			}
+			m.rebuildContent()
+			m.updateCommentSidebar()
+			return m, nil
+		}
 		for i := range m.tabs {
 			if m.tabs[i].path == msg.path {
-				m.tabs[i].preview.side(msg.before).failed = true
+				m.tabs[i].imageSide(msg.before, msg.markdown).failed = true
 			}
 		}
 		if len(m.tabs) > 0 && m.tab().state != nil {
@@ -229,6 +239,9 @@ func (m AppModel) imagePreviewLayout() (width, height int, horizontal bool) {
 }
 
 func (m AppModel) renderImagePreview() string {
+	if m.images.hidden {
+		return ""
+	}
 	t := m.tab()
 	ready := func(side previewSide) bool { return side.image != nil && side.image.ready }
 	if !ready(t.preview.before) && !ready(t.preview.after) {

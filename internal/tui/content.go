@@ -198,6 +198,9 @@ func (m *AppModel) rebuildContent() {
 					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, content), target)
 				}
 			}
+			if images := m.renderMarkdownImages(del.OldLineNum, true); images != "" {
+				layout.appendBlock(&b, images, target)
+			}
 			for idx, ann := range oldAnnosByEndLine[del.OldLineNum] {
 				if m.hideComments && !ann.drifted {
 					continue
@@ -363,6 +366,9 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		// Render inline annotations after this line
+		if images := m.renderMarkdownImages(lineNum, false); images != "" {
+			layout.appendBlock(&b, images, lineTarget)
+		}
 		if anns, ok := annosByEndLine[lineNum]; ok {
 			for idx, ann := range anns {
 				if m.hideComments && !ann.drifted {

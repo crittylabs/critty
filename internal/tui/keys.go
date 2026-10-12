@@ -37,6 +37,7 @@ type keyMap struct {
 	HideComments     key.Binding
 	FoldResolved     key.Binding
 	IgnoreWhitespace key.Binding
+	Images           key.Binding
 	Delete           key.Binding
 	FileComment      key.Binding
 	Help             key.Binding
@@ -68,6 +69,7 @@ var keys = keyMap{
 	HideComments:     key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide/show comments")),
 	FoldResolved:     key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "fold resolved comments")),
 	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),
+	Images:           key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "show/hide images")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),
 	Help:             key.NewBinding(key.WithKeys("alt+?"), key.WithHelp("M-?", "help")),
