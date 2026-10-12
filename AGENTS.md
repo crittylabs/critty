@@ -16,8 +16,11 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## Changelog maintenance
 
-- Record user-visible differences from the latest published release under `Unreleased`, including small fixes.  Describe the final behavior that will ship, and move entries to a versioned section during release preparation.
+- Write changelog entries as release notes for users.  Lead with what a feature lets them do and its main use cases, then explain important behavior and constraints.  Name new commands, skills, and integrations and explain their roles.
+- Record user-visible differences from the latest published release under `Unreleased`, including small fixes.  Consolidate related work into entries describing the final behavior that will ship, and move them to a versioned section during release preparation.
 - Omit fixes for problems introduced and resolved between releases.  Fold refinements of unreleased features into their feature entries, and keep fixes for problems that existed in a published release, including prereleases.  Verify release tags and publication history before removing a past fix.
+- Keep implementation mechanics, detailed dialog layouts, and exhaustive key bindings in code, Help, or the README.  Include controls only when they explain the change or help users adapt established usage; point to updated Help for full instructions.
+- State compatibility requirements before listing supported implementations as examples.  Describe layered integrations in terms of their host requirements.  Restrict platforms only when the implementation requires it.
 - A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
 
 ## TUI design
