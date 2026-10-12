@@ -1,11 +1,13 @@
+# Critty
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/critty-logo-dark-boxed.svg">
     <img src="assets/critty-logo-light-boxed.svg" alt="critty" width="400">
-  </picture>
+  </picture><br>
+  <a href="https://github.com/crittylabs/critty/releases/latest"><img src="https://img.shields.io/github/v/release/crittylabs/critty" alt="Latest release"></a>
+  <a href="https://github.com/crittylabs/critty/actions/workflows/ci.yml"><img src="https://github.com/crittylabs/critty/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
 </p>
-
-# critty
 
 > **critty** is the new name of crit, originally published as `kevindutra/crit`, with the fixes and improvements developed as TCrit; see [CHANGELOG.md](CHANGELOG.md) for every change since crit 0.2.2.
 
@@ -13,43 +15,26 @@ TUI for reviewing AI-generated code and plans — built for human-in-the-loop ag
 
 Read a plan or review code changes across multiple files, leave inline comments, and let your coding agent address the feedback automatically.
 
-Your agent writes code or a plan, you review it in the TUI, and the agent reads your comments and makes changes for the next round.
-
 <video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
 
 [More videos and screenshots](#gallery).
 
 ## Key Features
 
-- **Review in the terminal** — read plans, documents, and multi-file diffs with syntax highlighting, and comment on a line, a range, a deleted line, or a whole file.
-- **Round trips with your agent** — the agent opens the review in a Herdr tab or a tmux split, waits for you to submit, reads your comments, and comes back with the next round.  `critty install` sets this up for Claude Code, Codex, OpenCode, and Gemini CLI.
-- **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | critty --diff`, single documents, and versioned plans that carry comment threads across revisions.
-- **Attached documents and forms** — review notices, commit messages, and approval notes alongside code or on their own, even outside a Git repository.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
-- **Inline image previews** — compare image changes side by side and view local images in Markdown and comments on supported terminals.  [See an image review](#reviewing-an-image-replacement).
-- **Comments made for code review** — replies, resolve and reopen, GitHub-style suggestions, clipboard images, `@path L40` and comment-ID references, and editing in `$EDITOR`.  Multi-line comments follow insertions and deletions within the selected range across review rounds.
-- **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, search the current file incrementally with `/` / `?`, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
-- **Mouse and keyboard** — vim-style keys throughout, plus clickable tabs, lines, threads, and buttons, gutter drag to select ranges, and wheel scrolling.
-- **Scriptable and Crit-compatible** — [Crit](https://crit.md/)-compatible `review.json`, `critty comment` and `critty comments` for automation, and sessions that stop and resume by ID.
-- **Readable on any terminal** — light and dark backgrounds, per-author colors, compact tab paths, and a review bar that names what is under review.
+- **Review in the terminal** — read documents and multi-file diffs with syntax highlighting and inline comments.
+- **Round trips with your agent** — review, send feedback, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Gemini CLI.
+- **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
+- **Attached documents and forms** — review commit messages and approval notes alongside code, with checkboxes and choices for human decisions.
+- **Inline image previews** — compare image changes and view local images in Markdown and comments on supported terminals.  [See an image review](#reviewing-an-image-replacement).
+- **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
+- **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
+- **Scriptable and Crit-compatible** — automate comments with a [Crit](https://crit.md/)-compatible review format and resume saved sessions.
 
-To open a review at a specific file or line:
+### Image previews
 
-```bash
-critty notes.md:42
-critty --focus internal/tui/app.go
-critty review --staged --focus internal/tui/app.go:120
-critty --session <id> --focus internal/tui/app.go:120
-```
+PNG, JPEG, GIF, and WebP previews work on supported terminals, including Ghostty, Kitty, and iTerm2.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.  Unsupported images and terminals keep a text placeholder; supplied diffs remain text-only.
 
-Use `critty FILE[:LINE]` to review a single document, or `--focus PATH[:LINE]` with a file in the review.  Line numbers start at 1.  From round 2 onward, the review automatically focuses the first thread with a new reply from another author, in file and display order.  An explicit file line or `--focus` takes priority; `--focus` wins when both are given.
-
-Tabs, the file tree, and the file selector use `A` for new files and `D` for deleted files, alongside line counts: `(A +12)` or `(D -8)`.  Modified text files show counts such as `(+3 -2)`.  Empty files and binary files omit counts; binary changes show `(M)` for modifications or `(R)` for renames.  The binary content placeholder uses the same marker.  Additions are green, deletions red, and binary modifications and renames yellow; parentheses keep their normal color.
-
-File tabs follow the expanded file tree from top to bottom: directories come first, and names sort alphabetically within each directory.  Attached documents appear first in the attachments group.
-
-PNG, JPEG, GIF, and WebP files appear inline on terminals that support Kitty Unicode image placeholders, including Ghostty, Kitty, and iTerm2.  Critty checks support automatically; other terminals keep the binary-file placeholder.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.
-
-Modified and renamed images show **Before** and **After** previews with their pixel sizes, side by side in a wide content pane and stacked in a narrow one.  Previews follow the selected review scope: staged images come from the index, committed comparisons from the selected commits, and deleted images from the old side.  GIF previews show the first frame.  Animated WebP, images larger than 5 MiB or 16 megapixels, and binary files in supplied diffs keep the placeholder.  File comments work as usual; previews scroll with them, fit the content pane after resizing, and hide while a dialog is open.  [See Before and After previews](#reviewing-an-image-replacement).
+Press `I` or click **Images** to toggle previews.  Markdown and comment previews use local images; remote URLs are not fetched.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
 
 ## Install
 
@@ -81,7 +66,7 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 ### Review header
 
-The header shows the project name and, for Git reviews, the branch under review.  The project name defaults to the repository directory name, shared across linked worktrees, or the current directory name outside Git.  Use `critty --project 'My project'` to replace it.  Use `--topic 'Header display'` to replace the branch label, or `--topic ''` to hide it.  You can also add a topic to a document or plan review.  Saved sessions retain both overrides; pass the option again to change its label.
+Use `--project 'My project'` and `--topic 'Task name'` to customize the review header.  Git reviews show the project and branch by default.
 
 ### Codex with a background server
 
@@ -97,17 +82,17 @@ critty codex resume
 
 Launch Codex through `critty codex`, or put Critty's bundled `codex` wrapper before the original Codex in PATH.  The wrapper records which tmux or Herdr pane Codex runs in, then starts Codex with its arguments and environment unchanged.  `go install github.com/crittylabs/critty/cmd/...@latest` installs both binaries; the [mise GitHub backend](https://mise.jdx.dev/dev-tools/backends/github.html#bin_path) exposes both from the release archive when `github:crittylabs/critty` comes before the tool providing Codex in `[tools]`.
 
-Before each review round the Critty skill displays a one-time marker, and Critty looks for it in the registered panes to find where to open the review, so keep the marker visible.  A terminal filter such as [tfil](https://github.com/knu/tfil) 0.4.1 or later with `--critty-notify` can report the marker directly instead; the protocol is described in [docs/terminal-filter.md](docs/terminal-filter.md).
+Keep the one-time marker shown by the Critty skill visible so the review opens in the correct pane.  A terminal filter such as [tfil](https://github.com/knu/tfil) can report it directly; see [terminal-filter integration](docs/terminal-filter.md).
 
 ### Agent skills
 
-The binary embeds the integration for each agent and installs it with `critty install`, so the skills always match the installed version. Every target provides three pieces:
+`critty install` installs skills that match the binary:
 
-- `critty [file]` — the interactive review loop. It opens the TUI on the git changes (`critty`), a document (`critty <file>`), or a versioned plan (`critty plan <file>`), then has the agent address the comments round by round.
-- `critty-approval` — prepares YAML-frontmatter Markdown attachments with confirmations, choices, and operation consents, then binds the human result to the exact approved push, publication, or other action.  Other workflows can delegate approval handling to this skill while keeping their own storage and execution policies.
-- `critty-cli` — a reference skill the agent loads when it needs `critty comment`, `critty comments`, session or plan targeting, bulk JSON input, or the review file format.
+- [critty](internal/cli/skill/critty/SKILL.md) — runs the interactive review loop and handles feedback.
+- [critty-approval](internal/cli/skill/critty-approval/SKILL.md) — prepares drafts for human approval and checks the result before acting.
+- [critty-cli](internal/cli/skill/critty-cli/SKILL.md) — provides the detailed command and review-format reference.
 
-When you submit a round, the agent receives every thread, including resolved ones, so your final instructions reach it even on approval.  It replies only where there is new feedback, and it waits for your submission for 10 minutes by default; if that wait times out, send `hey` after submitting.  `critty stop --session <id>` keeps a review for later and `critty clear` deletes it.
+When you submit a round, the agent receives your comments and continues the workflow.  If its wait times out, send `hey` after submitting.
 
 Run the installer from your home directory to install globally, or from a repository root to install for that project only.
 
@@ -127,7 +112,7 @@ cd ~ && critty install codex        # ~/.agents/skills/{critty,critty-cli,critty
 critty install codex                # From a repo root: install for that project
 ```
 
-Then use `$critty`. The installed skills use Codex invocation syntax and reply attribution.
+Then use `$critty`.
 
 #### OpenCode
 
@@ -145,7 +130,7 @@ cd ~ && critty install gemini        # ~/.gemini/skills/{critty,critty-cli,critt
 critty install gemini                # From a repo root: install for that project
 ```
 
-Ask Gemini to use the `critty` skill to review your changes or a document. The current agent runs the review loop using the same instructions as the other integrations. Use `/skills reload` if Gemini CLI is already running, and `/skills list` to check discovery.
+Ask Gemini to use the `critty` skill to review your changes or a document.  Use `/skills reload` if Gemini CLI is already running.
 
 If you used the earlier `@tcrit` subagent integration, remove the old `.gemini/agents/tcrit.md` yourself; the installer leaves it in place.
 
@@ -165,33 +150,24 @@ Ask your agent to use `critty-approval` when you want to review a push, PR, issu
 
 In Claude Code, invoke `/critty-approval`; in Codex, use `$critty-approval`.  In OpenCode and Gemini CLI, ask the agent to use the `critty-approval` skill.
 
-The agent prepares Markdown attachments with YAML frontmatter describing the action and destination.  Publication text goes in a separate attachment, so review instructions and checkboxes stay out of the published body.  You can comment on the drafts, answer choices, and grant individual permissions in the same review.  The agent checks the result against the reviewed content before carrying out the authorized actions.  Critty itself does not publish or execute them.
+The agent prepares drafts for you to comment on and approve, then carries out the authorized actions.  You can answer choices and grant individual permissions in the same review.  Critty records the decisions; the agent executes the actions.
 
-Checkboxes are added when a separate decision is needed; they are not mandatory for every review.  An item marked `required` blocks approval until answered.  A `consent` item can be left unchecked while approving the rest, unless it is also `required`; that operation remains unauthorized.  See [Interactive forms](#interactive-forms) for the controls and [the approval skill](internal/cli/skill/critty-approval/SKILL.md) for the full workflow.
+See [Interactive forms](#interactive-forms) for basic controls and [the approval skill](internal/cli/skill/critty-approval/SKILL.md) for the full workflow.
 
 ### Building a custom flow
 
-Keep project policy in your instructions and delegate review mechanics to `critty` and approval documents to `critty-approval`.  Your policy decides when approval is required, where drafts are stored, and what happens after approval.  This example has the agent attach the commit message to the code review and commit once the review is approved.  Put something like this in your `CLAUDE.md` or `AGENTS.md`:
+Keep project policy in your `CLAUDE.md` or `AGENTS.md` and delegate review mechanics to the installed skills.  For example:
 
 ```markdown
-Every implementation request ends with a Critty review and a commit.  After implementing what was asked:
+After implementation, use the critty skill to review the staged changes
+with the proposed commit message attached.  Address feedback until approved,
+then commit with the exact reviewed message.
 
-1. Stage the source changes for this commit.
-2. Draft the exact commit message in a task-owned file outside the index.  The commands below use `COMMIT_MESSAGE.md` as an example path.
-3. Review with the `critty` skill: run `critty review --staged --attachment COMMIT_MESSAGE.md` and wait for it to exit.
-4. Address new feedback, update the message to match, stage the source changes, and reply on the thread.  Run the next round with `critty --session <id> --attachment COMMIT_MESSAGE.md` to refresh the attached message.  Repeat until approved.
-5. On approval, verify the message still matches the reviewed snapshot, then run `git commit -F COMMIT_MESSAGE.md`.
+Before publishing a PR or issue, use the critty-approval skill to review
+the destination and final text.  Execute only the approved actions.
 ```
 
-For external actions, add a policy such as this instead of copying the approval procedure into each workflow:
-
-```markdown
-Before publishing a PR or issue, use the critty-approval skill to review the exact destination and final text.  Keep drafts in our project scratch directory.  Execute only the actions authorized by the matching human result, then report their URLs.
-```
-
-With the review-and-commit policy in place, an implementation request is all it takes.  Watch the [Claude Code](#review-round-trips-with-claude-code) and [Codex](#review-round-trips-with-codex) examples in the Gallery: the reviewer comments on the code and attached commit message, then resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
-
-In those recordings, the reviewer selects the message body from line 3 with `v` in the second round and presses Enter to comment on the whole paragraph.
+Watch the [Claude Code](#review-round-trips-with-claude-code) and [Codex](#review-round-trips-with-codex) examples in the Gallery.
 
 ## Requirements
 
@@ -214,94 +190,43 @@ Without Herdr or tmux, launch critty yourself in an interactive terminal when an
 
 ## CLI overview
 
-Running `critty` with no subcommand reviews the current Git changes. Running `critty <file>` reviews one document.
-
 | Command | Purpose |
 |---------|---------|
-| `critty [file]` | Review current Git changes, or review `file` when given |
-| `critty --null --attachment FILE` | Review only attached documents, without requiring Git |
-| `critty --staged` | Review only changes staged in the index |
-| `critty --unstaged` | Review unstaged and untracked changes |
-| `critty --scope <scope>` | Select all (default), staged, unstaged, or a committed comparison |
-| `critty --diff[=FILE]` | Review a supplied diff; omit FILE or use `-` for stdin |
-| `critty review [--scope <scope>] [file]` | Explicit form of the default review command; `--staged` reviews only the index |
-| `critty plan [--name <slug>] [file]` | Create an independent versioned plan review; use `--session <id>` to continue one |
-| `critty --session <id>` | Resume a saved review after process exit, from its original directory |
-| `critty stop --session <id>` | Stop the TUI while keeping saved comments and round context |
-| `critty status` | List saved sessions in this directory, including whether each is running |
-| `critty clear --session <id>` | Delete one stopped review |
-| `critty comment ...` | Add comments or replies, import JSON, or clear the selected review |
-| `critty comments [--json] [--all]` | List unresolved comments, optionally including resolved comments |
-| `critty clear <file>` | Clear a document review; use `--code` for code review or `--all` for all reviews in the current directory |
-| `critty status <file>` / `critty status --code` | Print the document or aggregate code-review status as JSON |
-| `critty install <target>` | Install `claude-code`, `codex`, `opencode`, `gemini`, or `prompts`; `all` installs every agent integration |
-| `critty check` | Report installed integration files that are stale |
-| `critty env [all \| tty \| run <command>...]` | Print the variables that identify the current Herdr or tmux pane (`--json` for JSON), only the terminal device, or run a command with them |
-| `critty completion <shell>` | Generate completion for Bash, Zsh, Fish, or PowerShell |
+| `critty` | Review current Git changes |
+| `critty --staged` | Review staged changes |
+| `critty notes.md` | Review a document |
+| `critty plan plan.md` | Review a versioned plan |
+| `critty --session <id>` | Resume a saved review |
+| `critty status` | List saved reviews |
+| `critty stop --session <id>` | Stop a review and keep its comments |
+| `critty clear --session <id>` | Delete a saved review |
 
-When a tool runs from the terminal's process tree but without its multiplexer variables, `critty env` prints the `TMUX`, `TMUX_PANE`, and `TTY` or `HERDR_*` variables that identify the pane, as `NAME=value` lines or with `--json`.  Without a pane, `TTY` is the controlling terminal of the nearest ancestor process, or `SSH_TTY`.  `critty env tty` prints only the terminal device, and `critty env run <command>` (or `critty env -- <command>`) runs a command with those variables set.
+Use `critty notes.md:42` or `critty --focus path/to/file:42` to start at a particular line.
+
+For all commands and options, run `critty --help` or see the [CLI reference skill](internal/cli/skill/critty-cli/SKILL.md).
 
 ## Code Review (multi-file)
 
 ```bash
-critty
-# Equivalent explicit form
-critty review
-# Review only changes staged in the index
-critty --staged
-# Equivalent explicit form
-critty review --staged
-# Review unstaged and untracked changes
-critty --unstaged
-# Review an arbitrary commit range from stdin
-git diff main feature | critty --diff
-# Equivalent explicit form
-git diff main feature | critty review --diff
+critty                            # all current changes, including untracked files
+critty --staged                    # staged changes only
+critty --unstaged                  # unstaged and untracked changes
+critty --scope=main...             # changes since the merge base with main
 ```
 
-Detects changed files in your git repo and opens a tabbed TUI with syntax highlighting, diff markers, and inline commenting across all changed files.
+Browse the changed files, leave comments, and press `q` or click **Submit** to finish.  Submit feedback for another round, or approve when the comments are resolved.  The agent reads your feedback, updates the code, and reopens the saved session.
 
-Comments whose positions can no longer be tracked appear as a small `💬` at the right edge of the code, or at the top of the file when the line is gone.  Use `[` / `]` to focus a marker, then press Enter to expand or collapse its thread and read the original quoted text.  Press `e` to edit or reply.  Clicking a grouped marker expands all its threads, including resolved ones; click again to fold them together.  The checkbox beside the marker only shows resolution status.  Enter on a resolved thread opens its contents in the comment editor.
-
-When the next round takes you to a new agent reply, its unresolved thread opens automatically, even if the original line has moved.
-
-- Reviews staged, unstaged, and untracked changes against `HEAD` by default; `--staged` reviews only the index, and `--diff` reviews a supplied unified diff
-- Green gutter markers highlight changed lines, and comments from all files belong to one session
-
-```bash
-# Get unresolved comments in the agent-facing format
-critty comments --json
-```
+Comments follow source edits across rounds.  If a comment can no longer be matched, a `💬` marker keeps its original context accessible.
 
 ### Supplied diffs
 
-`critty --diff=changes.diff` reviews one Git unified diff, and bare `--diff` reads it from standard input, even outside a Git repository.  When the pre-change files are in the local Git object database, Critty reconstructs the complete files; otherwise it shows the supplied context and marks omitted lines.  For another round with updated input, regenerate the diff and pass the saved session:
+Review a diff file with `critty --diff=changes.diff`, or pipe a Git diff:
 
 ```bash
-git diff main feature | critty --diff --session <id>
+git diff main feature | critty --diff
 ```
 
-### How code review works
-
-Choose an explicit scope or a committed comparison:
-
-```bash
-critty --scope=all                 # HEAD versus working tree, including untracked files
-critty --scope=staged              # HEAD versus index (--staged remains an alias)
-critty --scope=unstaged            # index versus working tree, including untracked files
-critty --scope=main..HEAD          # compare the two committed snapshots
-critty --scope=main...             # compare the merge base with HEAD (omitted B)
-critty --scope=v0.7.0..v0.7.3      # review a historical comparison
-```
-
-An omitted endpoint means HEAD, and committed comparisons show the right endpoint's contents even if the working tree differs.  The scope stays fixed for the session, and every new invocation gets its own session ID, so use `--session <id>` with the comment commands when several reviews exist.
-
-1. An agent (or you) runs `critty review --code` — the TUI opens in a Herdr tab or tmux split and the command blocks
-2. Navigate between files and leave inline comments on the changes
-3. Press `q` or click **Submit** in the top bar — the finish dialog offers **Finish Review** with unresolved comments and **Approve** without any
-4. On finish, the blocked command prints every thread with instructions for the agent and `approved: true|false`
-5. The agent edits the files, replies with `critty comment --reply-to`, and runs the printed `critty --session <id>` for the next round, where the comments follow the updated code
-6. Resolve comments with `r` and approve to end the loop
+This also works outside a Git repository.  To provide an updated diff for the next round, repeat the command with `--session <id>`.
 
 ## Stopping and resuming
 
@@ -312,13 +237,12 @@ critty --session <id>             # reopen from the original directory
 critty clear --session <id>       # explicitly delete a stopped review
 ```
 
-The TUI closes after every submitted round.  Stopping mid-round keeps the comments, replies, and round number; code and document reviews reread their sources when resumed, while plan and supplied-diff reviews reopen the saved input.  The session ID is printed when a review starts and in the finish prompt.  Approval deletes the review data by default (`cleanup_on_approve`).
+The TUI closes after each submitted round.  Stopping mid-round keeps your feedback for later.  Use the session ID printed by Critty to resume the same review; approval normally cleans up its saved data.
 
 ## Plan Review (versioned)
 
 ```bash
-critty plan docs/plans/my-plan.md            # slug derived from the first heading
-critty plan --name auth docs/plans/plan.md   # pinned slug
+critty plan docs/plans/my-plan.md
 ```
 
 Saves numbered versions of the plan in the session directory.  Run `critty plan --session <id> <file>` to submit a revised version (stdin works too), or `critty --session <id>` to reopen the saved one.  Comments carry forward onto the revised text.
@@ -333,39 +257,17 @@ critty plan design.md --attachment APPROVAL.md
 critty --null --attachment APPROVAL.md
 ```
 
-These filenames are examples; choose paths that fit your project.  Keep review-only drafts outside the index.
+Keep review-only drafts outside the index.  Attachments appear before the main review and support comments and replies.  `--null` reviews attachments on their own, including outside Git.
 
-Documents appear in the supplied order before the review, under a separate **attachments/** tree.  Leave line comments and replies as usual.  The header shows the original path.  Text and Markdown are supported.
-
-Use `--null` to review only attachments, including outside a Git repository.  `--diff=/dev/null` or an empty diff file or stdin also works with attachments.  An empty diff without attachments is rejected.
-
-Resuming with `critty --session <id>` uses the saved document snapshots.  To revise them, pass the complete list again with `--attachment`; use `--clear-attachments` to remove all of them.  Comments on removed documents remain accessible.  A file can appear both as an attachment and in the diff, with separate comments.  Attachments also allow reviewing a clean Git scope.
+Resuming uses saved snapshots.  To update the attachments, pass the complete list again with `--attachment`; use `--clear-attachments` to remove them.
 
 ### Interactive forms
 
-In attached Markdown (`.md` or `.markdown`), press `Space` on a task-list item or click its checkbox or label to answer.  Wrapped labels are clickable through the end of their text; trailing whitespace is not.  `Enter` still opens a comment.  Code examples, quoted lists, and checkboxes in working files or the main document are display-only.  Answers are saved separately; the source document stays unchanged.  [See an attached checklist with an inline image](#attached-checklist-with-an-inline-image).
+In attached Markdown, press `Space` or click a checkbox to answer.  Answers are saved separately from the source document.  [See an attached checklist with an inline image](#attached-checklist-with-an-inline-image).
 
-```markdown
-- [ ] Send a copy of the report
-- [ ] I checked the destination <!-- form: id=destination required -->
-- [ ] Small batch <!-- form: id=batch value=small required -->
-- [ ] Large batch <!-- form: id=batch value=large required -->
-- [ ] Publish this report to the named repository <!-- form: id=publish consent -->
-```
+Required confirmations must be answered before approval.  Permission checkboxes apply to specific operations; approving the review leaves unchecked operations unauthorized.
 
-Use `required` for a confirmation that blocks approval until answered, and `consent` for an individual operation permission.  They can be combined.  Required items remain marked **Required** after confirmation.  Items with the same `id` and different `value` attributes form a single choice; selecting one clears the previous choice.  Give required, consent, and choice items an explicit `id`.  Quote attribute values containing spaces.  Describe each operation and its exact target in the document.
-
-An initial `[x]` supplies a default for ordinary items only.  Required confirmations and consents need a human action.  With missing confirmations, **Finish Review** sends feedback and draft answers without approving.  **Resolve All & Approve** resolves comments without checking any form items.  The finish dialog lists missing confirmations and the operations allowed or declined; scroll long details with `↑` / `↓` or the mouse wheel.
-
-Resuming unchanged input keeps draft answers.  Changing a field's definition resets that field.  Changing the review target or the content, order, or membership of the attachment list resets every required confirmation and consent.  Ordinary fields with explicit IDs and unchanged definitions keep their answers; unnamed fields may reset when the document changes.
-
-Use `--result FILE` to save the self-contained JSON result, including source snapshots, field definitions, answers, human provenance, and the review revision:
-
-```bash
-critty review --staged --attachment APPROVAL.md --result result.json
-```
-
-Completed form results are also retained as `result-<round>.json` in the session directory and included in the finish prompt.  Only a consent explicitly `true` in an approved result grants its described permission for the exact reviewed target.  Overall approval supplies no individual consent; feedback and stopped reviews grant none.  Critty records decisions and executes no operations.  Approval retains form reviews until the result has been recorded and the printed `critty clear --session <id>` command is run.  The result remains usable after session deletion.
+Ask your agent to use the [approval skill](internal/cli/skill/critty-approval/SKILL.md) to prepare forms.  Form syntax and exported results are documented in the [CLI reference](internal/cli/skill/critty-cli/SKILL.md).
 
 ## Document Review (single file)
 
@@ -373,166 +275,54 @@ Completed form results are also retained as `result-<round>.json` in the session
 critty review docs/plans/my-plan.md
 ```
 
-Opens a full-screen terminal UI with syntax-highlighted markdown, a comment sidebar, and modal overlays for adding/editing comments.
+Read the document, leave inline comments, and submit feedback or approve as in a code review.  The agent revises the document and reopens the same session for the next round.
 
-### Multiplexer mode
-
-When `critty review` runs inside Herdr, the TUI automatically opens in a dedicated full-width tab. Inside tmux, it opens in a side-by-side split pane. In both cases the invoking command blocks until you finish the review — the same feedback loop as [crit](https://github.com/tomasz-tomczyk/crit), with a TUI in place of the browser.
-
-Critty finds the pane that ran the command from the process tree, even when the agent's tool runner drops the multiplexer environment variables.  For Codex's background server, use the [Codex wrapper](#codex-with-a-background-server).
-
-### How document review works
-
-1. Claude writes a plan (or you open any markdown file)
-2. `critty review <path>` opens the TUI — read through and leave inline comments
-3. Finish the review with `q`; comments are saved as crit-compatible `review.json` under `$XDG_STATE_HOME/tcrit/reviews/` (or `~/.local/state/tcrit/reviews/`)
-4. Claude reads all returned threads for new instructions, including resolved threads, edits the document, and replies where there is new feedback or a substantive update.  Use `critty comments --json --all` to retrieve all saved threads separately.
-5. Claude runs the printed `critty --session <id>`; a new TUI restores the review with the fixes for the next round
+Inside Herdr or tmux, Critty opens the review in a dedicated tab or split pane and waits for your submission.  Without a multiplexer, run it directly in an interactive terminal.  For Codex's background server, use the [Codex wrapper](#codex-with-a-background-server).
 
 ## Keybindings
 
-On supported terminals, local images referenced by `![]()` or `<img src>` in Markdown appear beneath their source line, before its comments.  Images on the same line sit side by side and wrap when needed.  Paths are relative to the document, or to an attached document's original location.  Git reviews use the image from the selected scope, including deleted lines; references must stay inside the repository.  Remote URLs are not fetched.  Press `I` or click **Images** in the footer to turn image previews off or on for the review.  Image display starts on when the terminal supports it.  Supplied diffs keep their text-only view.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Move down / up |
+| `ctrl+d` / `ctrl+u` | Scroll half a page |
+| `g` / `G` | Jump to top / bottom |
+| `tab` / `shift+tab` | Switch files |
+| `t` | Focus the file tree or comments sidebar |
+| `n` / `N` | Jump to the next / previous change or open thread |
+| `/` / `?`, `ctrl+s` / `ctrl+r` | Search forward / backward |
+| `enter` | Add a comment or open a thread |
+| `v` | Select lines for a comment |
+| `f` | Comment on the whole file |
+| `[` / `]` | Jump between threads |
+| `r` / `R` | Toggle resolution / resolve and move to the next thread |
+| `w` | Toggle ignoring whitespace in diffs |
+| `h` / `H` | Fold resolved threads / hide comments |
+| `I` | Toggle image previews |
+| `alt+e` | Open the current line in `$EDITOR` |
+| `alt+?` | Show all keyboard shortcuts |
+| `q` | Open the finish dialog |
 
-| Key                                   | Action                                   |
-|---------------------------------------|------------------------------------------|
-| `j` / `k`                             | Move down / up through current and deleted lines |
-| `ctrl+d` / `ctrl+u` / `PgDn` / `PgUp` | Half page down / up                      |
-| `g` / `G` / `Home` / `End`            | Jump to top / bottom                     |
-| `/` / `?`, `ctrl+s` / `ctrl+r`        | Search the current file forward / backward as you type |
-| `alt+e` (`M-e`)                       | Open the current file at the cursor line in `$EDITOR`, if it exists on disk |
-| `alt+w` (`M-w`)                       | Copy the current source reference or focused thread's ID to the kill ring |
-| `alt+g` (`M-g`)                       | Enter a line number; jump there or confirm opening it in `$EDITOR` if absent from the review |
-| `enter`                               | Add comment at current line              |
-| `f`                                   | Comment on the file or reply to its existing thread |
-| `v`                                   | Visual select mode (multi-line comments) |
-| `s`                                   | Toggle comment sidebar                   |
-| `t`                                   | Switch the sidebar between the file tree and comments, and focus it |
-| `j` / `k`, `enter`, `h` / `l` (file tree) | Move (moving onto a file opens its tab), open the file or toggle a folder, fold / unfold |
-| `[` / `]`                             | Jump to prev / next comment, including resolved threads.  `]` on the last comment opens the finish dialog |
-| `{` / `}`                             | Jump to prev / next unresolved comment.  `}` on the last unresolved comment opens the finish dialog |
-| `h` / `H`                             | Fold all resolved threads / hide all comment boxes; press the same key again to return to normal |
-| `w`                                   | Toggle ignore whitespace across all files in code reviews |
-| `I`                                   | Toggle image previews, including local images in Markdown |
-| `r`                                   | Resolve / unresolve the focused comment in place |
-| `R`                                   | Resolve the focused comment and jump to the next unresolved thread, or open the finish dialog if none remain |
-| `d`                                   | Delete the selected comment after confirmation |
-| `ctrl+PgUp` / `ctrl+PgDn`               | Scroll the selected inline or sidebar thread |
-| `alt+?` (`M-?`)                       | Show all keyboard shortcuts              |
-| `q`                                   | Finish review (Approve when no unresolved comments remain) |
+### Search
 
-Ignore whitespace (`w`) hides changes in spaces and tabs within a line, including LF and CRLF differences, while still showing added or deleted blank lines.
+Search updates as you type.  Use `ctrl+s` / `ctrl+r` to move between matches, `enter` to keep the match, and `esc` or `ctrl+g` to return to the starting point.  During search, `alt+s` followed by `c`, `w`, `r`, or `m` toggles case handling, word search, regular expressions, or multi-file search.  The search prompt shows the active modes.
 
-**Incremental search:** `/` or `ctrl+s` searches the current file forward as you type, and `?` or `ctrl+r` backward, as in Emacs.  Type a regular expression at the prompt on the bottom line; matches stay within a line and ignore case unless the query contains an uppercase letter.  Each edit searches again from where the search started, and `ctrl+s` / `ctrl+r` move to the next or previous match.  When no match remains in that direction, the prompt shows "Failing"; press the key again to wrap around.  Visible matches are highlighted, the current one in orange.  `enter` ends the search at the match, `esc`, `ctrl+g`, or `ctrl+c` returns to where it started, and any other key ends the search and acts as usual.  `ctrl+s` or `ctrl+r` on an empty query searches for the previous query.  `ctrl+d` adds the character after the current match to the query, and `ctrl+w` adds the word after it, or one character where no word follows; words are runs of letters and digits in scripts written with spaces, so CJKV ideographs and kana are added one character at a time.  `backspace` removes the last typed or added piece.
+You can also click **Search** and use the on-screen controls.  See [incremental search in the Gallery](#incremental-search) or open Keyboard Help (`alt+?`) for more shortcuts.
 
-[See incremental search in the Gallery](#incremental-search).  You can also click Search in the top bar, then use Prev, Next, Keep, and Cancel below the search prompt.  Case and Files buttons show and toggle case folding and the search scope.  Clicking elsewhere ends the search at its current match and performs the clicked action.
+### Comments
 
-Paste text into the search prompt with your terminal's paste command, or use `ctrl+y` to paste the newest kill-ring entry from the comment editor or copied references.  Pasted text follows the current search mode; in regexp mode, metacharacters remain active.  Line breaks and tabs become spaces, and `backspace` removes the whole pasted piece.  The terminal cursor follows the input for IME candidate placement, and long queries scroll to keep the input end visible.  Keyboard Help (`alt+?`) has an Incremental search section; scroll with arrows, Page Up/Down, `ctrl+u` / `ctrl+d`, the mouse wheel, or its Up/Down buttons.
+In a comment or reply, `ctrl+s` saves and `ctrl+o` opens `$EDITOR`.  Emacs-style editing and kill-ring shortcuts are supported.  Use `ctrl+v` to paste text or a clipboard image; image paste needs `wl-paste` or `xclip` on Linux and uses the remote clipboard over SSH.
 
-During a search, `alt+s` (`M-s`) followed by a key toggles how the query matches: `i` or `c` switches between smart case and always ignoring case, `w` turns word search on or off, `r` turns regular expressions on or off, and `m` turns multi-file search on or off.  Word search matches the query's words separated by any punctuation or spaces, including Unicode text.  Its final word may be incomplete; add a space or punctuation to require the word's end.  Word and regular expression search exclude each other, and turning either off searches the literal text.  Multi-file search continues into the following or preceding files in tab order and counts matches across all files; while lines are selected, the search stays in the current file.  The prompt names the active modes as Emacs does, for example `Case-insensitive word multi-file I-search backward:`, and the choices persist for later searches.
+Link to a file with `@path/to/file L40`, or to a thread with its comment ID.  Typing `@` offers file completion.  Use `alt+w` to copy a source or thread reference and `ctrl+y` to paste it.
 
-Use `[` / `]` to revisit all threads and `{` / `}` to work through unresolved ones.  Press `enter` on a resolved thread to read it in the comment editor.  Comments displaced by source edits appear as `💬` markers; click one to open its threads together, or focus it and press `enter` to see the selected thread's original context.
+### Mouse controls
 
-**File references:** `@path/to/file`, optionally followed by ` L40`, in a comment or reply becomes a clickable link to that file and line.  Paths are relative to the review's working directory; escape a space with a backslash.  `alt+w` copies a ready-made reference for the current line, `ctrl+y` pastes it, and typing `@` completes paths, as described below.
-
-A reference without a line opens the file's tab.  When the file or line is not part of the review, a dialog offers to open it in `$EDITOR`, which also serves `alt+e` and `alt+g`; Critty passes `--goto FILE:LINE` to editors that advertise it and `+LINE FILE` to the rest.
-
-**Thread references:** A comment ID such as `c_a3f8b2` in a comment or reply links to that thread, even across review rounds; click it to jump there.  `alt+w` copies the focused thread's ID, as it does for source lines.
-
-**Comment dialogs:**
-
-| Key      | Action                                                        |
-|----------|---------------------------------------------------------------|
-| `ctrl+s` | Save the comment or reply (an existing one cleared to empty is deleted) |
-| `ctrl+o` | Edit the comment or reply in `$EDITOR`                         |
-| `alt+s` | Insert a suggestion block and select its code for replacement |
-| `alt+r` | Immediately toggle Resolved in Add/Edit Reply |
-| `ctrl+y` | Yank the latest kill at the cursor, replacing selected text |
-| `alt+y` | After a yank, replace the yanked text with the next older kill |
-| `ctrl+v` | Paste an image or text from the host's clipboard              |
-| `ctrl+k` | Kill the selection, or text from the cursor to line end |
-| `ctrl+u` | Kill the selection, or text back to line start |
-| `ctrl+w` / `alt+Backspace` | Kill the selection or the previous word |
-| `alt+d` / `alt+Delete` | Kill the selection or the next word |
-| `Delete` / `Backspace` | Delete the selected text, or the next / previous character |
-| `ctrl+PgUp` / `ctrl+PgDn` | Scroll code context and thread history             |
-| `@path` + `tab` | Complete the file name at the cursor; `↑` / `↓` and `enter` pick another candidate |
-
-**File completion:** Typing `@` followed by a path lists the matching entries of that directory, one level at a time, matched fuzzily.  `tab` accepts the first candidate and `esc` closes the list.
-
-The kill ring is shared across comment and reply dialogs for the TUI run and is independent of the system clipboard.  `alt` is the terminal's Meta modifier; configure your terminal to send Meta for these shortcuts.
-
-`ctrl+v` pastes an image when the clipboard holds one and text otherwise.  Image paste uses AppKit on macOS and needs `wl-paste` or `xclip` on Linux; over SSH it reads the remote host's clipboard.  Images are saved under the session's `attachments/` directory and referenced from the comment as Markdown, and they survive rounds and stop/resume.  With the default `cleanup_on_approve`, approval defers deletion until the agent has read them and runs the printed `critty clear --session <id>`.
-
-Local images in saved comments and replies also appear inline while image display is on.  Relative paths resolve from the review's working directory, `attachments/` paths from the session directory, and absolute paths are accepted, including outside the working directory.  These previews read current local files.  They appear in the inline thread and comment sidebar; scroll the thread to see images that do not fit.  Editing shows the Markdown text.  `I` toggles these previews together with document images.
-
-**Code review only:**
-
-| Key                 | Action                         |
-|---------------------|--------------------------------|
-| `tab` / `shift+tab` | Next / previous file tab from the content pane or sidebar; keep pane focus |
-| `n` / `N`           | Jump to next / previous change or unresolved comment from either pane |
-| `alt+p` (`M-p`)     | Open the file selector: type to filter tabs fuzzily, `↑` / `↓` choose, `enter` switches |
-| `1`-`9`             | Switch to the numbered file tab from the content pane |
-
-Normally, only threads resolved in earlier rounds are folded.  `h` also folds threads resolved in this round; `H` hides comments and shows line markers in a narrow right gutter.  Press either key to switch directly to its mode, or press it again to return to normal.  In the file tree, `h` keeps its folder-navigation role.  The tree starts fully expanded under the project name; fold the project folder to collapse the whole tree.  Folding or unfolding a folder also follows any chain of single child folders.
-
-`f` replies to the file's existing thread, or creates a file comment when there is none.  The file selector matches like VS Code's: gaps are allowed, several words must all match, and basename matches rank first.  `n` / `N` visit change hunks and unresolved comments in display order across files and reveal comments hidden with `H`.
-
-## Mouse controls
-
-- Click a file tab, code line, inline comment, sidebar, or sidebar comment to focus it.  Click the sidebar's **Comments** or **Files** tab to switch views; in the file tree, click a folder to fold or unfold it and a file to open it.
-- Every thread header ends with a button group.  **☐ Resolve** resolves the thread and releases focus; **☑︎ Resolved** reopens it and keeps it focused so its history stays visible.  **↑** / **↓** move to the previous or next thread like `[` / `]`, and **↓** on the last thread opens the finish dialog.  The red **x** deletes your own unanswered comment from the current round after confirmation.
-- Scroll code with the mouse wheel; over a thread, the wheel scrolls its history first.
-- Click the gutter to comment on a current or deleted line, or drag along it to select several lines.
-- Click inside a comment text box to focus it and position the cursor.
-- Click actions in comment and finish dialogs, including **Close**.  The **Submit** button in the top bar opens the finish dialog, and the footer **Help** button opens the keyboard help.
+Click tabs, files, lines, and threads to navigate.  Click or drag in the gutter to comment on a line or range.  Use the mouse wheel to scroll and the buttons on threads and dialogs to reply, resolve, or submit.
 
 ## Scriptable CLI
 
-The comment CLI follows [crit](https://github.com/tomasz-tomczyk/crit)'s
-syntax, so agent tooling written for crit works against Critty reviews:
+Agents can add comments, reply, and read saved feedback without opening the TUI.  See the [CLI reference skill](internal/cli/skill/critty-cli/SKILL.md) for commands, session targeting, and review-format details.
 
-```bash
-# Review-level, file-level, and line-level comments
-critty comment "Overall this looks good"
-critty comment docs/plan.md "Needs a rewrite"
-critty comment docs/plan.md:15 "This needs more detail"
-critty comment docs/plan.md:10-20 "Rethink this section"
-
-# Reply to a comment (e.g. an AI explaining how it addressed feedback)
-critty comment --reply-to c_a3f8b2 --author 'Claude Code' "Split into two functions"
-
-# Bulk import comments and replies from JSON
-critty comment --json --file comments.json
-
-# List unresolved comments (add --all for resolved ones, --json for JSON)
-critty comments
-critty comments --json
-
-# Clear review state
-critty clear docs/plan.md
-critty clear --code
-critty clear --all
-
-# Get review comments as JSON (single file)
-critty status docs/plan.md
-
-# Get all code review comments as JSON
-critty status --code
-```
-
-## Shell Completions
-
-```bash
-# Bash
-critty completion bash > /etc/bash_completion.d/critty
-
-# Zsh
-critty completion zsh > "${fpath[1]}/_critty"
-
-# Fish
-critty completion fish > ~/.config/fish/completions/critty.fish
-```
+Shell completions are available through `critty completion <shell>` for Bash, Zsh, Fish, and PowerShell.
 
 ## Gallery
 

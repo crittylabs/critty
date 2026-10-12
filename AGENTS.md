@@ -8,12 +8,9 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## How we work
 
-- Describe new features in `README.md` at the level of how to use them, not their internal rules.
-- Keep README Key Features focused on benefits for first-time readers.  Put detailed usage in the relevant instructions.
-- Update `README.md` for a release in the release preparation commit.
-- When preparing a release with major visual changes or headline features, propose recording new demo videos to show them.
-- When changing CLI behavior or review workflows, update the affected bundled skills under `internal/cli/skill/` in the same change so agents receive the current usage and constraints.
-- Follow [crit](https://github.com/tomasz-tomczyk/crit) for specification and compatibility decisions, and check its current implementation and documentation when a change touches the review format or workflow.
+- Keep `README.md` focused on feature benefits, installation, basic workflows and controls, and important limitations for human users.  Link to bundled skills under `internal/cli/skill/` and built-in help for details; update affected skills alongside CLI or workflow changes.
+- Update `README.md` in the release preparation commit.  For major visual changes or headline features, propose recording new demos.
+- Research [Crit](https://github.com/tomasz-tomczyk/crit)'s current implementation and documentation when changing the review format or workflow, and use the findings to inform specification and compatibility decisions.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.
 
 ## Changelog maintenance
