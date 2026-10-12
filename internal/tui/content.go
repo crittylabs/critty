@@ -113,7 +113,7 @@ func (m *AppModel) rebuildContent() {
 	b.Grow(len(sourceLines) * 200) // pre-allocate to reduce allocations
 	layout := newRenderedContentLayout()
 	appendAnnotation := func(ann annotation, focused bool, target contentMouseTarget) {
-		if ann.drifted && !t.expandedDrifted[ann.id] {
+		if ann.drifted && !m.driftedExpanded(ann.id, ann.resolved) && !(focused && ann.resolved) {
 			return
 		}
 		box, button := m.renderAnnotationBox(ann, boxWidth, focused)
@@ -392,7 +392,7 @@ func (m *AppModel) rebuildContent() {
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
 func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused bool) (string, commentHeaderRegion) {
-	collapsed := m.collapseResolved(ann.resolved, ann.resolvedRound)
+	collapsed := m.collapseResolved(ann.resolved, ann.resolvedRound) && !focused
 	if ann.drifted && m.tab().expandedDrifted[ann.id] && !m.foldResolved {
 		collapsed = false
 	}

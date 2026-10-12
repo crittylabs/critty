@@ -145,7 +145,8 @@ func (m *AppModel) selectMarker(ids []string) {
 		}
 		expand := false
 		for _, id := range ids {
-			expand = expand || !t.expandedDrifted[id]
+			c, _ := m.driftedComment(id)
+			expand = expand || !m.driftedExpanded(id, c.Resolved)
 		}
 		for _, id := range ids {
 			t.expandedDrifted[id] = expand
@@ -162,6 +163,13 @@ func (m *AppModel) selectMarker(ids []string) {
 	}
 }
 
+func (m *AppModel) driftedExpanded(id string, resolved bool) bool {
+	if expanded, ok := m.tab().expandedDrifted[id]; ok {
+		return expanded
+	}
+	return !resolved
+}
+
 func (m *AppModel) toggleDrifted(id string) {
 	if c, _ := m.driftedComment(id); c.Resolved {
 		m.openCommentThread(id)
@@ -171,7 +179,7 @@ func (m *AppModel) toggleDrifted(id string) {
 	if t.expandedDrifted == nil {
 		t.expandedDrifted = make(map[string]bool)
 	}
-	t.expandedDrifted[id] = !t.expandedDrifted[id]
+	t.expandedDrifted[id] = !m.driftedExpanded(id, false)
 	m.rebuildContent()
 	m.updateCommentSidebar()
 	m.scrollToCursor()

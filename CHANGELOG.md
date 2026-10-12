@@ -27,6 +27,8 @@
 
 ### Fixes
 
+- Unresolved drifted comments show their threads by default.  Resolved threads expand while focused with `[`, `]`, or the arrow keys, without requiring Enter.
+
 - TUI saves preserve comments and replies added or changed by concurrent CLI commands.  Conflicting edits to the same field report a save error instead of overwriting another writer's changes.
 
 - Demo recordings select the build prepared by `demo/setup.sh`, even when a tmux pane's login shell changes PATH.

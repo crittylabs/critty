@@ -79,46 +79,50 @@ func TestClickRenderedDriftedBubblePreservesResolution(t *testing.T) {
 	}
 }
 
-func TestDriftedFocusDoesNotExpandUntilEnter(t *testing.T) {
-	for _, hidden := range []bool{false, true} {
-		app := setupAppWithDoc(t, strings.Repeat("source\n", 50))
-		app.width, app.height = 100, 30
-		app.hideComments = hidden
-		app.tab().cursorLine = 1
-		app.recalculateLayout()
-		app.tab().state.Comments = []review.Comment{
-			{ID: "lost", StartLine: 200, EndLine: 200, Body: "lost body", Anchor: "old source"},
-			{ID: "drifted", StartLine: 40, EndLine: 40, Body: "drifted body", Drifted: true},
+func TestDriftedUnresolvedVisibleByDefault(t *testing.T) {
+	app := setupAppWithDoc(t, "source\n")
+	app.width, app.height = 100, 40
+	app.recalculateLayout()
+	app.tab().state.Comments = []review.Comment{
+		{ID: "drifted", StartLine: 1, EndLine: 1, Body: "drifted body", Drifted: true},
+		{ID: "lost", StartLine: 200, EndLine: 200, Body: "lost body", Anchor: "old source"},
+	}
+	app.rebuildContent()
+	app.updateCommentSidebar()
+	for _, body := range []string{"drifted body", "lost body", "old source"} {
+		if !strings.Contains(ansi.Strip(app.contentViewport.View()), body) {
+			t.Fatalf("unresolved thread hidden: %q", body)
 		}
-		app.rebuildContent()
-		app.updateCommentSidebar()
-		height := len(app.contentLayout.rows)
-		app = pressKey(app, ']')
-		if app.selectedCommentID() != "drifted" || app.modal != noModal || len(app.contentLayout.rows) != height {
-			t.Fatal("navigation expanded a folded thread")
-		}
-		if view := ansi.Strip(app.contentViewport.View()); !strings.Contains(view, "> ☐ 💬") || strings.Contains(view, "drifted body") {
-			t.Fatalf("focused marker = %q", view)
-		}
-		app = pressKey(app, tea.KeyEnter)
-		if view := ansi.Strip(app.contentViewport.View()); !strings.Contains(view, "drifted body") || app.modal != noModal {
-			t.Fatalf("Enter did not expand inline: %q", view)
-		}
-		app = pressKey(app, tea.KeyEnter)
-		if view := ansi.Strip(app.contentViewport.View()); strings.Contains(view, "drifted body") || !strings.Contains(view, "> ☐ 💬") || len(app.contentLayout.rows) != height {
-			t.Fatalf("Enter did not collapse inline: %q", view)
-		}
-		app = pressKey(app, '[')
-		if app.selectedCommentID() != "lost" || !strings.Contains(ansi.Strip(app.contentViewport.View()), "> ☐ 💬") || app.contentViewport.YOffset() != 0 {
-			t.Fatal("unplaced marker did not gain focus and scroll into view")
-		}
-		app = pressKey(app, tea.KeyEnter)
-		if !strings.Contains(ansi.Strip(app.contentViewport.View()), "old source") {
-			t.Fatal("unplaced thread did not expand")
-		}
-		app = pressKey(app, 'e')
-		if app.modal == noModal || app.editingID != "lost" {
-			t.Fatal("editor is no longer keyboard-accessible")
+	}
+	if !strings.Contains(ansi.Strip(app.commentViewport.View()), "drifted body") {
+		t.Fatal("unresolved drifted sidebar thread hidden")
+	}
+}
+
+func TestResolvedThreadsExpandOnKeyboardFocus(t *testing.T) {
+	for _, drifted := range []bool{false, true} {
+		for _, fold := range []bool{false, true} {
+			for _, key := range []rune{']', '[', tea.KeyDown, tea.KeyUp} {
+				t.Run(fmt.Sprintf("drifted=%t/fold=%t/key=%d", drifted, fold, key), func(t *testing.T) {
+					app := setupAppWithDoc(t, "one\ntwo\nthree\n")
+					app.width, app.height = 120, 40
+					app.foldResolved = fold
+					app.recalculateLayout()
+					app.tab().state.Comments = []review.Comment{{ID: "done", StartLine: 2, EndLine: 2, Resolved: true, Drifted: drifted, Body: "resolved body"}}
+					app.tab().cursorLine = 2
+					if key == '[' || key == tea.KeyUp {
+						app.tab().cursorLine = 3
+					}
+					app.rebuildContent()
+					if strings.Contains(ansi.Strip(app.contentViewport.View()), "resolved body") {
+						t.Fatal("resolved thread initially expanded")
+					}
+					app = pressKey(app, key)
+					if app.selectedCommentID() != "done" || app.modal != noModal || !strings.Contains(ansi.Strip(app.contentViewport.View()), "resolved body") {
+						t.Fatal("keyboard focus did not expand resolved thread inline")
+					}
+				})
+			}
 		}
 	}
 }
@@ -136,7 +140,7 @@ func TestDriftedMarkersOpenAndCollapseAllThreads(t *testing.T) {
 	app.rebuildContent()
 	app.updateCommentSidebar()
 	view := ansi.Strip(app.contentViewport.View())
-	if !strings.Contains(view, "normal body") || !strings.Contains(view, "💬 2") || strings.Contains(view, "first body") || strings.Contains(view, "second body") {
+	if !strings.Contains(view, "normal body") || !strings.Contains(view, "💬 2") || !strings.Contains(view, "first body") || strings.Contains(view, "second body") {
 		t.Fatalf("initial view = %q", view)
 	}
 	if len(app.contentLayout.markers) != 1 {
@@ -249,15 +253,14 @@ func TestUnplacedCommentsStayReachable(t *testing.T) {
 			app.tab().cursorLine = 0
 			app = pressKey(app, ']')
 			app = pressKey(app, ']')
-			app = pressKey(app, tea.KeyEnter)
 			if app.selectedCommentID() != c.ID || !strings.Contains(ansi.Strip(app.contentViewport.View()), c.Anchor) {
 				t.Fatalf("thread not reachable: selected %q, view %q", app.selectedCommentID(), ansi.Strip(app.contentViewport.View()))
 			}
 			if app.tab().state.Comments[1].Drifted || app.tab().state.Comments[1].Scope != "" {
 				t.Fatal("fallback changed stored drift or scope")
 			}
-			app = pressKey(app, tea.KeyEnter)
 			app = pressKey(app, 'H')
+			app.toggleDrifted(c.ID)
 			app.selectMarker([]string{c.ID})
 			if !app.hideComments || app.modal != noModal || !strings.Contains(ansi.Strip(app.contentViewport.View()), c.Anchor) {
 				t.Fatal("unplaced comment cannot be opened while comments are hidden")
@@ -273,6 +276,7 @@ func TestDriftedDeletedMarkerAndHiddenMode(t *testing.T) {
 	app.tab().deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "deleted"}}}
 	app.tab().state.Comments = []review.Comment{{ID: "old", StartLine: 1, EndLine: 1, Side: "old", Drifted: true, Body: "body", Anchor: "old anchor"}}
 	app = pressKey(app, 'H')
+	app.toggleDrifted("old")
 	marker := app.contentLayout.markers[0]
 	if row := app.contentLayout.rows[marker.rect.top]; row.side != "old" || row.line != 1 {
 		t.Fatalf("marker attached to wrong row: %+v", row)

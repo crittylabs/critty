@@ -217,7 +217,7 @@ func TestThreadScrollingUsesSelectedSurface(t *testing.T) {
 	}
 }
 
-func TestResolvedThreadsStayFoldedOnFocus(t *testing.T) {
+func TestResolvedThreadsExpandWhileFocused(t *testing.T) {
 	for _, surface := range []string{"inline", "sidebar"} {
 		for _, action := range []string{"keyboard", "click", "wheel"} {
 			t.Run(surface+"/"+action, func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestResolvedThreadsStayFoldedOnFocus(t *testing.T) {
 				case "wheel":
 					app = wheelMouse(app, x, y, tea.MouseWheelUp)
 				}
-				if got := view(); strings.Contains(got, "history") || strings.Contains(got, "latest reply") || !strings.Contains(got, "Resolved") {
+				if got := view(); (!strings.Contains(got, "history") && !strings.Contains(got, "latest reply")) || !strings.Contains(got, "Resolved") {
 					t.Fatalf("focused resolved thread = %q", got)
 				}
 				if !app.tab().state.Comments[0].Resolved {
@@ -621,8 +621,12 @@ func TestResolvedThreadsOpenWithEnter(t *testing.T) {
 				app.updateCommentSidebar()
 			}
 			app = pressKey(app, 'h')
-			if strings.Contains(ansi.Strip(app.contentViewport.View()), "resolved body") || strings.Contains(ansi.Strip(app.commentViewport.View()), "resolved body") {
-				t.Fatal("resolved body expanded on focus or h")
+			view := app.contentViewport.View()
+			if strings.Contains(surface, "sidebar") {
+				view = app.commentViewport.View()
+			}
+			if !strings.Contains(ansi.Strip(view), "resolved body") {
+				t.Fatal("focused resolved body hidden by h")
 			}
 			app = pressKey(app, tea.KeyEnter)
 			if app.modal == noModal || app.editingID != "resolved" {

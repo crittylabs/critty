@@ -639,7 +639,7 @@ func TestResolveKey_TogglesSelectedComment(t *testing.T) {
 	if len(app.tabs[0].sidebarItems) != 1 || !app.tabs[0].sidebarItems[0].resolved {
 		t.Fatalf("resolved comment lost its sidebar header: %+v", app.tabs[0].sidebarItems)
 	}
-	if got := app.commentViewport.View(); strings.Contains(got, comment.Body) {
+	if got := app.commentViewport.View(); !strings.Contains(got, comment.Body) {
 		t.Fatalf("resolved sidebar message = %q", got)
 	}
 
@@ -981,14 +981,13 @@ func TestRevertedAdditionShowsPlaceholderAndKeepsComments(t *testing.T) {
 		t.Fatalf("active tab = %q (outside changes: %t), want added.go kept outside the changes", app.tab().path, app.tab().outsideChanges)
 	}
 	content := ansi.Strip(app.contentViewport.View())
-	if !strings.Contains(content, "no longer part of the changes") || strings.Contains(content, "var x = 1") {
-		t.Fatalf("content = %q, want placeholder without stale content", content)
+	if !strings.Contains(content, "no longer part of the changes") || !strings.Contains(content, "Original text:") {
+		t.Fatalf("content = %q, want placeholder and original comment context", content)
 	}
 	if !strings.Contains(content, "💬") {
 		t.Fatalf("content = %q, want a marker for the kept comment", content)
 	}
 	app.jumpToComment(1, true)
-	app = pressKey(app, tea.KeyEnter)
 	if got := ansi.Strip(app.contentViewport.View()); !strings.Contains(got, "why one?") || !strings.Contains(got, "var x = 1") {
 		t.Fatalf("opened thread = %q, want the comment and its original text", got)
 	}

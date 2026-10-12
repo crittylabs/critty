@@ -107,8 +107,8 @@ func TestNewRoundFocusesFreshReplies(t *testing.T) {
 			if app.tab().cursorSide != tt.side || app.selectedCommentID() != app.tab().state.Comments[0].ID {
 				t.Fatal("wrong thread selected after carry-forward")
 			}
-			if got := ansi.Strip(app.contentViewport.View()); strings.Contains(got, "NEW AGENT RESPONSE") == tt.resolved {
-				t.Fatalf("reply visibility does not match resolution:\n%s", got)
+			if got := ansi.Strip(app.contentViewport.View()); !strings.Contains(got, "NEW AGENT RESPONSE") {
+				t.Fatalf("focused thread hides the fresh reply:\n%s", got)
 			}
 			// This is an unfinished round: reopening must not replay its initial jump.
 			loaded, err := review.OpenSessionAt(app.session.Key, app.session.Dir)
