@@ -57,6 +57,8 @@ go vet ./...
 
 Run `python3 e2e/scenarios.py` before pushing to test the final changes together.  Also run it when a change is known to affect its scenarios.  Reuse a passing result while the tested code remains unchanged.
 
+Use `e2e/native_terminal.py` inside the native terminal for isolated checks with saved stdout, stderr, and exit results.  Read its command help before launching; window closure alone does not indicate failure.
+
 See the README for installing the binary and the agent skills, and `CHANGELOG.md` for changes by release.
 
 When recording demos, verify that the recording runs the intended binary.  Login shells may reorder PATH, so setting PATH in the launcher alone does not establish which build runs in the recording pane.
