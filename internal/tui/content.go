@@ -113,7 +113,7 @@ func (m *AppModel) rebuildContent() {
 	b.Grow(len(sourceLines) * 200) // pre-allocate to reduce allocations
 	layout := newRenderedContentLayout()
 	appendAnnotation := func(ann annotation, focused bool, target contentMouseTarget) {
-		if ann.drifted && !m.driftedExpanded(ann.id, ann.resolved) && !(focused && ann.resolved) {
+		if ann.drifted && !m.driftedExpanded(ann.id, ann.resolved) && (!focused || !ann.resolved) {
 			return
 		}
 		box, button := m.renderAnnotationBox(ann, boxWidth, focused)

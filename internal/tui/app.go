@@ -2325,7 +2325,7 @@ func (m *AppModel) updateCommentSidebar() {
 		isSelected := m.focused == commentPane && idx == t.sidebarCursor
 		collapsed := m.collapseResolved(it.resolved, it.resolvedRound) && !isSelected
 		if it.drifted {
-			collapsed = (!m.driftedExpanded(it.id, it.resolved) || (m.foldResolved && it.resolved)) && !(isSelected && it.resolved)
+			collapsed = (!m.driftedExpanded(it.id, it.resolved) || (m.foldResolved && it.resolved)) && (!isSelected || !it.resolved)
 		}
 		var item strings.Builder
 

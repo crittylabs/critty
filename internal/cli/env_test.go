@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"slices"
 	"testing"
@@ -80,6 +82,22 @@ func TestEnvCommandPrintsTMUXEnvironment(t *testing.T) {
 	}
 	if output.String() != "/dev/ttys003\n" {
 		t.Errorf("env tty = %q", output.String())
+	}
+
+	closed, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := closed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	cmd.SetOut(closed)
+	for _, mode := range []string{"all", "tty"} {
+		t.Run(mode+" write error", func(t *testing.T) {
+			if err := cmd.RunE(cmd, []string{mode}); !errors.Is(err, os.ErrClosed) {
+				t.Fatalf("env %s error = %v, want closed output error", mode, err)
+			}
+		})
 	}
 }
 

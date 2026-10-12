@@ -29,6 +29,8 @@
 
 ### Fixes
 
+- `critty env` and `critty env tty` report output write failures instead of returning success.
+
 - Unresolved drifted comments show their threads by default.  Resolved threads expand while focused with `[`, `]`, or the arrow keys, without requiring Enter.
 
 - TUI saves preserve comments and replies added or changed by concurrent CLI commands.  Conflicting edits to the same field report a save error instead of overwriting another writer's changes.

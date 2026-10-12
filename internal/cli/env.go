@@ -58,8 +58,8 @@ to locate the pane that displays it.`,
 			if envJSON {
 				return printJSON(out, vars[i].value)
 			}
-			fmt.Fprintln(out, vars[i].value)
-			return nil
+			_, err := fmt.Fprintln(out, vars[i].value)
+			return err
 		}
 		if envJSON {
 			object := make(map[string]string, len(vars))
@@ -69,7 +69,9 @@ to locate the pane that displays it.`,
 			return printJSON(out, object)
 		}
 		for _, v := range vars {
-			fmt.Fprintf(out, "%s=%s\n", v.name, v.value)
+			if _, err := fmt.Fprintf(out, "%s=%s\n", v.name, v.value); err != nil {
+				return err
+			}
 		}
 		return nil
 	},
