@@ -9,6 +9,18 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+func renderBrand() string {
+	ld := lipgloss.LightDark(terminalIsDark)
+	tile := lipgloss.NewStyle().Bold(true).Background(lipgloss.BrightBlack)
+	word := lipgloss.NewStyle().Bold(true).
+		Foreground(ld(lipgloss.Black, lipgloss.BrightWhite)).
+		Background(ld(lipgloss.BrightWhite, lipgloss.Black))
+	return tile.Foreground(lipgloss.Color("#3fb950")).Render(">") +
+		tile.Foreground(lipgloss.BrightWhite).Render("_") +
+		word.Render(" crit") +
+		word.Foreground(ld(lipgloss.Color("#2ea043"), lipgloss.Color("#3fb950"))).Render("ty ")
+}
+
 func (m *AppModel) commentAuthorStyle(author string) lipgloss.Style {
 	if author == m.author {
 		return lipgloss.NewStyle().Foreground(textPrimary)

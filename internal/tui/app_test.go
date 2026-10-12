@@ -39,7 +39,7 @@ func TestRenderHeaderUsesCrittyBrand(t *testing.T) {
 			}
 
 			header := ansi.Strip(app.renderHeader())
-			if !strings.Contains(header, " Critty:") {
+			if !strings.Contains(header, ">_ critty ") {
 				t.Errorf("header = %q, want Critty branding", header)
 			}
 			if strings.Contains(header, " Crit:") {
@@ -54,7 +54,7 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 	app.project, app.topic = "critty", "header-project-topic"
 	app.width = 120
 	bar := ansi.Strip(app.renderReviewBar())
-	if !strings.HasPrefix(bar, " Critty: critty · header-project-topic — review the document.") {
+	if !strings.HasPrefix(bar, ">_ critty  critty · header-project-topic — review the document.") {
 		t.Fatalf("bar = %q", bar)
 	}
 	app.topic = "\x1b[31m" + strings.Repeat("長いトピック", 20) + "\n\t"
@@ -524,6 +524,7 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 
 func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
 	app := newISearchApp(t, 1)
+	app.version = "v1.0.0"
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 24})
 	app = pressAltKey(app, '?')
 	app = pressKey(app, tea.KeyEnd)
@@ -571,6 +572,36 @@ func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
 	if !strings.Contains(ansi.Strip(view.Content), "General") || lipgloss.Height(view.Content) > 40 {
 		t.Fatal("resizing did not fit the help content to the larger terminal")
 	}
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 40, Height: 12}} {
+			app, _ = updateApp(app, size)
+			app = pressKey(app, tea.KeyEnd)
+			view := app.View()
+			if !strings.Contains(ansi.Strip(view.Content), "critty v1.0.0") || lipgloss.Height(view.Content) > size.Height {
+				t.Fatal("help version missing or dialog clipped after scrolling and resizing")
+			}
+			footer, controls := app.helpFooter(app.modalInnerWidth(), 1, 0)
+			rows := strings.Split(ansi.Strip(footer), "\n")
+			if !strings.Contains(rows[len(rows)-1], "Up") || !strings.Contains(rows[len(rows)-1], "Down") {
+				t.Fatal("help scroll controls are not on the bottom row")
+			}
+			if size.Width == 80 && !strings.Contains(rows[len(rows)-1], "critty v1.0.0") {
+				t.Fatal("help version is not beside the scroll controls")
+			}
+			for _, control := range controls {
+				if control.rect.top != len(rows)-1 {
+					t.Fatal("help control hit area does not match the bottom row")
+				}
+			}
+			for _, region := range app.modalMouseRegions() {
+				if (region.action.close || region.action.scrollable) && (region.rect.top < 0 || region.rect.bottom > size.Height) {
+					t.Fatal("help control hidden by version footer")
+				}
+			}
+		}
+	}
+	initAdaptiveStyles(true)
 }
 
 func TestDocRenderedMsg_LoadsExistingComments(t *testing.T) {
@@ -1172,12 +1203,12 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 		t.Fatalf("bar width = %d, want %d", got, app.width)
 	}
 	plain := ansi.Strip(bar)
-	if !strings.HasPrefix(plain, " Critty: review the document on tmux.") || !strings.HasSuffix(plain, " Submit q ") {
+	if !strings.HasPrefix(plain, ">_ critty  review the document on tmux.") || !strings.HasSuffix(plain, " Submit q ") {
 		t.Fatalf("bar = %q, want the subject on the left and Submit on the right", plain)
 	}
 	for _, part := range []string{
-		reviewBarStyle.Bold(true).Render(" Critty"),
-		reviewBarStyle.Render(": "),
+		renderBrand(),
+		reviewBarStyle.Render(" "),
 		reviewBarStyle.Render("review the "),
 		reviewBarStyle.Render("document on tmux."),
 	} {

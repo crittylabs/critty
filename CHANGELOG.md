@@ -19,6 +19,8 @@
 
 ### Changed
 
+- Keyboard Help shows the running build's version beside a colored logo.  Help and the review banner share the logo, with a terminal prompt and green accents.  Help keeps its scroll controls on the bottom row, beside the version when space allows.
+
 - Building from source requires Go 1.27.2 or later.
 
 - Bundled skills separate the interactive review loop, CLI contracts, and approval handling, with detailed input and display rules in the CLI reference.

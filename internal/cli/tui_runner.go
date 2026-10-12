@@ -34,6 +34,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		Documents: documents.Documents,
 		Project:   reviewProjectLabel(cfg.ProjectRoot, sess),
 		Topic:     reviewTopicLabel(sess, mode),
+		Version:   versionString(),
 		Session:   sess,
 		Author:    cfg.Author,
 		Staged:    mode.staged,

@@ -254,6 +254,13 @@ def scenarios() -> None:
     )
     try:
         default_approval = Round("default-approval", ["plan.md"])
+        version = cli("--version").stdout.strip().removeprefix("critty version ")
+        default_approval.keys("M-?")
+        wait_until(
+            lambda: f"critty {version}" in default_approval.screen(),
+            "Help build version",
+        )
+        default_approval.keys("Escape")
         default_approval.keys("q", "Enter")
         default_approval.completed(True)
         report(

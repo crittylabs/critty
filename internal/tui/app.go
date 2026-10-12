@@ -65,6 +65,7 @@ type AppConfig struct {
 	Documents []review.AttachedDocument
 	Project   string
 	Topic     string
+	Version   string
 	Session   *review.Session
 	Author    string
 	// Staged reads code-review files and diffs from the Git index.
@@ -90,6 +91,7 @@ type AppModel struct {
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
+	version       string
 	width, height int
 	focused       pane
 	modal         modalType
@@ -269,6 +271,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
+		version:         cfg.Version,
 		filePath:        filePath,
 		tabs:            []FileTab{tab},
 		activeTab:       0,
@@ -344,6 +347,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
+		version:         cfg.Version,
 		tabs:            tabs,
 		activeTab:       0,
 		multiFile:       true,
@@ -2505,7 +2509,7 @@ func (m AppModel) renderReviewBar() string {
 		subject += " on " + m.host
 	}
 	subject += "."
-	text := reviewBarStyle.Bold(true).Render(" Critty") + reviewBarStyle.Render(": ")
+	text := renderBrand() + reviewBarStyle.Render(" ")
 	if m.project != "" {
 		text += reviewBarStyle.Bold(true).Render(headerLabel(m.project))
 		if m.topic != "" {
@@ -3895,9 +3899,27 @@ func (m AppModel) renderHelp(innerWidth int) string {
 func (m *AppModel) scrollHelp(delta int) {
 	lines := strings.Split(m.renderHelp(m.modalInnerWidth()), "\n")
 	header, _ := m.helpHeader(m.modalInnerWidth())
-	available := max(1, m.height-modalStyle.GetVerticalFrameSize()-lipgloss.Height(header)-1)
+	footer, _ := m.helpFooter(m.modalInnerWidth(), 0, 0)
+	available := max(1, m.height-modalStyle.GetVerticalFrameSize()-lipgloss.Height(header)-lipgloss.Height(footer))
 	maxOffset := max(0, len(lines)-available)
 	m.helpOffset = max(0, min(min(m.helpOffset, maxOffset)+delta, maxOffset))
+}
+
+func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegion) {
+	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
+		{rendered: m.renderModalButton("Up", "↑/PgUp", false), action: modalMouseAction{scrollable: true, scrollOffset: -pageSize}},
+		{rendered: m.renderModalButton("Down", "↓/PgDn", false), action: modalMouseAction{scrollable: true, scrollOffset: pageSize}},
+	}, width, top+1)
+	brand := renderBrand()
+	if m.version != "" {
+		ld := lipgloss.LightDark(terminalIsDark)
+		brand += lipgloss.NewStyle().Bold(true).Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue)).Render(m.version)
+	}
+	brand = ansi.Truncate(brand, width, "…")
+	if lipgloss.Height(buttons) == 1 && lipgloss.Width(buttons)+2+lipgloss.Width(brand) <= width {
+		return "\n" + buttons + strings.Repeat(" ", width-lipgloss.Width(buttons)-lipgloss.Width(brand)) + brand, regions
+	}
+	return lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(brand) + "\n" + buttons, regions
 }
 
 func (m AppModel) helpHeader(innerWidth int) (string, modalMouseRegion) {
@@ -4163,16 +4185,15 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		header, closeRegion := m.helpHeader(innerWidth)
 		regions = append(regions, closeRegion)
 		lines := strings.Split(m.renderHelp(innerWidth), "\n")
-		available := max(1, bgH-frameStyle.GetVerticalFrameSize()-lipgloss.Height(header)-1)
+		footer, _ := m.helpFooter(innerWidth, 0, 0)
+		available := max(1, bgH-frameStyle.GetVerticalFrameSize()-lipgloss.Height(header)-lipgloss.Height(footer))
 		offset := max(0, min(m.helpOffset, len(lines)-available))
 		body := strings.Join(lines[offset:min(len(lines), offset+available)], "\n")
 		prefix := header + "\n" + body + "\n"
-		buttons, scrollRegions := layoutModalButtonRow([]modalButtonSpec{
-			{rendered: m.renderModalButton("Up", "↑/PgUp", false), action: modalMouseAction{scrollable: true, scrollOffset: -available}},
-			{rendered: m.renderModalButton("Down", "↓/PgDn", false), action: modalMouseAction{scrollable: true, scrollOffset: available}},
-		}, innerWidth, strings.Count(prefix, "\n"))
+		footer, scrollRegions := m.helpFooter(innerWidth, available, strings.Count(prefix, "\n"))
 		regions = append(regions, scrollRegions...)
-		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons)
+		content := prefix + footer
+		modalContent = frameStyle.Width(modalWidth).Render(content)
 
 	case commentModal:
 		start, end := m.selectionRange()
