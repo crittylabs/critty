@@ -83,6 +83,7 @@ func TestPreviewTerminalRoundTrip(t *testing.T) {
 			if !responded && strings.Contains(output, fmt.Sprintf("i=%d", app.images.probeID)) {
 				responded = true
 				p.Send(uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte("OK")})
+				p.Send(tea.CursorPositionMsg{X: 0, Y: 0})
 			}
 			if strings.ContainsRune(output, kitty.Placeholder) {
 				p.Quit()
@@ -129,17 +130,60 @@ func TestImageCapabilityAndPassthrough(t *testing.T) {
 	if !strings.HasPrefix(sequence, "\x1bPtmux;") || !strings.Contains(sequence, "U=1") {
 		t.Fatalf("probe not passed through tmux: %q", sequence)
 	}
+	query := strings.Index(sequence, ansi.RequestCursorPositionReport)
+	cleanup := strings.Index(sequence, "a=d,d=I")
+	if query < 0 || cleanup < query || !strings.Contains(sequence, ansi.SaveCursor) ||
+		!strings.Contains(sequence, ansi.RestoreCursor) || !strings.Contains(sequence, ";AAAAAA==") {
+		t.Fatalf("probe does not measure and clean up a transparent placement: %q", sequence)
+	}
 	for _, tc := range []struct {
 		id      int
 		payload string
 		enabled bool
 	}{
-		{d.probeID + 1, "OK", false}, {d.probeID, "EINVAL", false}, {d.probeID, "OK", true},
+		{d.probeID + 1, "OK", false}, {d.probeID, "EINVAL", false}, {d.probeID, "OK", false},
 	} {
 		app := AppModel{images: d}
 		model, _ := app.Update(uv.KittyGraphicsEvent{Options: kitty.Options{ID: tc.id}, Payload: []byte(tc.payload)})
 		if model.(AppModel).images.enabled != tc.enabled {
 			t.Fatalf("capability %+v", tc)
+		}
+	}
+}
+
+func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		cursor  tea.CursorPositionMsg
+		payload string
+		enabled bool
+	}{
+		{"virtual placement", tea.CursorPositionMsg{X: 0, Y: 0}, "OK", true},
+		{"ignored extension", tea.CursorPositionMsg{X: 1, Y: 0}, "OK", false},
+		{"unsupported graphics", tea.CursorPositionMsg{X: 0, Y: 0}, "EINVAL", false},
+	} {
+		for _, cursorFirst := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/cursorFirst=%t", tc.name, cursorFirst), func(t *testing.T) {
+				app := AppModel{images: newImageDisplay()}
+				messages := []tea.Msg{
+					uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte(tc.payload)},
+					tc.cursor,
+				}
+				if cursorFirst {
+					messages[0], messages[1] = messages[1], messages[0]
+				}
+				for i, msg := range messages {
+					model, _ := app.Update(msg)
+					app = model.(AppModel)
+					if app.images.enabled != (i == 1 && tc.enabled) {
+						t.Fatalf("message %d: enabled=%t", i, app.images.enabled)
+					}
+				}
+				model, _ := app.Update(tea.CursorPositionMsg{X: 0, Y: 0})
+				if model.(AppModel).images.enabled != tc.enabled {
+					t.Fatal("later cursor reply changed capability")
+				}
+			})
 		}
 	}
 }

@@ -14,6 +14,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
 	_ "golang.org/x/image/webp"
@@ -23,10 +25,12 @@ const maxPreviewBytes = 5 << 20
 const maxPreviewPixels = 16 << 20
 
 type imageDisplay struct {
-	probeID int
-	enabled bool
-	hidden  bool
-	tmux    bool
+	probeID     int
+	probeReply  string
+	probeCursor *tea.CursorPositionMsg
+	enabled     bool
+	hidden      bool
+	tmux        bool
 }
 
 type inlineImage struct {
@@ -100,14 +104,45 @@ func (d imageDisplay) wrap(sequence string) string {
 }
 
 func (d imageDisplay) probe() tea.Cmd {
-	// An invisible placement checks the extension used by the renderer as
-	// well as image transmission.  Unsupported terminals never enable previews.
+	// A virtual placement leaves the cursor at home.  Terminals that ignore
+	// U=1 instead display the image and advance the cursor, even when replying OK.
 	if d.probeID == 0 || strings.HasPrefix(os.Getenv("TERM"), "screen") && !d.tmux {
 		return nil
 	}
-	return tea.Raw(d.wrap(ansi.KittyGraphics([]byte("AAAA/w=="),
+	sequence := ansi.SaveCursor + ansi.CursorPosition(1, 1) + ansi.KittyGraphics([]byte("AAAAAA=="),
 		"a=T", "f=32", "s=1", "v=1", "U=1", "c=1", "r=1",
-		fmt.Sprintf("i=%d", d.probeID))))
+		fmt.Sprintf("i=%d", d.probeID)) + ansi.RequestCursorPositionReport +
+		ansi.KittyGraphics(nil, "a=d", "d=I", "q=2", fmt.Sprintf("i=%d", d.probeID)) + ansi.RestoreCursor
+	return tea.Raw(d.wrap(sequence))
+}
+
+func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.images.probeID == 0 || m.images.enabled {
+		return m, nil
+	}
+	switch msg := msg.(type) {
+	case uv.KittyGraphicsEvent:
+		if msg.Options.ID != m.images.probeID || m.images.probeReply != "" {
+			return m, nil
+		}
+		m.images.probeReply = string(msg.Payload)
+	case tea.CursorPositionMsg:
+		if m.images.probeCursor != nil {
+			return m, nil
+		}
+		m.images.probeCursor = &msg
+	}
+	if m.images.probeReply != "OK" || m.images.probeCursor == nil ||
+		m.images.probeCursor.X != 0 || m.images.probeCursor.Y != 0 {
+		return m, nil
+	}
+	m.images.enabled = true
+	if len(m.tabs) > 0 && m.tab().state != nil {
+		m.rebuildContent()
+		m.updateCommentSidebar()
+	}
+	// Placeholder colors encode image IDs and must not be downsampled.
+	return m, func() tea.Msg { return tea.ColorProfileMsg{Profile: colorprofile.TrueColor} }
 }
 
 func imagePath(path string) bool {

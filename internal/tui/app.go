@@ -18,7 +18,6 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/colorprofile"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
@@ -482,21 +481,8 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch msg := msg.(type) {
-	case uv.KittyGraphicsEvent:
-		if msg.Options.ID != m.images.probeID {
-			return m, nil
-		}
-		m.images.enabled = string(msg.Payload) == "OK"
-		cleanup := tea.Raw(m.images.wrap(ansi.KittyGraphics(nil, "a=d", "d=I", "q=2", fmt.Sprintf("i=%d", m.images.probeID))))
-		if m.images.enabled {
-			if len(m.tabs) > 0 && m.tab().state != nil {
-				m.rebuildContent()
-				m.updateCommentSidebar()
-			}
-			// Placeholder colors encode image IDs and must not be downsampled.
-			return m, tea.Sequence(cleanup, func() tea.Msg { return tea.ColorProfileMsg{Profile: colorprofile.TrueColor} })
-		}
-		return m, cleanup
+	case uv.KittyGraphicsEvent, tea.CursorPositionMsg:
+		return m.updateImageCapability(msg)
 	case imageLoadedMsg:
 		return m.finishImageLoad(msg)
 	case imageTransmittedMsg:
