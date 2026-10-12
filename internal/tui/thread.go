@@ -25,8 +25,8 @@ func (m *AppModel) layoutThread(author, body string, replies []review.Reply, edi
 		}
 		layout.starts = append(layout.starts, len(layout.lines))
 		style := m.commentAuthorStyle(author)
-		content := style.Bold(true).Render(header) + "\n" + style.Render(m.linkFileReferences(body))
-		layout.lines = append(layout.lines, strings.Split(lipgloss.Wrap(expandDisplayTabs(content), max(1, width), ""), "\n")...)
+		content := lipgloss.Wrap(style.Bold(true).Render(header), max(1, width), "") + "\n" + m.renderCommentContent(author, body, "", width)
+		layout.lines = append(layout.lines, strings.Split(content, "\n")...)
 	}
 	name := author
 	if name == "" {
@@ -146,9 +146,7 @@ func (m *AppModel) renderLatestComment(author, body string, replies []review.Rep
 	if name == "" {
 		name = "anonymous"
 	}
-	style := m.commentAuthorStyle(author)
-	content := style.Bold(true).Render(name+": ") + style.Render(m.linkFileReferences(body))
-	lines := strings.Split(lipgloss.Wrap(expandDisplayTabs(content), max(1, width), ""), "\n")
+	lines := strings.Split(m.renderCommentContent(author, body, name+": ", width), "\n")
 	if len(lines) > height {
 		lines = append(lines[:height], footerStyle.Render("↓"))
 	}

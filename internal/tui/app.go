@@ -18,6 +18,8 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/document"
@@ -78,6 +80,9 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	images        imageDisplay
+	commentImages map[commentImageKey]*previewSide
+	imageBodies   map[string][]markdownImageRef
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
 	attachments   map[string]review.AttachedDocument
@@ -202,6 +207,8 @@ type renderedScreenLayout struct {
 	hasFinishButton bool
 	footerHelp      mouseRect
 	hasFooterHelp   bool
+	imagesButton    mouseRect
+	hasImagesButton bool
 	modalRegions    []modalMouseRegion
 	isearchCursor   *tea.Cursor
 	isearchRegions  []isearchMouseRegion
@@ -251,9 +258,11 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	tab := FileTab{
 		path:       filePath,
 		cursorLine: 1,
+		isBinary:   imagePath(filePath),
 	}
 
 	m := AppModel{
+		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
 		filePath:        filePath,
@@ -297,8 +306,9 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			}
 		}
 		ft := newFileTab(f.Path, diff)
+		ft.oldPath = f.OldPath
 		ft.status = f.Status.String()
-		ft.isBinary = f.IsBinary()
+		ft.isBinary = f.IsBinary() || cfg.Patch == nil && imagePath(f.Path)
 		if f.Status == gitpkg.StatusBinary {
 			ft.status = "modified"
 		}
@@ -326,6 +336,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
 		tabs:            tabs,
@@ -375,7 +386,7 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor)
+	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, m.images.probe())
 }
 
 func (m AppModel) loadDocuments() tea.Cmd {
@@ -433,9 +444,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch app := model.(type) {
 	case AppModel:
 		app.refreshCompletion()
-		return app, cmd
+		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	case *AppModel:
 		app.refreshCompletion()
+		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	}
 	return model, cmd
 }
@@ -454,6 +466,65 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch msg := msg.(type) {
+	case uv.KittyGraphicsEvent:
+		if msg.Options.ID != m.images.probeID {
+			return m, nil
+		}
+		m.images.enabled = string(msg.Payload) == "OK"
+		cleanup := tea.Raw(m.images.wrap(ansi.KittyGraphics(nil, "a=d", "d=I", "q=2", fmt.Sprintf("i=%d", m.images.probeID))))
+		if m.images.enabled {
+			if len(m.tabs) > 0 && m.tab().state != nil {
+				m.rebuildContent()
+				m.updateCommentSidebar()
+			}
+			// Placeholder colors encode image IDs and must not be downsampled.
+			return m, tea.Sequence(cleanup, func() tea.Msg { return tea.ColorProfileMsg{Profile: colorprofile.TrueColor} })
+		}
+		return m, cleanup
+	case imageLoadedMsg:
+		return m.finishImageLoad(msg)
+	case imageTransmittedMsg:
+		if msg.comment != nil {
+			if side := m.commentImages[*msg.comment]; side != nil {
+				side.image = &inlineImage{id: msg.id, width: msg.width, height: msg.height}
+			}
+			return m, nil
+		}
+		for i := range m.tabs {
+			if m.tabs[i].path == msg.path {
+				m.tabs[i].imageSide(msg.before, msg.markdown).image = &inlineImage{id: msg.id, width: msg.width, height: msg.height}
+			}
+		}
+		return m, nil
+	case imageReadyMsg:
+		if msg.comment != nil {
+			if side := m.commentImages[*msg.comment]; side != nil && side.image != nil {
+				side.image.ready = side.image.columns == msg.columns && side.image.rows == msg.rows
+			}
+			m.rebuildContent()
+			m.updateCommentSidebar()
+			return m, nil
+		}
+		for i := range m.tabs {
+			if m.tabs[i].path != msg.path {
+				continue
+			}
+			img := m.tabs[i].imageSide(msg.before, msg.markdown).image
+			if img != nil && img.columns == msg.columns && img.rows == msg.rows {
+				img.ready = true
+			}
+		}
+		if len(m.tabs) > 0 && m.tab().state != nil {
+			m.rebuildContent()
+		}
+		return m, nil
+	case markdownImagesMsg:
+		for i := range m.tabs {
+			if m.tabs[i].path == msg.path {
+				m.tabs[i].markdownImages = msg.images
+			}
+		}
+		return m, nil
 	case tea.BackgroundColorMsg:
 		initAdaptiveStyles(msg.IsDark())
 		m.modalTextarea.SetStyles(textarea.DefaultStyles(msg.IsDark()))
@@ -746,6 +817,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.multiFile {
 			m.toggleWhitespace()
 		}
+		return m, nil
+	case key.Matches(msg, keys.Images):
+		m.toggleImages()
 		return m, nil
 
 	case key.Matches(msg, keys.FoldResolved):
@@ -2547,10 +2621,14 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 
 	header := m.renderHeader()
 
+	content := m.contentViewport.View()
+	if m.modal != noModal {
+		content = hideImagePlaceholders(content)
+	}
 	contentBox := lipgloss.NewStyle().
 		Width(m.contentViewport.Width()).
 		Height(m.contentViewport.Height()).
-		Render(m.contentViewport.View())
+		Render(content)
 	if m.hideComments {
 		contentBox = lipgloss.JoinHorizontal(lipgloss.Top, contentBox, m.renderCommentGutter())
 	}
@@ -2585,10 +2663,12 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		layout.finishButton, layout.hasFinishButton = buttonRect(header, 0, m.submitButton())
 	}
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
+	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
 
 	full := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
 	if m.modal != noModal {
+		full = hideImagePlaceholders(full)
 		underlyingModal := noModal
 		switch m.modal {
 		case discardChangesModal:
@@ -2784,6 +2864,11 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if rect, ok := m.footerHelpRect(); ok && rect.contains(mouse) {
 		m.helpOffset = 0
 		m.modal = helpModal
+		return m, nil
+	}
+	_, imageLayout := m.renderReviewScreen()
+	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
+		m.toggleImages()
 		return m, nil
 	}
 
@@ -3671,7 +3756,7 @@ func (m AppModel) renderFooter() string {
 	if row, ok := m.formRows[t.path][t.cursorLine]; ok && row.item != nil && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" {
 		items = append([]string{k("space", "answer")}, items...)
 	}
-	items = append([]string{m.footerHelpButton()}, items...)
+	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
 
 	return footerStyle.Width(m.width).Render(strings.Join(items, " · "))
 }
@@ -3738,7 +3823,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
 		{keys: "h/H", desc: "fold/hide"},
-		{keys: "w", desc: "ignore WS"},
+		{keys: "w / I", desc: "WS / images"},
 		{keys: "d", desc: "delete comment"},
 		{keys: "q/C-c", desc: "finish"},
 	}, columnWidth)

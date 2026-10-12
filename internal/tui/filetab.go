@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -19,18 +20,22 @@ type fileReview struct {
 
 // FileTab holds per-file state for a single tab in the code review TUI.
 type FileTab struct {
-	attachment    *review.AttachedDocument
-	path          string
-	status        string
-	doc           *document.Document
-	state         *fileReview
-	diff          *gitpkg.DiffInfo // original diff, retained when whitespace is ignored
-	changedLines  map[int]bool     // line numbers that are added/modified
-	inlineChanges map[int][]gitpkg.InlineSegment
-	deletedAfter  map[int][]gitpkg.DeletedLine // deleted lines keyed by new-file line they appear after
-	changeChunks  []changeChunk                // contiguous groups of changed lines
-	cursorLine    int                          // 1-based
-	cursorSide    string                       // "old" for deleted lines; empty means new side
+	preview               imagePreview
+	markdownImages        []markdownImage
+	markdownImagesPending bool
+	attachment            *review.AttachedDocument
+	path                  string
+	oldPath               string
+	status                string
+	doc                   *document.Document
+	state                 *fileReview
+	diff                  *gitpkg.DiffInfo // original diff, retained when whitespace is ignored
+	changedLines          map[int]bool     // line numbers that are added/modified
+	inlineChanges         map[int][]gitpkg.InlineSegment
+	deletedAfter          map[int][]gitpkg.DeletedLine // deleted lines keyed by new-file line they appear after
+	changeChunks          []changeChunk                // contiguous groups of changed lines
+	cursorLine            int                          // 1-based
+	cursorSide            string                       // "old" for deleted lines; empty means new side
 
 	// Visual selection mode
 	selecting    bool
@@ -87,7 +92,8 @@ func (ft *FileTab) ensureHighlightCache() {
 	if ft.doc == nil || ft.chromaLines != nil {
 		return
 	}
-	ft.isMarkdown = strings.HasSuffix(strings.ToLower(ft.path), ".md")
+	ext := strings.ToLower(filepath.Ext(ft.path))
+	ft.isMarkdown = ext == ".md" || ext == ".markdown"
 	if ft.isMarkdown {
 		return
 	}

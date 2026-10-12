@@ -44,6 +44,10 @@ Tabs, the file tree, and the file selector use `A` for new files and `D` for del
 
 File tabs follow the expanded file tree from top to bottom: directories come first, and names sort alphabetically within each directory.  Attached documents appear first in the attachments group.
 
+PNG, JPEG, GIF, and WebP files appear inline on Ghostty and Kitty terminals that support Unicode image placeholders.  Critty checks support automatically; other terminals keep the binary-file placeholder.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.
+
+Modified and renamed images show **Before** and **After** previews with their pixel sizes, side by side in a wide content pane and stacked in a narrow one.  Previews follow the selected review scope: staged images come from the index, committed comparisons from the selected commits, and deleted images from the old side.  GIF previews show the first frame.  Animated WebP, images larger than 5 MiB or 16 megapixels, and binary files in supplied diffs keep the placeholder.  File comments work as usual; previews scroll with them, fit the content pane after resizing, and hide while a dialog is open.
+
 ## Install
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
@@ -392,6 +396,8 @@ Critty finds the pane that ran the command from the process tree, even when the 
 
 ## Keybindings
 
+On supported terminals, local images referenced by `![]()` or `<img src>` in Markdown appear beneath their source line, before its comments.  Images on the same line sit side by side and wrap when needed.  Paths are relative to the document, or to an attached document's original location.  Git reviews use the image from the selected scope, including deleted lines; references must stay inside the repository.  Remote URLs are not fetched.  Press `I` or click **Images** in the footer to turn image previews off or on for the review.  Image display starts on when the terminal supports it.  Supplied diffs keep their text-only view.
+
 | Key                                   | Action                                   |
 |---------------------------------------|------------------------------------------|
 | `j` / `k`                             | Move down / up through current and deleted lines |
@@ -411,6 +417,7 @@ Critty finds the pane that ran the command from the process tree, even when the 
 | `{` / `}`                             | Jump to prev / next unresolved comment.  `}` on the last unresolved comment opens the finish dialog |
 | `h` / `H`                             | Fold all resolved threads / hide all comment boxes; press the same key again to return to normal |
 | `w`                                   | Toggle ignore whitespace across all files in code reviews |
+| `I`                                   | Toggle image previews, including local images in Markdown |
 | `r`                                   | Resolve / unresolve the focused comment in place |
 | `R`                                   | Resolve the focused comment and jump to the next unresolved thread, or open the finish dialog if none remain |
 | `d`                                   | Delete the selected comment after confirmation |
@@ -460,6 +467,8 @@ A reference without a line opens the file's tab.  When the file or line is not p
 The kill ring is shared across comment and reply dialogs for the TUI run and is independent of the system clipboard.  `alt` is the terminal's Meta modifier; configure your terminal to send Meta for these shortcuts.
 
 `ctrl+v` pastes an image when the clipboard holds one and text otherwise.  Image paste uses AppKit on macOS and needs `wl-paste` or `xclip` on Linux; over SSH it reads the remote host's clipboard.  Images are saved under the session's `attachments/` directory and referenced from the comment as Markdown, and they survive rounds and stop/resume.  With the default `cleanup_on_approve`, approval defers deletion until the agent has read them and runs the printed `critty clear --session <id>`.
+
+Local images in saved comments and replies also appear inline while image display is on.  Relative paths resolve from the review's working directory, `attachments/` paths from the session directory, and absolute paths are accepted, including outside the working directory.  These previews read current local files.  They appear in the inline thread and comment sidebar; scroll the thread to see images that do not fit.  Editing shows the Markdown text.  `I` toggles these previews together with document images.
 
 **Code review only:**
 

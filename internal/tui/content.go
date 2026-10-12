@@ -133,7 +133,15 @@ func (m *AppModel) rebuildContent() {
 	}
 	if t.isBinary || t.doc == nil {
 		if t.isBinary {
-			layout.appendBlock(&b, "\n  Binary file "+t.changeSummary()+" — cannot display content.", contentMouseTarget{})
+			if preview := m.renderImagePreview(); preview != "" {
+				layout.appendBlock(&b, "\n  Image "+t.changeSummary(), contentMouseTarget{})
+				layout.appendBlock(&b, preview, contentMouseTarget{})
+			} else {
+				layout.appendBlock(&b, "\n  Binary file "+t.changeSummary()+" — cannot display content.", contentMouseTarget{})
+				if t.preview.before.failed || t.preview.after.failed {
+					layout.appendBlock(&b, "  Image preview unavailable (unsupported, damaged, or too large).", contentMouseTarget{})
+				}
+			}
 		} else if t.outsideChanges {
 			layout.appendBlock(&b, "\n  Added file removed — no longer part of the changes.", contentMouseTarget{})
 		}
@@ -189,6 +197,9 @@ func (m *AppModel) rebuildContent() {
 				} else {
 					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, content), target)
 				}
+			}
+			if images := m.renderMarkdownImages(del.OldLineNum, true); images != "" {
+				layout.appendBlock(&b, images, target)
 			}
 			for idx, ann := range oldAnnosByEndLine[del.OldLineNum] {
 				if m.hideComments && !ann.drifted {
@@ -355,6 +366,9 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		// Render inline annotations after this line
+		if images := m.renderMarkdownImages(lineNum, false); images != "" {
+			layout.appendBlock(&b, images, lineTarget)
+		}
 		if anns, ok := annosByEndLine[lineNum]; ok {
 			for idx, ann := range anns {
 				if m.hideComments && !ann.drifted {
