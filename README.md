@@ -17,12 +17,15 @@ Your agent writes code or a plan, you review it in the TUI, and the agent reads 
 
 <video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
 
+[More videos and screenshots](#gallery).
+
 ## Key Features
 
 - **Review in the terminal** — read plans, documents, and multi-file diffs with syntax highlighting, and comment on a line, a range, a deleted line, or a whole file.
 - **Round trips with your agent** — the agent opens the review in a Herdr tab or a tmux split, waits for you to submit, reads your comments, and comes back with the next round.  `critty install` sets this up for Claude Code, Codex, OpenCode, and Gemini CLI.
 - **Any change set** — staged, unstaged, or committed ranges such as `main...`, supplied diffs from `git diff | critty --diff`, single documents, and versioned plans that carry comment threads across revisions.
 - **Attached documents and forms** — review notices, commit messages, and approval notes alongside code or on their own, even outside a Git repository.  Answer checkboxes and choices, require confirmations, and export explicit operation permissions with the reviewed content.
+- **Inline image previews** — compare image changes side by side and view local images in Markdown and comments on supported terminals.  [See an image review](#reviewing-an-image-replacement).
 - **Comments made for code review** — replies, resolve and reopen, GitHub-style suggestions, clipboard images, `@path L40` and comment-ID references, and editing in `$EDITOR`.  Multi-line comments follow insertions and deletions within the selected range across review rounds.
 - **Fast navigation** — start at a file or line with `--focus`, use a file tree sidebar or fuzzy file switching, search the current file incrementally with `/` / `?`, move with `n` / `N` across changes and open threads, ignore whitespace in diffs, and hide comments with `H` while reading.
 - **Mouse and keyboard** — vim-style keys throughout, plus clickable tabs, lines, threads, and buttons, gutter drag to select ranges, and wheel scrolling.
@@ -44,9 +47,9 @@ Tabs, the file tree, and the file selector use `A` for new files and `D` for del
 
 File tabs follow the expanded file tree from top to bottom: directories come first, and names sort alphabetically within each directory.  Attached documents appear first in the attachments group.
 
-PNG, JPEG, GIF, and WebP files appear inline on Ghostty and Kitty terminals that support Unicode image placeholders.  Critty checks support automatically; other terminals keep the binary-file placeholder.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.
+PNG, JPEG, GIF, and WebP files appear inline on terminals that support Kitty Unicode image placeholders, including Ghostty, Kitty, and iTerm2.  Critty checks support automatically; other terminals keep the binary-file placeholder.  In tmux, enable forwarding with `tmux set -g allow-passthrough on`.
 
-Modified and renamed images show **Before** and **After** previews with their pixel sizes, side by side in a wide content pane and stacked in a narrow one.  Previews follow the selected review scope: staged images come from the index, committed comparisons from the selected commits, and deleted images from the old side.  GIF previews show the first frame.  Animated WebP, images larger than 5 MiB or 16 megapixels, and binary files in supplied diffs keep the placeholder.  File comments work as usual; previews scroll with them, fit the content pane after resizing, and hide while a dialog is open.
+Modified and renamed images show **Before** and **After** previews with their pixel sizes, side by side in a wide content pane and stacked in a narrow one.  Previews follow the selected review scope: staged images come from the index, committed comparisons from the selected commits, and deleted images from the old side.  GIF previews show the first frame.  Animated WebP, images larger than 5 MiB or 16 megapixels, and binary files in supplied diffs keep the placeholder.  File comments work as usual; previews scroll with them, fit the content pane after resizing, and hide while a dialog is open.  [See Before and After previews](#reviewing-an-image-replacement).
 
 ## Install
 
@@ -186,17 +189,9 @@ For external actions, add a policy such as this instead of copying the approval 
 Before publishing a PR or issue, use the critty-approval skill to review the exact destination and final text.  Keep drafts in our project scratch directory.  Execute only the actions authorized by the matching human result, then report their URLs.
 ```
 
-With the review-and-commit policy in place, an implementation request is all it takes.  The recordings below show the commit message attached to the code review.  The reviewer sends the code back with an inline comment, asks for a shorter message, and resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
+With the review-and-commit policy in place, an implementation request is all it takes.  Watch the [Claude Code](#review-round-trips-with-claude-code) and [Codex](#review-round-trips-with-codex) examples in the Gallery: the reviewer comments on the code and attached commit message, then resolves the last thread with `R` to open the approval dialog.  The agent commits with the reviewed message.
 
-In the second round, select the message body from line 3 with `v` and press Enter to comment on the whole paragraph.
-
-**Claude Code**
-
-<video controls src="https://github.com/user-attachments/assets/a8c68b3f-e569-4290-b314-0923f3572dd6"></video>
-
-**Codex**
-
-<video controls src="https://github.com/user-attachments/assets/9927c5f6-c7a6-4190-90dd-b20fef75f1e1"></video>
+In those recordings, the reviewer selects the message body from line 3 with `v` in the second round and presses Enter to comment on the whole paragraph.
 
 ## Requirements
 
@@ -348,7 +343,7 @@ Resuming with `critty --session <id>` uses the saved document snapshots.  To rev
 
 ### Interactive forms
 
-In attached Markdown (`.md` or `.markdown`), press `Space` on a task-list item or click its checkbox or label to answer.  Wrapped labels are clickable through the end of their text; trailing whitespace is not.  `Enter` still opens a comment.  Code examples, quoted lists, and checkboxes in working files or the main document are display-only.  Answers are saved separately; the source document stays unchanged.
+In attached Markdown (`.md` or `.markdown`), press `Space` on a task-list item or click its checkbox or label to answer.  Wrapped labels are clickable through the end of their text; trailing whitespace is not.  `Enter` still opens a comment.  Code examples, quoted lists, and checkboxes in working files or the main document are display-only.  Answers are saved separately; the source document stays unchanged.  [See an attached checklist with an inline image](#attached-checklist-with-an-inline-image).
 
 ```markdown
 - [ ] Send a copy of the report
@@ -396,7 +391,7 @@ Critty finds the pane that ran the command from the process tree, even when the 
 
 ## Keybindings
 
-On supported terminals, local images referenced by `![]()` or `<img src>` in Markdown appear beneath their source line, before its comments.  Images on the same line sit side by side and wrap when needed.  Paths are relative to the document, or to an attached document's original location.  Git reviews use the image from the selected scope, including deleted lines; references must stay inside the repository.  Remote URLs are not fetched.  Press `I` or click **Images** in the footer to turn image previews off or on for the review.  Image display starts on when the terminal supports it.  Supplied diffs keep their text-only view.
+On supported terminals, local images referenced by `![]()` or `<img src>` in Markdown appear beneath their source line, before its comments.  Images on the same line sit side by side and wrap when needed.  Paths are relative to the document, or to an attached document's original location.  Git reviews use the image from the selected scope, including deleted lines; references must stay inside the repository.  Remote URLs are not fetched.  Press `I` or click **Images** in the footer to turn image previews off or on for the review.  Image display starts on when the terminal supports it.  Supplied diffs keep their text-only view.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
 
 | Key                                   | Action                                   |
 |---------------------------------------|------------------------------------------|
@@ -429,7 +424,7 @@ Ignore whitespace (`w`) hides changes in spaces and tabs within a line, includin
 
 **Incremental search:** `/` or `ctrl+s` searches the current file forward as you type, and `?` or `ctrl+r` backward, as in Emacs.  Type a regular expression at the prompt on the bottom line; matches stay within a line and ignore case unless the query contains an uppercase letter.  Each edit searches again from where the search started, and `ctrl+s` / `ctrl+r` move to the next or previous match.  When no match remains in that direction, the prompt shows "Failing"; press the key again to wrap around.  Visible matches are highlighted, the current one in orange.  `enter` ends the search at the match, `esc`, `ctrl+g`, or `ctrl+c` returns to where it started, and any other key ends the search and acts as usual.  `ctrl+s` or `ctrl+r` on an empty query searches for the previous query.  `ctrl+d` adds the character after the current match to the query, and `ctrl+w` adds the word after it, or one character where no word follows; words are runs of letters and digits in scripts written with spaces, so CJKV ideographs and kana are added one character at a time.  `backspace` removes the last typed or added piece.
 
-You can also click Search in the top bar, then use Prev, Next, Keep, and Cancel below the search prompt.  Case and Files buttons show and toggle case folding and the search scope.  Clicking elsewhere ends the search at its current match and performs the clicked action.
+[See incremental search in the Gallery](#incremental-search).  You can also click Search in the top bar, then use Prev, Next, Keep, and Cancel below the search prompt.  Case and Files buttons show and toggle case folding and the search scope.  Clicking elsewhere ends the search at its current match and performs the clicked action.
 
 Paste text into the search prompt with your terminal's paste command, or use `ctrl+y` to paste the newest kill-ring entry from the comment editor or copied references.  Pasted text follows the current search mode; in regexp mode, metacharacters remain active.  Line breaks and tabs become spaces, and `backspace` removes the whole pasted piece.  The terminal cursor follows the input for IME candidate placement, and long queries scroll to keep the input end visible.  Keyboard Help (`alt+?`) has an Incremental search section; scroll with arrows, Page Up/Down, `ctrl+u` / `ctrl+d`, the mouse wheel, or its Up/Down buttons.
 
@@ -538,6 +533,32 @@ critty completion zsh > "${fpath[1]}/_critty"
 # Fish
 critty completion fish > ~/.config/fish/completions/critty.fish
 ```
+
+## Gallery
+
+### Code review with inline comments
+
+<video controls src="https://github.com/user-attachments/assets/0942656f-1192-455c-a29c-6af171c7138d"></video>
+
+### Review round trips with Claude Code
+
+<video controls src="https://github.com/user-attachments/assets/a8c68b3f-e569-4290-b314-0923f3572dd6"></video>
+
+### Review round trips with Codex
+
+<video controls src="https://github.com/user-attachments/assets/9927c5f6-c7a6-4190-90dd-b20fef75f1e1"></video>
+
+### Reviewing an image replacement
+
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/664a9bee-4d88-4467-8326-8360da97a078)
+
+### Attached checklist with an inline image
+
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/94076412-3b6d-47e0-a885-dee636686925)
+
+### Incremental search
+
+![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/bfd140a0-3631-4b61-a6b0-ea690ffafd7f)
 
 ## Development
 
