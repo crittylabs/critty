@@ -177,12 +177,12 @@ func TestMouseClickCommentModalSave(t *testing.T) {
 	app.modalTextarea.SetValue("mouse comment")
 	for _, region := range app.modalMouseRegions() {
 		if region.action.focus == 1 {
-			assertRegionContainsRenderedText(t, app, region.rect, "Save ctrl+s")
+			assertRegionContainsRenderedText(t, app, region.rect, "Save C-s")
 			break
 		}
 	}
 
-	app = clickModalAction(t, app, "Save ctrl+s")
+	app = clickModalAction(t, app, "Save C-s")
 
 	if app.modal != noModal || len(app.tab().state.Comments) != 1 || app.tab().state.Comments[0].Body != "mouse comment" {
 		t.Fatalf("modal = %v, comments = %+v; want saved mouse comment", app.modal, app.tab().state.Comments)
@@ -230,7 +230,7 @@ func TestRenderModalButtonSeparatesShortcutKeys(t *testing.T) {
 		want    string
 	}{
 		{name: "focused", label: "Approve", hint: "y", focused: true, want: " Approve y"},
-		{name: "multiple shortcuts", label: "Keep Editing", hint: "n / esc", want: " Keep Editing n / esc"},
+		{name: "multiple shortcuts", label: "Keep Editing", hint: "n / esc", want: " Keep Editing n / ESC"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -330,11 +330,11 @@ func TestMouseClickCommentModalSuggest(t *testing.T) {
 	app.tabs[0].cursorLine = 1
 	app.openLineComment()
 	view := app.View().Content
-	if !strings.Contains(view, "Suggest") || !strings.Contains(view, "alt+s") {
+	if !strings.Contains(view, "Suggest") || !strings.Contains(view, "M-s") {
 		t.Fatalf("missing suggestion button or shortcut: %q", view)
 	}
 
-	app = clickModalAction(t, app, "Suggest alt+s")
+	app = clickModalAction(t, app, "Suggest M-s")
 
 	if got := app.modalTextarea.Value(); !strings.Contains(got, "```suggestion\nfirst\n```") {
 		t.Fatalf("textarea = %q, want suggestion block", got)
@@ -347,7 +347,7 @@ func TestMouseClickCommentModalClose(t *testing.T) {
 	app.contentViewport.SetWidth(75)
 	app.openLineComment()
 
-	app = clickModalAction(t, app, "Close esc")
+	app = clickModalAction(t, app, "Close ESC")
 
 	if app.modal != noModal {
 		t.Fatalf("modal = %v, want closed", app.modal)
@@ -362,7 +362,7 @@ func TestMouseClickDirtyCommentModalCloseConfirmsDiscard(t *testing.T) {
 	app.openLineComment()
 	app.modalTextarea.SetValue("unsaved comment")
 
-	app = clickModalAction(t, app, "Close esc")
+	app = clickModalAction(t, app, "Close ESC")
 
 	if app.modal != discardChangesModal || app.discardReturn != commentModal {
 		t.Fatalf("modal = %v, return = %v; want discard confirmation for comment", app.modal, app.discardReturn)
@@ -375,17 +375,17 @@ func TestMouseClickDirtyCommentModalCloseConfirmsDiscard(t *testing.T) {
 		case 0:
 			assertRegionContainsRenderedText(t, app, region.rect, "Discard y")
 		case 1:
-			assertRegionContainsRenderedText(t, app, region.rect, "Keep Editing n / esc")
+			assertRegionContainsRenderedText(t, app, region.rect, "Keep Editing n / ESC")
 		}
 	}
 
-	app = clickModalAction(t, app, "Keep Editing n / esc")
+	app = clickModalAction(t, app, "Keep Editing n / ESC")
 	if app.modal != commentModal || app.modalTextarea.Value() != "unsaved comment" || !app.modalTextarea.Focused() {
 		t.Fatalf("modal = %v, textarea = %q, focused = %t; want resumed editing",
 			app.modal, app.modalTextarea.Value(), app.modalTextarea.Focused())
 	}
 
-	app = clickModalAction(t, app, "Close esc")
+	app = clickModalAction(t, app, "Close ESC")
 	app = clickModalAction(t, app, "Discard y")
 	if app.modal != noModal || app.modalTextarea.Value() != "" {
 		t.Fatalf("modal = %v, textarea = %q; want discarded and closed", app.modal, app.modalTextarea.Value())
@@ -422,7 +422,7 @@ func TestMouseClickDirtyEditModalCloseConfirmsDiscard(t *testing.T) {
 	app.openCommentThread(comment.ID)
 	app.modalTextarea.SetValue("changed")
 
-	app = clickModalAction(t, app, "Close esc")
+	app = clickModalAction(t, app, "Close ESC")
 	if app.modal != discardChangesModal || app.discardReturn != editModal {
 		t.Fatalf("modal = %v, return = %v; want discard confirmation for edit", app.modal, app.discardReturn)
 	}
@@ -445,7 +445,7 @@ func TestMouseClickUnchangedEditModalCloseDoesNotConfirm(t *testing.T) {
 	app.tabs[0].state.Comments = []review.Comment{comment}
 	app.openCommentThread(comment.ID)
 
-	app = clickModalAction(t, app, "Close esc")
+	app = clickModalAction(t, app, "Close ESC")
 
 	if app.modal != noModal {
 		t.Fatalf("modal = %v, want unchanged edit to close directly", app.modal)
@@ -472,11 +472,11 @@ func TestMouseClickCommentModalDelete(t *testing.T) {
 		case 0:
 			assertRegionContainsRenderedText(t, app, region.rect, "Delete y")
 		case 1:
-			assertRegionContainsRenderedText(t, app, region.rect, "Keep n / esc")
+			assertRegionContainsRenderedText(t, app, region.rect, "Keep n / ESC")
 		}
 	}
 
-	app = clickModalAction(t, app, "Keep n / esc")
+	app = clickModalAction(t, app, "Keep n / ESC")
 	if app.modal != editModal || len(app.tab().state.Comments) != 1 {
 		t.Fatalf("modal = %v, comments = %+v; want edit resumed", app.modal, app.tab().state.Comments)
 	}
@@ -546,7 +546,7 @@ func TestAddCommentModalKeepsFullContextScrollable(t *testing.T) {
 	if strings.Contains(plainRendered, "more lines") {
 		t.Fatal("add comment context is summarized instead of scrollable")
 	}
-	for _, action := range []string{"Save ctrl+s", "Close esc", "Suggest alt+s"} {
+	for _, action := range []string{"Save C-s", "Close ESC", "Suggest M-s"} {
 		if !strings.Contains(plainRendered, action) {
 			t.Fatalf("add comment modal does not show %q", action)
 		}
@@ -846,7 +846,7 @@ func TestEditReplyModalKeepsDeleteButtonVisibleWithLongThread(t *testing.T) {
 	const displayHeight = 24
 	background := lipgloss.NewStyle().Width(app.width).Height(displayHeight).Render("")
 	staleHeightRendered, _ := app.renderWithModalLayout(background)
-	for _, action := range []string{"Save ctrl+s", "Close esc", "Suggest alt+s", "Delete reply"} {
+	for _, action := range []string{"Save C-s", "Close ESC", "Suggest M-s", "Delete reply"} {
 		if !strings.Contains(ansi.Strip(staleHeightRendered), action) {
 			t.Fatalf("modal using display height does not show %q", action)
 		}
@@ -858,7 +858,7 @@ func TestEditReplyModalKeepsDeleteButtonVisibleWithLongThread(t *testing.T) {
 		t.Fatalf("modal height = %d, display height = %d", height, displayHeight)
 	}
 	plainRendered := ansi.Strip(rendered)
-	for _, action := range []string{"Save ctrl+s", "Close esc", "Suggest alt+s", "Delete reply"} {
+	for _, action := range []string{"Save C-s", "Close ESC", "Suggest M-s", "Delete reply"} {
 		if !strings.Contains(plainRendered, action) {
 			t.Fatalf("modal does not show %q", action)
 		}

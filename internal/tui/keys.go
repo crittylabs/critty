@@ -1,6 +1,16 @@
 package tui
 
-import "charm.land/bubbles/v2/key"
+import (
+	"strings"
+
+	"charm.land/bubbles/v2/key"
+)
+
+// keyHintNames formats static shortcut hints without changing event names.
+var keyHintNames = strings.NewReplacer(
+	"ctrl+", "C-", "alt+", "M-", "shift+", "S-",
+	"backspace", "DEL", "enter", "RET", "esc", "ESC", "space", "SPC", "tab", "TAB",
+)
 
 type keyMap struct {
 	Quit             key.Binding
@@ -38,19 +48,19 @@ var keys = keyMap{
 	Tab:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "toggle sidebar")),
 	Up:               key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
 	Down:             key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
-	HalfPageUp:       key.NewBinding(key.WithKeys("ctrl+u", "shift+up", "pgup"), key.WithHelp("shift+up", "half page up")),
-	HalfPageDown:     key.NewBinding(key.WithKeys("ctrl+d", "shift+down", "pgdown"), key.WithHelp("shift+down", "half page down")),
+	HalfPageUp:       key.NewBinding(key.WithKeys("ctrl+u", "shift+up", "pgup"), key.WithHelp("S-up", "half page up")),
+	HalfPageDown:     key.NewBinding(key.WithKeys("ctrl+d", "shift+down", "pgdown"), key.WithHelp("S-down", "half page down")),
 	Top:              key.NewBinding(key.WithKeys("g", "home", "<"), key.WithHelp("<", "file top")),
 	Bottom:           key.NewBinding(key.WithKeys("G", "end", ">"), key.WithHelp(">", "file bottom")),
 	NextUnresolved:   key.NewBinding(key.WithKeys("}"), key.WithHelp("}", "next unresolved comment")),
 	PrevUnresolved:   key.NewBinding(key.WithKeys("{"), key.WithHelp("{", "prev unresolved comment")),
 	NextComment:      key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "next comment")),
 	PrevComment:      key.NewBinding(key.WithKeys("["), key.WithHelp("[", "prev comment")),
-	Cancel:           key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
-	Confirm:          key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "confirm")),
+	Cancel:           key.NewBinding(key.WithKeys("esc"), key.WithHelp("ESC", "cancel")),
+	Confirm:          key.NewBinding(key.WithKeys("enter"), key.WithHelp("RET", "confirm")),
 	VisualMode:       key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "select lines")),
-	PrevTab:          key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev tab")),
-	NextTab:          key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next tab")),
+	PrevTab:          key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("S-TAB", "prev tab")),
+	NextTab:          key.NewBinding(key.WithKeys("tab"), key.WithHelp("TAB", "next tab")),
 	NextChange:       key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next change/open comment")),
 	PrevChange:       key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev change/open comment")),
 	Resolve:          key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resolve/unresolve")),
@@ -60,6 +70,6 @@ var keys = keyMap{
 	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),
-	Help:             key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
+	Help:             key.NewBinding(key.WithKeys("alt+?"), key.WithHelp("M-?", "help")),
 	FileTree:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "switch sidebar view")),
 }

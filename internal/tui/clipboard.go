@@ -21,7 +21,7 @@ func (m *AppModel) pasteClipboardImage() tea.Cmd {
 	m.clipboardID++
 	id := m.clipboardID
 	m.clipboardPending = true
-	m.clipboardStatus = "Reading clipboard image… (esc to cancel)"
+	m.clipboardStatus = "Reading clipboard image… (ESC to cancel)"
 	return func() tea.Msg {
 		data, err := clipboard.ReadImage()
 		msg := clipboardImageMsg{id: id, data: data, err: err}

@@ -177,7 +177,8 @@ func (m *AppModel) rebuildContent() {
 			if di < len(cachedHL) {
 				cached = cachedHL[di]
 			}
-			for wi, content := range deletedDisplayLines(del.Content, cached, del.Inline, isMarkdown, textWidth) {
+			decorate := m.isearchDecorator(lineRef{side: "old", line: del.OldLineNum})
+			for wi, content := range deletedDisplayLines(del.Content, cached, del.Inline, isMarkdown, textWidth, decorate) {
 				if isSelected {
 					content = inlineBackground(selectedLineBg, ansi.Strip(content))
 				} else if isSidebarHighlight {
@@ -218,6 +219,13 @@ func (m *AppModel) rebuildContent() {
 		isSidebarHighlight := sidebarHighlightSide == "" && sidebarHighlightStart > 0 && lineNum >= sidebarHighlightStart && lineNum <= sidebarHighlightEnd
 		isChanged := t.changedLines != nil && t.changedLines[lineNum]
 		inlineChanges := t.inlineChanges[lineNum]
+		decorate := m.isearchDecorator(lineRef{line: lineNum})
+		highlight := func(s string) string {
+			if decorate != nil {
+				s, _ = decorate(s)
+			}
+			return s
+		}
 
 		// Marker column
 		var marker string
@@ -253,7 +261,7 @@ func (m *AppModel) rebuildContent() {
 
 		// Check if this line is part of a table block
 		if len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight {
-			for wi, styledLine := range inlineDiffDisplayLines(inlineChanges, isMarkdown, textWidth, diffCommonTextBg, diffAddedTextBg) {
+			for wi, styledLine := range inlineDiffDisplayLines(inlineChanges, isMarkdown, textWidth, diffCommonTextBg, diffAddedTextBg, decorate) {
 				if wi == 0 {
 					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, styledLine), lineTarget)
 				} else {
@@ -277,7 +285,7 @@ func (m *AppModel) rebuildContent() {
 				styledLine = inlineBackground(diffChangedLineBg, styledLine)
 			}
 
-			wrappedLines := strings.Split(lipgloss.Wrap(expandDisplayTabs(styledLine), textWidth, ""), "\n")
+			wrappedLines := strings.Split(lipgloss.Wrap(highlight(expandDisplayTabs(styledLine)), textWidth, ""), "\n")
 			for wi, wrappedLine := range wrappedLines {
 				if wi == 0 {
 					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
@@ -291,7 +299,7 @@ func (m *AppModel) rebuildContent() {
 			} else if isSidebarHighlight {
 				formLine = inlineBackground(sidebarHighlightBg, formLine)
 			}
-			for wi, row := range strings.Split(lipgloss.Wrap(formLine, textWidth, ""), "\n") {
+			for wi, row := range strings.Split(lipgloss.Wrap(highlight(formLine), textWidth, ""), "\n") {
 				if checkboxX >= 0 {
 					plain := ansi.Strip(row)
 					start := lipgloss.Width(plain[:len(plain)-len(strings.TrimLeft(plain, " \t"))])
@@ -317,6 +325,14 @@ func (m *AppModel) rebuildContent() {
 			styleFunc := func(s string) string { return s }
 			if isMarkdown {
 				styleFunc = func(s string) string { return highlightMarkdown(s) }
+			}
+			// Highlight search matches in the styled line before wrapping, so a
+			// matched Markdown line is styled whole instead of row by row.
+			if decorate != nil {
+				if decorated, ok := decorate(styleFunc(displayLine)); ok {
+					displayLine = decorated
+					styleFunc = func(s string) string { return s }
+				}
 			}
 			if isSelected {
 				styleFunc = func(s string) string { return inlineBackground(selectedLineBg, s) }
@@ -602,7 +618,9 @@ func inlineBackground(style lipgloss.Style, content string) string {
 	return bgAnsi + patched.String() + "\033[0m"
 }
 
-func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, width int, base, changed lipgloss.Style) []string {
+// inlineDiffDisplayLines renders an inline diff wrapped to width.  decorate,
+// when not nil, highlights search matches before wrapping.
+func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, width int, base, changed lipgloss.Style, decorate func(string) (string, bool)) []string {
 	var b strings.Builder
 	for _, segment := range segments {
 		content := segment.Content
@@ -615,18 +633,35 @@ func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, wi
 		}
 		b.WriteString(inlineBackground(style, content))
 	}
-	return strings.Split(lipgloss.Wrap(expandDisplayTabs(b.String()), width, ""), "\n")
+	line := expandDisplayTabs(b.String())
+	if decorate != nil {
+		line, _ = decorate(line)
+	}
+	return strings.Split(lipgloss.Wrap(line, width, ""), "\n")
 }
 
-func deletedDisplayLines(content, cached string, inline []gitpkg.InlineSegment, isMarkdown bool, width int) []string {
+func deletedDisplayLines(content, cached string, inline []gitpkg.InlineSegment, isMarkdown bool, width int, decorate func(string) (string, bool)) []string {
 	if len(inline) > 0 {
-		return inlineDiffDisplayLines(inline, isMarkdown, width, diffCommonTextBg, diffDeletedTextBg)
+		return inlineDiffDisplayLines(inline, isMarkdown, width, diffCommonTextBg, diffDeletedTextBg, decorate)
 	}
-	display := content
+	display := expandDisplayTabs(content)
 	if cached != "" {
-		display = cached
+		display = expandDisplayTabs(cached)
 	}
-	lines := strings.Split(lipgloss.Wrap(expandDisplayTabs(display), width, ""), "\n")
+	if decorate != nil {
+		styled := display
+		if isMarkdown {
+			styled = highlightMarkdown(styled)
+		}
+		if decorated, ok := decorate(styled); ok {
+			lines := strings.Split(lipgloss.Wrap(decorated, width, ""), "\n")
+			for i := range lines {
+				lines[i] = inlineBackground(diffDeletedLineBg, lines[i])
+			}
+			return lines
+		}
+	}
+	lines := strings.Split(lipgloss.Wrap(display, width, ""), "\n")
 	for i := range lines {
 		if isMarkdown {
 			lines[i] = highlightMarkdown(lines[i])

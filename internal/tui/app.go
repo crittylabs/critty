@@ -140,6 +140,7 @@ type AppModel struct {
 	modalOpenedAt        time.Time
 	modalOpeningClick    tea.Mouse
 	modalReferenceOffset int
+	helpOffset           int
 	discardReturn        modalType
 	deleteReturn         modalType
 	pendingDelete        int
@@ -149,6 +150,7 @@ type AppModel struct {
 	lineInput            textinput.Model
 	pendingLocation      sourceLocation
 	locationError        string
+	isearch              isearchState
 
 	err error
 }
@@ -201,6 +203,8 @@ type renderedScreenLayout struct {
 	footerHelp      mouseRect
 	hasFooterHelp   bool
 	modalRegions    []modalMouseRegion
+	isearchCursor   *tea.Cursor
+	isearchRegions  []isearchMouseRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -539,6 +543,12 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseClickMsg:
 		m.killRing.interrupt()
+		if m.handleISearchMouse(msg.Mouse()) {
+			return m, nil
+		}
+		if m.isearch.active && m.modal == noModal && msg.Mouse().Button == tea.MouseLeft {
+			m.exitISearch(false)
+		}
 		return m.handleMouseClick(msg)
 	case tea.MouseMotionMsg:
 		m.killRing.interrupt()
@@ -556,6 +566,12 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.killRing.interrupt()
 		}
 		return m.handleKeyPress(msg)
+	case tea.PasteMsg:
+		if m.isearch.active && m.modal == noModal {
+			m.killRing.interrupt()
+			m.isearchPaste(msg.Content)
+			return m, nil
+		}
 	}
 
 	var cmd tea.Cmd
@@ -619,6 +635,21 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.modal == helpModal {
 		if key.Matches(msg, keys.Help) || key.Matches(msg, keys.Cancel) {
 			m.modal = noModal
+		} else {
+			switch msg.String() {
+			case "up", "k":
+				m.scrollHelp(-1)
+			case "down", "j":
+				m.scrollHelp(1)
+			case "pgup", "ctrl+u":
+				m.scrollHelp(-max(1, m.height/2))
+			case "pgdown", "ctrl+d":
+				m.scrollHelp(max(1, m.height/2))
+			case "home", "g":
+				m.helpOffset = 0
+			case "end", "G":
+				m.scrollHelp(len(strings.Split(m.renderHelp(m.modalInnerWidth()), "\n")))
+			}
 		}
 		return m, nil
 	}
@@ -643,6 +674,16 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	t := m.tab()
+	if m.isearch.active && m.handleISearchKey(msg) {
+		return m, nil
+	}
+	switch msg.String() {
+	case "ctrl+s", "/", "ctrl+r", "?":
+		if t.doc != nil {
+			m.startISearch(msg.String() == "ctrl+s" || msg.String() == "/")
+			return m, nil
+		}
+	}
 	if msg.String() == "space" || msg.String() == " " {
 		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
 			return m, nil
@@ -697,6 +738,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, keys.Help):
+		m.helpOffset = 0
 		m.modal = helpModal
 		return m, nil
 
@@ -1716,6 +1758,7 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) openFinishModal() {
 	m.persist()
+	m.recalculateLayout()
 	m.modal = finishModal
 	m.modalFocus = 0
 	m.modalReferenceOffset = 0
@@ -2157,7 +2200,7 @@ func (m *AppModel) updateCommentSidebar() {
 	var b strings.Builder
 
 	if len(t.sidebarItems) == 0 {
-		message := "No comments yet.\n\nPress enter for a line comment,\nor 'f' for a file comment."
+		message := "No comments yet.\n\nPress RET for a line comment,\nor 'f' for a file comment."
 		if len(t.state.Comments) > 0 {
 			message = "All comments resolved."
 		}
@@ -2364,6 +2407,9 @@ func (m AppModel) renderReviewBar() string {
 	text += reviewBarStyle.Render(subject)
 	button := m.submitButton()
 	right := button + reviewBarStyle.Render(" ")
+	if search := m.searchButton(); search != "" {
+		right = search + reviewBarStyle.Render(" ") + right
+	}
 	if m.ignoreWhitespace {
 		right = reviewBarStyle.Render("[WS: ignored] ") + right
 	}
@@ -2445,7 +2491,7 @@ func (m AppModel) View() tea.View {
 	if m.err != nil {
 		hint := "Press q to quit."
 		if m.finishSaveFailed {
-			hint = "Enter: retry saving · esc: return to review · q: quit without finishing"
+			hint = "RET: retry saving · ESC: return to review · q: quit without finishing"
 		}
 		v := tea.NewView(fmt.Sprintf("Error: %v\n\n%s", m.err, hint))
 		v.AltScreen = true
@@ -2469,6 +2515,9 @@ func (m AppModel) View() tea.View {
 	v := tea.NewView(full)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
+	if c := layout.isearchCursor; c != nil && c.X >= 0 && c.X < m.width && c.Y >= 0 && c.Y < m.height {
+		v.Cursor = c
+	}
 	cursor := m.modalTextarea.Cursor()
 	switch m.modal {
 	case gotoLineModal:
@@ -2520,6 +2569,18 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		sections = append(sections, footer)
 	}
 	layout := renderedScreenLayout{}
+	if rect, ok := buttonRect(header, 0, m.searchButton()); ok && m.searchButton() != "" {
+		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
+	}
+	if m.isearch.active && m.modal == noModal {
+		_, x := m.isearchPrompt()
+		layout.isearchCursor = tea.NewCursor(x, footerTop)
+		_, regions := m.isearchControls(footerTop + 1)
+		layout.isearchRegions = append(layout.isearchRegions, regions...)
+		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{
+			rect: mouseRect{left: 0, right: m.width, top: footerTop, bottom: footerTop + 1}, action: isearchInput,
+		})
+	}
 	if !t.selecting {
 		layout.finishButton, layout.hasFinishButton = buttonRect(header, 0, m.submitButton())
 	}
@@ -2683,6 +2744,15 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal == fileSelectModal {
 		return m.handleFileSelectMouse(mouse)
 	}
+	if m.modal == helpModal {
+		for _, region := range m.modalMouseRegions() {
+			if region.action.scrollable && region.rect.contains(mouse) {
+				m.scrollHelp(region.action.scrollOffset)
+				break
+			}
+		}
+		return m, nil
+	}
 	if m.isTextModal() {
 		return m.handleTextModalMouse(mouse)
 	}
@@ -2712,6 +2782,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	if rect, ok := m.footerHelpRect(); ok && rect.contains(mouse) {
+		m.helpOffset = 0
 		m.modal = helpModal
 		return m, nil
 	}
@@ -3384,6 +3455,15 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	if m.isTextModal() {
 		return m.handleTextModalWheel(msg.Mouse())
 	}
+	if m.modal == helpModal {
+		switch msg.Mouse().Button {
+		case tea.MouseWheelUp:
+			m.scrollHelp(-3)
+		case tea.MouseWheelDown:
+			m.scrollHelp(3)
+		}
+		return m, nil
+	}
 	if m.modal == finishModal {
 		if msg.Mouse().Button == tea.MouseWheelUp {
 			m.modalReferenceOffset = max(0, m.modalReferenceOffset-3)
@@ -3537,6 +3617,10 @@ const footerMinHeight = 22
 // renderFooter renders the key hints and the Help button, or "" when the
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
+	if m.isearch.active {
+		controls, _ := m.isearchControls(0)
+		return m.renderISearchPrompt() + "\n" + controls
+	}
 	if m.locationError != "" {
 		return footerStyle.Width(m.width).Render(m.locationError)
 	}
@@ -3545,7 +3629,7 @@ func (m AppModel) renderFooter() string {
 	}
 	t := m.tabs[m.activeTab]
 	k := func(key, desc string) string {
-		return footerKeyStyle.Render(key) + " " + footerDescStyle.Render(desc)
+		return footerKeyStyle.Render(keyHintNames.Replace(key)) + " " + footerDescStyle.Render(desc)
 	}
 
 	var items []string
@@ -3593,7 +3677,7 @@ func (m AppModel) renderFooter() string {
 }
 
 func (m AppModel) footerHelpButton() string {
-	return renderBarButton("Help", "?")
+	return renderBarButton("Help", "M-?")
 }
 
 // buttonRect locates a rendered button in a block that starts at screen row
@@ -3623,7 +3707,7 @@ func renderHelpGroup(title string, items []helpItem, width int) string {
 	}
 	keyWidth := 0
 	for _, item := range items {
-		if w := lipgloss.Width(item.keys); w > keyWidth {
+		if w := lipgloss.Width(keyHintNames.Replace(item.keys)); w > keyWidth {
 			keyWidth = w
 		}
 	}
@@ -3636,7 +3720,7 @@ func renderHelpGroup(title string, items []helpItem, width int) string {
 	b.WriteString(helpHeadingStyle.Render(title))
 	b.WriteString("\n")
 	for i, item := range items {
-		key := helpKeyStyle.Width(keyWidth).Render(item.keys)
+		key := helpKeyStyle.Width(keyWidth).Render(keyHintNames.Replace(item.keys))
 		b.WriteString(key + helpDescriptionStyle.Render(item.desc))
 		if i < len(items)-1 {
 			b.WriteString("\n")
@@ -3656,21 +3740,22 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "h/H", desc: "fold/hide"},
 		{keys: "w", desc: "ignore WS"},
 		{keys: "d", desc: "delete comment"},
-		{keys: "q/ctrl+c", desc: "finish"},
+		{keys: "q/C-c", desc: "finish"},
 	}, columnWidth)
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
 		{keys: "↑/↓,j/k", desc: "move"},
 		{keys: "PgUp/PgDn", desc: "half page"},
-		{keys: "shift+↑/↓,ctrl+u/d", desc: "half page"},
+		{keys: "shift+↑/↓,C-u/d", desc: "half page"},
 		{keys: "Home/End,g/G,</>", desc: "top/bottom"},
 		{keys: "[/]", desc: "comments"},
 	}, columnWidth)
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
 		{keys: "{/}", desc: "unresolved"},
-		{keys: "alt+e/g", desc: "editor/line"},
-		{keys: "alt+w", desc: "copy ref"},
-		{keys: "alt+p", desc: "open file"},
+		{keys: "/ ?", desc: "search text"},
+		{keys: "M-e/g", desc: "editor/line"},
+		{keys: "M-w", desc: "copy ref"},
+		{keys: "M-p", desc: "open file"},
 		{keys: "tab/S-tab", desc: "files"},
 		{keys: "1-9", desc: "file tab"},
 		{keys: "n/N", desc: "diff/open"},
@@ -3680,13 +3765,35 @@ func (m AppModel) renderHelp(innerWidth int) string {
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, general, "  ", navigation, "  ", codeReview)
 	contexts := renderHelpGroup("Selection and dialogs", []helpItem{
-		{keys: "↑/↓,j/k · enter/v/esc · ctrl+PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
-		{keys: "ctrl+s/o/v · alt+s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
-		{keys: "ctrl+k/u/w,alt+d · ctrl+y/alt+y · @path,tab", desc: "kill · yank · complete"},
+		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
+		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
+		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "y/n/esc · ←/→,h/l,tab/shift+tab · enter", desc: "confirm/cancel · focus · activate finish dialog"},
 	}, innerWidth)
 
-	return columns + "\n" + contexts
+	search := renderHelpGroup("Incremental search", []helpItem{
+		{keys: "C-s / C-r", desc: "next / previous match; repeat to wrap"},
+		{keys: "enter / esc,C-g/c", desc: "keep match / cancel and return"},
+		{keys: "backspace / C-y", desc: "undo input piece / paste kill ring"},
+		{keys: "C-d / C-w", desc: "add following character / word"},
+		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
+		{keys: "terminal paste", desc: "paste text into the query"},
+	}, innerWidth)
+	return columns + "\n\n" + search + "\n\n" + contexts
+}
+
+func (m *AppModel) scrollHelp(delta int) {
+	lines := strings.Split(m.renderHelp(m.modalInnerWidth()), "\n")
+	header, _ := m.helpHeader(m.modalInnerWidth())
+	available := max(1, m.height-modalStyle.GetVerticalFrameSize()-lipgloss.Height(header)-1)
+	maxOffset := max(0, len(lines)-available)
+	m.helpOffset = max(0, min(min(m.helpOffset, maxOffset)+delta, maxOffset))
+}
+
+func (m AppModel) helpHeader(innerWidth int) (string, modalMouseRegion) {
+	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (M-? / ESC to close)"), innerWidth)
+	legend := helpLegendStyle.Render("C-: ctrl+, M-: meta/alt+, S-: shift+, RET: enter, DEL: backspace")
+	return title + "\n" + lipgloss.Wrap(legend, innerWidth, ""), closeRegion
 }
 
 func (m AppModel) renderModalButton(label, hint string, focused bool) string {
@@ -3706,7 +3813,7 @@ func renderButton(label, hint string, labelStyle, keyStyle lipgloss.Style) strin
 	if hint == "" {
 		return labelStyle.Render(label + " ")
 	}
-	keys := strings.Split(hint, " / ")
+	keys := strings.Split(keyHintNames.Replace(hint), " / ")
 	var renderedHint strings.Builder
 	for i, key := range keys {
 		if i > 0 {
@@ -3937,10 +4044,19 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		modalContent = frameStyle.Width(modalWidth).Render(content)
 
 	case helpModal:
-		title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (? / esc to close)"), innerWidth)
+		header, closeRegion := m.helpHeader(innerWidth)
 		regions = append(regions, closeRegion)
-		modalContent = frameStyle.Width(modalWidth).Render(
-			title + "\n" + m.renderHelp(innerWidth))
+		lines := strings.Split(m.renderHelp(innerWidth), "\n")
+		available := max(1, bgH-frameStyle.GetVerticalFrameSize()-lipgloss.Height(header)-1)
+		offset := max(0, min(m.helpOffset, len(lines)-available))
+		body := strings.Join(lines[offset:min(len(lines), offset+available)], "\n")
+		prefix := header + "\n" + body + "\n"
+		buttons, scrollRegions := layoutModalButtonRow([]modalButtonSpec{
+			{rendered: m.renderModalButton("Up", "↑/PgUp", false), action: modalMouseAction{scrollable: true, scrollOffset: -available}},
+			{rendered: m.renderModalButton("Down", "↓/PgDn", false), action: modalMouseAction{scrollable: true, scrollOffset: available}},
+		}, innerWidth, strings.Count(prefix, "\n"))
+		regions = append(regions, scrollRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons)
 
 	case commentModal:
 		start, end := m.selectionRange()
@@ -3952,12 +4068,12 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		contextContent := m.renderContextPreview(side, start, end, innerWidth-4, 0)
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderModalButton("Save", "ctrl+s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
 			buttonSpecs = append(buttonSpecs, modalButtonSpec{
-				rendered: m.renderModalButton("Suggest", "alt+s", m.modalFocus == 3),
+				rendered: m.renderModalButton("Suggest", "M-s", m.modalFocus == 3),
 				action:   modalMouseAction{focus: 3},
 			})
 		}
@@ -4003,7 +4119,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			title+"\n"+path+"\n\n", m.clipboardTextareaView(), innerWidth)
 		regions = append(regions, textareaRegion)
 		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
-			{rendered: m.renderModalButton("Save", "ctrl+s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
@@ -4020,7 +4136,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		if m.hasModalResolution() {
 			comment, _ := m.driftedComment(m.editingID)
-			checkbox := renderResolution(comment.Resolved, "Resolved") + " " + modalBtnNormalKey.Render("alt+r")
+			checkbox := renderResolution(comment.Resolved, "Resolved") + " " + modalBtnNormalKey.Render("M-r")
 			checkboxWidth := lipgloss.Width(checkbox)
 			left := max(0, innerWidth-checkboxWidth-3)
 			title = ansi.Truncate(modalTitleStyle.MarginBottom(0).Render(titleText), max(0, left-1), "…")
@@ -4057,12 +4173,12 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 		}
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderModalButton("Save", "ctrl+s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
 			buttonSpecs = append(buttonSpecs, modalButtonSpec{
-				rendered: m.renderModalButton("Suggest", "alt+s", m.modalFocus == 3),
+				rendered: m.renderModalButton("Suggest", "M-s", m.modalFocus == 3),
 				action:   modalMouseAction{focus: 3},
 			})
 		}
@@ -4181,7 +4297,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		}, innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
 		regions = append(regions, closeRegion)
-		hint := footerStyle.Render("esc: back to review · q: quit without finishing")
+		hint := footerStyle.Render("ESC: back to review · q: quit without finishing")
 
 		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons + "\n" + hint)
 	}

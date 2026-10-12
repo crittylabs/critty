@@ -6,11 +6,27 @@
 
 ### Features
 
+- Incremental search has clickable Search, Prev, Next, Keep, Cancel, case-fold, and multi-file controls.  Search controls stay available in short terminals and wrap after resizing.  `alt+s i` toggles case folding, alongside `alt+s c`.
+
 - The bundled `critty-approval` skill prepares Markdown approval attachments with YAML frontmatter and interactive confirmations, choices, and consents, then ties execution to the exact human-approved result.  All four agent integrations install it.
 
 - `--null` reviews only attached documents without requiring a Git repository.
 
+- Search the current file incrementally with `/` or `ctrl+s` forward and `?` or `ctrl+r` backward, as in Emacs.  Queries are regular expressions with smart case, matches stay within a line, and visible matches are highlighted.  `alt+s` followed by `c`, `w`, `r`, or `m` toggles case folding, word search, regular expressions, and searching across files, and the prompt names the active modes.  `ctrl+d` and `ctrl+w` add the character or word after the current match to the query.
+
+### Changed
+
+- The keyboard help moves from `?` to `alt+?`, since `?` now starts a backward search.
+
 ### Fixes
+
+- Word search recognizes Unicode letters, numbers, and combining marks in words and their boundaries, including Japanese and accented text.
+
+- Incremental search accepts terminal pastes and `ctrl+y` from the shared kill ring.  Its real terminal cursor follows the input for IME candidate placement, including wide and combining characters, and long queries keep their input end visible.
+
+- Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
+
+- Opening the finish dialog refreshes the layout so changes in footer height do not push it beyond the terminal.
 
 - Empty diff input, including `--diff=/dev/null`, can be reviewed with attachments and resumed from its saved session.
 
