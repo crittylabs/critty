@@ -470,7 +470,7 @@ def scenarios() -> None:
         assert not mouse.result.exists(), "missing confirmation allowed approval"
         assert "Complete required confirmations" in mouse.screen(), mouse.screen()
         mouse.click(r"Back ESC")
-        mouse.click(r"Viewed Required")
+        mouse.click(r"\bViewed\b")
         mouse.keys("q")
         mouse.click(r"[○●] Approve")
         mouse.click(r"Submit RET")
