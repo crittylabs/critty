@@ -458,26 +458,40 @@ def scenarios() -> None:
             "# Mouse submission\n- [ ] Viewed <!-- form: id=viewed required -->\n"
         )
         mouse = Round("mouse-submit", ["--null", "--attachment", "mouse-approval.md"])
+        tmux("resize-pane", "-t", mouse.pane, "-x", "54")
+        assert tmux("display-message", "-p", "-t", mouse.pane, "#{pane_width}") == "54"
         mouse.comment("Existing feedback.")
         mouse.keys("r")
         assert all(c.get("resolved") for c in mouse.comments())
         mouse.keys("q")
         mouse.click(r"Overall comment \(optional\)")
-        mouse.text("どちらの動画もOKです！")
+        mouse.text("Both videos look good!")
         mouse.click(r"[○●] Approve")
         assert "● Approve" in mouse.screen(), "mouse did not select Approve"
         mouse.click(r"Submit RET")
         assert not mouse.result.exists(), "missing confirmation allowed approval"
         assert "Complete required confirmations" in mouse.screen(), mouse.screen()
         mouse.click(r"Back ESC")
+        screen = wait_until(
+            lambda: mouse.screen() if "Required" in mouse.screen() else None,
+            "wrapped required confirmation",
+        )
+        rows = screen.splitlines()
+        viewed_row = next(
+            i for i, row in enumerate(rows) if re.search(r"\bViewed\b", row)
+        )
+        required_row = next(
+            i for i, row in enumerate(rows) if re.search(r"\bRequired\b", row)
+        )
+        assert viewed_row != required_row, screen
         mouse.click(r"\bViewed\b")
         mouse.keys("q")
         mouse.click(r"[○●] Approve")
         mouse.click(r"Submit RET")
         mouse.completed(True)
-        assert "どちらの動画もOKです！" in mouse.out.read_text()
+        assert "Both videos look good!" in mouse.out.read_text()
         report(
-            "resolve, overall comment, mouse Approve/Submit: missing confirmation blocks visibly; confirming allows retry"
+            "54-column mouse Approve/Submit: missing confirmation blocks visibly; wrapped confirmation allows retry"
         )
 
         form = Round(
