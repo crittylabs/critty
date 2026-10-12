@@ -325,7 +325,7 @@ def scenarios() -> None:
         overall = Round("overall-resumed", ["--session", submission.session])
         overall.keys("}")
         wait_until(
-            lambda: "Overall review comments" in overall.screen(),
+            lambda: "Overall comments" in overall.screen(),
             "overall thread navigation",
         )
         overall.keys("r")
