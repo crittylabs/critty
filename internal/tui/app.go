@@ -3991,6 +3991,7 @@ func layoutModalButtonRow(specs []modalButtonSpec, width, top int) (string, []mo
 
 func layoutModalTextarea(before, textareaView string, width int) (string, modalMouseRegion) {
 	before = lipgloss.Wrap(before, width, "")
+	textareaView = lipgloss.Wrap(textareaView, width, "")
 	top := strings.Count(before, "\n")
 	return before + textareaView + "\n\n", modalMouseRegion{
 		rect: mouseRect{

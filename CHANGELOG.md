@@ -6,7 +6,7 @@ Critty brings code and document reviews, approvals, and user choices into one te
 
 ### Features
 
-- Submit an optional overall review comment with Approve, Reject, or Comment radio choices and a Submit button.  The dialog color follows the selection, and Enter submits it; the default is Approve when remaining threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the round open.  The first character in an empty overall comment selects Comment immediately; Ctrl+S only focuses Submit without sending.  Abort asks before exiting without submitting.  Drafts survive returning to the review and stopping or resuming the session.  Previous overall comments are available in their own tab for navigation, replies, and resolution.  Finish output and form results include the decision and overall comment.
+- Submit an optional overall review comment with Approve, Reject, or Comment radio choices and a Submit button.  The dialog color follows the selection, and Enter submits it.  Tab follows the visual order, with the comment field immediately before Submit.  The default is Approve when remaining threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the round open.  The first character in an empty overall comment selects Comment immediately; Ctrl+S only focuses Submit without sending.  Abort asks before exiting without submitting.  Drafts survive returning to the review and stopping or resuming the session.  Previous overall comments are available in their own tab for navigation, replies, and resolution.  Finish output and form results include the decision and overall comment.
 
 - Press `I` or click the Images button to toggle image previews.  Markdown's local `![]()` and `<img src>` images appear beneath the reference line and above its comments, side by side with wrapping.  Attached Markdown resolves paths from its original location, including in `--diff` and `--null` reviews; Git reviews use the selected image snapshot.
 - Local images in comments and replies appear in their inline threads and the sidebar, including pasted images and paths outside the working directory.  The same `I` toggle controls them.
@@ -36,6 +36,8 @@ Critty brings code and document reviews, approvals, and user choices into one te
 - Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.  Shortcut hints use Emacs-style `C-`, `M-`, `S-`, `RET`, `ESC`, `SPC`, `TAB`, and `DEL` notation, with a fixed legend in Help.
 
 ### Fixes
+
+- Dialog buttons remain clickable when submission or clipboard status messages wrap.
 
 - `critty env` and `critty env tty` report output write failures instead of returning success.
 

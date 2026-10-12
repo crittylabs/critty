@@ -141,6 +141,17 @@ class Round:
         tmux("send-keys", "-l", "-t", self.pane, text)
         time.sleep(0.1)
 
+    def click(self, pattern: str) -> None:
+        for y, row in enumerate(self.screen().splitlines(), 1):
+            match = re.search(pattern, row)
+            if match:
+                # Button rows contain spaces and single-cell frame/selector glyphs.
+                x = match.start() + 1
+                self.text(f"\x1b[<35;{x};{y}M")
+                self.text(f"\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m")
+                return
+        raise AssertionError(f"mouse target not visible: {pattern}\n{self.screen()}")
+
     def comment(
         self, body: str, file: bool = True, expected: str | None = None
     ) -> None:
@@ -277,7 +288,7 @@ def scenarios() -> None:
             "plan.md",
             "Existing feedback.",
         )
-        unchanged.keys("q", "Tab", "Tab", "Tab")
+        unchanged.keys("q", "BTab")
         unchanged.text("Preserve draft.")
         unchanged.keys("Tab", "a", "Enter")
         wait_until(
@@ -301,7 +312,7 @@ def scenarios() -> None:
 
         for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:
             submission = Round(f"submit-{verdict}", ["plan.md"])
-            submission.keys("q", "Tab", "Tab", "Tab")
+            submission.keys("q", "BTab")
             body = f"Overall comment: {verdict}."
             submission.text(body)
             assert "● Comment" in submission.screen(), (
@@ -346,7 +357,7 @@ def scenarios() -> None:
         )
 
         draft = Round("submit-draft", ["plan.md"])
-        draft.keys("q", "Tab", "Tab", "Tab")
+        draft.keys("q", "BTab")
         draft.text("Saved draft.")
         draft.keys("Escape")
         draft.keys("q", "q")
@@ -364,7 +375,7 @@ def scenarios() -> None:
         wait_until(
             lambda: "Saved draft" in resumed_draft.screen(), "restored overall draft"
         )
-        resumed_draft.keys("Tab", "Tab", "Tab")
+        resumed_draft.keys("BTab")
         resumed_draft.text(" Updated draft.")
         cli("stop", "--session", draft.session)
         resumed_draft.completed(None)
@@ -443,6 +454,32 @@ def scenarios() -> None:
         (WORK / "approval.md").write_text(
             "# Local scenario only\n- [ ] Confirm <!-- form: id=confirm required -->\n- [ ] Small <!-- form: id=size value=small -->\n- [ ] Large <!-- form: id=size value=large -->\n- [x] Publish <!-- form: id=publish consent -->\n"
         )
+        (WORK / "mouse-approval.md").write_text(
+            "# Mouse submission\n- [ ] Viewed <!-- form: id=viewed required -->\n"
+        )
+        mouse = Round("mouse-submit", ["--null", "--attachment", "mouse-approval.md"])
+        mouse.comment("Existing feedback.")
+        mouse.keys("r")
+        assert all(c.get("resolved") for c in mouse.comments())
+        mouse.keys("q")
+        mouse.click(r"Overall comment \(optional\)")
+        mouse.text("どちらの動画もOKです！")
+        mouse.click(r"[○●] Approve")
+        assert "● Approve" in mouse.screen(), "mouse did not select Approve"
+        mouse.click(r"Submit RET")
+        assert not mouse.result.exists(), "missing confirmation allowed approval"
+        assert "Complete required confirmations" in mouse.screen(), mouse.screen()
+        mouse.click(r"Back ESC")
+        mouse.click(r"Viewed Required")
+        mouse.keys("q")
+        mouse.click(r"[○●] Approve")
+        mouse.click(r"Submit RET")
+        mouse.completed(True)
+        assert "どちらの動画もOKです！" in mouse.out.read_text()
+        report(
+            "resolve, overall comment, mouse Approve/Submit: missing confirmation blocks visibly; confirming allows retry"
+        )
+
         form = Round(
             "forms",
             [

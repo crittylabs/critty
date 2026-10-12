@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"image/color"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -172,7 +173,9 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if msg.String() == "shift+tab" {
 			delta = -1
 		}
-		m.modalFocus = (m.modalFocus + delta + finishAbort + 1) % (finishAbort + 1)
+		order := []int{finishApprove, finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort}
+		index := slices.Index(order, m.modalFocus)
+		m.modalFocus = order[(index+delta+len(order))%len(order)]
 		if m.modalFocus == finishText {
 			return m, m.modalTextarea.Focus()
 		}
