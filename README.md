@@ -40,7 +40,7 @@ Press `I` or click **Images** to toggle previews.  Markdown and comment previews
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
 
-Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews, configuration, and custom prompts keep their TCrit paths, so they remain available.  If tfil reports terminal markers, update it to 0.4.1 or later.
+Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews remain in their TCrit paths.  Configuration and custom prompts use Critty paths, with the TCrit paths supported as lower-priority fallbacks at each level.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
 After upgrading to v1.0.0, rerun `critty install` for your agent to update the bundled review, CLI reference, and approval skills.
 
@@ -138,10 +138,12 @@ If you used the earlier `@tcrit` subagent integration, remove the old `.gemini/a
 #### Prompt templates
 
 ```bash
-cd ~ && critty install prompts        # Install global templates under ~/.config/tcrit/prompts/
-critty install prompts                # From a repo root: install under .tcrit/prompts/
+cd ~ && critty install prompts        # Install global templates under ~/.config/critty/prompts/
+critty install prompts                # From a repo root: install under .critty/prompts/
 critty check                         # Report stale installed integrations
 ```
+
+Configuration files are `~/.config/critty/config.json` (or `$XDG_CONFIG_HOME/critty/config.json`) and `.critty.config.json` in the project root.  Project settings override global settings.  Each level reads its legacy TCrit file only when the Critty file is absent.  See the [CLI skill](internal/cli/skill/critty-cli/SKILL.md#local-storage-and-command-effects) for details.
 
 ### Reviewing actions before execution
 

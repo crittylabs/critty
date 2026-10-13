@@ -1,5 +1,5 @@
 // Package config loads Critty configuration from the XDG config directory
-// (global) and the project root (.tcrit.config.json), mirroring crit's
+// (global) and the project root (.critty.config.json), mirroring crit's
 // two-level merge semantics for the subset of keys Critty supports.
 package config
 
@@ -49,22 +49,23 @@ func GlobalPath() string {
 
 // ProjectPath returns the project config file path under root.
 func ProjectPath(root string) string {
-	return filepath.Join(root, ".tcrit.config.json")
+	return filepath.Join(root, ".critty.config.json")
 }
 
-// Load reads and merges global and project configuration.  projectRoot may
-// be empty to skip the project level.  Missing files are not errors.
+// Load merges global and project configuration.  Each level falls back to its
+// legacy path only when the current file is absent.  projectRoot may be empty
+// to skip the project level.  Missing files are not errors.
 func Load(projectRoot string) (*Config, error) {
 	cfg := &Config{CleanupOnApprove: true}
 
-	global, err := readFile(GlobalPath())
+	global, err := readPreferredFile(GlobalPath(), filepath.Join(xdg.LegacyConfigHome(), "config.json"))
 	if err != nil {
 		return nil, err
 	}
 	apply(cfg, global)
 
 	if projectRoot != "" {
-		project, err := readFile(ProjectPath(projectRoot))
+		project, err := readPreferredFile(ProjectPath(projectRoot), filepath.Join(projectRoot, ".tcrit.config.json"))
 		if err != nil {
 			return nil, err
 		}
@@ -75,6 +76,14 @@ func Load(projectRoot string) (*Config, error) {
 		cfg.Author = gitUserName()
 	}
 	return cfg, nil
+}
+
+func readPreferredFile(path, legacy string) (*fileConfig, error) {
+	file, err := readFile(path)
+	if file != nil || err != nil {
+		return file, err
+	}
+	return readFile(legacy)
 }
 
 // LoadCurrent loads configuration for the current directory, using the git

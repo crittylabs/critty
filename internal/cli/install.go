@@ -225,7 +225,7 @@ func integrations() map[string][]integrationFile {
 		data := stock[name]
 		prompts = append(prompts, integrationFile{
 			content:    func() ([]byte, error) { return data, nil },
-			dest:       filepath.Join(".tcrit", "prompts", name),
+			dest:       filepath.Join(".critty", "prompts", name),
 			globalDest: filepath.Join(xdg.ConfigHome(), "prompts", name), // absolute
 		})
 	}

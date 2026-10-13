@@ -21,9 +21,14 @@ func StateHome() string {
 }
 
 // ConfigHome returns the base config directory ($XDG_CONFIG_HOME or
-// ~/.config) with the tcrit application directory appended.
+// ~/.config) with the critty application directory appended.
 func ConfigHome() string {
-	return AppConfigHome(appDir)
+	return AppConfigHome("critty")
+}
+
+// LegacyConfigHome returns the former TCrit configuration directory.
+func LegacyConfigHome() string {
+	return AppConfigHome("tcrit")
 }
 
 // AppConfigHome returns the XDG config directory of another application,

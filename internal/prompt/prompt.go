@@ -106,8 +106,8 @@ func RenderFinish(prompts map[string]string, projectRoot string, ctx Context) st
 
 // resolveTemplateText applies crit's precedence: config prompts entry
 // (mode-specific, then generic; project entries already win in the merged
-// map), then conventional files under the project's .tcrit/prompts/ and the
-// global config prompts directory, then the embedded stock template.
+// map), then project and global prompt directories, then the stock template.
+// Current names win over legacy names within each level.
 func resolveTemplateText(prompts map[string]string, projectRoot, hook, mode string) (string, error) {
 	for _, key := range []string{hook + ":" + mode, hook} {
 		if v, ok := prompts[key]; ok {
@@ -121,9 +121,9 @@ func resolveTemplateText(prompts map[string]string, projectRoot, hook, mode stri
 	}
 	var dirs []string
 	if projectRoot != "" {
-		dirs = append(dirs, filepath.Join(projectRoot, ".tcrit", "prompts"))
+		dirs = append(dirs, filepath.Join(projectRoot, ".critty", "prompts"), filepath.Join(projectRoot, ".tcrit", "prompts"))
 	}
-	dirs = append(dirs, filepath.Join(xdg.ConfigHome(), "prompts"))
+	dirs = append(dirs, filepath.Join(xdg.ConfigHome(), "prompts"), filepath.Join(xdg.LegacyConfigHome(), "prompts"))
 	for _, dir := range dirs {
 		for _, name := range names {
 			data, err := os.ReadFile(filepath.Join(dir, name))

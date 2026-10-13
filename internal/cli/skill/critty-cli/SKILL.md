@@ -10,7 +10,7 @@ Use `/critty` to run the interactive review loop and `/critty-approval` to prepa
 
 ## Local storage and command effects
 
-Critty is a local CLI and human review TUI, not a hosted review service.  Review data lives under `$XDG_STATE_HOME/tcrit` (default `~/.local/state/tcrit`); configuration lives under `$XDG_CONFIG_HOME/tcrit` (default `~/.config/tcrit`).  Review processes communicate through local Unix sockets.  The built-in review and comment commands do not upload review contents or publish repository changes.
+Critty is a local CLI and human review TUI, not a hosted review service.  Review data lives under `$XDG_STATE_HOME/tcrit` (default `~/.local/state/tcrit`).  Configuration uses `$XDG_CONFIG_HOME/critty/config.json` (default `~/.config/critty/config.json`) and `.critty.config.json` in the project root.  Each level reads its TCrit file only if the Critty file is absent: `$XDG_CONFIG_HOME/tcrit/config.json` globally, `.tcrit.config.json` for the project.  Project settings override global settings; ignore patterns are unioned and prompt keys are merged across those two levels.  Custom prompt files use `.critty/prompts/` and the global `critty/prompts/` directory, with the corresponding TCrit directories as lower-priority fallbacks at each level.  `critty install prompts` writes only the Critty paths.  Review processes communicate through local Unix sockets.  The built-in review and comment commands do not upload review contents or publish repository changes.
 
 | Command | Effects |
 | --- | --- |

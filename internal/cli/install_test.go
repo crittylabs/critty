@@ -116,6 +116,20 @@ func TestAllIncludesEveryAgent(t *testing.T) {
 	}
 }
 
+func TestPromptInstallUsesCrittyPaths(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	for _, file := range integrations()["prompts"] {
+		name := filepath.Base(file.dest)
+		if file.dest != filepath.Join(".critty", "prompts", name) {
+			t.Errorf("project prompt destination = %q", file.dest)
+		}
+		if file.globalDest != filepath.Join(configHome, "critty", "prompts", name) {
+			t.Errorf("global prompt destination = %q", file.globalDest)
+		}
+	}
+}
+
 func TestClaudeSkillsAreVerbatim(t *testing.T) {
 	for _, name := range skillNames {
 		embedded, err := skillContent.ReadFile("skill/" + name + "/SKILL.md")

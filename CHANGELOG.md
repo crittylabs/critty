@@ -12,6 +12,8 @@
 
 ### Changed
 
+- Configuration uses `~/.config/critty/config.json` and `.critty.config.json`, falling back to the legacy TCrit file only when the new file is absent at that level.  Custom prompts use the corresponding `critty/prompts/` and `.critty/prompts/` directories, with TCrit paths as fallbacks.  Project settings still override global settings, and review storage stays unchanged.
+
 - **Resolve** and **Images** controls underline their shortcut keys, `r` and `I`; the Images button uses less footer space.
 
 ## 1.0.0
