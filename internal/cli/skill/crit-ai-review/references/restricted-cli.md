@@ -11,7 +11,7 @@ Before launch, the requester creates a policy JSON file containing:
 - `cwd`: absolute review working directory.
 - `binary`: absolute path to the verified Critty executable.
 - `session`: the existing review session ID.
-- `author`: the fixed AI reviewer name.
+- `author`: the fixed reviewer comment author selected under the shared skill's naming rule.
 - `locations`: bare permitted file paths from the frozen target, without numeric range suffixes.  The reviewer may append a positive line or ascending line range as `:line[-end]`; review-level comments need no location.
 - `read_roots`: resolved absolute directories authorized for investigation, normally the review workspace.  Read/search paths outside these roots are denied.  Supply CLI excerpts when the installed skill lies outside them.
 - `read_commands`: lists of exact argument vectors for read-only commands the requester has checked.  Use absolute executables and review their entire arguments; this is trusted permission configuration, not model input.  Include needed Git history and diff commands, with pagers, external diff drivers, text conversion, and filesystem monitors disabled.  Supply their canonical command strings to the reviewer.  Additional investigations can request another checked command; never add a blanket shell allowance.

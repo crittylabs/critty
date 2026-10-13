@@ -20,7 +20,7 @@ POLICY = {
     "cwd": "/project",
     "binary": "/trusted/critty",
     "session": "0123456789ab",
-    "author": "Claude Fable (AI review)",
+    "author": "Claude Code Fable (reviewer)",
     "locations": ["src/example.py"],
     "read_roots": ["/project"],
     "read_commands": [["/usr/bin/git", "--no-pager", "log", "--oneline", "-n", "20"]],
