@@ -52,10 +52,10 @@ Before trusting an installation, verify the resulting tool surface: no `exec_com
 - `capabilities`: current roots, exact read-command indices, comment paths, destination, and denial recovery.
 - `read_file`, `list_files`, `search`: bounded UTF-8 reads, paged directory listings, and literal-text search under authorized roots.  Directory traversal omits `.git` and does not follow directory symlinks; resolved file paths must stay within a permitted root.  Search reports skipped non-text, unreadable, or oversized files.  Use `read_command` for approved Git history queries.
 - `read_command`: execute one exact requester-approved argv by index.  It cannot add arguments, input, shell syntax, or a different cwd.
-- `post_finding`: supply a literal body and optional permitted path or source range.  Session and author are fixed by policy.  Shell metacharacters in the body remain data.
+- `post_finding`: supply a literal body and optional permitted path or source range.  Omit `location` for the overall completion comment required by the shared skill.  Session and author are fixed by policy.  Shell metacharacters in the body remain data.
 - `resolve_finding`: supply a policy-listed own comment ID, its exact path (empty for review-level comments), and a nonempty reason.  The server posts the reason as a reply and resolves that thread using the fixed session and author.  Read it back with `comments` to verify persistence.
 - `reply_finding`: supply the same ID, path, and reason to reply without changing resolution state.  Use this when your concern is satisfied but another reviewer has an unresolved or unanswered concern about the same issue.
-- `comments`: read findings with optional request-ID filtering and pagination.  Read back the intended bodies and IDs after posting.
+- `comments`: read comments with optional request-ID filtering and pagination.  Read back the intended bodies and IDs after posting.
 
 Follow pagination and report truncation or skipped evidence.  After a rejected optional operation, consult `capabilities`, use an available alternative, and continue.  Ask the requester only when missing evidence is essential.  A posting timeout has an uncertain outcome: check `comments` before retrying.
 

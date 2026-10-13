@@ -25,7 +25,7 @@ Include an explicit capability summary in the assignment: accessible roots, avai
 
 The default outcome is an independent assessment for the human to consider.  After each completed or partial AI review, present findings, limitations, and proposed next steps, even when there are no findings.  Wait for human feedback before applying fixes or dispatching another AI round.  Carry their additional instructions into the next assignment and keep them distinct from AI findings.  A review-only request ends with that assessment; it need not become an implementation loop.
 
-Use the caller's selected human review method for these checkpoints.  With Critty, follow the `/critty` skill to display the target and AI findings and collect the human's response.  Silence does not select a next action.
+Use the caller's selected human review method for these checkpoints.  With Critty, follow the `/critty` skill to resume the assigned session from its original working directory with `critty --session <id>`.  Refresh the reviewed input through that session's continuation workflow, preserving its comments, replies, and attachment identities as the human review advances to the next round.  Use the current saved round in each AI assignment and completion report; the AI request ID identifies an assignment within that session, not a new human review.  Read back the existing threads before resuming.  Silence does not select a next action.
 
 For a request to work with another AI to refine the work, use [crit-ai-cowork](../crit-ai-cowork/SKILL.md).  It reuses this skill's request, posting, and result contracts and replaces only the per-round human checkpoint with an AI feedback loop.  An assigned reviewer always follows the Reviewer section; the requester owns checkpoints and implementation.
 
@@ -68,9 +68,11 @@ Supply the reviewer with this skill and the relevant CLI reference if they canno
 
 When the host reports the running model, verify that it matches the model represented by the reviewer author.  If it differs, stop the run, retain any saved comments, and report the mismatch.  Correct the assignment and posting policy before retrying with a new request ID.
 
-Collect both the reviewer's final response and the persisted comments.  Match the request ID, target identity, session, round, and comment IDs.  A successful comment command proves neither coverage nor review completion.  No comments, a timeout, or an exited process without a final report does not mean no findings.
+Collect both the reviewer's final response and the persisted comments, including its review-level completion comment even when there are no findings.  Match the request ID, target identity, session, round, and comment IDs.  A successful comment command proves neither coverage nor review completion.  No comments, a timeout, or an exited process without a final report does not mean no findings.
 
 If the reviewer cannot access the same local Critty storage, have them return findings in the documented bulk-comment JSON format with the completion report.  Verify target identity, paths, and coordinates before posting that payload to the selected session with the reviewer author.  For relayed reviewer findings and replies, this author takes precedence over the CLI reference's usual instruction to use your own agent name.  Preserve the returned text and identify relayed entries in the completion report.  Read them back and report the resulting comment IDs.  This is a return transport, not a new permission to publish to a hosted service.
+
+If the final response arrived without a saved completion comment, relay its assessment and limitations as a review-level comment under the reviewer author, identify it as relayed, and verify it by readback.  Keep the requester's own assessment and proposed next steps under its existing author; a requester summary does not replace the reviewer's completion comment.
 
 Treat partial, failed, or stale results as incomplete.  Preserve useful findings and state what remains unchecked.  For a retry, first confirm the earlier run has stopped, inspect any comments it saved, and issue a new request ID so results cannot be mistaken for the original run.
 
@@ -100,6 +102,8 @@ Read the thread back to verify that the reply and intended resolution state were
 
 Post findings to the explicit session with the reviewer author specified in the assignment.  Include the request ID in comment bodies so concurrent reviews can be distinguished.  Use source coordinates from the reviewed snapshot and the supplied path mapping.  For deleted lines or uncertain anchors, use a file-level finding with quoted context instead of inventing a new-side line number.
 
+Before returning, post an overall (review-level) completion comment under the same reviewer author, including when no actionable findings were found.  Write a short assessment for the human: lead with the conclusion, then summarize coverage and material verification limits.  Include the request ID and a compact reference to the frozen target, session, and round.  Keep full hashes, tool configuration, and execution bookkeeping in the final response and saved records rather than the comment.  Distinguish checks you performed from requester-supplied results.  With the restricted Codex MCP server, call `post_finding` with the report body and omit `location`; with the CLI, omit the file path.  Read the comment back and include its ID in the final response.  If posting is unavailable, return the report as a bulk JSON entry with `scope: "review"` for the requester to relay, and state that it is not yet saved.
+
 Use the allowed posting interface with literal arguments.  If quoting or bulk input would require creating a file or executing a shell pipeline, return the payload to the requester to prepare and post.  After posting, read `critty comments --session <id> --all --json` and match the saved author, bodies, paths, and ranges; retain their IDs.  After an uncertain write, inspect saved comments before retrying so a partial success does not create duplicates.  Report a persistence failure separately from the review findings.
 
 Return an explicit final response even when there are no findings.  Include:
@@ -107,6 +111,7 @@ Return an explicit final response even when there are no findings.  Include:
 - The request ID, reviewed target identity, session, and round.
 - Whether the requested review is complete, partial, or blocked, with actual coverage and checks performed.
 - Findings and their saved comment IDs, resolved own findings and their reasons, and findings left open; or an explicit statement that no actionable findings were found in the reviewed scope.
+- The saved overall completion comment ID, or its unsaved review-level payload for relay.
 - Unchecked areas, failed checks, uncertainties, and whether all intended comments were confirmed saved.  If storage is inaccessible, include the bulk JSON payload for the requester to post.
 
 These are contents of the agent's final response, not a new Critty JSON schema.  A completed review may contain findings.  Keep completion separate from a clean assessment and from human approval.  Critty's `--summary` describes an interactive human review round; do not use it as an AI completion signal or edit its output to manufacture one.
