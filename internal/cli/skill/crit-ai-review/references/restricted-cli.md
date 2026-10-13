@@ -23,6 +23,8 @@ Run `python3 scripts/claude_review_gate.py --describe <policy.json>` from this s
 
 Choose read commands that cover the actual target: `git diff HEAD` includes staged and unstaged tracked changes; untracked snapshots still require direct reads.  Supply a checked hashing command over the target paths when independent digest verification is needed.  Otherwise, identify hashes as requester-verified and have the requester compare them before and after the review; the reviewer should not claim to have recomputed them.
 
+The `.tmp/` directory in the command example below is illustrative.  Replace it consistently with the scratch directory used in your environment, and prepare the referenced files there before launch.
+
 From that working directory, a launch using caller-prepared files is:
 
 ```sh
