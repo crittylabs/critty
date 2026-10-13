@@ -1,6 +1,6 @@
 ---
 name: crit-ai-cowork
-description: Work with another AI through Critty to refine requested work using review, fixes, and exchanges between agents, then present it for final human review. Use crit-ai-review for a second opinion with human input between rounds.
+description: Work with another AI through Critty to refine requested work, including human review comments asking for collaboration with a named AI such as Claude or Codex, then present it for final human review. Use crit-ai-review for a second opinion or consultation with human input between rounds.
 ---
 
 # Cowork with Another AI
