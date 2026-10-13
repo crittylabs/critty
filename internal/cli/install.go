@@ -15,7 +15,8 @@ import (
 	"github.com/crittylabs/critty/internal/xdg"
 )
 
-//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md
+//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md skill/crit-ai-review/SKILL.md skill/crit-ai-review/references/restricted-cli.md skill/crit-ai-review/scripts/claude_review_gate.py skill/crit-ai-cowork/SKILL.md
+//go:embed skill/crit-ai-review/references/codex-cli.md skill/crit-ai-review/scripts/codex_review_server.py skill/crit-ai-review/scripts/codex-review-requirements.txt
 var skillContent embed.FS
 
 var installForce bool
@@ -69,7 +70,7 @@ var skillVariants = map[string]skillVariant{
 	},
 }
 
-var skillNames = []string{"critty", "critty-cli", "critty-approval"}
+var skillNames = []string{"critty", "critty-cli", "critty-approval", "crit-ai-review", "crit-ai-cowork"}
 
 // renderSkill returns the embedded skill rewritten for the named agent.
 func renderSkill(name, agent string) ([]byte, error) {
@@ -135,6 +136,17 @@ func skillFile(name, agent, dir string) integrationFile {
 	}
 }
 
+func skillResource(name, resource, dir string) integrationFile {
+	rel := filepath.Join(dir, "skills", name, filepath.FromSlash(resource))
+	return integrationFile{
+		content: func() ([]byte, error) {
+			return skillContent.ReadFile("skill/" + name + "/" + resource)
+		},
+		dest:       rel,
+		globalDest: rel,
+	}
+}
+
 // integrations maps install target names to their files, following crit's
 // naming (the Claude Code agent is "claude-code").
 func integrations() map[string][]integrationFile {
@@ -179,6 +191,27 @@ func integrations() map[string][]integrationFile {
 		skillFile("critty", "gemini", ".gemini"),
 		skillFile("critty-cli", "gemini", ".gemini"),
 		skillFile("critty-approval", "gemini", ".gemini"),
+	}
+
+	for agent, dir := range map[string]string{
+		"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini",
+	} {
+		files := []integrationFile{
+			skillFile("crit-ai-review", agent, dir),
+			skillFile("crit-ai-cowork", agent, dir),
+			skillResource("crit-ai-review", "references/restricted-cli.md", dir),
+			skillResource("crit-ai-review", "scripts/claude_review_gate.py", dir),
+			skillResource("crit-ai-review", "references/codex-cli.md", dir),
+			skillResource("crit-ai-review", "scripts/codex_review_server.py", dir),
+			skillResource("crit-ai-review", "scripts/codex-review-requirements.txt", dir),
+		}
+		if agent == "opencode" {
+			for i := range files {
+				rel := strings.TrimPrefix(files[i].dest, dir+string(filepath.Separator))
+				files[i].globalDest = filepath.Join(openCodeGlobal, rel)
+			}
+		}
+		m[agent] = append(m[agent], files...)
 	}
 
 	var prompts []integrationFile
@@ -229,12 +262,16 @@ Run from your home directory to install globally, or from a repository
 root to install for that project only, following crit's convention.
 
 Targets:
-  claude-code  Claude Code skills (critty, critty-cli, critty-approval)
-  codex        Codex skills (critty, critty-cli, critty-approval)
-  opencode     OpenCode command (/critty) and skills (critty-cli, critty-approval)
-  gemini       Gemini CLI skills (critty, critty-cli, critty-approval)
+  claude-code  Claude Code skills
+  codex        Codex skills
+  opencode     OpenCode command (/critty) and skills
+  gemini       Gemini CLI skills
   prompts      Stock finish prompt templates (customize after copying)
-  all          claude-code + codex + opencode + gemini`,
+  all          claude-code + codex + opencode + gemini
+
+Agent targets include critty-cli, critty-approval, crit-ai-review, and
+crit-ai-cowork, with their reference files and review gate. The interactive
+critty workflow is a skill except in OpenCode, where it is a command.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := args[0]

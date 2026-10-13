@@ -274,6 +274,8 @@ def scenarios() -> None:
     try:
         default_approval = Round("default-approval", ["plan.md"])
         version = cli("--version").stdout.strip().removeprefix("critty version ")
+        # Keep long development versions visible instead of testing truncation.
+        tmux("resize-pane", "-t", default_approval.pane, "-x", "100")
         default_approval.keys("M-?")
         wait_until(
             lambda: f"critty {version}" in default_approval.screen(),

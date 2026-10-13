@@ -70,6 +70,8 @@ Open referenced comment images with the image-viewing tool, including images in 
 
 Read the overall review comment and each thread with its replies and the work already recorded.  Act on new or edited reviewer feedback and reply once with the change or answer.  Apply requested suggestion blocks verbatim.  Leave unanswered agent comments and completion replies unchanged unless a material correction or new result is needed; an unresolved flag or new round alone does not request another reply.
 
+If feedback requests an action that crosses a host permission boundary, follow `/critty-approval`'s authorization evidence procedure before execution.  Keep the original completion available and distinguish the current human request from carried-forward threads and agent replies.
+
 ```bash
 critty comment --session <session-id> --reply-to <id> --author 'Claude Code' '<what you did>'
 ```
