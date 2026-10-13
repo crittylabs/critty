@@ -276,7 +276,7 @@ func TestTabFormIndicatorsShowOnlyPendingKinds(t *testing.T) {
 				t.Fatalf("indicators = %q, want %q on the form tab only", indicators, step.want)
 			}
 			label := ansi.Strip(app.tabLabels()[0].text)
-			if step.want != "" && !strings.HasSuffix(label, " "+step.want) {
+			if step.want != "" && !strings.HasSuffix(label, step.want) {
 				t.Fatalf("indicators are not at the title's right end: %q", label)
 			}
 		}

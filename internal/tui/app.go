@@ -2809,13 +2809,16 @@ func (m *AppModel) tabLabels() []tabLabel {
 	for i, t := range m.tabs {
 		label := abbreviatedTabPath(t.displayPath())
 		start := strings.LastIndexByte(label, '/') + 1
-		filenameStyle := ansi.NewStyle().Underline(t.state != nil && unresolvedCommentCount(t.state.Comments) > 0)
+		filenameStyle := ansi.NewStyle()
 		if i == m.activeTab {
 			filenameStyle = filenameStyle.Bold()
 		}
 		label = label[:start] + filenameStyle.String() + label[start:] + ansi.NewStyle().Normal().Underline(false).String()
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
+		}
+		if t.state != nil && unresolvedCommentCount(t.state.Comments) > 0 {
+			indicators[i] = "💬" + indicators[i]
 		}
 		if indicators[i] != "" {
 			label += " " + indicators[i]
@@ -2878,6 +2881,9 @@ func (m *AppModel) renderTab(labels []tabLabel, i int, isFirst bool) string {
 
 func (m *AppModel) renderTabOverflowIndicator(text string, isFirst bool) string {
 	style := inactiveTabStyle.Foreground(subtle)
+	if m.contentPaneWidth() < 32 {
+		style = style.Padding(0)
+	}
 	border, _, _, _, _ := style.GetBorder()
 	if isFirst {
 		border.BottomLeft = "├"
@@ -2909,7 +2915,7 @@ func (m *AppModel) visibleTabWindow(labels []tabLabel) (int, int) {
 	}
 
 	indicatorWidth := func(text string) int {
-		return lipgloss.Width(inactiveTabStyle.Render(text))
+		return lipgloss.Width(m.renderTabOverflowIndicator(text, false))
 	}
 	leftWidth, rightWidth := 0, 0
 	if m.activeTab > 0 {

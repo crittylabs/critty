@@ -112,9 +112,9 @@ func TestTabFilenameEmphasis(t *testing.T) {
 		}{
 			{name: "no state"},
 			{name: "no comments", state: &fileReview{}},
-			{name: "line comment", state: &fileReview{Comments: []review.Comment{{Scope: "line"}}}, want: "日本 file.go"},
+			{name: "line comment", state: &fileReview{Comments: []review.Comment{{Scope: "line"}}}, want: "💬"},
 			{name: "resolved", state: &fileReview{Comments: []review.Comment{{Resolved: true}}}},
-			{name: "file comment", state: &fileReview{Comments: []review.Comment{{Scope: "file"}}}, want: "日本 file.go"},
+			{name: "file comment", state: &fileReview{Comments: []review.Comment{{Scope: "file"}}}, want: "💬"},
 		} {
 			t.Run(fmt.Sprintf("active=%d/%s", active, tt.name), func(t *testing.T) {
 				app.tabs[0].state = tt.state
@@ -148,8 +148,11 @@ func TestTabFilenameEmphasis(t *testing.T) {
 				for i := range len(rendered) {
 					parser.Advance(rendered[i])
 				}
-				if got := underlined.String(); got != tt.want {
-					t.Fatalf("underlined text = %q, want %q", got, tt.want)
+				if got := underlined.String(); got != "" {
+					t.Fatalf("tab label still uses underlining: %q", got)
+				}
+				if got := strings.Contains(ansi.Strip(rendered), "💬"); got != (tt.want != "") {
+					t.Fatalf("tab bubble presence = %t, want %t", got, tt.want != "")
 				}
 				wantBold := ""
 				if active == 0 {
