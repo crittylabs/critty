@@ -16,9 +16,17 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## Changelog maintenance
 
-- Write changelog entries as release notes for users.  Lead with what a feature lets them do and its main use cases, then explain important behavior and constraints.  Name new commands, skills, and integrations and explain their roles.
-- Record user-visible differences from the latest published release under `Unreleased`, including small fixes.  Consolidate related work into entries describing the final behavior that will ship, and move them to a versioned section during release preparation.
-- Omit fixes for problems introduced and resolved between releases.  Fold refinements of unreleased features into their feature entries, and keep fixes for problems that existed in a published release, including prereleases.  Verify release tags and publication history before removing a past fix.
+Treat `Unreleased` as a compact description of the final user-visible differences from the latest published release.  Update it as a whole, rather than adding a record for each commit or task.
+
+Before every changelog update:
+
+1. Verify the latest published release and its tag.  Compare that tag with the final changes being prepared, including in-scope uncommitted work; the previous commit is not the baseline.
+2. Read all of `Unreleased` and find the entries covering the affected features.  Rewrite those entries to describe the final behavior, merging related additions, refinements, and fixes into one entry per user-visible change.  Add a separate entry only for an independent difference from the release baseline.
+3. Remove superseded behavior, duplicate explanations, and fixes for problems introduced and resolved after the baseline.  Retain fixes for problems present in a published release, including prereleases; verify publication history before removing them.
+4. Check the complete section against the release comparison.  Every entry must describe a remaining user-visible difference, and every such difference, including small fixes, must be covered.  Keep only the wording needed to explain those differences and their important constraints.
+
+- Write entries as release notes for users.  Lead with what a feature lets them do and its main use cases.  Name new commands, skills, and integrations and explain their roles; link to details instead of accumulating workflow steps.
+- Move the consolidated section to a versioned section during release preparation.  Keep published sections unchanged unless correcting an error.
 - Keep implementation mechanics, detailed dialog layouts, and exhaustive key bindings in code, Help, or the README.  Include controls only when they explain the change or help users adapt established usage; point to updated Help for full instructions.
 - State compatibility requirements before listing supported implementations as examples.  Describe layered integrations in terms of their host requirements.  Restrict platforms only when the implementation requires it.
 - A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
