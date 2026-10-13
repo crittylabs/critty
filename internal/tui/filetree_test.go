@@ -142,6 +142,28 @@ func TestFileTreeFollowsActiveTabAndUnfoldsItsDirectories(t *testing.T) {
 	}
 }
 
+func TestMetaBracesSwitchFileTabs(t *testing.T) {
+	for _, tc := range []struct {
+		prev, next tea.KeyPressMsg
+	}{
+		{tea.KeyPressMsg{Code: '{', Mod: tea.ModAlt}, tea.KeyPressMsg{Code: '}', Mod: tea.ModAlt}},
+		{tea.KeyPressMsg{Code: '[', ShiftedCode: '{', Mod: tea.ModAlt | tea.ModShift}, tea.KeyPressMsg{Code: ']', ShiftedCode: '}', Mod: tea.ModAlt | tea.ModShift}},
+		{tea.KeyPressMsg{Code: '{', Mod: tea.ModAlt | tea.ModShift}, tea.KeyPressMsg{Code: '}', Mod: tea.ModAlt | tea.ModShift}},
+	} {
+		t.Run(tc.prev.String(), func(t *testing.T) {
+			app := newFileTreeTestApp()
+			app, _ = updateApp(app, tc.next)
+			if app.activeTab != 1 {
+				t.Fatalf("next: active tab = %d, want 1", app.activeTab)
+			}
+			app, _ = updateApp(app, tc.prev)
+			if app.activeTab != 0 {
+				t.Fatalf("prev: active tab = %d, want 0", app.activeTab)
+			}
+		})
+	}
+}
+
 func TestFileTreeCursorSelectsFilesAndKeysFoldDirectories(t *testing.T) {
 	app := newFileTreeTestApp()
 	app = pressKey(app, 's')

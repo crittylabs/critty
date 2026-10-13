@@ -4,6 +4,8 @@
 
 ### Features
 
+- Switch to the previous or next file tab with `M-{` or `M-}`, alongside `S-TAB` and `TAB`.
+
 - Save review verdicts, all feedback threads, and attachment identities with `--summary FILE`, so agents can read a compact JSON result without parsing finish messages or repeatedly loading unchanged attachment bodies.  The bundled review skill uses this result while retaining complete feedback and approval evidence.
 
 ### Changed
