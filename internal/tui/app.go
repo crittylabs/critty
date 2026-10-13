@@ -45,6 +45,7 @@ const (
 	deleteConfirmModal
 	finishModal
 	finishResolveModal
+	finishFormsModal
 	finishAbortModal
 	helpModal
 	gotoLineModal
@@ -217,6 +218,7 @@ type renderedScreenLayout struct {
 	modalRegions    []modalMouseRegion
 	isearchCursor   *tea.Cursor
 	isearchRegions  []isearchMouseRegion
+	progressRegions []progressRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -453,18 +455,29 @@ func codeDiff(path, oldPath, ref string, staged bool) (*gitpkg.DiffInfo, error) 
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	emptyBefore := m.modal == finishModal && m.modalFocus == finishText && m.modalTextarea.Value() == ""
+	previousHeaderHeight := m.headerHeight()
 	model, cmd := m.update(msg)
 	switch app := model.(type) {
 	case AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
+		app.refreshHeaderLayout(previousHeaderHeight)
 		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
+		app.refreshHeaderLayout(previousHeaderHeight)
 		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	}
 	return model, cmd
+}
+
+func (m *AppModel) refreshHeaderLayout(previousHeight int) {
+	if len(m.tabs) > 0 && m.width > 0 && m.headerHeight() != previousHeight {
+		m.recalculateLayout()
+		m.rebuildContent()
+		m.scrollToCursor()
+	}
 }
 
 func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -740,6 +753,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.modal == finishResolveModal || m.modal == finishAbortModal {
 		return m.handleFinishConfirmationKey(msg)
+	}
+	if m.modal == finishFormsModal {
+		return m.handleFinishFormsKey(msg)
 	}
 
 	if len(m.tabs) == 0 {
@@ -1861,7 +1877,7 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 	if !verdict.Valid() {
 		verdict = m.defaultFinishVerdict()
 	}
-	if verdict == review.VerdictApprove && len(m.missingForms()) == 0 {
+	if verdict == review.VerdictApprove {
 		if m.modal == finishModal {
 			m.saveFinishDraft()
 		} else {
@@ -1871,12 +1887,13 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 			m.finishSaveFailed = true
 			return m, nil
 		}
-		if m.unresolvedTotal() > 0 {
-			m.finishVerdict = verdict
-			m.modal, m.modalFocus = finishResolveModal, 0
+		m.finishVerdict = verdict
+		if len(m.missingForms()) > 0 {
+			m.modal, m.modalFocus = finishFormsModal, finishReviewForms
 			m.modalTextarea.Blur()
 			return m, nil
 		}
+		return m.confirmFormApproval()
 	}
 	return m.submitReview(verdict)
 }
@@ -2441,11 +2458,12 @@ func (m AppModel) reviewScopeLabel() string {
 }
 
 func (m AppModel) renderHeader() string {
+	header, _ := m.renderHeaderWithProgress()
+	return header
+}
+
+func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 	t := m.tab()
-	commentCount := 0
-	if t.state != nil {
-		commentCount = unresolvedCommentCount(t.state.Comments)
-	}
 	displayPath := t.displayPath()
 	if t.attachment != nil {
 		displayPath = t.attachment.Source
@@ -2474,20 +2492,70 @@ func (m AppModel) renderHeader() string {
 			position = fmt.Sprintf("L%d/%d", t.cursorLine, t.doc.LineCount())
 		}
 		suffix = " " + headerPathStyle.Foreground(lipgloss.Cyan).Render(position)
-		suffix += " · " + headerCountStyle.Render(countNoun(commentCount, "comment", "comments"))
-	} else {
-		suffix = " · " + headerCountStyle.Render(countNoun(commentCount, "comment", "comments"))
 	}
 	headerWidth := max(0, m.width-headerStyle.GetHorizontalFrameSize())
+	progress, regions := m.layoutProgressCounts(0, 0, -1)
+	progress = " " + progress
+	for i := range regions {
+		regions[i].rect.left++
+		regions[i].rect.right++
+	}
+	wrapProgress := m.width > 0 && ansi.StringWidth(prefix+suffix)+3+ansi.StringWidth(progress) > headerWidth
+	if t.selecting {
+		progress, regions = "", nil
+	}
+	progressWidth := 0
+	if progress != "" && !wrapProgress {
+		progressWidth = 3 + ansi.StringWidth(progress)
+	}
 	if m.width > 0 {
-		pathWidth := max(0, headerWidth-ansi.StringWidth(prefix)-ansi.StringWidth(suffix))
+		pathWidth := max(0, headerWidth-ansi.StringWidth(prefix)-ansi.StringWidth(suffix)-progressWidth)
 		displayPath = truncateLeftToWidth(displayPath, pathWidth)
 	}
 	headerContent := prefix + inlineBackground(headerPathStyle, headerPathStyle.Render(displayPath+suffix))
-	if m.width > 0 {
-		headerContent = ansi.Truncate(headerContent, headerWidth, "")
+	progressLeft, progressTop := ansi.StringWidth(headerContent)+3, 0
+	if progress != "" {
+		if wrapProgress {
+			progress, regions = m.layoutProgressCounts(max(1, headerWidth-1), 0, -1)
+			lines := strings.Split(progress, "\n")
+			for i, line := range lines {
+				padding := max(0, headerWidth-1-ansi.StringWidth(line))
+				lines[i] = strings.Repeat(" ", padding) + inlineBackground(lipgloss.NewStyle().Background(buttonBackground), " "+line)
+				for j := range regions {
+					if regions[j].rect.top == i {
+						regions[j].rect.left += padding + 1
+						regions[j].rect.right += padding + 1
+					}
+				}
+			}
+			progress = strings.Join(lines, "\n")
+			headerContent += "\n"
+			progressLeft, progressTop = 0, 1
+		} else {
+			headerContent += "   "
+			if m.width > 0 {
+				progressLeft = headerWidth - ansi.StringWidth(progress)
+				headerContent += strings.Repeat(" ", max(0, progressLeft-ansi.StringWidth(headerContent)))
+			}
+			progress = inlineBackground(lipgloss.NewStyle().Background(buttonBackground), progress)
+		}
+		headerContent += progress
 	}
-	return m.renderReviewBar() + "\n" + headerStyle.Width(m.width).Render(headerContent)
+	if m.width > 0 {
+		lines := strings.Split(headerContent, "\n")
+		for i := range lines {
+			lines[i] = ansi.Truncate(lines[i], headerWidth, "")
+		}
+		headerContent = strings.Join(lines, "\n")
+	}
+	bar := m.renderReviewBar()
+	for i := range regions {
+		regions[i].rect.left += progressLeft + headerStyle.GetPaddingLeft()
+		regions[i].rect.right += progressLeft + headerStyle.GetPaddingLeft()
+		regions[i].rect.top += lipgloss.Height(bar) + progressTop + headerStyle.GetPaddingTop()
+		regions[i].rect.bottom += lipgloss.Height(bar) + progressTop + headerStyle.GetPaddingTop()
+	}
+	return bar + "\n" + inlineBackground(headerStyle, headerStyle.Width(m.width).Render(headerContent)), regions
 }
 
 // renderReviewBar renders the top bar: what is under review, the review-wide
@@ -2659,7 +2727,7 @@ func (m AppModel) placeModalCursor(v *tea.View, regions []modalMouseRegion) {
 func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	t := m.tab()
 
-	header := m.renderHeader()
+	header, progressRegions := m.renderHeaderWithProgress()
 
 	content := m.contentViewport.View()
 	if m.modal != noModal {
@@ -2686,7 +2754,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if footer != "" {
 		sections = append(sections, footer)
 	}
-	layout := renderedScreenLayout{}
+	layout := renderedScreenLayout{progressRegions: progressRegions}
 	if rect, ok := buttonRect(header, 0, m.searchButton()); ok && m.searchButton() != "" {
 		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
 	}
@@ -2876,6 +2944,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal == finishResolveModal || m.modal == finishAbortModal {
 		return m.handleFinishConfirmationMouse(mouse)
 	}
+	if m.modal == finishFormsModal {
+		return m.handleFinishFormsMouse(mouse)
+	}
 	if m.modal == finishModal {
 		return m.handleFinishModalMouse(mouse)
 	}
@@ -2910,6 +2981,12 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	_, imageLayout := m.renderReviewScreen()
+	for _, region := range imageLayout.progressRegions {
+		if region.rect.contains(mouse) {
+			m.jumpToProgress(region.kind)
+			return m, nil
+		}
+	}
 	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
 		m.toggleImages()
 		return m, nil
@@ -3878,6 +3955,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
+		{keys: "r/esc (forms)", desc: "review/cancel"},
+		{keys: "tab · enter (dialog counters)", desc: "focus count · jump to first pending/completed item"},
 	}, innerWidth)
 
 	search := renderHelpGroup("Incremental search", []helpItem{
@@ -4421,8 +4500,13 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		content, resolveRegions := m.finishResolveContent(innerWidth)
 		regions = append(regions, resolveRegions...)
 		modalContent = frameStyle.Width(modalWidth).Render(content)
+	case finishFormsModal:
+		frameStyle = frameStyle.BorderForeground(lipgloss.Yellow)
+		content, formRegions := m.finishFormsContent(innerWidth)
+		regions = append(regions, formRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(content)
 	case finishModal:
-		frameStyle = frameStyle.BorderForeground(finishColor(m.finishVerdict))
+		frameStyle = frameStyle.BorderForeground(m.finishAttentionColor())
 		content, finishRegions := m.finishModalContent(innerWidth)
 		regions = append(regions, finishRegions...)
 		modalContent = frameStyle.Width(modalWidth).Render(content)

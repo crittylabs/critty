@@ -87,10 +87,6 @@ var (
 			Foreground(lipgloss.BrightWhite).
 			Background(accent)
 
-	// headerCountStyle shows the comment count in plain white, which reads
-	// on the magenta header where blue does not.
-	headerCountStyle = headerPathStyle.Bold(false).Foreground(lipgloss.White)
-
 	commentStyle = lipgloss.NewStyle().
 			Foreground(muted).
 			PaddingLeft(1)

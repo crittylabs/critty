@@ -4,15 +4,17 @@
 
 ### Features
 
-- Switch to the previous or next file tab with `M-{` or `M-}`, alongside `S-TAB` and `TAB`.
-
 - **Experimental AI review:** Get second opinions with `crit-ai-review`, or refine work with another AI using `crit-ai-cowork` before final human review.  Both require an existing Critty session and authorized reviewer access.  Reviewers post findings and manage their own threads; your agent makes edits and runs checks.  All agent install targets include these skills, with restricted CLI setups for Claude Code (Python 3.10+) and Codex (Python 3.11+ with the MCP SDK).  See the [README](https://github.com/crittylabs/critty#ai-review-and-collaboration-experimental) for usage and setup.
+
+- Navigate attachment checkboxes and choices alongside review threads.  `[` / `]` visit every thread and form item; `{` / `}` visit unresolved threads and unanswered required items.  `n` / `N` visit diff hunks, unresolved threads, unanswered required items, and optional form items.  A required choice group has one unresolved stop until answered.  See the [navigation table](https://github.com/crittylabs/critty#review-navigation).
+
+- Added actionable counters to the main screen and decision dialogs to show item counts and completion status.  Click a counter to jump to an item.  Prominent messages and colors highlight unresolved threads and unanswered items to help prevent omissions.  Required answers block approval; optional answers remain optional, and unchecked consents stay unauthorized.
+
+- Switch to the previous or next file tab with `M-{` or `M-}`, alongside `S-TAB` and `TAB`.
 
 - Export verdicts, feedback, and attachment identities as compact JSON with `--summary FILE`.  Bundled skills use it to read results and retain original human feedback for host permission checks.
 
 ### Changed
-
-- Navigate attachment checkboxes and choices alongside review threads.  `[` / `]` visit every thread and form item; `{` / `}` visit unresolved threads and unanswered required items.  `n` / `N` visit diff hunks, unresolved threads, unanswered required items, and optional form items.  A required choice group has one unresolved stop until answered.  See the [navigation table](https://github.com/crittylabs/critty#review-navigation).
 
 - Configuration uses `~/.config/critty/config.json` and `.critty.config.json`, falling back to the legacy TCrit file only when the new file is absent at that level.  Custom prompts use the corresponding `critty/prompts/` and `.critty/prompts/` directories, with TCrit paths as fallbacks.  Project settings still override global settings, and review storage stays unchanged.
 

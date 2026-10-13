@@ -21,6 +21,12 @@ const (
 	finishSubmit
 	finishBack
 	finishAbort
+	finishProgressStart
+)
+
+const (
+	finishReviewForms = iota
+	finishCancelForms
 )
 
 func (m *AppModel) defaultFinishVerdict() review.Verdict {
@@ -120,7 +126,7 @@ func (m *AppModel) saveFinishDraft() {
 // SaveUnsubmittedDraft preserves the editor when the program is stopped
 // externally rather than through the modal's own controls.
 func (m *AppModel) SaveUnsubmittedDraft() error {
-	if (m.modal != finishModal && m.modal != finishResolveModal && m.modal != finishAbortModal) || m.session == nil || m.session.CJ.RoundState.Finished {
+	if (m.modal != finishModal && m.modal != finishResolveModal && m.modal != finishAbortModal && m.modal != finishFormsModal) || m.session == nil || m.session.CJ.RoundState.Finished {
 		return nil
 	}
 	m.err = nil
@@ -140,6 +146,10 @@ func (m *AppModel) closeFinishModal() {
 }
 
 func (m *AppModel) finishFocusedAction() (tea.Model, tea.Cmd) {
+	if m.modalFocus >= finishProgressStart {
+		m.jumpToProgress(progressKind(m.modalFocus - finishProgressStart))
+		return m, nil
+	}
 	switch m.modalFocus {
 	case finishApprove, finishReject, finishComment, finishSubmit:
 		return m.doFinish()
@@ -149,6 +159,16 @@ func (m *AppModel) finishFocusedAction() (tea.Model, tea.Cmd) {
 		return m.requestFinishAbort()
 	}
 	return m, nil
+}
+
+func (m *AppModel) finishFocusOrder() []int {
+	order := []int{finishApprove, finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort}
+	for _, count := range m.progressCounts() {
+		if count.total > 0 {
+			order = append(order, finishProgressStart+int(count.kind))
+		}
+	}
+	return order
 }
 
 func (m *AppModel) requestFinishAbort() (tea.Model, tea.Cmd) {
@@ -173,7 +193,7 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if msg.String() == "shift+tab" {
 			delta = -1
 		}
-		order := []int{finishApprove, finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort}
+		order := m.finishFocusOrder()
 		index := slices.Index(order, m.modalFocus)
 		m.modalFocus = order[(index+delta+len(order))%len(order)]
 		if m.modalFocus == finishText {
@@ -217,10 +237,12 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m.requestFinishAbort()
 	case "left", "h":
-		m.modalFocus = max(finishApprove, m.modalFocus-1)
+		order := m.finishFocusOrder()
+		m.modalFocus = order[max(0, slices.Index(order, m.modalFocus)-1)]
 		m.selectFinishVerdict(m.modalFocus)
 	case "right", "l":
-		m.modalFocus = min(finishAbort, m.modalFocus+1)
+		order := m.finishFocusOrder()
+		m.modalFocus = order[min(len(order)-1, slices.Index(order, m.modalFocus)+1)]
 		m.selectFinishVerdict(m.modalFocus)
 	case "up", "k":
 		m.scrollFinishReference(-1)
@@ -260,12 +282,69 @@ func (m AppModel) finishTextareaHeight() int {
 	return max(1, min(5, m.height-22))
 }
 
-func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(finishColor(m.finishVerdict)).Render("Submit review"), width)
-	content := title + "\n"
-	if m.height >= 18 && len(m.missingForms()) > 0 {
-		content += lipgloss.Wrap("Approve requires all confirmations.", width, "") + "\n"
+func (m *AppModel) finishStatus(width int) string {
+	text, _ := m.layoutProgressCounts(width, 0, -1)
+	return text
+}
+
+func (m AppModel) optionalFormsNotice(width int) string {
+	hasOptional := false
+	for _, pending := range m.pendingForms() {
+		if !pending.item.Required {
+			hasOptional = true
+			break
+		}
 	}
+	if !hasOptional {
+		return ""
+	}
+	text := "Optional items remain unanswered."
+	if len(m.missingForms()) == 0 {
+		text += " You can still approve."
+	}
+	return lipgloss.Wrap(lipgloss.NewStyle().Foreground(warning).Render(text), width, "")
+}
+
+func (m AppModel) finishAttentionColor() color.Color {
+	if m.finishVerdict == review.VerdictReject || m.finishVerdict == review.VerdictComment {
+		return finishColor(m.finishVerdict)
+	}
+	if len(m.missingForms()) > 0 {
+		return lipgloss.Red
+	}
+	if len(m.pendingForms()) > 0 {
+		return warning
+	}
+	if m.unresolvedTotal() > 0 {
+		return lipgloss.Cyan
+	}
+	return success
+}
+
+func (m AppModel) finishNotices(width int) string {
+	var notices []string
+	if m.unresolvedTotal() > 0 {
+		notices = append(notices, "Unresolved threads remain.")
+	}
+	if len(m.missingForms()) > 0 {
+		notices = append(notices, "Required items remain unchecked or unselected.")
+	}
+	text := ""
+	if len(notices) > 0 {
+		text = lipgloss.Wrap(lipgloss.NewStyle().Foreground(lipgloss.Red).Render(strings.Join(notices, " ")), width, "")
+	}
+	if optional := m.optionalFormsNotice(width); optional != "" {
+		if text != "" {
+			text += "\n"
+		}
+		text += optional
+	}
+	return text
+}
+
+func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
+	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Submit review"), width)
+	content := title + "\n"
 	choices, choiceRegions := m.finishChoices(width, strings.Count(content, "\n"))
 	content += choices + "\n"
 	var reference strings.Builder
@@ -289,7 +368,9 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 	}
 	regions := append([]modalMouseRegion{closeRegion}, choiceRegions...)
 	buttons, _ := m.finishButtons(width, 0)
-	available := m.height - modalStyle.GetVerticalFrameSize() - lipgloss.Height(content) - m.finishTextareaHeight() - lipgloss.Height(buttons) - 4
+	progress, _ := m.layoutProgressCounts(width, 0, progressKind(m.modalFocus-finishProgressStart))
+	notice := m.finishNotices(width)
+	available := m.height - modalStyle.GetVerticalFrameSize() - lipgloss.Height(content) - m.finishTextareaHeight() - lipgloss.Height(buttons) - lipgloss.Height(progress) - lipgloss.Height(notice) - 4
 	if reference.Len() > 0 && available >= 3 {
 		height := min(8, available)
 		initialOffset := latestThreadStart + latestThread.initialOffset(height-2)
@@ -309,12 +390,13 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 	buttons, buttonRegions := m.finishButtons(width, strings.Count(content, "\n"))
 	content += buttons
 	regions = append(regions, buttonRegions...)
-	if m.height >= 18 {
-		hint := "a/r/c: select · Tab: focus · q: abort"
-		if m.modalFocus == finishText {
-			hint = "Tab: focus · C-s: focus Submit"
-		}
-		content += "\n" + footerStyle.Render(hint)
+	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n")+1, progressKind(m.modalFocus-finishProgressStart))
+	content += "\n" + progress
+	for _, region := range progressRegions {
+		regions = append(regions, modalMouseRegion{rect: region.rect, action: modalMouseAction{focus: finishProgressStart + int(region.kind)}})
+	}
+	if notice != "" {
+		content += "\n" + notice
 	}
 	return content, regions
 }
@@ -387,6 +469,114 @@ func (m *AppModel) backFromFinishConfirmation() {
 	m.recalculateLayout()
 }
 
+// confirmFormApproval preserves the required-answer gate and the separate
+// confirmation before resolving outstanding threads.
+func (m *AppModel) confirmFormApproval() (tea.Model, tea.Cmd) {
+	if len(m.missingForms()) > 0 {
+		m.clipboardStatus = "Complete required items before approving."
+		return m, nil
+	}
+	if m.unresolvedTotal() > 0 {
+		m.modal, m.modalFocus = finishResolveModal, 0
+		m.modalTextarea.Blur()
+		return m, nil
+	}
+	if m.modal == finishFormsModal {
+		m.modal = finishModal
+	}
+	return m.submitReview(review.VerdictApprove)
+}
+
+func (m *AppModel) finishFormsAction() (tea.Model, tea.Cmd) {
+	switch m.modalFocus {
+	case finishReviewForms:
+		pending := m.pendingForms()
+		m.closeFinishModal()
+		if m.modal != noModal {
+			return m, nil
+		}
+		if len(pending) > 0 {
+			first := pending[0]
+			m.selectComment(first.tab, commentTarget{formID: first.item.ID, line: first.item.Line})
+		}
+	case finishCancelForms:
+		m.backFromFinishConfirmation()
+	default:
+		if m.modalFocus >= finishProgressStart {
+			m.jumpToProgress(progressKind(m.modalFocus - finishProgressStart))
+		}
+	}
+	return m, nil
+}
+
+func (m *AppModel) handleFinishFormsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "r", "R":
+		m.modalFocus = finishReviewForms
+		return m.finishFormsAction()
+	case "c", "C", "n", "N", "esc":
+		m.backFromFinishConfirmation()
+	case "tab", "shift+tab", "left", "right", "up", "down", "h", "j", "k", "l":
+		order := []int{finishReviewForms, finishCancelForms}
+		for _, count := range m.progressCounts() {
+			if count.total > 0 {
+				order = append(order, finishProgressStart+int(count.kind))
+			}
+		}
+		step := 1
+		if msg.String() == "shift+tab" || msg.String() == "left" || msg.String() == "up" || msg.String() == "h" || msg.String() == "k" {
+			step = -1
+		}
+		index := max(0, slices.Index(order, m.modalFocus))
+		m.modalFocus = order[(index+step+len(order))%len(order)]
+	case "enter", "space", " ":
+		return m.finishFormsAction()
+	case "q", "ctrl+c":
+		return m.requestFinishAbort()
+	}
+	return m, nil
+}
+
+func (m *AppModel) handleFinishFormsMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
+	for _, region := range m.modalMouseRegions() {
+		if !region.rect.contains(mouse) {
+			continue
+		}
+		if region.action.close {
+			m.backFromFinishConfirmation()
+			return m, nil
+		}
+		if !region.action.dialog {
+			m.modalFocus = region.action.focus
+			return m.finishFormsAction()
+		}
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m AppModel) finishFormsContent(width int) (string, []modalMouseRegion) {
+	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(warning).Render("Unanswered form items"), width)
+	prefix := title + "\n"
+	required := len(m.missingForms()) > 0
+	if required {
+		prefix += lipgloss.Wrap(lipgloss.NewStyle().Foreground(lipgloss.Red).Bold(true).Render("Required items must be completed."), width, "") + "\n"
+	} else {
+		prefix += lipgloss.Wrap("Review unanswered items before approving.", width, "") + "\n"
+	}
+	prefix += "\n"
+	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
+		{rendered: m.renderModalButton("Review", "r", m.modalFocus == finishReviewForms), action: modalMouseAction{focus: finishReviewForms}},
+		{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == finishCancelForms), action: modalMouseAction{focus: finishCancelForms}},
+	}, width, strings.Count(prefix, "\n"))
+	content := prefix + buttons + "\n"
+	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n"), progressKind(m.modalFocus-finishProgressStart))
+	for _, region := range progressRegions {
+		regions = append(regions, modalMouseRegion{rect: region.rect, action: modalMouseAction{focus: finishProgressStart + int(region.kind)}})
+	}
+	return content + progress, append(regions, closeRegion)
+}
+
 func (m *AppModel) confirmFinishAction() (tea.Model, tea.Cmd) {
 	if m.modal == finishAbortModal {
 		return m, tea.Quit
@@ -402,8 +592,25 @@ func (m *AppModel) handleFinishConfirmationKey(msg tea.KeyPressMsg) (tea.Model, 
 	case "n", "N", "esc":
 		m.backFromFinishConfirmation()
 	case "tab", "shift+tab", "left", "right", "h", "l":
-		m.modalFocus = 1 - m.modalFocus
+		order := []int{0, 1}
+		if m.modal == finishResolveModal {
+			for _, count := range m.progressCounts() {
+				if count.total > 0 {
+					order = append(order, finishProgressStart+int(count.kind))
+				}
+			}
+		}
+		step := 1
+		if msg.String() == "shift+tab" || msg.String() == "left" || msg.String() == "h" {
+			step = -1
+		}
+		index := max(0, slices.Index(order, m.modalFocus))
+		m.modalFocus = order[(index+step+len(order))%len(order)]
 	case "enter":
+		if m.modal == finishResolveModal && m.modalFocus >= finishProgressStart {
+			m.jumpToProgress(progressKind(m.modalFocus - finishProgressStart))
+			return m, nil
+		}
 		if m.modalFocus == 0 {
 			return m.confirmFinishAction()
 		}
@@ -433,6 +640,10 @@ func (m *AppModel) handleFinishConfirmationMouse(mouse tea.Mouse) (tea.Model, te
 		if region.action.dialog {
 			return m, nil
 		}
+		if m.modal == finishResolveModal && region.action.focus >= finishProgressStart {
+			m.jumpToProgress(progressKind(region.action.focus - finishProgressStart))
+			return m, nil
+		}
 		if region.action.focus == 0 {
 			return m.confirmFinishAction()
 		}
@@ -444,13 +655,19 @@ func (m *AppModel) handleFinishConfirmationMouse(mouse tea.Mouse) (tea.Model, te
 
 func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Resolve all & approve?"), width)
-	info := fmt.Sprintf("Resolve all %d unresolved thread(s) before approving?", m.unresolvedTotal())
+	count := lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("%d unresolved thread(s)", m.unresolvedTotal()))
+	info := "Resolve all " + count + " before approving?"
 	prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", width, "")
 	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
 		{rendered: m.renderModalButton("Resolve All", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
-	return prefix + buttons, append(regions, closeRegion)
+	content := prefix + buttons + "\n"
+	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n"), progressKind(m.modalFocus-finishProgressStart))
+	for _, region := range progressRegions {
+		regions = append(regions, modalMouseRegion{rect: region.rect, action: modalMouseAction{focus: finishProgressStart + int(region.kind)}})
+	}
+	return content + progress, append(regions, closeRegion)
 }
 
 func (m AppModel) finishAbortContent(width int) (string, []modalMouseRegion) {

@@ -216,11 +216,16 @@ func TestFormNavigationFinishAndWrap(t *testing.T) {
 
 func formTestApp(t *testing.T) (AppModel, chan FinishEvent) {
 	t.Helper()
+	return formTestAppWithContent(t, "# Form\n- [ ] Required confirmation with a long label that wraps <!-- form: id=confirm required -->\n- [ ] Small <!-- form: id=size value=small -->\n- [ ] Large <!-- form: id=size value=large -->\n- [x] Publish <!-- form: id=publish consent -->\n\n```md\n- [ ] Example\n```\n")
+}
+
+func formTestAppWithContent(t *testing.T, content string) (AppModel, chan FinishEvent) {
+	t.Helper()
 	sess, err := review.OpenSession(t.TempDir(), "forms")
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := review.AttachedDocument{ID: "a", Source: "/missing/form.md", Name: "form.md", Content: "# Form\n- [ ] Required confirmation with a long label that wraps <!-- form: id=confirm required -->\n- [ ] Small <!-- form: id=size value=small -->\n- [ ] Large <!-- form: id=size value=large -->\n- [x] Publish <!-- form: id=publish consent -->\n\n```md\n- [ ] Example\n```\n"}
+	doc := review.AttachedDocument{ID: "a", Source: "/missing/form.md", Name: "form.md", Content: content}
 	ch := make(chan FinishEvent, 1)
 	app := NewApp("target.md", AppConfig{Session: sess, Documents: []review.AttachedDocument{doc}, Author: "Human", FinishCh: ch})
 	for i := range app.tabs {
@@ -328,6 +333,7 @@ func TestMissingFormFinishesAsFeedbackWithoutResolving(t *testing.T) {
 func TestFormApprovalAndResultFailure(t *testing.T) {
 	app, ch := formTestApp(t)
 	app.toggleForm(2)
+	app.toggleForm(3)
 	app.toggleForm(5)
 	_, cmd := app.doFinish()
 	if !isQuit(cmd) {
@@ -342,6 +348,8 @@ func TestFormApprovalAndResultFailure(t *testing.T) {
 	}
 	app, ch = formTestApp(t)
 	app.toggleForm(2)
+	app.toggleForm(3)
+	app.toggleForm(5)
 	if err := os.Mkdir(filepath.Join(app.session.Dir, "result-1.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -424,6 +432,7 @@ func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
 		t.Run(string(verdict), func(t *testing.T) {
 			app, ch := formTestApp(t)
 			app.toggleForm(2)
+			app.toggleForm(3)
 			app.toggleForm(5)
 			app.openFinishModal()
 			app.modalTextarea.SetValue("Overall comment retained on retry.")
