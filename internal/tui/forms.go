@@ -142,6 +142,7 @@ func (m *AppModel) toggleForm(line int) bool {
 		if line < item.Line || line > item.EndLine {
 			continue
 		}
+		m.tab().cursorOnForm = true
 		var value any = !form.Selected(item, d.Answers[item.ID])
 		if item.Choice {
 			value = item.Value

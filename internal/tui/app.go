@@ -1114,6 +1114,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 		if moved {
+			t.cursorOnForm = false
 			if t.cursorLine == 0 && !t.cursorOnAnnotation {
 				m.moveCursorBy(t, 1, 1)
 			}
@@ -2214,6 +2215,9 @@ type commentTarget struct {
 	line     int
 	side     string
 	annoIdx  int
+	formID   string
+	required bool
+	first    bool
 }
 
 // sidebarItem represents a comment in the sidebar list.
@@ -2961,6 +2965,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 				if control.rect.contains(point) {
 					m.focused = contentPane
 					m.tab().cursorLine, m.tab().cursorSide, m.tab().cursorOnAnnotation = control.line, "", false
+					m.tab().cursorOnForm = true
 					m.toggleForm(control.line)
 					return m, nil
 				}
@@ -2988,6 +2993,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 				t.cursorLine == target.line && t.cursorSide == target.side && t.cursorAnnoIdx == target.annotationIndex
 			t.cursorLine, t.cursorSide = target.line, target.side
 			t.cursorOnAnnotation = target.annotation
+			t.cursorOnForm = false
 			t.cursorAnnoIdx = target.annotationIndex
 			if !t.selecting && target.annotation {
 				point := tea.Mouse{X: mouse.X - left, Y: mouse.Y - top + m.contentViewport.YOffset()}
@@ -3276,6 +3282,7 @@ func (m *AppModel) updateMouseSelection(mouse tea.Mouse, autoScroll bool) {
 		}
 		t.cursorLine, t.cursorSide = target.line, target.side
 		t.cursorOnAnnotation = false
+		t.cursorOnForm = false
 		t.cursorAnnoIdx = 0
 		t.selecting = true
 		m.rebuildContent()
@@ -3515,6 +3522,7 @@ func (m *AppModel) selectSidebarItem(i int) {
 	if !isGeneralCommentScope(item.scope) {
 		t.cursorLine, t.cursorSide = item.line, item.side
 		t.cursorOnAnnotation = false
+		t.cursorOnForm = false
 		t.cursorAnnoIdx = 0
 		m.scrollToAnnotation(item.side, item.line, item.endLine)
 	}
@@ -3747,7 +3755,7 @@ func (m AppModel) renderFooter() string {
 			enterAction = "toggle thread"
 		}
 		items = []string{
-			k("[/]", "all comments"),
+			k("[/]", "threads/forms"),
 			k("{/}", "unresolved"),
 			k("s", "sidebar"),
 			k("t", "files/comments"),
@@ -3764,7 +3772,7 @@ func (m AppModel) renderFooter() string {
 		if m.multiFile {
 			items = append([]string{
 				k("tab/S-tab", "next/prev tab"),
-				k("n/N", "change/open comment"),
+				k("n/N", "change/open/form"),
 			}, items...)
 		}
 	}
@@ -3848,7 +3856,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "PgUp/PgDn", desc: "half page"},
 		{keys: "shift+↑/↓,C-u/d", desc: "half page"},
 		{keys: "Home/End,g/G,</>", desc: "top/bottom"},
-		{keys: "[/]", desc: "comments"},
+		{keys: "[/]", desc: "threads/forms"},
 	}, columnWidth)
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
 		{keys: "{/}", desc: "unresolved"},
@@ -3859,7 +3867,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "tab/shift+tab", desc: "next/prev file"},
 		{keys: "alt+}/alt+{", desc: "next/prev file"},
 		{keys: "1-9", desc: "file tab"},
-		{keys: "n/N", desc: "diff/open"},
+		{keys: "n/N", desc: "diff/open/form"},
 		{keys: "↑/↓", desc: "choose file"},
 		{keys: "enter/esc", desc: "open/cancel"},
 	}, columnWidth)

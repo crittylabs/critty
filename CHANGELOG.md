@@ -12,6 +12,8 @@
 
 ### Changed
 
+- Navigate attachment checkboxes and choices alongside review threads.  `[` / `]` visit every thread and form item; `{` / `}` visit unresolved threads and unanswered required items.  `n` / `N` visit diff hunks, unresolved threads, unanswered required items, and optional form items.  A required choice group has one unresolved stop until answered.  See the [navigation table](https://github.com/crittylabs/critty#review-navigation).
+
 - Configuration uses `~/.config/critty/config.json` and `.critty.config.json`, falling back to the legacy TCrit file only when the new file is absent at that level.  Custom prompts use the corresponding `critty/prompts/` and `.critty/prompts/` directories, with TCrit paths as fallbacks.  Project settings still override global settings, and review storage stays unchanged.
 
 - **Resolve** and **Images** controls underline their shortcut keys, `r` and `I`; the Images button uses less footer space.

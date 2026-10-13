@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,8 +11,208 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/form"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestFormNavigationTargets(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		key  rune
+		want []string
+	}{
+		{"changes", 'n', []string{"hunk:2", "confirm:2", "inline", "size:3", "publish:5", "hunk:1", "main"}},
+		{"all", ']', []string{"confirm:2", "inline", "size:3", "resolved", "size:4", "publish:5", "main"}},
+		{"unresolved", '}', []string{"confirm:2", "inline", "size:3", "main"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app, _ := formTestApp(t)
+			for i := range app.forms.Documents[0].Items {
+				if app.forms.Documents[0].Items[i].ID == "size" {
+					app.forms.Documents[0].Items[i].Required = true
+				}
+			}
+			app.tabs[0].state.Comments = []review.Comment{
+				{ID: "file", Scope: "file", Body: "File"},
+				{ID: "inline", StartLine: 2, EndLine: 2, Body: "Inline"},
+				{ID: "resolved", StartLine: 3, EndLine: 3, Body: "Resolved", Resolved: true},
+			}
+			app.tabs[0].changeChunks = []changeChunk{{startLine: 2, endLine: 2}}
+			app.tabs[1].state.Comments = []review.Comment{{ID: "main", StartLine: 1, EndLine: 1, Body: "Main"}}
+			app.tabs[1].changeChunks = []changeChunk{{startLine: 1, endLine: 1}}
+			app.selectComment(0, app.commentTargets(0)[0])
+			position := func() string {
+				if id := app.selectedCommentID(); id != "" {
+					return id
+				}
+				if app.tab().cursorOnForm {
+					return fmt.Sprintf("%s:%d", app.formRows[app.tab().path][app.tab().cursorLine].item.ID, app.tab().cursorLine)
+				}
+				return fmt.Sprintf("hunk:%d", app.tab().cursorLine)
+			}
+			for _, want := range tt.want {
+				app = pressKey(app, tt.key)
+				if got := position(); got != want || app.modal != noModal {
+					t.Fatalf("%c reached %s (modal %v), want %s", tt.key, got, app.modal, want)
+				}
+			}
+			if len(app.missingForms()) != 2 {
+				t.Fatal("navigation changed the answers")
+			}
+			app = pressKey(app, tt.key)
+			if tt.key == 'n' {
+				if position() != "main" || app.modal != noModal {
+					t.Fatal("change navigation did not stop at the end")
+				}
+			} else if app.modal != finishModal {
+				t.Fatal("forward navigation did not open Submit at the end")
+			} else {
+				app = pressKey(app, tea.KeyEscape)
+			}
+			backward := map[rune]rune{'n': 'N', ']': '[', '}': '{'}[tt.key]
+			for i := len(tt.want) - 2; i >= 0; i-- {
+				app = pressKey(app, backward)
+				if got := position(); got != tt.want[i] {
+					t.Fatalf("%c reached %s, want %s", backward, got, tt.want[i])
+				}
+			}
+			app = pressKey(app, backward)
+			if position() != "file" {
+				t.Fatal("backward navigation skipped the file comment")
+			}
+			app = pressKey(app, backward)
+			want := "main"
+			if backward == 'N' {
+				want = "file"
+			}
+			if position() != want {
+				t.Fatalf("backward boundary reached %s, want %s", position(), want)
+			}
+		})
+	}
+}
+
+func TestRequiredFormNavigationUsesValidHumanAnswers(t *testing.T) {
+	for _, human := range []bool{false, true} {
+		t.Run(fmt.Sprintf("human=%t", human), func(t *testing.T) {
+			app, _ := formTestApp(t)
+			d := &app.forms.Documents[0]
+			for i := range d.Items {
+				d.Items[i].Required = true
+			}
+			d.Answers["confirm"] = form.Answer{Value: true, Human: human}
+			d.Answers["size"] = form.Answer{Value: "large", Human: human}
+			d.Answers["publish"] = form.Answer{Value: true, Human: human}
+			for _, target := range app.reviewTargets(0) {
+				if target.resolved != human {
+					t.Fatalf("%s resolved=%t, want %t", target.formID, target.resolved, human)
+				}
+			}
+			app.tabs[1].state.Comments = []review.Comment{{ID: "main", StartLine: 1, EndLine: 1}}
+			app.tab().cursorLine = 1
+			app = pressKey(app, '}')
+			if human {
+				if app.selectedCommentID() != "main" {
+					t.Fatal("answered required items were not skipped")
+				}
+			} else if app.tab().cursorLine != 2 || !app.tab().cursorOnForm {
+				t.Fatal("nonhuman answer resolved a required item")
+			}
+			app.activeTab = 0
+			app.tab().cursorLine, app.tab().cursorOnForm = 1, false
+			app = pressKey(app, 'n')
+			if human && app.selectedCommentID() != "main" {
+				t.Fatal("change navigation included answered required items")
+			}
+			if !human && (app.tab().cursorLine != 2 || !app.tab().cursorOnForm) {
+				t.Fatal("change navigation skipped an unanswered required item")
+			}
+			app.activeTab = 0
+			app.tab().cursorLine, app.tab().cursorOnForm = 1, false
+			for _, line := range []int{2, 3, 4, 5} {
+				app = pressKey(app, ']')
+				if app.tab().cursorLine != line || !app.tab().cursorOnForm {
+					t.Fatalf("all-item navigation reached %d, want %d", app.tab().cursorLine, line)
+				}
+			}
+			app.selectComment(0, app.reviewTargets(0)[0])
+			app = pressKey(app, ' ')
+			if !app.reviewTargets(0)[0].unresolved() {
+				t.Fatal("unchecking a required checkbox did not reopen it")
+			}
+		})
+	}
+}
+
+func TestOptionalChoiceNavigationAndFormFocus(t *testing.T) {
+	app, _ := formTestApp(t)
+	app.tab().cursorLine = 2
+	app = pressKey(app, ' ')
+	for _, line := range []int{3, 4, 5} {
+		app = pressKey(app, 'n')
+		if app.tab().cursorLine != line || !app.tab().cursorOnForm {
+			t.Fatalf("optional navigation reached %d, want %d", app.tab().cursorLine, line)
+		}
+	}
+	app = pressKey(app, '?')
+	app = typeSearch(app, "Small")
+	if app.tab().cursorOnForm {
+		t.Fatal("search kept form focus")
+	}
+	app = pressKey(app, tea.KeyEscape)
+	if app.tab().cursorLine != 5 || !app.tab().cursorOnForm {
+		t.Fatal("search cancellation did not restore form focus")
+	}
+	app = pressKey(app, 'N')
+	if app.tab().cursorLine != 4 || !app.tab().cursorOnForm {
+		t.Fatal("restored focus skipped an optional choice")
+	}
+	app = pressKey(app, 'k')
+	if app.tab().cursorOnForm {
+		t.Fatal("line movement kept form navigation focus")
+	}
+	app.tabs[1].state.Comments = []review.Comment{{ID: "main", StartLine: 1, EndLine: 1}}
+	app = pressKey(app, '}')
+	if app.selectedCommentID() != "main" {
+		t.Fatal("unresolved navigation included optional form items")
+	}
+}
+
+func TestFormNavigationFinishAndWrap(t *testing.T) {
+	for _, key := range []rune{']', '}'} {
+		t.Run(string(key), func(t *testing.T) {
+			app, _ := formTestApp(t)
+			app.tabs = app.tabs[:1]
+			app.multiFile = false
+			app.tab().cursorLine = 1
+			app = pressKey(app, key)
+			first := app.tab().cursorLine
+			if first != 2 || !app.tab().cursorOnForm {
+				t.Fatal("did not focus the first form control")
+			}
+			if key == ']' {
+				for range 3 {
+					app = pressKey(app, key)
+				}
+			}
+			last := app.tab().cursorLine
+			app = pressKey(app, key)
+			if app.modal != finishModal || app.tab().cursorLine != last {
+				t.Fatal("last form control did not open Submit without moving")
+			}
+			app = pressKey(app, tea.KeyEscape)
+			app.selectComment(0, app.reviewTargets(0)[0])
+			backward := '['
+			if key == '}' {
+				backward = '{'
+			}
+			app = pressKey(app, backward)
+			if app.tab().cursorLine != last || !app.tab().cursorOnForm {
+				t.Fatal("backward navigation did not wrap to the last matching control")
+			}
+		})
+	}
+}
 
 func formTestApp(t *testing.T) (AppModel, chan FinishEvent) {
 	t.Helper()

@@ -173,6 +173,7 @@ type isearchState struct {
 	originTab          int
 	origin             lineRef
 	originOnAnnotation bool
+	originOnForm       bool
 	originAnnoIdx      int
 	originOffset       int
 }
@@ -360,6 +361,7 @@ func (m *AppModel) startISearch(forward bool) {
 		originTab:          m.activeTab,
 		origin:             lineRef{side: t.cursorSide, line: t.cursorLine},
 		originOnAnnotation: t.cursorOnAnnotation,
+		originOnForm:       t.cursorOnForm,
 		originAnnoIdx:      t.cursorAnnoIdx,
 		originOffset:       m.contentViewport.YOffset(),
 	}
@@ -660,6 +662,7 @@ func (m *AppModel) isearchLand(match isearchMatch, ok bool) {
 	t := m.tab()
 	t.cursorLine, t.cursorSide = match.ref.line, match.ref.side
 	t.cursorOnAnnotation, t.cursorAnnoIdx = false, 0
+	t.cursorOnForm = false
 	m.rebuildContent()
 	m.scrollToCursor()
 }
@@ -686,6 +689,7 @@ func (m *AppModel) restoreISearchOrigin() {
 	t := m.tab()
 	t.cursorLine, t.cursorSide = s.origin.line, s.origin.side
 	t.cursorOnAnnotation, t.cursorAnnoIdx = s.originOnAnnotation, s.originAnnoIdx
+	t.cursorOnForm = s.originOnForm
 	m.rebuildContent()
 	m.contentViewport.SetYOffset(s.originOffset)
 }

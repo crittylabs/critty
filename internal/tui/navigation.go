@@ -1,6 +1,10 @@
 package tui
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/crittylabs/critty/internal/form"
+)
 
 // selectionRange returns the ordered start/end of the current selection.
 // If not selecting, returns cursorLine, cursorLine.
@@ -138,9 +142,62 @@ func (m *AppModel) targetPosition(t *FileTab, target commentTarget) int {
 	return m.visualLineIndex(t, lineRef{side: target.side, line: target.line})
 }
 
+// reviewTargets adds form controls to the comment stops in display order.
+// Required choices share a resolution state and one unresolved stop per group.
+func (m *AppModel) reviewTargets(tabIndex int) []commentTarget {
+	targets := m.commentTargets(tabIndex)
+	if m.forms == nil {
+		return targets
+	}
+	t := &m.tabs[tabIndex]
+	d := m.forms.Document(t.path)
+	if d == nil || len(d.Items) == 0 {
+		return targets
+	}
+	seen := map[string]bool{}
+	for _, item := range d.Items {
+		targets = append(targets, commentTarget{
+			formID: item.ID, line: item.Line, required: item.Required,
+			resolved: !item.Required || form.Satisfied(item, d.Answers[item.ID]),
+			first:    !seen[item.ID],
+		})
+		seen[item.ID] = true
+	}
+	positions := map[lineRef]int{}
+	for i, ref := range m.visualLines(t) {
+		positions[ref] = i
+	}
+	position := func(target commentTarget) int {
+		if target.line == 0 {
+			return -1
+		}
+		if pos, ok := positions[lineRef{side: target.side, line: target.line}]; ok {
+			return pos
+		}
+		return -1
+	}
+	sort.SliceStable(targets, func(i, j int) bool {
+		left, right := targets[i], targets[j]
+		if left.line == right.line && left.side == right.side {
+			// Controls are in the source row; comments follow that row.
+			return left.formID != "" && right.formID == ""
+		}
+		return position(left) < position(right)
+	})
+	return targets
+}
+
+func (target commentTarget) unresolved() bool {
+	return !target.resolved && (target.formID == "" || target.first)
+}
+
+func (target commentTarget) changeStop() bool {
+	return target.unresolved() || target.formID != "" && !target.required
+}
+
 // currentCommentTarget returns the index of the target the user is on: the
 // selected sidebar item when the sidebar has focus, otherwise the focused
-// inline annotation.
+// inline annotation or form control.
 func (m *AppModel) currentCommentTarget(targets []commentTarget) int {
 	t := m.tab()
 	if m.focused == commentPane {
@@ -156,7 +213,14 @@ func (m *AppModel) currentCommentTarget(targets []commentTarget) int {
 	}
 	if t.cursorOnAnnotation {
 		for i, target := range targets {
-			if target.line == t.cursorLine && target.side == t.cursorSide && target.annoIdx == t.cursorAnnoIdx {
+			if target.formID == "" && target.line == t.cursorLine && target.side == t.cursorSide && target.annoIdx == t.cursorAnnoIdx {
+				return i
+			}
+		}
+	}
+	if m.focused == contentPane && t.cursorOnForm && !t.cursorOnAnnotation && t.cursorSide == "" {
+		for i, target := range targets {
+			if target.formID != "" && target.line == t.cursorLine {
 				return i
 			}
 		}
@@ -164,7 +228,7 @@ func (m *AppModel) currentCommentTarget(targets []commentTarget) int {
 	return -1
 }
 
-// jumpToComment moves to the adjacent comment in tab, line, and annotation
+// jumpToComment moves to the adjacent thread or form control in display
 // order, wrapping across the entire review.
 func (m *AppModel) jumpToComment(step int, includeResolved bool) bool {
 	tabIndex, target, ok := m.adjacentComment(step, includeResolved)
@@ -175,10 +239,10 @@ func (m *AppModel) jumpToComment(step int, includeResolved bool) bool {
 }
 
 // nextCommentOrFinish moves to the next comment like jumpToComment, except
-// that on the last thread of the review it opens the finish dialog instead of
+// that on the last matching target it opens the finish dialog instead of
 // wrapping around to the first.
 func (m *AppModel) nextCommentOrFinish(includeResolved bool) {
-	if m.currentCommentTarget(m.commentTargets(m.activeTab)) >= 0 {
+	if m.currentCommentTarget(m.reviewTargets(m.activeTab)) >= 0 {
 		if _, _, ok := m.adjacentCommentNoWrap(1, includeResolved); !ok {
 			m.openFinishModal()
 			return
@@ -200,12 +264,12 @@ func (m *AppModel) adjacentCommentNoWrap(step int, includeResolved bool) (int, c
 // from the opposite end of the review until it returns to the current tab.
 func (m *AppModel) findAdjacentComment(step int, includeResolved, wrap bool) (int, commentTarget, bool) {
 	t := m.tab()
-	targets := m.commentTargets(m.activeTab)
+	targets := m.reviewTargets(m.activeTab)
 	current := m.currentCommentTarget(targets)
 
 	if current >= 0 {
 		for adjacent := current + step; adjacent >= 0 && adjacent < len(targets); adjacent += step {
-			if targets[adjacent].resolved && !includeResolved {
+			if !includeResolved && !targets[adjacent].unresolved() {
 				continue
 			}
 			return m.activeTab, targets[adjacent], true
@@ -214,13 +278,13 @@ func (m *AppModel) findAdjacentComment(step int, includeResolved, wrap bool) (in
 		cursor := m.visualLineIndex(t, lineRef{side: t.cursorSide, line: t.cursorLine})
 		if step > 0 {
 			for _, target := range targets {
-				if (includeResolved || !target.resolved) && m.targetPosition(t, target) >= cursor {
+				if (includeResolved || target.unresolved()) && m.targetPosition(t, target) >= cursor {
 					return m.activeTab, target, true
 				}
 			}
 		} else {
 			for i := len(targets) - 1; i >= 0; i-- {
-				if (includeResolved || !targets[i].resolved) && m.targetPosition(t, targets[i]) <= cursor {
+				if (includeResolved || targets[i].unresolved()) && m.targetPosition(t, targets[i]) <= cursor {
 					return m.activeTab, targets[i], true
 				}
 			}
@@ -234,7 +298,7 @@ func (m *AppModel) findAdjacentComment(step int, includeResolved, wrap bool) (in
 		} else if tabIndex < 0 || tabIndex >= len(m.tabs) {
 			break
 		}
-		targets = m.commentTargets(tabIndex)
+		targets = m.reviewTargets(tabIndex)
 		if len(targets) == 0 {
 			continue
 		}
@@ -243,7 +307,7 @@ func (m *AppModel) findAdjacentComment(step int, includeResolved, wrap bool) (in
 			start = len(targets) - 1
 		}
 		for i := start; i >= 0 && i < len(targets); i += step {
-			if targets[i].resolved && !includeResolved {
+			if !includeResolved && !targets[i].unresolved() {
 				continue
 			}
 			return tabIndex, targets[i], true
@@ -261,7 +325,8 @@ func (m *AppModel) selectComment(tabIndex int, target commentTarget) {
 	}
 	m.focused = contentPane
 	t.cursorLine, t.cursorSide = target.line, target.side
-	t.cursorOnAnnotation = true
+	t.cursorOnAnnotation = target.formID == ""
+	t.cursorOnForm = target.formID != ""
 	t.cursorAnnoIdx = target.annoIdx
 	m.rebuildContent()
 	m.updateCommentSidebar()
@@ -295,7 +360,7 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 		}
 		targets = append(targets, changeTarget{position: position, chunk: chunk})
 	}
-	for _, comment := range m.commentTargets(tabIndex) {
+	for _, comment := range m.reviewTargets(tabIndex) {
 		position := -1
 		if comment.line != 0 {
 			var ok bool
@@ -305,7 +370,7 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 			}
 		}
 		targets = append(targets, changeTarget{position: position, comment: comment})
-		hasStop = hasStop || !comment.resolved
+		hasStop = hasStop || comment.changeStop()
 	}
 	if !hasStop {
 		chunk := changeChunk{}
@@ -320,11 +385,13 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 	return targets
 }
 
-// jumpToChange visits changes and unresolved comments in display order,
-// stopping at the beginning and end of the review.
+// jumpToChange visits changes, unresolved threads and required forms, and
+// optional form controls, stopping at the beginning and end of the review.
 func (m *AppModel) jumpToChange(step int) bool {
 	currentID := m.selectedCommentID()
 	t := m.tab()
+	reviewTargets := m.reviewTargets(m.activeTab)
+	currentReview := m.currentCommentTarget(reviewTargets)
 	cursor := m.visualLineIndex(t, lineRef{side: t.cursorSide, line: t.cursorLine})
 	if t.isBinary && !t.cursorOnAnnotation {
 		cursor = 0
@@ -338,9 +405,10 @@ func (m *AppModel) jumpToChange(step int) bool {
 	for tabIndex := m.activeTab; tabIndex >= 0 && tabIndex < len(m.tabs); tabIndex += step {
 		targets := m.changeTargets(tabIndex)
 		current := -1
-		if tabIndex == m.activeTab && currentID != "" {
+		if tabIndex == m.activeTab && (currentID != "" || currentReview >= 0) {
 			for i, target := range targets {
-				if target.comment.id == currentID {
+				if currentID != "" && target.comment.id == currentID ||
+					currentReview >= 0 && target.comment.formID != "" && target.comment == reviewTargets[currentReview] {
 					current = i
 					break
 				}
@@ -352,7 +420,7 @@ func (m *AppModel) jumpToChange(step int) bool {
 		}
 		for i := start; i >= 0 && i < len(targets); i += step {
 			target := targets[i]
-			if target.comment.resolved {
+			if (target.comment.id != "" || target.comment.formID != "") && !target.comment.changeStop() {
 				continue
 			}
 			if tabIndex == m.activeTab {
@@ -361,15 +429,15 @@ func (m *AppModel) jumpToChange(step int) bool {
 						continue
 					}
 				} else if step > 0 {
-					if target.position < cursor || (target.position == cursor && target.comment.id == "") {
+					if target.position < cursor || (target.position == cursor && target.comment.id == "" && target.comment.formID == "") {
 						continue
 					}
 				} else if target.position >= cursor {
 					continue
 				}
 			}
-			if target.comment.id != "" {
-				if m.hideComments {
+			if target.comment.id != "" || target.comment.formID != "" {
+				if target.comment.formID == "" && m.hideComments {
 					m.hideComments = false
 					m.recalculateLayout()
 				}
@@ -399,6 +467,7 @@ func (m *AppModel) selectChange(tabIndex int, chunk changeChunk) {
 	cursor := m.changeCursor(t, chunk)
 	t.cursorLine, t.cursorSide = cursor.line, cursor.side
 	t.cursorOnAnnotation = false
+	t.cursorOnForm = false
 	t.cursorAnnoIdx = 0
 	m.rebuildContent()
 	m.updateCommentSidebar()
