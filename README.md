@@ -34,7 +34,7 @@ Give inline feedback, approve a proposed action, or choose between alternatives.
 
 PNG, JPEG, GIF, and WebP previews work in terminals that implement the [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) with Unicode image placeholders, such as Kitty, Ghostty, and iTerm2.  Within these terminals, previews work through tmux or Herdr with passthrough enabled.  For tmux, enable forwarding with `tmux set -g allow-passthrough on`.  GIF previews use the first frame; animated WebP and images over 5 MiB or 16 megapixels keep a text placeholder, as do unsupported terminals.  Supplied diffs show changed images as text placeholders; local images in attached Markdown and comments can still appear.
 
-Press `I` or click **Images** to toggle previews.  Markdown and comment previews use local images; remote URLs are not fetched.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
+Press `I` or click **Images** to toggle previews or recheck support when images are unavailable.  Detection retries unanswered startup queries and checks again once on the first keypress if support remains unconfirmed.  Markdown and comment previews use local images; remote URLs are not fetched.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
 
 ## Install
 
@@ -327,7 +327,7 @@ Inside Herdr or tmux, Critty opens the review in a dedicated tab or split pane a
 | `r` / `R` | Toggle resolution / resolve and move to the next thread |
 | `w` | Toggle ignoring whitespace in diffs |
 | `h` / `H` | Fold resolved threads / hide comments |
-| `I` | Toggle image previews |
+| `I` | Toggle image previews or recheck support |
 | `alt+e` | Open the current line in `$EDITOR` |
 | `alt+?` | Show all keyboard shortcuts |
 | `q` | Open the finish dialog |
