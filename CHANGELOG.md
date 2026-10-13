@@ -6,17 +6,13 @@
 
 - Switch to the previous or next file tab with `M-{` or `M-}`, alongside `S-TAB` and `TAB`.
 
-- **Experimental:** Request AI second opinions with `crit-ai-review`, or let two agents refine work with `crit-ai-cowork` before final human review.  Both skills use an existing Critty session and an authorized reviewer connection.  Reviewer comments identify the tool and model as `{tool} {model} (reviewer)`; the requester keeps its existing author name.  Reviewers leave a short overall completion comment with their assessment and verification limits, even when there are no findings; requesters relay returned reports under the reviewer identity when needed.  Human checkpoints resume the same Critty session, preserving its threads and attachments across rounds.  All agent install targets include the skills and restricted reviewer tools for Claude Code (Python 3.10+) and Codex (Python 3.11+ with the MCP SDK): reviewers can investigate the workspace and post findings while the requester makes edits and runs checks.  Assignments describe permitted operations and how to continue after an optional operation is denied.
+- **Experimental AI review:** Get second opinions with `crit-ai-review`, or refine work with another AI using `crit-ai-cowork` before final human review.  Both require an existing Critty session and authorized reviewer access.  Reviewers post findings and manage their own threads; your agent makes edits and runs checks.  All agent install targets include these skills, with restricted CLI setups for Claude Code (Python 3.10+) and Codex (Python 3.11+ with the MCP SDK).  See the [README](https://github.com/crittylabs/critty#ai-review-and-collaboration-experimental) for usage and setup.
 
-- Save review verdicts, all feedback threads, and attachment identities with `--summary FILE`, so agents can read a compact JSON result without parsing finish messages or repeatedly loading unchanged attachment bodies.  The bundled review skill uses this result while retaining complete feedback and approval evidence.
-
-- Bundled skills carry the original human review request and its session context into host permission requests.  AI review assignments identify the external service, transmitted material, and local posting scope.  Automatic-review acceptance still depends on the host's policy and access to the original completion.
-
-- AI reviewers resolve their own findings after verifying a fix or response, or when a finding no longer applies.  If a human or another reviewer still appears to have an unresolved or unanswered concern in the same thread or about the same issue, the AI only replies that its own concern is satisfied and leaves the thread open.  Restricted Claude and Codex tools limit replies and resolution to requester-verified comment IDs and paths and save the reason as a reply.  Human and other reviewers' findings retain their resolution state.
+- Export verdicts, feedback, and attachment identities as compact JSON with `--summary FILE`.  Bundled skills use it to read results and retain original human feedback for host permission checks.
 
 ### Changed
 
-- Thread **Resolve** toggles and the **Images** footer button underline their shortcut keys, `r` and `I`, as the Submit dialog's choices do.  The Images button no longer shows a separate key hint, which saves footer space.
+- **Resolve** and **Images** controls underline their shortcut keys, `r` and `I`; the Images button uses less footer space.
 
 ## 1.0.0
 

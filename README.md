@@ -91,6 +91,7 @@ Keep the one-time marker shown by the Critty skill visible so the review opens i
 - [critty](internal/cli/skill/critty/SKILL.md) — runs the interactive review loop and handles feedback.
 - [critty-approval](internal/cli/skill/critty-approval/SKILL.md) — prepares drafts for human approval and checks the result before acting.
 - [critty-cli](internal/cli/skill/critty-cli/SKILL.md) — provides the detailed command and review-format reference.
+- [crit-ai-review](internal/cli/skill/crit-ai-review/SKILL.md) and [crit-ai-cowork](internal/cli/skill/crit-ai-cowork/SKILL.md) — add [experimental AI review and collaboration](#ai-review-and-collaboration-experimental).
 
 When you submit a round, the agent receives your comments and continues the workflow.  If its wait times out, send `hey` after submitting.
 
@@ -99,7 +100,7 @@ Run the installer from your home directory to install globally, or from a reposi
 #### Claude Code
 
 ```bash
-cd ~ && critty install claude-code   # ~/.claude/skills/{critty,critty-cli,critty-approval}/
+cd ~ && critty install claude-code   # Global skills under ~/.claude/skills/
 critty install claude-code           # From a repo root: install for that project
 ```
 
@@ -108,7 +109,7 @@ Then use `/critty [file]`.
 #### Codex
 
 ```bash
-cd ~ && critty install codex        # ~/.agents/skills/{critty,critty-cli,critty-approval}/
+cd ~ && critty install codex        # Global skills under ~/.agents/skills/
 critty install codex                # From a repo root: install for that project
 ```
 
@@ -117,7 +118,7 @@ Then use `$critty`.
 #### OpenCode
 
 ```bash
-cd ~ && critty install opencode     # ~/.config/opencode/commands/critty.md and ~/.config/opencode/skills/{critty-cli,critty-approval}/
+cd ~ && critty install opencode     # Global command and skills under ~/.config/opencode/
 critty install opencode             # From a repo root: install for that project
 ```
 
@@ -126,7 +127,7 @@ Then use `/critty [file]`.
 #### Gemini CLI
 
 ```bash
-cd ~ && critty install gemini        # ~/.gemini/skills/{critty,critty-cli,critty-approval}/
+cd ~ && critty install gemini        # Global skills under ~/.gemini/skills/
 critty install gemini                # From a repo root: install for that project
 ```
 
@@ -153,6 +154,25 @@ In Claude Code, invoke `/critty-approval`; in Codex, use `$critty-approval`.  In
 The agent prepares drafts for you to comment on and approve, then carries out the authorized actions.  You can answer choices and grant individual permissions in the same review.  Critty records the decisions; the agent executes the actions.
 
 See [Approvals and choices](#approvals-and-choices) for basic controls and [the approval skill](internal/cli/skill/critty-approval/SKILL.md) for the full workflow.
+
+### AI review and collaboration (Experimental)
+
+Ask another AI to review code or documents in an existing Critty session.  Choose the reviewer independently of the model doing the implementation, and follow the discussion in the same comment threads:
+
+- Use `crit-ai-review` for a second opinion.  Your agent reports the findings and waits for your feedback before making fixes or requesting another AI round.
+- Use `crit-ai-cowork` to let your agent address findings and exchange follow-up reviews with the other AI, then present the result for final human review.
+
+For example, ask your agent:
+
+> Use crit-ai-review with Claude Fable to review these changes in the current Critty session.
+
+> Use crit-ai-cowork with Astra to refine this implementation, then bring it back for my review.
+
+In Claude Code, invoke `/crit-ai-review` or `/crit-ai-cowork`; in Codex, use `$crit-ai-review` or `$crit-ai-cowork`.  In OpenCode and Gemini CLI, ask the agent to use the named skill.  Rerun `critty install` for your agent after upgrading to a build that includes these skills.
+
+The workflow requires an existing Critty session and authorized access to the selected AI through a host that can enforce restricted reviewer tools or return findings for your agent to post.  Reviewers inspect the workspace, post findings under their tool and model name, and can resolve their own findings after verification while preserving other participants' concerns.  Your agent makes edits and runs checks; human approval remains part of the workflow.
+
+Bundled restricted CLI setups cover Claude Code with Python 3.10+ and Codex with Python 3.11+ and the MCP Python SDK.  The installer copies their setup resources; it does not install Python dependencies.  Interfaces and supported launch configurations may change.  See the [AI review skill](internal/cli/skill/crit-ai-review/SKILL.md) for setup and the [cowork skill](internal/cli/skill/crit-ai-cowork/SKILL.md) for the collaboration loop.
 
 ### Building a custom flow
 
