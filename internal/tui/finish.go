@@ -374,9 +374,8 @@ func (m AppModel) finishChoices(width, top int) (string, []modalMouseRegion) {
 			symbol = "●"
 		}
 		style := lipgloss.NewStyle().Foreground(finishColor(option.verdict)).Background(buttonBackground).Bold(selected).Underline(m.modalFocus == finishApprove+i)
-		keyStyle := style.Underline(true)
 		choices = append(choices, modalButtonSpec{
-			rendered: style.Render(symbol+" ") + keyStyle.Render(option.label[:1]) + style.Render(option.label[1:]),
+			rendered: style.Render(symbol+" ") + renderAccessKey(option.label, style),
 			action:   modalMouseAction{focus: finishApprove + i, pick: true},
 		})
 	}

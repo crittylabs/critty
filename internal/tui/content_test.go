@@ -179,7 +179,7 @@ func TestRenderAnnotationBoxCollapsesResolvedThread(t *testing.T) {
 	})
 
 	box, _ := app.renderAnnotationBox(ann, 40, false)
-	if !strings.Contains(box, "Resolved") {
+	if !strings.Contains(ansi.Strip(box), "Resolved") {
 		t.Fatalf("resolved annotation box = %q", box)
 	}
 	if strings.Contains(box, "please fix") || strings.Contains(box, "fixed") {

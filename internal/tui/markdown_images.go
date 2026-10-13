@@ -303,5 +303,5 @@ func (m AppModel) imagesButton() string {
 	} else if !m.images.enabled {
 		state = "unavailable"
 	}
-	return renderBarButton(fmt.Sprintf("Images: %s", state), "I")
+	return renderAccessKeyBarButton(fmt.Sprintf("Images: %s", state))
 }

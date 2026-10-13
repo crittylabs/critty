@@ -454,17 +454,24 @@ func (m *AppModel) collapseResolved(resolved bool, round int) bool {
 	return resolved && (m.foldResolved || round == 0 || round < m.reviewRound())
 }
 
-func renderResolution(resolved bool, label string) string {
+// renderResolution renders the resolution checkbox followed by label.  With
+// accessKey, the first letter of label is underlined as the toggle key.
+func renderResolution(resolved bool, label string, accessKey bool) string {
 	checkbox := "☐"
 	style := inlineLabelComment.Foreground(lipgloss.Yellow)
 	if resolved {
 		checkbox = "☑︎"
 		style = resolvedBadge
 	}
-	if label != "" {
-		checkbox += " " + label
+	style = style.Background(buttonBackground)
+	switch {
+	case label == "":
+		return style.Render(checkbox)
+	case accessKey:
+		return style.Render(checkbox+" ") + renderAccessKey(label, style)
+	default:
+		return style.Render(checkbox + " " + label)
 	}
-	return style.Background(buttonBackground).Render(checkbox)
 }
 
 // renderCommentHeader appends the right-aligned action group
@@ -478,7 +485,7 @@ func renderCommentHeader(label string, resolved, deletable bool, width int) (str
 	if resolved {
 		resolveLabel = "Resolved"
 	}
-	resolve := renderResolution(resolved, resolveLabel)
+	resolve := renderResolution(resolved, resolveLabel, true)
 	resolveWidth := lipgloss.Width("☑︎ Resolved")
 	group := func(arrows bool) (string, commentHeaderRegion) {
 		actions := lipgloss.NewStyle().Width(resolveWidth).Render(resolve)

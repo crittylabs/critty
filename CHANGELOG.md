@@ -6,6 +6,10 @@
 
 - Save review verdicts, all feedback threads, and attachment identities with `--summary FILE`, so agents can read a compact JSON result without parsing finish messages or repeatedly loading unchanged attachment bodies.  The bundled review skill uses this result while retaining complete feedback and approval evidence.
 
+### Changed
+
+- Thread **Resolve** toggles and the **Images** footer button underline their shortcut keys, `r` and `I`, as the Submit dialog's choices do.  The Images button no longer shows a separate key hint, which saves footer space.
+
 ## 1.0.0
 
 Critty 1.0 brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.

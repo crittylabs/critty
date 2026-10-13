@@ -3927,6 +3927,19 @@ func renderBarButton(label, hint string) string {
 	return renderButton(label, hint, modalBtnFocusedLabel.Bold(true), modalBtnFocusedKey)
 }
 
+// renderAccessKeyBarButton renders a bar button whose key is the first
+// letter of its label, underlining that letter instead of adding a hint.
+func renderAccessKeyBarButton(label string) string {
+	return renderAccessKey(label+" ", modalBtnFocusedLabel.Bold(true))
+}
+
+// renderAccessKey underlines the first character of label to show that it
+// is the key that triggers the control.
+func renderAccessKey(label string, style lipgloss.Style) string {
+	_, size := utf8.DecodeRuneInString(label)
+	return style.Underline(true).Render(label[:size]) + style.Padding(0).Render(label[size:])
+}
+
 func renderButton(label, hint string, labelStyle, keyStyle lipgloss.Style) string {
 	if hint == "" {
 		return labelStyle.Render(label + " ")
@@ -4260,7 +4273,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		if m.hasModalResolution() {
 			comment, _ := m.driftedComment(m.editingID)
-			checkbox := renderResolution(comment.Resolved, "Resolved") + " " + modalBtnNormalKey.Render("M-r")
+			checkbox := renderResolution(comment.Resolved, "Resolved", false) + " " + modalBtnNormalKey.Render("M-r")
 			checkboxWidth := lipgloss.Width(checkbox)
 			left := max(0, innerWidth-checkboxWidth-3)
 			title = ansi.Truncate(modalTitleStyle.MarginBottom(0).Render(titleText), max(0, left-1), "…")

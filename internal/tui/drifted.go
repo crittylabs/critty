@@ -112,7 +112,7 @@ func (m *AppModel) decorateDrifted(content string, layout *renderedContentLayout
 		if len(ids) > 1 {
 			label += commentLineStyle.Foreground(lipgloss.Blue).Render(fmt.Sprintf(" %d", len(ids)))
 		}
-		label = renderResolution(resolved, "") + " " + label
+		label = renderResolution(resolved, "", false) + " " + label
 		prefix := "  "
 		for _, id := range ids {
 			if id == m.selectedCommentID() {

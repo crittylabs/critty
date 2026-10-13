@@ -1395,3 +1395,40 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 		t.Error("terminalIsDark is still true after a light background probe")
 	}
 }
+
+func TestAccessKeyUnderline(t *testing.T) {
+	resolve, _ := renderCommentHeader("", false, false, 40)
+	resolved, _ := renderCommentHeader("", true, false, 40)
+	for _, tt := range []struct {
+		name, rendered, want string
+	}{
+		{"resolve", resolve, "R"},
+		{"resolved", resolved, "R"},
+		{"images", renderAccessKeyBarButton("Images: on"), "I"},
+		{"edit dialog", renderResolution(true, "Resolved", false), ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var underlined strings.Builder
+			var pen uv.Style
+			parser := ansi.NewParser()
+			parser.SetHandler(ansi.Handler{
+				Print: func(r rune) {
+					if pen.Underline != uv.UnderlineNone {
+						underlined.WriteRune(r)
+					}
+				},
+				HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
+					if cmd == 'm' {
+						uv.ReadStyle(params, &pen)
+					}
+				},
+			})
+			for i := range len(tt.rendered) {
+				parser.Advance(tt.rendered[i])
+			}
+			if got := underlined.String(); got != tt.want {
+				t.Fatalf("underlined text = %q, want %q in %q", got, tt.want, tt.rendered)
+			}
+		})
+	}
+}
