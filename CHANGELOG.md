@@ -8,7 +8,7 @@
 
 - Navigate attachment checkboxes and choices alongside review threads.  `[` / `]` visit every thread and form item; `{` / `}` visit unresolved threads and unanswered required items.  `n` / `N` visit diff hunks, unresolved threads, unanswered required items, and optional form items.  A required choice group has one unresolved stop until answered.  See the [navigation table](https://github.com/crittylabs/critty#review-navigation).
 
-- Added actionable counters to the main screen and decision dialogs to show item counts and completion status.  Click a counter to jump to an item.  Prominent messages and colors highlight unresolved threads and unanswered items to help prevent omissions.  Required answers block approval; optional answers remain optional, and unchecked consents stay unauthorized.
+- Added actionable counters to the main screen and decision dialogs to show item counts and completion status.  Click a counter to jump to an item.  Tab titles flag unanswered checkboxes and choices.  Prominent messages and colors highlight unresolved threads and unanswered items to help prevent omissions.  Required answers block approval; optional answers remain optional, and unchecked consents stay unauthorized.
 
 - Switch to the previous or next file tab with `M-{` or `M-}`, alongside `S-TAB` and `TAB`.
 

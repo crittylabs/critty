@@ -2797,13 +2797,15 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 }
 
 type tabLabel struct {
-	text     string
-	rendered string
-	width    int
+	text       string
+	rendered   string
+	width      int
+	indicators string
 }
 
 func (m *AppModel) tabLabels() []tabLabel {
 	labels := make([]tabLabel, len(m.tabs))
+	indicators := m.tabFormIndicators()
 	for i, t := range m.tabs {
 		label := abbreviatedTabPath(t.displayPath())
 		start := strings.LastIndexByte(label, '/') + 1
@@ -2815,7 +2817,10 @@ func (m *AppModel) tabLabels() []tabLabel {
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
 		}
-		labels[i] = tabLabel{text: label}
+		if indicators[i] != "" {
+			label += " " + indicators[i]
+		}
+		labels[i] = tabLabel{text: label, indicators: indicators[i]}
 	}
 	return labels
 }
@@ -2846,7 +2851,29 @@ func (m *AppModel) renderTab(labels []tabLabel, i int, isFirst bool) string {
 	} else if isFirst {
 		border.BottomLeft = "├"
 	}
-	return style.Border(border).Render(labels[i].text)
+	label := labels[i].text
+	paneWidth := m.contentPaneWidth()
+	total := 0
+	for _, label := range labels {
+		total += ansi.StringWidth(label.text) + style.GetHorizontalFrameSize()
+	}
+	if total > paneWidth {
+		if m.activeTab > 0 {
+			paneWidth -= lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(m.activeTab, true), false))
+		}
+		if m.activeTab < len(labels)-1 {
+			paneWidth -= lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(len(labels)-m.activeTab-1, false), false))
+		}
+	}
+	available := max(1, paneWidth-style.GetHorizontalFrameSize())
+	if m.width > 0 && ansi.StringWidth(label) > available {
+		suffix := ""
+		if labels[i].indicators != "" {
+			suffix = " " + labels[i].indicators
+		}
+		label = ansi.Truncate(label, max(0, available-ansi.StringWidth(suffix)), "…") + suffix
+	}
+	return style.Border(border).Render(label)
 }
 
 func (m *AppModel) renderTabOverflowIndicator(text string, isFirst bool) string {
@@ -2856,6 +2883,19 @@ func (m *AppModel) renderTabOverflowIndicator(text string, isFirst bool) string 
 		border.BottomLeft = "├"
 	}
 	return style.Border(border).Render(text)
+}
+
+func (m *AppModel) tabOverflowText(count int, backwards bool) string {
+	if m.contentPaneWidth() < 32 {
+		if backwards {
+			return "↤"
+		}
+		return "↦"
+	}
+	if backwards {
+		return fmt.Sprintf("↤ %d more", count)
+	}
+	return fmt.Sprintf("%d more ↦", count)
 }
 
 func (m *AppModel) visibleTabWindow(labels []tabLabel) (int, int) {
@@ -2873,10 +2913,10 @@ func (m *AppModel) visibleTabWindow(labels []tabLabel) (int, int) {
 	}
 	leftWidth, rightWidth := 0, 0
 	if m.activeTab > 0 {
-		leftWidth = indicatorWidth(fmt.Sprintf("↤ %d more", m.activeTab))
+		leftWidth = indicatorWidth(m.tabOverflowText(m.activeTab, true))
 	}
 	if m.activeTab < len(labels)-1 {
-		rightWidth = indicatorWidth(fmt.Sprintf("%d more ↦", len(labels)-m.activeTab-1))
+		rightWidth = indicatorWidth(m.tabOverflowText(len(labels)-m.activeTab-1, false))
 	}
 
 	available := paneWidth - leftWidth - rightWidth
@@ -3009,7 +3049,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		start, end := m.visibleTabWindow(labels)
 		x := 0
 		if start > 0 {
-			indicator := m.renderTabOverflowIndicator(fmt.Sprintf("↤ %d more", start), true)
+			indicator := m.renderTabOverflowIndicator(m.tabOverflowText(start, true), true)
 			width := lipgloss.Width(indicator)
 			if mouse.X >= x && mouse.X < x+width {
 				m.selectTab(start - 1)
@@ -3025,7 +3065,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 			x += labels[i].width
 		}
 		if end < len(labels) {
-			indicator := m.renderTabOverflowIndicator(fmt.Sprintf("%d more ↦", len(labels)-end), false)
+			indicator := m.renderTabOverflowIndicator(m.tabOverflowText(len(labels)-end, false), false)
 			if mouse.X >= x && mouse.X < x+lipgloss.Width(indicator) {
 				m.selectTab(end)
 				return m, nil
@@ -3780,14 +3820,14 @@ func (m *AppModel) renderTabBar() string {
 
 	var parts []string
 	if start > 0 {
-		ind := m.renderTabOverflowIndicator(fmt.Sprintf("↤ %d more", start), true)
+		ind := m.renderTabOverflowIndicator(m.tabOverflowText(start, true), true)
 		parts = append(parts, ind)
 	}
 	for i := start; i < end; i++ {
 		parts = append(parts, m.renderTab(labels, i, i == start && start == 0))
 	}
 	if end < len(labels) {
-		ind := m.renderTabOverflowIndicator(fmt.Sprintf("%d more ↦", len(labels)-end), false)
+		ind := m.renderTabOverflowIndicator(m.tabOverflowText(len(labels)-end, false), false)
 		parts = append(parts, ind)
 	}
 

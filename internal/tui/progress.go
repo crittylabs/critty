@@ -77,6 +77,31 @@ func (m *AppModel) progressCounts() []progressCount {
 	return result
 }
 
+func (m *AppModel) tabFormIndicators() []string {
+	indicators := make([]string, len(m.tabs))
+	pending := make([][progressOptionalChoices + 1]bool, len(m.tabs))
+	for _, field := range m.pendingForms() {
+		pending[field.tab][formProgressKind(field.item)] = true
+	}
+	for tab, kinds := range pending {
+		for kind := progressRequiredChecks; kind <= progressOptionalChoices; kind++ {
+			if !kinds[kind] {
+				continue
+			}
+			symbol := "☐"
+			if kind == progressRequiredChoices || kind == progressOptionalChoices {
+				symbol = "○"
+			}
+			foreground := color.Color(warning)
+			if kind <= progressRequiredChoices {
+				foreground = lipgloss.Red
+			}
+			indicators[tab] += lipgloss.NewStyle().Foreground(foreground).Render(symbol)
+		}
+	}
+	return indicators
+}
+
 func (p progressCount) render(focused bool) string {
 	foreground := color.Color(warning)
 	if p.kind <= progressRequiredChoices {

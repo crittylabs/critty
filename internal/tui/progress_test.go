@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/review"
@@ -246,4 +247,39 @@ func TestResolveConfirmationCountersNavigateWithoutApproving(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestTabFormIndicatorsShowOnlyPendingKinds(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		app := progressTestApp(t, false)
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: 40, Height: 16})
+		if row := app.renderTabBar(); lipgloss.Width(row) > app.contentPaneWidth() || !strings.Contains(ansi.Strip(row), "☐○☐○") {
+			t.Fatalf("small terminal lost the indicators or overflowed: %q", row)
+		}
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: 110, Height: 30})
+		for _, step := range []struct {
+			lines []int
+			want  string
+		}{
+			{want: "☐○☐○"},
+			{lines: []int{2}, want: "○☐○"},
+			{lines: []int{3}, want: "☐○"},
+			{lines: []int{5, 6}, want: "○"},
+			{lines: []int{7}, want: ""},
+		} {
+			for _, line := range step.lines {
+				app.toggleForm(line)
+			}
+			indicators := app.tabFormIndicators()
+			if got := ansi.Strip(indicators[0]); got != step.want || indicators[1] != "" {
+				t.Fatalf("indicators = %q, want %q on the form tab only", indicators, step.want)
+			}
+			label := ansi.Strip(app.tabLabels()[0].text)
+			if step.want != "" && !strings.HasSuffix(label, " "+step.want) {
+				t.Fatalf("indicators are not at the title's right end: %q", label)
+			}
+		}
+	}
+	initAdaptiveStyles(true)
 }

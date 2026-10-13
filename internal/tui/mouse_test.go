@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -113,7 +112,7 @@ func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
 			x := 1
 			want := start - 1
 			if tt.right {
-				x = lipgloss.Width(app.renderTabOverflowIndicator("↤ "+strconv.Itoa(start)+" more", true))
+				x = lipgloss.Width(app.renderTabOverflowIndicator(app.tabOverflowText(start, true), true))
 				for i := start; i < end; i++ {
 					x += labels[i].width
 				}
