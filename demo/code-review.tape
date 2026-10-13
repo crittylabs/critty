@@ -54,7 +54,7 @@ Sleep 1s
 Show
 
 # Ask for a review; the critty skill opens the TUI in a tmux split pane.
-Type@40ms `Review the staged changes with Critty. Use "$DEMO_DIR/bin/critty" for every Critty command.`
+Type@40ms "Review the staged changes with Critty."
 Sleep 500ms
 Enter
 Wait+Screen@300s /Comments \(\d+\)/
@@ -75,15 +75,21 @@ Sleep 1.5s
 
 # Finish the round: the TUI closes and Claude Code addresses the comment.
 Type "q"
-Sleep 800ms
+Sleep 3s
 Enter
 
 # The next round opens with Claude's reply focused in the thread.
 Wait+Screen@600s /↳ /
 Sleep 3s
 
+# Read the fixed code below the thread, then return to the thread.
+Type@220ms "jjjjjjjj"
+Sleep 2.5s
+Type "["
+Sleep 1.5s
+
 # Resolve the thread and approve.
 Type "R"
-Sleep 1.5s
+Sleep 3s
 Enter
 Sleep 8s

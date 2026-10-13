@@ -15,7 +15,7 @@ A terminal UI for reviewing code and documents, approving actions, and making ch
 
 Give inline feedback, approve a proposed action, or choose between alternatives.  Handle these decisions on their own or alongside code and document reviews, then let your agent continue from your feedback and answers.
 
-<video controls src="https://github.com/user-attachments/assets/ce50713a-ae3a-4112-9d1a-3948cb1f4e42"></video>
+<video controls src="https://github.com/user-attachments/assets/54676fec-c805-466e-90e2-20824f835ae5"></video>
 
 [More videos and screenshots](#gallery).
 
@@ -42,7 +42,7 @@ Install the `critty` binary, then install the review skills for your agent with 
 
 Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews remain in their TCrit paths.  Configuration and custom prompts use Critty paths, with the TCrit paths supported as lower-priority fallbacks at each level.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
-After upgrading to v1.0.0, rerun `critty install` for your agent to update the bundled review, CLI reference, and approval skills.
+After upgrading to v1.1.0, rerun `critty install` for your agent to add the experimental AI review skills and update the bundled review, CLI reference, and approval skills.
 
 ### Command-line binary
 
@@ -383,27 +383,35 @@ Shell completions are available through `critty completion <shell>` for Bash, Zs
 
 ### Code review with inline comments
 
-<video controls src="https://github.com/user-attachments/assets/ce50713a-ae3a-4112-9d1a-3948cb1f4e42"></video>
+<video controls src="https://github.com/user-attachments/assets/54676fec-c805-466e-90e2-20824f835ae5"></video>
 
 ### Review round trips with Claude Code
 
-<video controls src="https://github.com/user-attachments/assets/13f3b6de-be99-404e-810c-1f75ade27286"></video>
+<video controls src="https://github.com/user-attachments/assets/55d9840f-72bd-4c23-bf40-12e4d60ca0e5"></video>
 
 ### Review round trips with Codex
 
-<video controls src="https://github.com/user-attachments/assets/c92e291a-afbb-4ae9-b6ae-b0118adf40ba"></video>
+<video controls src="https://github.com/user-attachments/assets/1b89d0c7-dd79-42a7-abf4-d2c945949065"></video>
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/a9b28b8f-f999-4779-8f94-68c16f15d703)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/0bf182e4-4b4b-4b47-a46b-66d56370a25d)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/cd3084ea-ab94-4d10-b4ee-7da5725474a6)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/95def963-d152-4543-960f-76349480921f)
+
+### Review progress and pending items
+
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/c3e16cc1-9e94-4d5b-9550-d8d8a92f4bde)
+
+### Submitting with unfinished items
+
+![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/28b4b663-b7e3-417e-bfb6-a41f92fbbab3)
 
 ### Incremental search
 
-![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/35168aa2-7349-4123-b28a-1ad393f714fc)
+![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/a2934ab7-c2dc-46d9-995e-e31b57b1a9f1)
 
 ## Development
 
