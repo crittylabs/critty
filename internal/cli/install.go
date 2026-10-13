@@ -16,6 +16,7 @@ import (
 )
 
 //go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md skill/crit-ai-review/SKILL.md skill/crit-ai-review/references/restricted-cli.md skill/crit-ai-review/scripts/claude_review_gate.py skill/crit-ai-cowork/SKILL.md
+//go:embed skill/crit-ai-review/references/codex-cli.md skill/crit-ai-review/scripts/codex_review_server.py skill/crit-ai-review/scripts/codex-review-requirements.txt
 var skillContent embed.FS
 
 var installForce bool
@@ -200,6 +201,9 @@ func integrations() map[string][]integrationFile {
 			skillFile("crit-ai-cowork", agent, dir),
 			skillResource("crit-ai-review", "references/restricted-cli.md", dir),
 			skillResource("crit-ai-review", "scripts/claude_review_gate.py", dir),
+			skillResource("crit-ai-review", "references/codex-cli.md", dir),
+			skillResource("crit-ai-review", "scripts/codex_review_server.py", dir),
+			skillResource("crit-ai-review", "scripts/codex-review-requirements.txt", dir),
 		}
 		if agent == "opencode" {
 			for i := range files {

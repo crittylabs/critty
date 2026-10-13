@@ -5,6 +5,8 @@ description: Work with another AI through Critty to refine requested work using 
 
 # Cowork with Another AI
 
+Experimental: interfaces and supported launch configurations may change.
+
 Read [crit-ai-review](../crit-ai-review/SKILL.md) and follow its requester workflow, request identity, snapshot, posting, and completion contracts.  This skill changes only how the requester acts between AI review rounds.  Keep its reviewer role unchanged.
 
 A request such as `/crit-ai-cowork` with `Astra` selects a collaborator for the current task and authorizes in-scope fixes and follow-up between agents.  Follow the shared skill's `with` argument handling.  Establish the target outcome and acceptance checks before dispatch, using existing task context.  If the request only asks for an opinion, use `crit-ai-review` instead.  Preserve the user's selected collaborator and the caller's execution permissions.

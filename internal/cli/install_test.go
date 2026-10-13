@@ -46,6 +46,8 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 	for _, rel := range []string{
 		"crit-ai-review/SKILL.md", "crit-ai-cowork/SKILL.md",
 		"crit-ai-review/references/restricted-cli.md", "crit-ai-review/scripts/claude_review_gate.py",
+		"crit-ai-review/references/codex-cli.md", "crit-ai-review/scripts/codex_review_server.py",
+		"crit-ai-review/scripts/codex-review-requirements.txt",
 	} {
 		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
 	}
@@ -88,6 +90,8 @@ func TestIntegrationLayouts(t *testing.T) {
 		for _, rel := range []string{
 			"crit-ai-review/SKILL.md", "crit-ai-cowork/SKILL.md",
 			"crit-ai-review/references/restricted-cli.md", "crit-ai-review/scripts/claude_review_gate.py",
+			"crit-ai-review/references/codex-cli.md", "crit-ai-review/scripts/codex_review_server.py",
+			"crit-ai-review/scripts/codex-review-requirements.txt",
 		} {
 			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
 		}
@@ -274,13 +278,14 @@ func TestAIReviewSkillResources(t *testing.T) {
 				if !bytes.Equal(got, data) {
 					t.Errorf("installed asset %s differs", dest)
 				}
-				if strings.HasSuffix(dest, ".py") {
-					embedded, err := skillContent.ReadFile("skill/crit-ai-review/scripts/claude_review_gate.py")
+				if filepath.Base(dest) != "SKILL.md" {
+					_, resource, _ := strings.Cut(filepath.ToSlash(dest), "/crit-ai-review/")
+					embedded, err := skillContent.ReadFile("skill/crit-ai-review/" + resource)
 					if err != nil {
 						t.Fatal(err)
 					}
 					if !bytes.Equal(got, embedded) {
-						t.Error("review gate changed during rendering")
+						t.Error("review resource changed during rendering")
 					}
 				}
 			}

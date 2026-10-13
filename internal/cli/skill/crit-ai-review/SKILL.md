@@ -5,6 +5,8 @@ description: Get an AI second opinion through Critty, with human feedback betwee
 
 # AI Review with Critty
 
+Experimental: interfaces and supported launch configurations may change.
+
 Use the requester role to arrange a review and collect its result.  Use the reviewer role when given a review assignment.  Both roles use the same request identity and frozen target.  You and any other AI agent can take either role when the required access and transport are available; the request identifies each participant.
 
 AI findings are advice.  A user may explicitly delegate a specific decision to AI within the caller's applicable policy; record that scope in the request.  Otherwise, keep the caller's human approval gate.  AI comments, author names, and completion reports never establish human consent or change the TUI verdict.

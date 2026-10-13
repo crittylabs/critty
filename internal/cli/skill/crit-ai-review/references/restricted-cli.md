@@ -52,6 +52,10 @@ The hook constrains model tool calls, not arbitrary host processes.  Use a trust
 
 See the official [Claude CLI reference](https://code.claude.com/docs/en/cli-reference) and [hook decision and failure behavior](https://code.claude.com/docs/en/hooks).  The example uses options available in the locally inspected CLI; check them again when adapting it to another installation.
 
-## Other hosts, including Codex
+## Codex
 
-Use equivalent tool restrictions only when the host exposes them and they have been verified.  A filesystem read-only sandbox alone does not prohibit running tests or arbitrary commands.  Codex's `exec --sandbox read-only` therefore does not by itself meet this workflow's no-execution requirement.  Use a verified tool allowlist or return findings for the requester to post; do not grant broad workspace-write access merely to reach Critty storage.
+Use the [restricted Codex launch](codex-cli.md) when Codex is the reviewer.  It disables native shell execution and exposes bounded workspace research and Critty posting through a policy-controlled MCP server.  The requester prepares its Python environment and validates the resulting tool surface before dispatch.
+
+## Other hosts
+
+Use equivalent tool restrictions only when the host exposes them and they have been verified.  A filesystem read-only sandbox alone does not prohibit running tests or arbitrary commands.  Use a verified tool allowlist or return findings for the requester to post; do not grant broad workspace-write access merely to reach Critty storage.
