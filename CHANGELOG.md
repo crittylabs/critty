@@ -8,6 +8,8 @@
 
 - Save review verdicts, all feedback threads, and attachment identities with `--summary FILE`, so agents can read a compact JSON result without parsing finish messages or repeatedly loading unchanged attachment bodies.  The bundled review skill uses this result while retaining complete feedback and approval evidence.
 
+- Bundled skills carry the original human review request and its session context into host permission requests.  AI review assignments identify the external service, transmitted material, and local posting scope.  Automatic-review acceptance still depends on the host's policy and access to the original completion.
+
 ## 1.0.0
 
 Critty 1.0 brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.
