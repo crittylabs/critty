@@ -237,9 +237,11 @@ critty --unstaged                  # unstaged and untracked changes
 critty --scope=main...             # changes since the merge base with main
 ```
 
-Browse the changed files, leave comments, and press `q` or click **Submit** to finish.  Add an optional overall comment, then select **Approve**, **Reject** to request changes, or **Comment** to send feedback.  The dialog color follows the selection; click **Submit** to send it.  Approve resolves remaining comments; required form confirmations must be complete.  The default selection is Approve when remaining unresolved threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the dialog open.  Press `enter` to submit or use `tab` / `shift+tab` to focus and edit the overall comment.  In that editor, `ctrl+s` moves focus to Submit without sending.  Typing the first character into an empty editor changes Approve to Comment immediately; further typing or deletion preserves your selection, and you can select Approve again.  Previous overall comments appear in **Overall comments**, where you can navigate, reply, and resolve them like other threads.  **Back** keeps the draft, and **Abort** asks before exiting without submitting; declining returns to the dialog.  The agent reads your feedback, updates the code, and reopens the saved session.
+Browse the changed files, leave comments, and press `q` or click **Submit** to finish.  Add an optional overall comment, then select **Approve**, **Reject** to request changes, or **Comment** to send feedback.  Click **Submit** to send it.  Approve resolves remaining comments; required form confirmations must be complete.  The default selection is Approve when remaining unresolved threads have no new reviewer feedback, otherwise Comment.  Approval with unresolved threads asks before resolving all; declining keeps the dialog open.  Press `enter` to submit or use `tab` / `shift+tab` to focus and edit the overall comment.  In that editor, `ctrl+s` moves focus to Submit without sending.  Typing the first character into an empty editor changes Approve to Comment immediately; further typing or deletion preserves your selection, and you can select Approve again.  Previous overall comments appear in **Overall comments**, where you can navigate, reply, and resolve them like other threads.  **Back** keeps the draft, and **Abort** asks before exiting without submitting; declining returns to the dialog.  The agent reads your feedback, updates the code, and reopens the saved session.
 
 Comments follow source edits across rounds.  If a comment can no longer be matched, a `💬` marker keeps its original context accessible.
+
+Actionable counters in the main screen and decision dialogs show item counts and completion status.  Click a counter to jump to an item.  Prominent messages and colors highlight unresolved threads and unanswered items to help prevent omissions.
 
 ### Supplied diffs
 
@@ -292,6 +294,8 @@ Attached Markdown can include checkboxes for confirmations and permissions, and 
 
 Required confirmations must be answered before approval.  Permission checkboxes apply to specific operations; approving the review leaves unchecked operations unauthorized.
 
+Approving with unanswered required items offers **Review** to visit an unanswered item or **Cancel** to return to Submit.  Unanswered optional items are highlighted but do not block approval.
+
 Ask your agent to use the [approval skill](internal/cli/skill/critty-approval/SKILL.md) to prepare forms.  Form syntax and exported results are documented in the [CLI reference](internal/cli/skill/critty-cli/SKILL.md).
 
 ## Document Review (single file)
@@ -313,12 +317,13 @@ Inside Herdr or tmux, Critty opens the review in a dedicated tab or split pane a
 | `g` / `G` | Jump to top / bottom |
 | `tab` / `shift+tab` | Switch files |
 | `t` | Focus the file tree or comments sidebar |
-| `n` / `N` | Jump to the next / previous change or open thread |
+| `n` / `N` | Jump to the next / previous change, unresolved thread, or form item needing review |
 | `/` / `?`, `ctrl+s` / `ctrl+r` | Search forward / backward |
 | `enter` | Add a comment or open a thread |
 | `v` | Select lines for a comment |
 | `f` | Comment on the whole file |
-| `[` / `]` | Jump between threads |
+| `[` / `]` | Jump between all threads and form items |
+| `{` / `}` | Jump between unresolved threads and unanswered required form items |
 | `r` / `R` | Toggle resolution / resolve and move to the next thread |
 | `w` | Toggle ignoring whitespace in diffs |
 | `h` / `H` | Fold resolved threads / hide comments |
@@ -326,6 +331,31 @@ Inside Herdr or tmux, Critty opens the review in a dedicated tab or split pane a
 | `alt+e` | Open the current line in `$EDITOR` |
 | `alt+?` | Show all keyboard shortcuts |
 | `q` | Open the finish dialog |
+
+### Review navigation
+
+Navigation follows tab order and display order within each tab.  Each thread is one stop, including its replies.  Jumping to a form item focuses it without changing its answer; press `Space` or click to answer.
+
+| Target | `n` next / `N` previous | `]` next / `[` previous | `}` next / `{` previous |
+|--------|:----------------------:|:----------------------:|:----------------------:|
+| Diff hunk | Yes | No | No |
+| Changed binary file | Yes | No | No |
+| File tab without another `n` / `N` target, including attachments | Yes | No | No |
+| Unresolved thread | Yes | Yes | Yes |
+| Resolved thread | No | Yes | No |
+| Unchecked required checkbox | Yes | Yes | Yes |
+| Checked required checkbox | No | Yes | No |
+| Unanswered required choice group | Yes | Yes | Yes |
+| Answered required choice group | No | Yes | No |
+| Optional checkbox or choice, answered or unanswered | Yes | Yes | No |
+
+Required checkboxes are unresolved until confirmed by a human for the current review.  Unchecking a box makes it unresolved again.  Required choices share one answer per group: choosing any option resolves the whole group, including the unselected alternatives.  Initial defaults and invalidated answers do not resolve required items.
+
+`n` / `N` and `{` / `}` stop once per unanswered required choice group, on its first option.  `[` / `]` visit each option separately so you can change an answer.  Controls precede comments on the same source row; a hunk starting there precedes both.
+
+`n` / `N` stop at the ends of the review.  From the last matching thread or form item, `]` or `}` opens the finish dialog.  `[` and `{` wrap from the first matching target to the last.  From ordinary content, bracket navigation wraps to find a matching target.
+
+Changed binary files have a file-level stop for `n` / `N`.  Any tab without hunks, unresolved threads, unanswered required items, or optional form items also has a whole-file stop.  This includes attachments and files retained outside the current diff.  Threads and form items within these tabs follow the same rules as in other files.
 
 ### Search
 

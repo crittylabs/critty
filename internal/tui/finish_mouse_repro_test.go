@@ -106,8 +106,18 @@ func TestFinishMouseSubmitMissingConfirmationKeepsButtonsAligned(t *testing.T) {
 		t.Fatal("missing confirmation emitted a result")
 	default:
 	}
-	if !strings.Contains(app.View().Content, "Complete required confirmations") {
+	if app.modal != finishFormsModal || !strings.Contains(app.View().Content, "Required items must be completed") {
 		t.Fatalf("blocked Submit did not show its reason:\n%s", app.View().Content)
+	}
+	for _, region := range app.modalMouseRegions() {
+		if region.action.focus == finishCancelForms && !region.action.dialog && !region.action.close {
+			assertRegionContainsRenderedText(t, app, region.rect, "Cancel ESC")
+			app = clickMouse(app, region.rect.left, region.rect.top)
+			break
+		}
+	}
+	if app.modal != finishModal {
+		t.Fatal("Cancel did not return to Submit")
 	}
 	for _, region := range app.modalMouseRegions() {
 		if region.action.focus == finishBack && !region.action.dialog && !region.action.textarea {
@@ -137,14 +147,24 @@ func TestFinishTabOrderPlacesInputBeforeSubmit(t *testing.T) {
 				t.Fatal("previous thread is not visible")
 			}
 			app.modalFocus = finishApprove
-			for _, focus := range []int{finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort, finishApprove} {
+			forward := []int{finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort}
+			if thread {
+				forward = append(forward, finishProgressStart+int(progressThreads))
+			}
+			forward = append(forward, finishApprove)
+			for _, focus := range forward {
 				app = pressKey(app, tea.KeyTab)
 				if app.modalFocus != focus || app.modalTextarea.Focused() != (focus == finishText) {
 					t.Fatalf("Tab focus = %d, want %d", app.modalFocus, focus)
 				}
 			}
 			app.modalFocus = finishSubmit
-			for _, focus := range []int{finishText, finishComment, finishReject, finishApprove, finishAbort, finishBack, finishSubmit} {
+			backward := []int{finishText, finishComment, finishReject, finishApprove}
+			if thread {
+				backward = append(backward, finishProgressStart+int(progressThreads))
+			}
+			backward = append(backward, finishAbort, finishBack, finishSubmit)
+			for _, focus := range backward {
 				app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 				if app.modalFocus != focus || app.modalTextarea.Focused() != (focus == finishText) {
 					t.Fatalf("Shift+Tab focus = %d, want %d", app.modalFocus, focus)

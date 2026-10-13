@@ -112,9 +112,9 @@ func TestTabFilenameEmphasis(t *testing.T) {
 		}{
 			{name: "no state"},
 			{name: "no comments", state: &fileReview{}},
-			{name: "line comment", state: &fileReview{Comments: []review.Comment{{Scope: "line"}}}, want: "日本 file.go"},
+			{name: "line comment", state: &fileReview{Comments: []review.Comment{{Scope: "line"}}}, want: "💬"},
 			{name: "resolved", state: &fileReview{Comments: []review.Comment{{Resolved: true}}}},
-			{name: "file comment", state: &fileReview{Comments: []review.Comment{{Scope: "file"}}}, want: "日本 file.go"},
+			{name: "file comment", state: &fileReview{Comments: []review.Comment{{Scope: "file"}}}, want: "💬"},
 		} {
 			t.Run(fmt.Sprintf("active=%d/%s", active, tt.name), func(t *testing.T) {
 				app.tabs[0].state = tt.state
@@ -148,8 +148,11 @@ func TestTabFilenameEmphasis(t *testing.T) {
 				for i := range len(rendered) {
 					parser.Advance(rendered[i])
 				}
-				if got := underlined.String(); got != tt.want {
-					t.Fatalf("underlined text = %q, want %q", got, tt.want)
+				if got := underlined.String(); got != "" {
+					t.Fatalf("tab label still uses underlining: %q", got)
+				}
+				if got := strings.Contains(ansi.Strip(rendered), "💬"); got != (tt.want != "") {
+					t.Fatalf("tab bubble presence = %t, want %t", got, tt.want != "")
 				}
 				wantBold := ""
 				if active == 0 {
@@ -174,11 +177,8 @@ func TestRenderHeaderPathBackground(t *testing.T) {
 	app.filePath = "path/to/file"
 	app.width = 80
 	_, header, _ := strings.Cut(app.renderHeader(), "\n")
-	if !strings.Contains(ansi.Strip(header), "path/to/file L0/3 · 0 comments") {
+	if !strings.Contains(strings.Join(strings.Fields(ansi.Strip(header)), " "), "path/to/file L0/3 0/0 💬") {
 		t.Fatalf("path and status should retain their order: %q", header)
-	}
-	if strings.Contains(header, "48;2;") {
-		t.Fatalf("header = %q, want the palette background rather than truecolor", header)
 	}
 	var styles []uv.Style
 	var pen uv.Style
@@ -194,13 +194,25 @@ func TestRenderHeaderPathBackground(t *testing.T) {
 	for i := range len(header) {
 		parser.Advance(header[i])
 	}
+	plain := ansi.Strip(header)
+	gapStart := strings.Index(plain, "L0/3") + len("L0/3")
+	gapEnd := strings.Index(plain, "0/0")
+	for i, style := range styles[gapStart : gapEnd-1] {
+		if plain[gapStart+i] != ' ' || style.Bg == nil || color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(accent) {
+			t.Fatalf("header gap must contain spaces with the accent background: %+v", style)
+		}
+	}
+	if style := styles[gapEnd-1]; plain[gapEnd-1] != ' ' || style.Bg == nil || color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(buttonBackground) {
+		t.Fatalf("summary must have one space inside its background: %+v", style)
+	}
 	for _, part := range []struct {
 		text string
 		fg   color.Color
+		bg   color.Color
 	}{
-		{"path/to/file", lipgloss.BrightWhite},
-		{"L0/3", lipgloss.Cyan},
-		{"0 comments", lipgloss.White},
+		{"path/to/file", lipgloss.BrightWhite, accent},
+		{"L0/3", lipgloss.Cyan, accent},
+		{"0/0", success, buttonBackground},
 	} {
 		start := strings.Index(ansi.Strip(header), part.text)
 		if start < 0 {
@@ -210,7 +222,7 @@ func TestRenderHeaderPathBackground(t *testing.T) {
 		for _, style := range styles[start : start+len(part.text)] {
 			if style.Fg == nil || style.Bg == nil ||
 				color.RGBAModel.Convert(style.Fg) != color.RGBAModel.Convert(part.fg) ||
-				color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(accent) {
+				color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(part.bg) {
 				t.Fatalf("wrong colors in %q: %+v", part.text, style)
 			}
 		}
@@ -223,10 +235,10 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 		setup func(*AppModel)
 		want  string
 	}{
-		{name: "document", want: "L0/3 · 0 comments"},
-		{name: "deleted", setup: func(app *AppModel) { app.tabs[0].cursorSide = "old" }, want: "L0 (deleted) · 0 comments"},
+		{name: "document", want: "L0/3 0/0 💬"},
+		{name: "deleted", setup: func(app *AppModel) { app.tabs[0].cursorSide = "old" }, want: "L0 (deleted) 0/0 💬"},
 		{name: "selection", setup: func(app *AppModel) { app.tabs[0].selecting = true }, want: "VISUAL  L0-0"},
-		{name: "loading", setup: func(app *AppModel) { app.tabs[0].doc = nil }, want: "0 comments"},
+		{name: "loading", setup: func(app *AppModel) { app.tabs[0].doc = nil }, want: "0/0 💬"},
 	}
 
 	for _, tt := range tests {
@@ -246,7 +258,7 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 			if !strings.Contains(plainHeader, "…") {
 				t.Errorf("header = %q, want truncated path", plainHeader)
 			}
-			if !strings.Contains(plainHeader, tt.want) {
+			if !strings.Contains(strings.Join(strings.Fields(plainHeader), " "), strings.Join(strings.Fields(tt.want), " ")) {
 				t.Errorf("header = %q, want status %q", plainHeader, tt.want)
 			}
 		})
@@ -569,8 +581,12 @@ func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
 	}
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 40})
 	view := app.View()
-	if !strings.Contains(ansi.Strip(view.Content), "General") || lipgloss.Height(view.Content) > 40 {
+	if !strings.Contains(ansi.Strip(view.Content), "Keyboard Help") || lipgloss.Height(view.Content) > 40 {
 		t.Fatal("resizing did not fit the help content to the larger terminal")
+	}
+	app = pressKey(app, tea.KeyHome)
+	if !strings.Contains(ansi.Strip(app.View().Content), "General") {
+		t.Fatal("the top of help is unreachable after resizing")
 	}
 	for _, dark := range []bool{true, false} {
 		initAdaptiveStyles(dark)
@@ -1283,8 +1299,8 @@ func TestCountsUseSingularForOne(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
 	app.tab().state.Comments = []review.Comment{{ID: "c1", Scope: "file", Body: "one"}}
-	if header := ansi.Strip(app.renderHeader()); !strings.Contains(header, "· 1 comment") || strings.Contains(header, "1 comments") {
-		t.Fatalf("header = %q, want a singular comment count", header)
+	if header := ansi.Strip(app.renderHeader()); !strings.Contains(header, "0/1 💬") {
+		t.Fatalf("header = %q, want the thread completion count", header)
 	}
 }
 

@@ -24,6 +24,54 @@ type formRow struct {
 	hidden []form.Span
 }
 
+type formReviewItem struct {
+	tab      int
+	item     form.Item
+	answered bool
+}
+
+// formReviewItems represents each choice group once, at its first option.
+func (m *AppModel) formReviewItems() []formReviewItem {
+	if m.forms == nil {
+		return nil
+	}
+	var items []formReviewItem
+	for tabIndex, tab := range m.tabs {
+		d := m.forms.Document(tab.path)
+		if d == nil {
+			continue
+		}
+		seen := map[string]bool{}
+		for _, item := range d.Items {
+			if seen[item.ID] {
+				continue
+			}
+			seen[item.ID] = true
+			answer := d.Answers[item.ID]
+			answered := form.Selected(item, answer)
+			if item.Choice {
+				value, ok := answer.Value.(string)
+				answered = ok && value != ""
+			}
+			if item.Required || item.Consent {
+				answered = form.Satisfied(item, answer)
+			}
+			items = append(items, formReviewItem{tab: tabIndex, item: item, answered: answered})
+		}
+	}
+	return items
+}
+
+func (m *AppModel) pendingForms() []formReviewItem {
+	var pending []formReviewItem
+	for _, item := range m.formReviewItems() {
+		if !item.answered {
+			pending = append(pending, item)
+		}
+	}
+	return pending
+}
+
 func (m *AppModel) indexForms() {
 	m.formRows = map[string]map[int]formRow{}
 	for i := range m.forms.Documents {
@@ -142,6 +190,7 @@ func (m *AppModel) toggleForm(line int) bool {
 		if line < item.Line || line > item.EndLine {
 			continue
 		}
+		m.tab().cursorOnForm = true
 		var value any = !form.Selected(item, d.Answers[item.ID])
 		if item.Choice {
 			value = item.Value

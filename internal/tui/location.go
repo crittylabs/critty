@@ -107,6 +107,7 @@ func (m *AppModel) navigateSource(location sourceLocation) tea.Cmd {
 		m.activeTab = i
 		m.focused = contentPane
 		t.selecting, t.cursorOnAnnotation = false, false
+		t.cursorOnForm = false
 		t.cursorSide = ""
 		t.cursorLine = max(1, location.line)
 		if location.line == 0 {

@@ -48,6 +48,7 @@ type FileTab struct {
 
 	// Annotation focus
 	cursorOnAnnotation bool
+	cursorOnForm       bool
 	cursorAnnoIdx      int
 	expandedDrifted    map[string]bool
 

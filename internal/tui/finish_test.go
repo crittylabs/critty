@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"image/color"
 	"strings"
 	"testing"
 
@@ -10,6 +11,259 @@ import (
 
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestSubmitAttentionColorsAndNotices(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		for _, state := range []string{"required", "threads", "optional", "optional-and-threads", "complete"} {
+			app, _ := formTestApp(t)
+			if state != "required" {
+				app.toggleForm(2)
+			}
+			if state == "threads" || state == "complete" {
+				app.toggleForm(3)
+				app.toggleForm(5)
+			}
+			if state == "threads" || state == "optional-and-threads" {
+				app.tab().state.Comments = []review.Comment{testComment()}
+			}
+			want := success
+			switch state {
+			case "required":
+				want = lipgloss.Red
+			case "threads":
+				want = lipgloss.Cyan
+			case "optional", "optional-and-threads":
+				want = warning
+			}
+			if color.RGBAModel.Convert(app.finishAttentionColor()) != color.RGBAModel.Convert(want) {
+				t.Fatalf("%s: wrong border color", state)
+			}
+			for _, verdict := range []review.Verdict{review.VerdictReject, review.VerdictComment} {
+				app.finishVerdict = verdict
+				if color.RGBAModel.Convert(app.finishAttentionColor()) != color.RGBAModel.Convert(finishColor(verdict)) {
+					t.Fatalf("%s: %s border depends on pending items", state, verdict)
+				}
+			}
+			notice := ansi.Strip(app.finishNotices(70))
+			if strings.Contains(notice, "Required items") != (state == "required") || strings.Contains(notice, "Unresolved threads") != (state == "threads" || state == "optional-and-threads") || strings.Contains(notice, "Optional items") != (state == "required" || state == "optional" || state == "optional-and-threads") {
+				t.Fatalf("%s: unexpected notices: %s", state, notice)
+			}
+			app.openFinishModal()
+			app.finishVerdict = review.VerdictReject
+			content, _ := app.finishModalContent(70)
+			greenTitle := modalTitleStyle.MarginBottom(0).Foreground(success).Render("Submit review")
+			if !strings.Contains(content, greenTitle) {
+				t.Fatal("Submit title changed color with the verdict")
+			}
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestFinishPendingSummary(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		app, _ := formTestApp(t)
+		app.tab().state.Comments = []review.Comment{testComment()}
+		app.forms.Documents[0].Items[1].Required = true
+		app.forms.Documents[0].Items[2].Required = true
+		app.openFinishModal()
+		content, _ := app.finishModalContent(70)
+		plain := strings.Join(strings.Fields(ansi.Strip(content)), " ")
+		const status = "0/1 💬 0/1 ☐ 0/1 ○ 0/1 ☐"
+		if !strings.Contains(plain, status) || strings.Index(plain, status) < strings.Index(plain, "Abort q") || strings.Contains(plain, "a/r/c: select") {
+			t.Fatalf("progress counters are not below the buttons: %s", plain)
+		}
+		for _, label := range []string{"0/1 ☐", "0/1 ○"} {
+			if !strings.Contains(content, "\x1b[31;1m"+label) && !strings.Contains(content, "\x1b[1;31m"+label) {
+				t.Fatalf("required status is not red: %q", content)
+			}
+		}
+		app.closeFinishModal()
+		app.tab().cursorLine = 2
+		app.toggleForm(2)
+		app.toggleForm(4)
+		app.toggleForm(5)
+		app.toggleResolve(testComment().ID)
+		if status := ansi.Strip(app.finishStatus(70)); status != "1/1 💬  1/1 ☑  1/1 ●  1/1 ☑" {
+			t.Fatalf("completed counts or marks are wrong: %s", status)
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestFinishStatusCompletionColorsAndMarks(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		app, _ := formTestApp(t)
+		app.toggleForm(2)
+		app.toggleForm(4)
+		app.toggleForm(5)
+		status := app.finishStatus(90)
+		if plain := ansi.Strip(status); plain != "0/0 💬  1/1 ☑  1/1 ☑  1/1 ●" {
+			t.Fatalf("optional choice counted alternatives instead of groups: %s", plain)
+		}
+		for _, expected := range []struct{ color, label string }{
+			{"32", "1/1 ☑"},
+			{"33", "1/1 ☑"},
+			{"33", "1/1 ●"},
+		} {
+			if !strings.Contains(status, "\x1b["+expected.color+";1m"+expected.label) && !strings.Contains(status, "\x1b[1;"+expected.color+"m"+expected.label) {
+				t.Fatalf("wrong completion color for %s: %q", expected.label, status)
+			}
+		}
+		app.forms.Documents[0].Items[3].Required = true
+		app.toggleForm(5)
+		status = app.finishStatus(90)
+		if plain := ansi.Strip(status); plain != "0/0 💬  1/2 ☐  1/1 ●" {
+			t.Fatalf("partially completed checkboxes used a completed mark: %s", plain)
+		}
+		if !strings.Contains(status, "\x1b[31;1m1/2 ☐") && !strings.Contains(status, "\x1b[1;31m1/2 ☐") {
+			t.Fatalf("partially completed required checks are not red: %q", status)
+		}
+	}
+	initAdaptiveStyles(true)
+}
+
+func TestFinishFormsReviewAndCancelPreserveDraft(t *testing.T) {
+	for _, cancel := range []bool{false, true} {
+		app, ch := formTestApp(t)
+		app.activeTab = 1
+		app.openFinishModal()
+		app.modalTextarea.SetValue("Keep this overall comment.")
+		app.finishVerdict = review.VerdictApprove
+		_, cmd := app.doFinish()
+		if isQuit(cmd) || app.modal != finishFormsModal || app.modalFocus != finishReviewForms {
+			t.Fatal("approval did not default to reviewing pending forms")
+		}
+		key := tea.KeyEnter
+		if cancel {
+			key = tea.KeyEscape
+		}
+		app, cmd = pressKeyCmd(app, key)
+		if isQuit(cmd) || app.finishDraft != "Keep this overall comment." || app.session.CJ.RoundState.ReviewCommentDraft != app.finishDraft {
+			t.Fatal("pending-form action lost the draft or submitted")
+		}
+		if cancel {
+			if app.modal != finishModal || app.finishVerdict != review.VerdictApprove || app.modalTextarea.Value() != app.finishDraft {
+				t.Fatal("Cancel did not return to Submit with the decision and draft")
+			}
+		} else if app.modal != noModal || app.activeTab != 0 || app.tab().cursorLine != 2 || !app.tab().cursorOnForm {
+			t.Fatal("Review did not jump to the first pending item across tabs")
+		}
+		select {
+		case <-ch:
+			t.Fatal("review/cancel emitted submission")
+		default:
+		}
+		if err := app.SaveUnsubmittedDraft(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestFinishFormsHasNoProceedShortcut(t *testing.T) {
+	app, ch := formTestApp(t)
+	app.toggleForm(2)
+	app.openFinishModal()
+	app.modalTextarea.SetValue("Keep this overall comment.")
+	app.modal, app.modalFocus = finishFormsModal, finishReviewForms
+	app, cmd := pressKeyCmd(app, 'f')
+	if isQuit(cmd) || app.modal != finishFormsModal || app.session.CJ.RoundState.Finished {
+		t.Fatal("removed shortcut submitted the review")
+	}
+	app = pressKey(app, tea.KeyEscape)
+	if app.modal != finishModal || app.modalTextarea.Value() != "Keep this overall comment." {
+		t.Fatal("Cancel lost the draft")
+	}
+	select {
+	case <-ch:
+		t.Fatal("removed shortcut emitted approval")
+	default:
+	}
+}
+
+func TestApproveWithUnansweredOptionalForms(t *testing.T) {
+	for _, unresolved := range []bool{false, true} {
+		app, ch := formTestApp(t)
+		app.toggleForm(2)
+		if unresolved {
+			app.tab().state.Comments = []review.Comment{testComment()}
+		}
+		app.openFinishModal()
+		app.modalTextarea.SetValue("Approve with optional answers empty.")
+		app.finishVerdict = review.VerdictApprove
+		if notice := app.optionalFormsNotice(70); !strings.Contains(ansi.Strip(notice), "You can still approve") || notice == ansi.Strip(notice) {
+			t.Fatal("optional items lack a colored notice")
+		}
+		_, cmd := app.doFinish()
+		if unresolved {
+			if app.modal != finishResolveModal {
+				t.Fatal("optional items bypassed thread confirmation")
+			}
+			app, cmd = pressKeyCmd(app, 'y')
+		}
+		if !isQuit(cmd) {
+			t.Fatalf("optional items blocked approval: %v", app.err)
+		}
+		event := takeEvent(t, ch)
+		if !event.Approved || event.Result.Consents["a"]["publish"] || event.Result.Documents[0].Answers["size"].Value != "" {
+			t.Fatal("approval changed optional answers or granted consent")
+		}
+	}
+}
+
+func TestFinishFormsCannotProceedPastRequiredItems(t *testing.T) {
+	app, ch := formTestApp(t)
+	app.openFinishModal()
+	app.finishVerdict = review.VerdictApprove
+	app.doFinish()
+	app, cmd := pressKeyCmd(app, 'f')
+	if isQuit(cmd) || app.modal != finishFormsModal || app.modalFocus != finishReviewForms {
+		t.Fatal("shortcut bypassed required items")
+	}
+	app.modalFocus = finishCancelForms
+	app, cmd = pressKeyCmd(app, tea.KeyEnter)
+	if isQuit(cmd) || app.modal != finishModal || app.session.CJ.RoundState.Finished {
+		t.Fatal("Cancel submitted unanswered required items")
+	}
+	select {
+	case <-ch:
+		t.Fatal("unanswered required item emitted approval")
+	default:
+	}
+}
+
+func TestFinishPendingDialogsFitSmallTerminals(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		for _, size := range [][2]int{{40, 12}, {54, 14}, {80, 24}} {
+			for _, required := range []bool{false, true} {
+				app, _ := formTestAppWithContent(t, "- [ ] Confirm <!-- form: id=confirm required -->\n- [ ] Required choice <!-- form: id=required-choice value=chosen required -->\n- [ ] Optional choice <!-- form: id=optional-choice value=chosen -->\n- [ ] Consent <!-- form: id=publish consent -->\n- [ ] Optional checkbox <!-- form: id=extra -->\n")
+				app.width, app.height = size[0], size[1]
+				app.tab().state.Comments = []review.Comment{testComment()}
+				if !required {
+					app.toggleForm(1)
+					app.toggleForm(2)
+				}
+				app.openFinishModal()
+				for _, modal := range []modalType{finishModal, finishFormsModal} {
+					app.modal = modal
+					for _, region := range app.modalMouseRegions() {
+						if region.action.dialog || region.action.textarea || region.action.scrollable {
+							continue
+						}
+						if region.rect.top < 0 || region.rect.bottom > app.height || region.rect.right > app.width {
+							t.Fatalf("modal %v has unreachable control in %v: %+v", modal, size, region)
+						}
+					}
+				}
+			}
+		}
+	}
+	initAdaptiveStyles(true)
+}
 
 func TestMouseClickSubmitButtonOpensModal(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
@@ -411,7 +665,7 @@ func TestExplicitApprovalRequiresConfirmations(t *testing.T) {
 	}
 }
 
-func TestFinishRadioSelectionChangesColorWithoutSubmitting(t *testing.T) {
+func TestFinishRadioSelectionChangesFrameColorWithoutSubmitting(t *testing.T) {
 	for _, dark := range []bool{true, false} {
 		initAdaptiveStyles(dark)
 		app, ch := newFinishTestApp(t, nil)

@@ -143,8 +143,9 @@ class Round:
         tmux("send-keys", "-l", "-t", self.pane, text)
         time.sleep(0.1)
 
-    def click(self, pattern: str) -> None:
-        for y, row in enumerate(self.screen().splitlines(), 1):
+    def click(self, pattern: str, last: bool = False) -> None:
+        rows = list(enumerate(self.screen().splitlines(), 1))
+        for y, row in reversed(rows) if last else rows:
             match = re.search(pattern, row)
             if match:
                 # Button rows contain spaces and single-cell frame/selector glyphs.
@@ -481,13 +482,17 @@ def scenarios() -> None:
         assert "● Approve" in mouse.screen(), "mouse did not select Approve"
         mouse.click(r"Submit RET")
         assert not mouse.result.exists(), "missing confirmation allowed approval"
-        assert "Complete required confirmations" in mouse.screen(), mouse.screen()
-        mouse.click(r"Back ESC")
+        assert "Required items must be completed" in mouse.screen(), mouse.screen()
+        assert "Proceed anyway" not in mouse.screen(), mouse.screen()
+        mouse.keys("f")
+        assert not mouse.result.exists(), "Proceed bypassed required confirmation"
+        mouse.click(r"Review r")
         screen = wait_until(
             lambda: mouse.screen() if "Required" in mouse.screen() else None,
             "wrapped required confirmation",
         )
         rows = screen.splitlines()
+        assert "L2/" in screen, "Review did not focus the first unchecked item"
         viewed_row = next(
             i for i, row in enumerate(rows) if re.search(r"\bViewed\b", row)
         )
@@ -515,7 +520,23 @@ def scenarios() -> None:
                 str(ROOT / "form-result.json"),
             ],
         )
+        form.comment("Pending form review thread.")
+        form.click(r"0/1 💬")
+        form.keys("r")
+        assert all(c.get("resolved") for c in form.comments())
+        form.click(r"1/1 💬")
+        form.keys("g")
         form.keys("j", "Space", "j", "j", "Space")
+        form.keys("q")
+        form.click(r"Overall comment \(optional\)")
+        form.text("Keep this form review draft.")
+        form.click(r"1/1 💬", last=True)
+        assert not form.result.exists(), "counter click submitted the review"
+        form.keys("q", "Tab", "Tab", "Tab", "Tab", "Tab", "Enter")
+        assert "L5/" in form.screen(), "Submit counter did not focus unchecked consent"
+        form.keys("q")
+        assert "Optional items remain unanswered" in form.screen(), form.screen()
+        form.keys("Escape")
         form.finish(True)
         result = json.loads((ROOT / "form-result.json").read_text())
         assert result["approved"] and result["session"] == form.session, result
@@ -527,8 +548,9 @@ def scenarios() -> None:
         assert not any(
             values.get("publish") for values in result["consents"].values()
         ), result
+        assert "Keep this form review draft." in form.out.read_text()
         report(
-            "human form confirmation and choice export correctly; initial checked consent grants nothing"
+            "header and Submit counters navigate; drafts and human answers export; unchecked consent grants nothing"
         )
 
         failure = Round(
