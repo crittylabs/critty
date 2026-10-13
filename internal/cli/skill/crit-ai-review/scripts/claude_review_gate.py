@@ -32,6 +32,19 @@ def valid_policy(policy: object) -> bool:
         return False
     if any(re.search(r":[0-9]+(?:-[0-9]+)?$", path) for path in policy["locations"]):
         return False
+    targets = policy.get("resolvable_comments", [])
+    if not isinstance(targets, list):
+        return False
+    for target in targets:
+        if (
+            not isinstance(target, dict)
+            or set(target) != {"id", "path"}
+            or not isinstance(target["id"], str)
+            or not re.fullmatch(r"[cr]_[0-9a-f]{6}", target["id"])
+            or not isinstance(target["path"], str)
+            or (target["id"].startswith("r_") != (target["path"] == ""))
+        ):
+            return False
     commands = policy.get("read_commands")
     return isinstance(commands, list) and all(
         isinstance(command, list)
@@ -95,6 +108,15 @@ def permitted(event: dict, policy: dict) -> bool:
     if args in policy["read_commands"]:
         return True
     binary, session, author = policy["binary"], policy["session"], policy["author"]
+    for target in policy.get("resolvable_comments", []):
+        for resolve in (False, True):
+            prefix = resolution_argv(policy, target, resolve)
+            if (
+                args[: len(prefix)] == prefix
+                and len(args) == len(prefix) + 1
+                and args[-1].strip()
+            ):
+                return True
     if args == [binary, "comments", "--session", session, "--all", "--json"]:
         return True
     prefix = [binary, "comment", "--session", session, "--author", author, "--"]
@@ -115,6 +137,24 @@ def permitted(event: dict, policy: dict) -> bool:
         return False
     start, _, end = lines.partition("-")
     return not end or int(end) >= int(start)
+
+
+def resolution_argv(policy: dict, target: dict, resolve: bool = True) -> list[str]:
+    args = [
+        policy["binary"],
+        "comment",
+        "--session",
+        policy["session"],
+        "--author",
+        policy["author"],
+        "--reply-to",
+        target["id"],
+    ]
+    if resolve:
+        args.append("--resolve")
+    if target["path"]:
+        args.extend(["--path", target["path"]])
+    return args + ["--"]
 
 
 def describe(policy: dict) -> dict:
@@ -144,6 +184,14 @@ def describe(policy: dict) -> dict:
             ]
         ),
         "comment_paths": policy["locations"],
+        "resolve_prefixes": [
+            shlex.join(resolution_argv(policy, target))
+            for target in policy.get("resolvable_comments", [])
+        ],
+        "reply_prefixes": [
+            shlex.join(resolution_argv(policy, target, False))
+            for target in policy.get("resolvable_comments", [])
+        ],
         "posting": "Append an optional permitted path[:line[-end]], then the literal body, using canonical POSIX quoting.",
         "denial_recovery": "Continue with allowed research. Report unavailable evidence; ask the requester only when it is essential. Do not repeat denied operations or bypass the gate.",
         "forbidden": ["file edits", "tests", "builds", "other commands", "delegation"],

@@ -1,6 +1,6 @@
 # Restricted Codex review
 
-Use the bundled `scripts/codex_review_server.py` to expose research and finding tools over MCP stdio.  It uses the same policy JSON as the Claude gate.  The server executes checked argument vectors directly, fixes their working directory, and accepts no shell, environment, executable, or session overrides from the reviewer.  Its only write operation calls Critty to add a finding.
+Use the bundled `scripts/codex_review_server.py` to expose research and finding tools over MCP stdio.  It uses the same policy JSON as the Claude gate.  The server executes checked argument vectors directly, fixes their working directory, and accepts no shell, environment, executable, or session overrides from the reviewer.  Its write operations call Critty to add a finding, reply to a policy-listed own finding, or resolve it with a reason.
 
 Codex's Bash hook input contains the command string, not every execution option.  A hook alone cannot validate a caller-selected shell or all tool paths.  Disable native shell execution, external tools, and delegation; retain a read-only sandbox for native file tools.  The MCP server supplies the permitted operations.  Do not grant workspace-write access to make posting work: the server owns the narrow posting operation outside the model's sandbox.
 
@@ -53,6 +53,8 @@ Before trusting an installation, verify the resulting tool surface: no `exec_com
 - `read_file`, `list_files`, `search`: bounded UTF-8 reads, paged directory listings, and literal-text search under authorized roots.  Directory traversal omits `.git` and does not follow directory symlinks; resolved file paths must stay within a permitted root.  Search reports skipped non-text, unreadable, or oversized files.  Use `read_command` for approved Git history queries.
 - `read_command`: execute one exact requester-approved argv by index.  It cannot add arguments, input, shell syntax, or a different cwd.
 - `post_finding`: supply a literal body and optional permitted path or source range.  Session and author are fixed by policy.  Shell metacharacters in the body remain data.
+- `resolve_finding`: supply a policy-listed own comment ID, its exact path (empty for review-level comments), and a nonempty reason.  The server posts the reason as a reply and resolves that thread using the fixed session and author.  Read it back with `comments` to verify persistence.
+- `reply_finding`: supply the same ID, path, and reason to reply without changing resolution state.  Use this when your concern is satisfied but another reviewer has an unresolved or unanswered concern about the same issue.
 - `comments`: read findings with optional request-ID filtering and pagination.  Read back the intended bodies and IDs after posting.
 
 Follow pagination and report truncation or skipped evidence.  After a rejected optional operation, consult `capabilities`, use an available alternative, and continue.  Ask the requester only when missing evidence is essential.  A posting timeout has an uncertain outcome: check `comments` before retrying.

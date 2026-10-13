@@ -118,6 +118,63 @@ class CodexReviewTest(unittest.TestCase):
                 self.tools.comments("REQUEST current")["comments"], [comments[1]]
             )
 
+    def test_resolution_is_scoped_and_keeps_body_literal(self) -> None:
+        target = {"id": "c_123abc", "path": "source.py"}
+        self.policy["resolvable_comments"] = [target]
+        body = "Verified fix: $(touch bad); `id`"
+        with patch.object(self.tools, "run", return_value="ok") as run:
+            self.assertEqual(
+                self.tools.resolve_finding(target["id"], body, target["path"]), "ok"
+            )
+            self.assertEqual(
+                run.call_args.args[0],
+                [
+                    "/trusted/critty",
+                    "comment",
+                    "--session",
+                    "0123456789ab",
+                    "--author",
+                    "Codex Astra (reviewer)",
+                    "--reply-to",
+                    "c_123abc",
+                    "--resolve",
+                    "--path",
+                    "source.py",
+                    "--",
+                    body,
+                ],
+            )
+            for comment_id, path, reason in [
+                ("c_ffffff", "source.py", body),
+                (target["id"], "other.py", body),
+                (target["id"], "", body),
+                (target["id"], "source.py", " "),
+            ]:
+                with self.assertRaises(ValueError):
+                    self.tools.resolve_finding(comment_id, reason, path)
+            self.assertEqual(run.call_count, 1)
+
+    def test_reply_does_not_resolve_and_rejects_unlisted_threads(self) -> None:
+        target = {"id": "c_123abc", "path": "source.py"}
+        self.policy["resolvable_comments"] = [target]
+        body = "My concern is satisfied; human follow-up remains. $(touch bad)"
+        with patch.object(self.tools, "run", return_value="ok") as run:
+            self.assertEqual(
+                self.tools.reply_finding(target["id"], body, target["path"]), "ok"
+            )
+            argv = run.call_args.args[0]
+            self.assertNotIn("--resolve", argv)
+            self.assertEqual(argv[-1], body)
+            self.assertEqual(argv[argv.index("--reply-to") + 1], target["id"])
+            for comment_id, path, reason in [
+                ("c_ffffff", "source.py", body),
+                (target["id"], "other.py", body),
+                (target["id"], "source.py", " "),
+            ]:
+                with self.assertRaises(ValueError):
+                    self.tools.reply_finding(comment_id, reason, path)
+            self.assertEqual(run.call_count, 1)
+
     def test_describe_without_sdk_or_model(self) -> None:
         policy = self.root / "policy.json"
         policy.write_text(json.dumps(self.policy))
@@ -130,7 +187,8 @@ class CodexReviewTest(unittest.TestCase):
         ]
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         self.assertEqual(
-            json.loads(result.stdout)["comment_tools"], ["comments", "post_finding"]
+            json.loads(result.stdout)["comment_tools"],
+            ["comments", "post_finding", "reply_finding", "resolve_finding"],
         )
         policy.write_text("{}")
         result = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -163,6 +221,8 @@ class CodexReviewTest(unittest.TestCase):
                         "read_command",
                         "comments",
                         "post_finding",
+                        "reply_finding",
+                        "resolve_finding",
                     },
                 )
                 denied = await client.call_tool("read_file", {"path": "../policy.json"})

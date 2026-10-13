@@ -46,6 +46,77 @@ def event(command: str) -> dict:
 
 
 class ClaudeReviewGateTest(unittest.TestCase):
+    def test_reply_only_keeps_the_same_thread_boundary(self) -> None:
+        target = {"id": "c_123abc", "path": "src/example.py"}
+        policy = {**POLICY, "resolvable_comments": [target]}
+        argv = gate.resolution_argv(policy, target, False)
+        self.assertNotIn("--resolve", argv)
+        self.assertTrue(
+            gate.permitted(
+                event(
+                    shlex.join(
+                        argv + ["My concern is satisfied; human follow-up remains."]
+                    )
+                ),
+                policy,
+            )
+        )
+        for other in [{**target, "id": "c_ffffff"}, {**target, "path": "other.py"}]:
+            self.assertFalse(
+                gate.permitted(
+                    event(
+                        shlex.join(
+                            gate.resolution_argv(policy, other, False) + ["Satisfied"]
+                        )
+                    ),
+                    policy,
+                )
+            )
+        self.assertFalse(gate.permitted(event(shlex.join(argv + [" "])), policy))
+
+    def test_only_listed_own_findings_can_be_resolved(self) -> None:
+        targets = [
+            {"id": "c_123abc", "path": "src/example.py"},
+            {"id": "r_123abc", "path": ""},
+        ]
+        policy = {**POLICY, "resolvable_comments": targets}
+        for target in targets:
+            argv = gate.resolution_argv(policy, target)
+            self.assertTrue(
+                gate.permitted(event(shlex.join(argv + ["Verified fix"])), policy)
+            )
+            self.assertFalse(
+                gate.permitted(event(shlex.join(argv + ["Verified fix"])), POLICY)
+            )
+            self.assertFalse(gate.permitted(event(shlex.join(argv + [" "])), policy))
+            for other in [
+                {**target, "id": "c_ffffff"},
+                {**target, "path": "other.py"},
+            ]:
+                self.assertFalse(
+                    gate.permitted(
+                        event(
+                            shlex.join(gate.resolution_argv(policy, other) + ["Reason"])
+                        ),
+                        policy,
+                    )
+                )
+            self.assertFalse(
+                gate.permitted(
+                    event(shlex.join(argv + ["Reason"]) + "; touch x"), policy
+                )
+            )
+        for targets in [
+            None,
+            {},
+            ["c_123abc"],
+            [{"id": "c_123abc", "path": ""}],
+            [{"id": "r_123abc", "path": "src/example.py"}],
+        ]:
+            self.assertFalse(
+                gate.valid_policy({**POLICY, "resolvable_comments": targets})
+            )
+
     def test_literal_comments(self) -> None:
         for body in ["Finding", "Don't run $(touch x); `id`\nnext line"]:
             with self.subTest(body=body):

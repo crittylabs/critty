@@ -15,7 +15,7 @@ Load `/critty-cli` before reading or posting review comments, or use the relevan
 
 ## Reviewer permissions
 
-Give the other AI read access to the review workspace, including surrounding code, instructions, dependencies, and read-only Git history.  Permit directory searches needed for that investigation.  Its only permitted task writes are adding findings through Critty CLI to the assigned session.  Disable direct file editing, arbitrary command execution, tests, builds, formatters, and further delegation.  The requester runs checks and supplies their results, makes source changes, and prepares any input files.  This boundary applies to both second opinions and cowork.
+Give the other AI read access to the review workspace, including surrounding code, instructions, dependencies, and read-only Git history.  Permit directory searches needed for that investigation.  Its only permitted task writes are adding findings, replying to its own threads, and resolving its own verified findings through the restricted Critty interface to the assigned session.  Disable direct file editing, arbitrary command execution, tests, builds, formatters, and further delegation.  The requester runs checks and supplies their results, makes source changes, and prepares any input files.  This boundary applies to both second opinions and cowork.
 
 Enforce the boundary with the host's tool controls, not only the review prompt.  If the host cannot narrowly permit Critty posting, run a read-only reviewer and have the requester post its returned findings.  Read [restricted CLI review](references/restricted-cli.md) when using Claude Code or Codex CLI; it describes the limits of each launch form.
 
@@ -54,6 +54,8 @@ Give the reviewer a self-contained request containing:
 
 Confirm that the session belongs to this target and read its existing threads before dispatch.  Use `critty status` and `critty comments --session <id> --all --json`, together with the saved review input.  Resolve a missing or mismatched target before posting or launching a reviewer.
 
+For follow-up reviews, identify that reviewer's existing findings by their saved author, request IDs, and earlier completion reports.  Supply their IDs and paths as `resolvable_comments` in the restricted posting policy.  Include only verified own findings; omit human and other reviewers' threads.  Use an empty list when none qualify.  New findings can be added to this list by the requester after verifying their saved identity, before a later assignment.
+
 If no session exists, prepare the request first and report that the return destination is missing.  Use the `/critty` skill to create a human review only when that interactive workflow is requested.  Do not open a waiting TUI solely to allocate an AI destination.  `comment --output` is a data-root option: existing session resolution can take precedence, and it does not freeze the review input.
 
 ### Dispatch and collect
@@ -90,6 +92,12 @@ Inspect surrounding code, dependencies, and history needed to assess the request
 
 ### Return findings and completion
 
+Read replies and the revised target for each of your earlier findings.  Resolve your own finding when the response or fix is valid, or when the finding is no longer applicable.  Reply with the evidence or reason and set `--resolve`, or use the restricted `resolve_finding` tool.  Keep unresolved findings open when evidence is insufficient or the issue remains.  This skill authorizes resolution of your own findings under the CLI reference's user-authorization rule; it grants no authority over human or other reviewers' threads.
+
+Before resolving, read the latest full thread and other threads about the same issue.  If another reviewer, including the human, appears to have an unresolved or unanswered concern there, or you cannot tell whether it was addressed, leave the thread open.  State that your own concern is satisfied and why, using a reply without `--resolve` or the restricted `reply_finding` tool.  Your satisfaction does not settle another reviewer's concern.  Unrelated open findings elsewhere in the review do not prevent resolving your own thread.
+
+Read the thread back to verify that the reply and intended resolution state were saved.  If the transport cannot post the decision, return its ID, path, and reason to the requester for verified relay under your reviewer author; include `resolve: true` only when closing is appropriate under the rule above.  The requester relays your decision rather than deciding on your behalf.  Report blocked or failed resolution separately from the assessment.
+
 Post findings to the explicit session with the reviewer author specified in the assignment.  Include the request ID in comment bodies so concurrent reviews can be distinguished.  Use source coordinates from the reviewed snapshot and the supplied path mapping.  For deleted lines or uncertain anchors, use a file-level finding with quoted context instead of inventing a new-side line number.
 
 Use the allowed posting interface with literal arguments.  If quoting or bulk input would require creating a file or executing a shell pipeline, return the payload to the requester to prepare and post.  After posting, read `critty comments --session <id> --all --json` and match the saved author, bodies, paths, and ranges; retain their IDs.  After an uncertain write, inspect saved comments before retrying so a partial success does not create duplicates.  Report a persistence failure separately from the review findings.
@@ -98,9 +106,9 @@ Return an explicit final response even when there are no findings.  Include:
 
 - The request ID, reviewed target identity, session, and round.
 - Whether the requested review is complete, partial, or blocked, with actual coverage and checks performed.
-- Findings and their saved comment IDs, or an explicit statement that no actionable findings were found in the reviewed scope.
+- Findings and their saved comment IDs, resolved own findings and their reasons, and findings left open; or an explicit statement that no actionable findings were found in the reviewed scope.
 - Unchecked areas, failed checks, uncertainties, and whether all intended comments were confirmed saved.  If storage is inaccessible, include the bulk JSON payload for the requester to post.
 
 These are contents of the agent's final response, not a new Critty JSON schema.  A completed review may contain findings.  Keep completion separate from a clean assessment and from human approval.  Critty's `--summary` describes an interactive human review round; do not use it as an AI completion signal or edit its output to manufacture one.
 
-Keep human comments, resolution state, forms, and verdicts intact.  The reviewer role authorizes inspection and the assigned findings channel; it does not authorize source edits, session cleanup, or additional reviewers.
+Keep human and other reviewers' comments and resolution state, forms, and verdicts intact.  The reviewer role authorizes inspection and the assigned findings channel; it does not authorize source edits, session cleanup, or additional reviewers.

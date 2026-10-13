@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterator
 from functools import wraps
 from pathlib import Path
 
-from claude_review_gate import describe, permitted, valid_policy
+from claude_review_gate import describe, permitted, resolution_argv, valid_policy
 
 MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_OUTPUT = 32000
@@ -29,13 +29,25 @@ class ReviewTools:
     def capabilities(self) -> dict:
         """Describe the actual permitted tools and how to recover from denials."""
         result = describe(self.policy)
-        del result["list_comments"], result["post_prefix"]
-        result["comment_tools"] = ["comments", "post_finding"]
+        for key in [
+            "list_comments",
+            "post_prefix",
+            "resolve_prefixes",
+            "reply_prefixes",
+        ]:
+            del result[key]
+        result["comment_tools"] = [
+            "comments",
+            "post_finding",
+            "reply_finding",
+            "resolve_finding",
+        ]
+        result["resolvable_comments"] = self.policy.get("resolvable_comments", [])
         result["session"] = self.policy["session"]
         result["author"] = self.policy["author"]
         result["read_tools"] = ["read_file", "list_files", "search", "read_command"]
         result["posting"] = (
-            "Use post_finding(body, location) and comments; the server fixes the session and author."
+            "Use reply_finding to leave listed own threads open; resolve_finding also closes them. The server fixes the session and author."
         )
         result["read_commands"] = [
             {"index": i, "argv": args}
@@ -215,6 +227,22 @@ class ReviewTools:
             )
         return self.run(argv)
 
+    def resolve_finding(self, comment_id: str, body: str, path: str = "") -> str:
+        """Reply with evidence and resolve one requester-verified own finding."""
+        return self._reply_finding(comment_id, body, path, True)
+
+    def reply_finding(self, comment_id: str, body: str, path: str = "") -> str:
+        """Reply to a listed own finding without changing its resolution state."""
+        return self._reply_finding(comment_id, body, path, False)
+
+    def _reply_finding(
+        self, comment_id: str, body: str, path: str, resolve: bool
+    ) -> str:
+        target = {"id": comment_id, "path": path}
+        if target not in self.policy.get("resolvable_comments", []) or not body.strip():
+            raise ValueError("reply outside permitted own findings")
+        return self.run(resolution_argv(self.policy, target, resolve) + [body])
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -252,6 +280,8 @@ def main() -> None:
         tools.read_command,
         tools.comments,
         tools.post_finding,
+        tools.reply_finding,
+        tools.resolve_finding,
     ]:
         server.tool()(recoverable(method))
     server.run(transport="stdio")

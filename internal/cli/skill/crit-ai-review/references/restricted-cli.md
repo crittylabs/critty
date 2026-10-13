@@ -12,6 +12,7 @@ Before launch, the requester creates a policy JSON file containing:
 - `binary`: absolute path to the verified Critty executable.
 - `session`: the existing review session ID.
 - `author`: the fixed reviewer comment author selected under the shared skill's naming rule.
+- `resolvable_comments`: optional list of `{"id": "c_123abc", "path": "src/example.py"}` entries verified by the requester as this reviewer's own findings.  These threads permit replies with or without resolution.  Use an empty path for review-level IDs (`r_…`).  Match both ID and path to disambiguate file comment IDs.  Omission permits neither replies nor resolution.  Keep this list fixed during an assignment.
 - `locations`: bare permitted file paths from the frozen target, without numeric range suffixes.  The reviewer may append a positive line or ascending line range as `:line[-end]`; review-level comments need no location.
 - `read_roots`: resolved absolute directories authorized for investigation, normally the review workspace.  Read/search paths outside these roots are denied.  Supply CLI excerpts when the installed skill lies outside them.
 - `read_commands`: lists of exact argument vectors for read-only commands the requester has checked.  Use absolute executables and review their entire arguments; this is trusted permission configuration, not model input.  Include needed Git history and diff commands, with pagers, external diff drivers, text conversion, and filesystem monitors disabled.  Supply their canonical command strings to the reviewer.  Additional investigations can request another checked command; never add a blanket shell allowance.
@@ -42,9 +43,13 @@ The requester supplies exact command examples generated with Python's `shlex.joi
 <binary> comments --session <session> --all --json
 <binary> comment --session <session> --author <author> -- <body>
 <binary> comment --session <session> --author <author> -- <location> <body>
+<binary> comment --session <session> --author <author> --reply-to <own-id> --resolve --path <path> -- <reason>
+<binary> comment --session <session> --author <author> --reply-to <own-id> --path <path> -- <reason>
 ```
 
-The gate accepts only that canonical POSIX quoting, including the `--` separator.  It checks the full command, fixed session and author, and permitted file paths and numeric ranges.  Flags outside the listed command shapes, environment assignments, pipes, redirections, substitutions, and command chaining are not executable through this interface.  Metacharacters inside a canonically quoted body remain literal text.  Replies, resolving, clearing, session creation, and bulk-file preparation remain with the requester.
+For review-level replies, omit `--path`.  Generate allowed reply and resolution prefixes from the gate's capability summary; only the policy's exact ID/path pairs are accepted, and the reason must be nonempty.  Use the reply-only form while another reviewer has an unresolved or unanswered concern about the same issue.
+
+The gate accepts only that canonical POSIX quoting, including the `--` separator.  It checks the full command, fixed session and author, permitted file paths and numeric ranges, and the own-finding resolution list.  Flags outside the listed command shapes, environment assignments, pipes, redirections, substitutions, and command chaining are not executable through this interface.  Metacharacters inside a canonically quoted body remain literal text.  Other replies, clearing, session creation, and bulk-file preparation remain with the requester.
 
 Validate the installed CLI's options and hook support first.  Confirm the gate denies tests, edits, and reads outside the authorized roots while admitting workspace research, a supplied Git command, and the selected comment command.  `onFailure: block` closes hook failures; `--restricted` also confines built-in file tools to the launch directories.  A missing settings file can remove the hook entirely, so validate it and inspect startup and tool events rather than treating a successful launch as proof.  If the write boundary cannot be enforced, omit Bash entirely and use the returned-payload transport.  Do not weaken the launch to bypass permissions.
 

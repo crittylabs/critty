@@ -10,6 +10,8 @@
 
 - Bundled skills carry the original human review request and its session context into host permission requests.  AI review assignments identify the external service, transmitted material, and local posting scope.  Automatic-review acceptance still depends on the host's policy and access to the original completion.
 
+- AI reviewers resolve their own findings after verifying a fix or response, or when a finding no longer applies.  If a human or another reviewer still appears to have an unresolved or unanswered concern in the same thread or about the same issue, the AI only replies that its own concern is satisfied and leaves the thread open.  Restricted Claude and Codex tools limit replies and resolution to requester-verified comment IDs and paths and save the reason as a reply.  Human and other reviewers' findings retain their resolution state.
+
 ## 1.0.0
 
 Critty 1.0 brings code and document reviews, approvals, and user choices into one terminal session.  Review proposed changes alongside an approval checklist or a choice of next steps, or use the same workflow for a standalone decision.  Your agent receives both your review feedback and explicit answers.

@@ -16,8 +16,8 @@ A request such as `/crit-ai-cowork` with `Astra` selects a collaborator for the 
 After collecting and verifying each AI result:
 
 1. Assess the findings against the requirements and evidence.  Exchange focused questions or counterexamples with the reviewer when needed; agreement alone is not evidence of correctness.
-2. Make authorized fixes and run the affected checks as the requester.  The other AI only reads and posts findings through the restricted Critty interface; it does not edit files or execute checks.
-3. Capture the revised target and request review of the affected scope, explicitly carrying forward unresolved findings.  Reuse valid results for unchanged content.  Keep each assignment tied to its own version and completion report.
+2. Make authorized fixes and run the affected checks as the requester.  The other AI reads, posts findings, replies to its own threads, and resolves its own verified findings through the restricted Critty interface; it does not edit files or execute checks.
+3. Capture the revised target and request review of the affected scope, explicitly carrying forward unresolved findings and permitting the reviewer to resolve its own findings after verification.  Reuse valid results for unchanged content.  Keep each assignment tied to its own version and completion report.
 
 For a one-shot reviewer that has exited, continue an exchange by posting the requester's question or evidence as a reply, then launching a new assignment with a new request ID and references to that thread and the prior result.  A live transport may continue on its existing handle.  An exited process cannot receive another question merely by waiting on it.
 
