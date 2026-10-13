@@ -34,6 +34,9 @@ func TestNewRoundReplyFocusFromEmptyBaseline(t *testing.T) {
 				t.Fatal(err)
 			}
 			app = restartRound(t, app)
+			if app.images.retriedOnKey {
+				t.Fatal("round focus consumed the first-key image retry")
+			}
 			if got, want := app.tab().cursorOnAnnotation, author != app.author; got != want {
 				t.Fatalf("focused = %t, want %t", got, want)
 			}
@@ -103,6 +106,9 @@ func TestNewRoundFocusesFreshReplies(t *testing.T) {
 			}
 			if app.activeTab != 1 || app.focused != contentPane || !app.tab().cursorOnAnnotation {
 				t.Fatalf("focus = tab %d pane %v annotation %t", app.activeTab, app.focused, app.tab().cursorOnAnnotation)
+			}
+			if app.images.retriedOnKey {
+				t.Fatal("round focus consumed the first-key image retry")
 			}
 			if app.tab().cursorSide != tt.side || app.selectedCommentID() != app.tab().state.Comments[0].ID {
 				t.Fatal("wrong thread selected after carry-forward")

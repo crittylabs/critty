@@ -25,6 +25,7 @@ func TestStartupFocus(t *testing.T) {
 					}
 				}
 				app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "z.txt"}, {Path: "a.txt"}}, "HEAD", AppConfig{FocusPath: "./z.txt", FocusLine: line})
+				probeID := app.images.probeID
 				window := tea.WindowSizeMsg{Width: 100, Height: 18}
 				if !lateWindow {
 					app, _ = updateApp(app, window)
@@ -37,6 +38,9 @@ func TestStartupFocus(t *testing.T) {
 				}
 				if app.activeTab != 1 || app.tab().cursorLine != max(1, line) || app.tab().cursorOnAnnotation {
 					t.Fatalf("focus = tab %d, line %d, annotation %t", app.activeTab, app.tab().cursorLine, app.tab().cursorOnAnnotation)
+				}
+				if app.images.retriedOnKey || app.images.probeID != probeID {
+					t.Fatal("startup focus retried image detection")
 				}
 				if line == 25 && app.contentViewport.YOffset() == 0 {
 					t.Fatal("focused line was not scrolled into view")

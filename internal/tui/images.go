@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -24,13 +25,25 @@ import (
 const maxPreviewBytes = 5 << 20
 const maxPreviewPixels = 16 << 20
 
+const imageProbeDelay = 150 * time.Millisecond
+const imageProbeTimeout = 500 * time.Millisecond
+const maxImageProbeAttempts = 3
+const imageProbeRow = 2
+
+type imageProbeMsg struct{ id int }
+type imageProbeTimeoutMsg struct{ id int }
+
 type imageDisplay struct {
-	probeID     int
-	probeReply  string
-	probeCursor *tea.CursorPositionMsg
-	enabled     bool
-	hidden      bool
-	tmux        bool
+	probeID      int
+	probeReply   string
+	probeCursor  *tea.CursorPositionMsg
+	checking     bool
+	attempts     int
+	retriedOnKey bool
+	input        imageResponseInput
+	enabled      bool
+	hidden       bool
+	tmux         bool
 }
 
 type inlineImage struct {
@@ -89,7 +102,38 @@ type imageReadyMsg struct {
 }
 
 func newImageDisplay() imageDisplay {
-	return imageDisplay{probeID: newImageID(), tmux: os.Getenv("TMUX") != ""}
+	return imageDisplay{probeID: newImageID(), checking: true, tmux: os.Getenv("TMUX") != ""}
+}
+
+func (d imageDisplay) scheduleProbe() tea.Cmd {
+	return tea.Tick(imageProbeDelay, func(time.Time) tea.Msg { return imageProbeMsg{d.probeID} })
+}
+
+func (d *imageDisplay) retryOnKey(previousID int) tea.Cmd {
+	if d.enabled || d.retriedOnKey {
+		return nil
+	}
+	d.retriedOnKey = true
+	if d.probeID != previousID {
+		return nil
+	}
+	return d.restartProbe()
+}
+
+func (d *imageDisplay) restartProbe() tea.Cmd {
+	d.attempts = 0
+	return d.nextProbe()
+}
+
+func (d *imageDisplay) nextProbe() tea.Cmd {
+	previous := d.probeID
+	for d.probeID == previous {
+		d.probeID = newImageID()
+	}
+	d.probeReply = ""
+	d.probeCursor = nil
+	d.checking = true
+	return d.scheduleProbe()
 }
 
 func newImageID() int {
@@ -104,12 +148,13 @@ func (d imageDisplay) wrap(sequence string) string {
 }
 
 func (d imageDisplay) probe() tea.Cmd {
-	// A virtual placement leaves the cursor at home.  Terminals that ignore
+	// A virtual placement leaves the cursor unchanged.  Terminals that ignore
 	// U=1 instead display the image and advance the cursor, even when replying OK.
+	// Row two avoids the ambiguous F3 input event produced by row-one reports.
 	if d.probeID == 0 || strings.HasPrefix(os.Getenv("TERM"), "screen") && !d.tmux {
 		return nil
 	}
-	sequence := ansi.SaveCursor + ansi.CursorPosition(1, 1) + ansi.KittyGraphics([]byte("AAAAAA=="),
+	sequence := ansi.SaveCursor + ansi.CursorPosition(1, imageProbeRow) + ansi.KittyGraphics([]byte("AAAAAA=="),
 		"a=T", "f=32", "s=1", "v=1", "U=1", "c=1", "r=1",
 		fmt.Sprintf("i=%d", d.probeID)) + ansi.RequestCursorPositionReport +
 		ansi.KittyGraphics(nil, "a=d", "d=I", "q=2", fmt.Sprintf("i=%d", d.probeID)) + ansi.RestoreCursor
@@ -117,23 +162,48 @@ func (d imageDisplay) probe() tea.Cmd {
 }
 
 func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.images.probeID == 0 || m.images.enabled {
+	if m.images.probeID == 0 || m.images.enabled || !m.images.checking {
 		return m, nil
 	}
 	switch msg := msg.(type) {
+	case imageProbeMsg:
+		if msg.id != m.images.probeID {
+			return m, nil
+		}
+		m.images.attempts++
+		id := m.images.probeID
+		return m, tea.Batch(m.images.probe(), tea.Tick(imageProbeTimeout,
+			func(time.Time) tea.Msg { return imageProbeTimeoutMsg{id} }))
+	case imageProbeTimeoutMsg:
+		if msg.id != m.images.probeID {
+			return m, nil
+		}
+		m.images.checking = false
+		if m.images.attempts < maxImageProbeAttempts {
+			cmd := m.images.nextProbe()
+			return m, cmd
+		}
+		return m, nil
 	case uv.KittyGraphicsEvent:
-		if msg.Options.ID != m.images.probeID || m.images.probeReply != "" {
+		if m.images.attempts == 0 || msg.Options.ID != m.images.probeID || m.images.probeReply != "" {
 			return m, nil
 		}
 		m.images.probeReply = string(msg.Payload)
+		if m.images.probeReply != "OK" {
+			m.images.checking = false
+			return m, nil
+		}
 	case tea.CursorPositionMsg:
-		if m.images.probeCursor != nil {
+		// The placement reply precedes its cursor report in the terminal input
+		// stream.  Ignore reports from earlier queries before that reply.
+		if m.images.probeReply != "OK" || m.images.probeCursor != nil {
 			return m, nil
 		}
 		m.images.probeCursor = &msg
+		m.images.checking = false
 	}
 	if m.images.probeReply != "OK" || m.images.probeCursor == nil ||
-		m.images.probeCursor.X != 0 || m.images.probeCursor.Y != 0 {
+		m.images.probeCursor.X != 0 || m.images.probeCursor.Y != imageProbeRow-1 {
 		return m, nil
 	}
 	m.images.enabled = true

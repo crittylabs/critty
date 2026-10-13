@@ -3,6 +3,7 @@ package tui
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -54,6 +55,16 @@ func (w *previewOutput) output() string {
 }
 
 func TestPreviewTerminalRoundTrip(t *testing.T) {
+	for _, encoded := range []bool{false, true} {
+		for _, lost := range []int{0, 2} {
+			t.Run(fmt.Sprintf("csi-u=%t/lostProbes=%d", encoded, lost), func(t *testing.T) {
+				testPreviewTerminalRoundTrip(t, lost, encoded)
+			})
+		}
+	}
+}
+
+func testPreviewTerminalRoundTrip(t *testing.T, lost int, encoded bool) {
 	t.Setenv("TMUX", "")
 	dir := t.TempDir()
 	path := dir + "/image.png"
@@ -61,8 +72,21 @@ func TestPreviewTerminalRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewApp(path, AppConfig{})
+	app.images.tmux = encoded
 	out := &previewOutput{changed: make(chan struct{}, 1)}
-	p := tea.NewProgram(app, tea.WithInput(nil), tea.WithOutput(out),
+	input, replies, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := input.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
+			t.Error(err)
+		}
+		if err := replies.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	p := tea.NewProgram(app, tea.WithInput(input), tea.WithOutput(out),
 		tea.WithWindowSize(80, 24), tea.WithColorProfile(colorprofile.ANSI256), tea.WithoutSignalHandler())
 	type result struct {
 		model tea.Model
@@ -73,17 +97,35 @@ func TestPreviewTerminalRoundTrip(t *testing.T) {
 	t.Cleanup(func() { p.Kill() })
 	deadline := time.NewTimer(5 * time.Second)
 	defer deadline.Stop()
-	responded := false
+	seen := make(map[int]bool)
 	for {
 		select {
 		case <-deadline.C:
 			t.Fatal("terminal did not display image")
 		case <-out.changed:
 			output := out.output()
-			if !responded && strings.Contains(output, fmt.Sprintf("i=%d", app.images.probeID)) {
-				responded = true
-				p.Send(uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte("OK")})
-				p.Send(tea.CursorPositionMsg{X: 0, Y: 0})
+			for _, sequence := range strings.Split(output, "\x1b_G")[1:] {
+				header, _, ok := strings.Cut(sequence, ";")
+				if !ok {
+					continue
+				}
+				var options kitty.Options
+				if err := options.UnmarshalText([]byte(header)); err != nil {
+					t.Fatal(err)
+				}
+				if options.Action != kitty.TransmitAndPut || seen[options.ID] {
+					continue
+				}
+				seen[options.ID] = true
+				if len(seen) > lost {
+					response := fmt.Sprintf("\x1b[4;8R\x1b_Gi=%d;OK\x1b\\\x1b[2;1R", options.ID)
+					if encoded {
+						response = fmt.Sprintf("\x1b[95;3uGi=%d;OK\x1b[92;3u\x1b[91;3u2;1R", options.ID)
+					}
+					if _, err := replies.WriteString(response); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			if strings.ContainsRune(output, kitty.Placeholder) {
 				p.Quit()
@@ -92,6 +134,9 @@ func TestPreviewTerminalRoundTrip(t *testing.T) {
 					t.Fatal(finished.err)
 				}
 				img := finished.model.(AppModel).tabs[0].preview.after.image
+				if finished.model.(AppModel).images.retriedOnKey {
+					t.Fatal("terminal response triggered the first-key retry")
+				}
 				if img == nil || !img.ready {
 					t.Fatal("image displayed before transmission completed")
 				}
@@ -144,6 +189,7 @@ func TestImageCapabilityAndPassthrough(t *testing.T) {
 		{d.probeID + 1, "OK", false}, {d.probeID, "EINVAL", false}, {d.probeID, "OK", false},
 	} {
 		app := AppModel{images: d}
+		app.images.attempts = 1
 		model, _ := app.Update(uv.KittyGraphicsEvent{Options: kitty.Options{ID: tc.id}, Payload: []byte(tc.payload)})
 		if model.(AppModel).images.enabled != tc.enabled {
 			t.Fatalf("capability %+v", tc)
@@ -158,33 +204,185 @@ func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
 		payload string
 		enabled bool
 	}{
-		{"virtual placement", tea.CursorPositionMsg{X: 0, Y: 0}, "OK", true},
-		{"ignored extension", tea.CursorPositionMsg{X: 1, Y: 0}, "OK", false},
-		{"unsupported graphics", tea.CursorPositionMsg{X: 0, Y: 0}, "EINVAL", false},
+		{"virtual placement", tea.CursorPositionMsg{X: 0, Y: 1}, "OK", true},
+		{"ignored extension", tea.CursorPositionMsg{X: 1, Y: 1}, "OK", false},
+		{"unsupported graphics", tea.CursorPositionMsg{X: 0, Y: 1}, "EINVAL", false},
 	} {
-		for _, cursorFirst := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/cursorFirst=%t", tc.name, cursorFirst), func(t *testing.T) {
-				app := AppModel{images: newImageDisplay()}
-				messages := []tea.Msg{
-					uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte(tc.payload)},
-					tc.cursor,
+		t.Run(tc.name, func(t *testing.T) {
+			app := AppModel{images: newImageDisplay()}
+			app.images.attempts = 1
+			messages := []tea.Msg{
+				uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte(tc.payload)},
+				tc.cursor,
+			}
+			for i, msg := range messages {
+				model, _ := app.Update(msg)
+				app = model.(AppModel)
+				if app.images.enabled != (i == 1 && tc.enabled) {
+					t.Fatalf("message %d: enabled=%t", i, app.images.enabled)
 				}
-				if cursorFirst {
-					messages[0], messages[1] = messages[1], messages[0]
-				}
-				for i, msg := range messages {
-					model, _ := app.Update(msg)
-					app = model.(AppModel)
-					if app.images.enabled != (i == 1 && tc.enabled) {
-						t.Fatalf("message %d: enabled=%t", i, app.images.enabled)
-					}
-				}
-				model, _ := app.Update(tea.CursorPositionMsg{X: 0, Y: 0})
-				if model.(AppModel).images.enabled != tc.enabled {
-					t.Fatal("later cursor reply changed capability")
-				}
-			})
+			}
+			model, _ := app.Update(tea.CursorPositionMsg{X: 0, Y: 1})
+			if model.(AppModel).images.enabled != tc.enabled {
+				t.Fatal("later cursor reply changed capability")
+			}
+		})
+	}
+}
+
+func TestImageProbeRetriesAndIgnoresStaleResponses(t *testing.T) {
+	app := AppModel{images: newImageDisplay()}
+	var previous int
+	var cmd tea.Cmd
+	for attempt := 1; attempt <= maxImageProbeAttempts; attempt++ {
+		id := app.images.probeID
+		if id == previous {
+			t.Fatal("retry reused its image ID")
 		}
+		app, cmd = updateApp(app, imageProbeMsg{id})
+		if cmd == nil || app.images.attempts != attempt {
+			t.Fatalf("attempt %d: no probe or timeout", attempt)
+		}
+		if previous != 0 {
+			app, _ = updateApp(app, uv.KittyGraphicsEvent{Options: kitty.Options{ID: previous}, Payload: []byte("OK")})
+			app, _ = updateApp(app, tea.CursorPositionMsg{X: 7, Y: 3})
+			app, _ = updateApp(app, imageProbeTimeoutMsg{previous})
+			app, _ = updateApp(app, imageProbeMsg{previous})
+			if app.images.probeReply != "" || app.images.probeCursor != nil || !app.images.checking || app.images.attempts != attempt {
+				t.Fatal("old response or timer contaminated the retry")
+			}
+		}
+		if attempt < maxImageProbeAttempts {
+			app, cmd = updateApp(app, imageProbeTimeoutMsg{id})
+			if cmd == nil || !app.images.checking {
+				t.Fatal("missing retry after lost probe")
+			}
+			previous = id
+			continue
+		}
+		app, _ = updateApp(app, uv.KittyGraphicsEvent{Options: kitty.Options{ID: id}, Payload: []byte("OK")})
+		app, _ = updateApp(app, tea.CursorPositionMsg{X: 0, Y: 1})
+		app, _ = updateApp(app, imageProbeTimeoutMsg{id})
+		if !app.images.enabled || app.images.checking {
+			t.Fatal("retry did not recover supported terminal")
+		}
+	}
+}
+
+func TestImageProbeExhaustionAndManualRecheck(t *testing.T) {
+	for _, mouse := range []bool{false, true} {
+		t.Run(fmt.Sprintf("mouse=%t", mouse), func(t *testing.T) {
+			app := setupAppWithDoc(t, "source\n")
+			app.images = newImageDisplay()
+			for attempt := 0; attempt < maxImageProbeAttempts; attempt++ {
+				id := app.images.probeID
+				app, _ = updateApp(app, imageProbeMsg{id})
+				app, _ = updateApp(app, imageProbeTimeoutMsg{id})
+			}
+			if app.images.checking || !strings.Contains(app.imagesButton(), "unavailable") {
+				t.Fatal("unanswered probes did not finish")
+			}
+			oldID := app.images.probeID
+			var cmd tea.Cmd
+			if mouse {
+				app.width, app.height = 100, 40
+				app.recalculateLayout()
+				_, layout := app.renderReviewScreen()
+				app, cmd = updateApp(app, tea.MouseClickMsg{X: layout.imagesButton.left, Y: layout.imagesButton.top, Button: tea.MouseLeft})
+			} else {
+				app, cmd = updateApp(app, tea.KeyPressMsg{Code: 'I', Text: "I"})
+			}
+			if cmd == nil || !app.images.checking || app.images.hidden || app.images.probeID == oldID || app.images.attempts != 0 {
+				t.Fatal("manual recheck did not start a fresh probe cycle")
+			}
+			previous := app.images.probeID
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'I', Text: "I"})
+			if app.images.probeID == previous || app.images.hidden {
+				t.Fatal("repeated recheck did not restart the running probe")
+			}
+			id := app.images.probeID
+			app, _ = updateApp(app, imageProbeMsg{id})
+			app, _ = updateApp(app, uv.KittyGraphicsEvent{Options: kitty.Options{ID: id}, Payload: []byte("OK")})
+			app, _ = updateApp(app, tea.CursorPositionMsg{X: 0, Y: 1})
+			if !app.images.enabled || app.images.hidden {
+				t.Fatal("manual recheck did not restore previews")
+			}
+		})
+	}
+}
+
+func TestImageManualRecheckHasNoAttemptLimit(t *testing.T) {
+	app := setupAppWithDoc(t, "source\n")
+	for cycle := 0; cycle < 5; cycle++ {
+		previous := app.images.probeID
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'I', Text: "I"})
+		if !app.images.checking || app.images.attempts != 0 || app.images.probeID == previous {
+			t.Fatalf("cycle %d: manual check did not restart", cycle)
+		}
+		app, _ = updateApp(app, imageProbeTimeoutMsg{previous})
+		if !app.images.checking || app.images.attempts != 0 {
+			t.Fatal("old timeout ended the manual check")
+		}
+		for attempt := 0; attempt < maxImageProbeAttempts; attempt++ {
+			id := app.images.probeID
+			app, _ = updateApp(app, imageProbeMsg{id})
+			app, _ = updateApp(app, imageProbeTimeoutMsg{id})
+		}
+		if app.images.checking {
+			t.Fatal("automatic retries did not stop")
+		}
+	}
+}
+
+func TestImageProbeIgnoresEarlierCursorReports(t *testing.T) {
+	app := AppModel{images: newImageDisplay()}
+	id := app.images.probeID
+	app, _ = updateApp(app, imageProbeMsg{id})
+	app, _ = updateApp(app, tea.CursorPositionMsg{X: 7, Y: 3})
+	app, _ = updateApp(app, uv.KittyGraphicsEvent{Options: kitty.Options{ID: id}, Payload: []byte("OK")})
+	app, _ = updateApp(app, tea.CursorPositionMsg{X: 0, Y: 1})
+	if !app.images.enabled {
+		t.Fatal("earlier cursor report blocked a supported terminal")
+	}
+}
+
+func TestImageProbeOnFirstKey(t *testing.T) {
+	for _, checking := range []bool{false, true} {
+		t.Run(fmt.Sprintf("checking=%t", checking), func(t *testing.T) {
+			app := setupAppWithDoc(t, "source\n")
+			app.images = newImageDisplay()
+			app.images.checking = checking
+			app.modal = commentModal
+			app.modalTextarea.Focus()
+			previous := app.images.probeID
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'a', Text: "a"})
+			if !app.images.checking || !app.images.retriedOnKey || app.images.probeID == previous {
+				t.Fatal("first key did not restart unconfirmed detection")
+			}
+			id := app.images.probeID
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Text: "b"})
+			if app.images.probeID != id || app.modalTextarea.Value() != "ab" {
+				t.Fatal("retry repeated or intercepted normal input")
+			}
+			for attempt := 0; attempt < maxImageProbeAttempts; attempt++ {
+				id := app.images.probeID
+				app, _ = updateApp(app, imageProbeMsg{id})
+				app, _ = updateApp(app, imageProbeTimeoutMsg{id})
+			}
+			id = app.images.probeID
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'c', Text: "c"})
+			if app.images.checking || app.images.probeID != id || app.modalTextarea.Value() != "abc" {
+				t.Fatal("later key retried unavailable detection")
+			}
+		})
+	}
+	app := setupAppWithDoc(t, "source\n")
+	app.images = newImageDisplay()
+	app.images.enabled = true
+	id := app.images.probeID
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab})
+	if app.images.probeID != id || app.images.retriedOnKey {
+		t.Fatal("confirmed terminal was checked again")
 	}
 }
 

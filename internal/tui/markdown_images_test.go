@@ -218,6 +218,7 @@ func TestImagesTogglePreservesTextInput(t *testing.T) {
 		}
 	}
 	app := setupAppWithDoc(t, "source\n")
+	app.images.enabled = true
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'i', Text: "i"})
 	if app.images.hidden {
 		t.Fatal("lowercase i toggled images")

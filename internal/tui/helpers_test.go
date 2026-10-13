@@ -38,6 +38,9 @@ func setupAppWithDoc(t *testing.T, content string) AppModel {
 	app.activeTab = 0
 	updated, _ := app.Update(docRenderedMsg{})
 	a := updated.(AppModel)
+	// Most model tests do not run terminal commands.  Image detection tests
+	// initialize their own display state when exercising the first-key retry.
+	a.images.retriedOnKey = true
 	a.contentViewport.SetHeight(5)
 	a.sidebarView = commentsView // most tests exercise the comment sidebar
 	return a
@@ -224,6 +227,7 @@ func newFinishTestApp(t *testing.T, comments []review.Comment) (AppModel, chan F
 		FinishCh: finishCh,
 	})
 	app.tabs[0].state = &fileReview{Comments: comments}
+	app.images.retriedOnKey = true
 	app.sidebarView = commentsView
 	return app, finishCh
 }

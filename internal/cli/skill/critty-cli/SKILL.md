@@ -130,6 +130,8 @@ Explicit focus applies only to that invocation.  `--focus` wins over a document'
 
 Supported terminals preview PNG, JPEG, GIF, and WebP, with Before and After views for modified or renamed images.  Detection is automatic; tmux needs `allow-passthrough on`.  GIF uses its first frame.  Animated WebP, images over 5 MiB or 16 megapixels, and unsupported terminals retain placeholders.  Images accept file comments without adding source lines or changing anchors.
 
+Capability detection supports tmux's extended-key input and retries unanswered startup queries.  If support remains unconfirmed, the first keypress checks again, allowing recovery after a previously hidden terminal becomes visible.  Further checks can be requested manually.
+
 Git previews read the selected snapshot, including deleted images.  Markdown image paths resolve from the document or attachment's original location; Git references must stay inside the repository.  Supplied diffs remain text-only.  Remote URLs are not fetched.
 
 Comment images read current local files: ordinary relative paths use the review's working directory, `attachments/` paths use the session directory, and absolute paths may be outside the repository.  Follow the finish output's base directory when reading them.  `/critty` covers reading images before approval cleanup.

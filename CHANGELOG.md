@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Image previews work with tmux's extended-key input and retry capability detection when startup queries receive no response.  If support remains unconfirmed, the first keypress checks again after the terminal becomes visible.  Press `I` or click Images to restart an unsuccessful or ongoing check as often as needed.  The Images control shows when a check is in progress.
+
 ## 1.1.0
 
 ### Features

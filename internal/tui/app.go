@@ -397,7 +397,7 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, m.images.probe())
+	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, m.images.scheduleProbe())
 }
 
 func (m AppModel) loadDocuments() tea.Cmd {
@@ -481,6 +481,51 @@ func (m *AppModel) refreshHeaderLayout(previousHeight int) {
 }
 
 func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	msg, cmd := m.images.decodeResponse(msg)
+	if msg == nil {
+		return m, cmd
+	}
+	if replay, ok := msg.(imageResponseReplayMsg); ok {
+		var commands []tea.Cmd
+		for _, key := range replay.keys {
+			model, cmd := m.updateKeyPress(key)
+			switch app := model.(type) {
+			case AppModel:
+				m = app
+			case *AppModel:
+				m = *app
+			}
+			commands = append(commands, cmd)
+		}
+		return m, tea.Batch(commands...)
+	}
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		return m.updateKeyPress(key)
+	}
+	return m.updateMessage(msg)
+}
+
+func (m AppModel) updateKeyPress(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	previousID := m.images.probeID
+	model, cmd := m.updateMessage(key)
+	switch app := model.(type) {
+	case AppModel:
+		probe := app.images.retryOnKey(previousID)
+		if probe != nil {
+			cmd = tea.Batch(cmd, probe)
+		}
+		return app, cmd
+	case *AppModel:
+		probe := app.images.retryOnKey(previousID)
+		if probe != nil {
+			cmd = tea.Batch(cmd, probe)
+		}
+		return app, cmd
+	}
+	return model, cmd
+}
+
+func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.clipboardPending {
 		switch input := msg.(type) {
 		case tea.KeyPressMsg:
@@ -494,7 +539,7 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch msg := msg.(type) {
-	case uv.KittyGraphicsEvent, tea.CursorPositionMsg:
+	case uv.KittyGraphicsEvent, tea.CursorPositionMsg, imageProbeMsg, imageProbeTimeoutMsg:
 		return m.updateImageCapability(msg)
 	case imageLoadedMsg:
 		return m.finishImageLoad(msg)
@@ -840,8 +885,8 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case key.Matches(msg, keys.Images):
-		m.toggleImages()
-		return m, nil
+		cmd := m.toggleImages()
+		return m, cmd
 
 	case key.Matches(msg, keys.FoldResolved):
 		m.foldResolved = !m.foldResolved
@@ -3034,8 +3079,8 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		}
 	}
 	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
-		m.toggleImages()
-		return m, nil
+		cmd := m.toggleImages()
+		return m, cmd
 	}
 
 	headerHeight := m.headerHeight()

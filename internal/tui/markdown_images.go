@@ -288,18 +288,25 @@ func (m AppModel) renderMarkdownImages(line int, before bool) string {
 	return lipgloss.NewStyle().PaddingLeft(gutterWidth).Render(strings.Join(rows, "\n"))
 }
 
-func (m *AppModel) toggleImages() {
+func (m *AppModel) toggleImages() tea.Cmd {
+	if !m.images.enabled {
+		m.images.hidden = false
+		return m.images.restartProbe()
+	}
 	m.images.hidden = !m.images.hidden
 	m.recalculateLayout()
 	m.rebuildContent()
 	m.updateCommentSidebar()
 	m.scrollToCursor()
+	return nil
 }
 
 func (m AppModel) imagesButton() string {
 	state := "on"
 	if m.images.hidden {
 		state = "off"
+	} else if !m.images.enabled && m.images.checking {
+		state = "checking"
 	} else if !m.images.enabled {
 		state = "unavailable"
 	}
