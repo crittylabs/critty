@@ -4,6 +4,8 @@
 
 ### Features
 
+- Request AI second opinions with `crit-ai-review`, or let two agents refine work with `crit-ai-cowork` before final human review.  Both skills use an existing Critty session and an authorized reviewer connection.  All agent install targets include the skills and a Python 3.10+ gate for restricted Claude Code reviews: reviewers can investigate the workspace and post findings while the requester makes edits and runs checks.  Assignments describe permitted operations and how to continue after an optional operation is denied.
+
 - Save review verdicts, all feedback threads, and attachment identities with `--summary FILE`, so agents can read a compact JSON result without parsing finish messages or repeatedly loading unchanged attachment bodies.  The bundled review skill uses this result while retaining complete feedback and approval evidence.
 
 ## 1.0.0

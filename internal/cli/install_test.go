@@ -43,6 +43,12 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 		filepath.Join(".opencode", "commands", "critty.md"):                 filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
 		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
+	for _, rel := range []string{
+		"crit-ai-review/SKILL.md", "crit-ai-cowork/SKILL.md",
+		"crit-ai-review/references/restricted-cli.md", "crit-ai-review/scripts/claude_review_gate.py",
+	} {
+		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
+	}
 	for _, f := range integrations()["opencode"] {
 		if f.globalDest != want[f.dest] {
 			t.Errorf("%s global destination = %q, want %q", f.dest, f.globalDest, want[f.dest])
@@ -78,6 +84,13 @@ func TestIntegrationLayouts(t *testing.T) {
 		},
 	}
 	for target, dests := range want {
+		dir := map[string]string{"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini"}[target]
+		for _, rel := range []string{
+			"crit-ai-review/SKILL.md", "crit-ai-cowork/SKILL.md",
+			"crit-ai-review/references/restricted-cli.md", "crit-ai-review/scripts/claude_review_gate.py",
+		} {
+			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
+		}
 		if got := destinations(t, target); !slices.Equal(got, dests) {
 			t.Errorf("%s destinations = %q, want %q", target, got, dests)
 		}
@@ -223,6 +236,52 @@ func TestApprovalSkillReferencesUseAgentConventions(t *testing.T) {
 				}
 				if !bytes.Contains(caller, []byte("`"+variant.skillRef("critty-approval")+"`")) {
 					t.Errorf("%s cannot discover the approval workflow", name)
+				}
+			}
+		})
+	}
+}
+
+func TestAIReviewSkillResources(t *testing.T) {
+	for agent, variant := range skillVariants {
+		t.Run(agent, func(t *testing.T) {
+			for _, name := range []string{"crit-ai-review", "crit-ai-cowork"} {
+				data, err := renderSkill(name, agent)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Contains(data, []byte("`"+variant.skillRef("crit-ai-cowork")+"` with `Astra`")) {
+					t.Errorf("%s has the wrong invocation example for %s", name, agent)
+				}
+			}
+			for _, f := range integrations()[agent] {
+				if !strings.Contains(filepath.ToSlash(f.dest), "/crit-ai-review/") {
+					continue
+				}
+				data, err := f.content()
+				if err != nil {
+					t.Fatal(err)
+				}
+				dest := filepath.Join(t.TempDir(), f.dest)
+				f.dest = dest
+				if err := installIntegrationFile(f, false); err != nil {
+					t.Fatal(err)
+				}
+				got, err := os.ReadFile(dest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(got, data) {
+					t.Errorf("installed asset %s differs", dest)
+				}
+				if strings.HasSuffix(dest, ".py") {
+					embedded, err := skillContent.ReadFile("skill/crit-ai-review/scripts/claude_review_gate.py")
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(got, embedded) {
+						t.Error("review gate changed during rendering")
+					}
 				}
 			}
 		})

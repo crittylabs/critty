@@ -51,6 +51,9 @@ jobs:
 
       - run: go test ./...
 
+      - name: Test AI reviewer permissions
+        run: python3 e2e/claude_review_gate_test.py
+
       - name: Install tmux for E2E scenarios
         run: |
           set -euo pipefail
