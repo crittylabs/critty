@@ -77,7 +77,7 @@ func TestFinishPendingSummary(t *testing.T) {
 			t.Fatalf("progress counters are not below the buttons: %s", plain)
 		}
 		for _, label := range []string{"0/1 ☐", "0/1 ○"} {
-			if !strings.Contains(content, "\x1b[31;1m"+label) && !strings.Contains(content, "\x1b[1;31m"+label) {
+			if !hasForeground(content, progressColors.required, label) {
 				t.Fatalf("required status is not red: %q", content)
 			}
 		}
@@ -105,12 +105,15 @@ func TestFinishStatusCompletionColorsAndMarks(t *testing.T) {
 		if plain := ansi.Strip(status); plain != "0/0 💬  1/1 ☑  1/1 ☑  1/1 ●" {
 			t.Fatalf("optional choice counted alternatives instead of groups: %s", plain)
 		}
-		for _, expected := range []struct{ color, label string }{
-			{"32", "1/1 ☑"},
-			{"33", "1/1 ☑"},
-			{"33", "1/1 ●"},
+		for _, expected := range []struct {
+			color color.Color
+			label string
+		}{
+			{progressColors.complete, "1/1 ☑"},
+			{progressColors.pending, "1/1 ☑"},
+			{progressColors.pending, "1/1 ●"},
 		} {
-			if !strings.Contains(status, "\x1b["+expected.color+";1m"+expected.label) && !strings.Contains(status, "\x1b[1;"+expected.color+"m"+expected.label) {
+			if !hasForeground(status, expected.color, expected.label) {
 				t.Fatalf("wrong completion color for %s: %q", expected.label, status)
 			}
 		}
@@ -120,7 +123,7 @@ func TestFinishStatusCompletionColorsAndMarks(t *testing.T) {
 		if plain := ansi.Strip(status); plain != "0/0 💬  1/2 ☐  1/1 ●" {
 			t.Fatalf("partially completed checkboxes used a completed mark: %s", plain)
 		}
-		if !strings.Contains(status, "\x1b[31;1m1/2 ☐") && !strings.Contains(status, "\x1b[1;31m1/2 ☐") {
+		if !hasForeground(status, progressColors.required, "1/2 ☐") {
 			t.Fatalf("partially completed required checks are not red: %q", status)
 		}
 	}

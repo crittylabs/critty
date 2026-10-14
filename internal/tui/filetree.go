@@ -251,12 +251,12 @@ func (m *AppModel) treeRowText(i int) string {
 			style = style.Foreground(lipgloss.Magenta)
 		}
 	} else if m.tabs[row.tabIndex].attachment != nil {
-		style = style.Foreground(lipgloss.Yellow)
+		style = style.Foreground(warning)
 	}
 	if !row.isDir && row.tabIndex == m.activeTab {
-		style = style.Bold(true)
-		if m.tabs[row.tabIndex].attachment == nil {
-			style = style.Foreground(textPrimary)
+		style = style.Bold(true).Foreground(textPrimary)
+		if m.tabs[row.tabIndex].attachment != nil {
+			style = style.Foreground(activeAttachmentColor)
 		}
 	}
 	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon+label)

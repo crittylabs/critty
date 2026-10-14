@@ -19,7 +19,11 @@ func newCodeHighlighter(filename string) func(string) []string {
 	}
 	lexer = chroma.Coalesce(lexer)
 
+	// Monokai's light foregrounds are unreadable on a light background.
 	style := styles.Get("monokai")
+	if !terminalIsDark {
+		style = styles.Get("monokailight")
+	}
 	formatter := formatters.Get("terminal256")
 
 	return func(content string) []string {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"image/color"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,6 +45,25 @@ func setupAppWithDoc(t *testing.T, content string) AppModel {
 	a.contentViewport.SetHeight(5)
 	a.sidebarView = commentsView // most tests exercise the comment sidebar
 	return a
+}
+
+// hasForeground reports whether some occurrence of label directly follows
+// an SGR sequence that sets the foreground to c.
+func hasForeground(content string, c color.Color, label string) bool {
+	param := ";" + strings.TrimSuffix(strings.TrimPrefix(fgToAnsi(c), "\x1b["), "m") + ";"
+	for rest := content; ; {
+		i := strings.Index(rest, label)
+		if i < 0 {
+			return false
+		}
+		prefix := rest[:i]
+		if j := strings.LastIndex(prefix, "\x1b["); j >= 0 && strings.HasSuffix(prefix, "m") {
+			if strings.Contains(";"+prefix[j+2:len(prefix)-1]+";", param) {
+				return true
+			}
+		}
+		rest = rest[i+len(label):]
+	}
 }
 
 func pressKey(app AppModel, code rune) AppModel {

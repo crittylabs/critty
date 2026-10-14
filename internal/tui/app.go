@@ -589,7 +589,14 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.BackgroundColorMsg:
+		recolor := msg.IsDark() != terminalIsDark
 		initAdaptiveStyles(msg.IsDark())
+		for i := range m.tabs {
+			if recolor && m.tabs[i].chromaLines != nil {
+				m.tabs[i].chromaLines, m.tabs[i].deletedLineCache = nil, nil
+				m.tabs[i].ensureHighlightCache()
+			}
+		}
 		m.modalTextarea.SetStyles(textarea.DefaultStyles(msg.IsDark()))
 		if len(m.tabs) > 0 && m.tab().state != nil {
 			m.rebuildContent()
