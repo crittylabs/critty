@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Files containing a bare carriage return, such as shell scripts, no longer show the lines after it shifted against their line numbers and diff markers.  Carriage returns and other control characters in source lines now appear in caret notation such as `^M`.
+
 ## 1.1.2
 
 ### Changed

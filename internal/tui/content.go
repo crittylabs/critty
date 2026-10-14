@@ -15,11 +15,42 @@ func expandDisplayTabs(s string) string {
 	return strings.ReplaceAll(s, "\t", strings.Repeat(" ", displayTabWidth))
 }
 
+// displaySourceText makes a source line safe to render as fixed-width rows:
+// tabs become spaces, and other C0 control characters and DEL become caret
+// notation such as ^M so a stray CR cannot overwrite the row.  ESC passes
+// through so syntax highlighting survives; apply this before adding
+// hyperlinks, whose OSC terminator is BEL.
+func displaySourceText(s string) string {
+	if strings.IndexFunc(s, needsDisplayEscape) < 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r == '\t':
+			b.WriteString(strings.Repeat(" ", displayTabWidth))
+		case r == 0x7f:
+			b.WriteString("^?")
+		case needsDisplayEscape(r):
+			b.WriteByte('^')
+			b.WriteByte(byte(r) + 0x40)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func needsDisplayEscape(r rune) bool {
+	return r == 0x7f || r < 0x20 && r != '\n' && r != 0x1b
+}
+
 func documentDisplayLine(t *FileTab, index int, fallback string) string {
 	if !t.isMarkdown && t.chromaLines != nil && index < len(t.chromaLines) {
-		return expandDisplayTabs(t.chromaLines[index])
+		return displaySourceText(t.chromaLines[index])
 	}
-	return expandDisplayTabs(fallback)
+	return displaySourceText(fallback)
 }
 
 // rebuildContent renders the document line-by-line with cursor, selection,
@@ -297,7 +328,7 @@ func (m *AppModel) rebuildContent() {
 				styledLine = inlineBackground(diffChangedLineBg, styledLine)
 			}
 
-			wrappedLines := strings.Split(lipgloss.Wrap(highlight(expandDisplayTabs(styledLine)), textWidth, ""), "\n")
+			wrappedLines := strings.Split(lipgloss.Wrap(highlight(displaySourceText(styledLine)), textWidth, ""), "\n")
 			for wi, wrappedLine := range wrappedLines {
 				if wi == 0 {
 					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
@@ -691,7 +722,7 @@ func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, wi
 		}
 		b.WriteString(inlineBackground(style, content))
 	}
-	line := expandDisplayTabs(b.String())
+	line := displaySourceText(b.String())
 	if decorate != nil {
 		line, _ = decorate(line)
 	}
@@ -702,9 +733,9 @@ func deletedDisplayLines(content, cached string, inline []gitpkg.InlineSegment, 
 	if len(inline) > 0 {
 		return inlineDiffDisplayLines(inline, isMarkdown, width, diffCommonTextBg, diffDeletedTextBg, decorate)
 	}
-	display := expandDisplayTabs(content)
+	display := displaySourceText(content)
 	if cached != "" {
-		display = expandDisplayTabs(cached)
+		display = displaySourceText(cached)
 	}
 	if decorate != nil {
 		styled := display

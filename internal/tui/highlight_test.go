@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
@@ -40,5 +41,19 @@ func BenchmarkHighlightDeletedLines(b *testing.B) {
 	for b.Loop() {
 		tab := FileTab{path: doc.Path, doc: doc, deletedAfter: map[int][]gitpkg.DeletedLine{0: deleted}}
 		tab.ensureHighlightCache()
+	}
+}
+
+func TestCodeHighlighterKeepsLineCountWithBareCR(t *testing.T) {
+	content := "[alias]\n\tfix = sed \"s/\r$//\"\n[core]\n\teditor = vim\n"
+	got := newCodeHighlighter("config")(content)
+	want := []string{"[alias]", "\tfix = sed \"s/\r$//\"", "[core]", "\teditor = vim"}
+	if len(got) != len(want) {
+		t.Fatalf("line count %d, want %d: %q", len(got), len(want), got)
+	}
+	for i, line := range got {
+		if plain := ansi.Strip(line); plain != want[i] {
+			t.Errorf("line %d: %q, want %q", i+1, plain, want[i])
+		}
 	}
 }

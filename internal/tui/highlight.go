@@ -26,16 +26,20 @@ func newCodeHighlighter(filename string) func(string) []string {
 	}
 	formatter := formatters.Get("terminal256")
 
+	// Chroma's default options turn a lone CR into a newline, which would
+	// shift every later line against the document's line numbers.
+	options := &chroma.TokeniseOptions{State: "root", EnsureLF: false}
+
 	return func(content string) []string {
-		iterator, err := lexer.Tokenise(nil, content)
+		raw := strings.Split(content, "\n")
+		iterator, err := lexer.Tokenise(options, content)
 		if err != nil {
-			// Fallback to raw lines
-			return strings.Split(content, "\n")
+			return raw
 		}
 
 		var buf bytes.Buffer
 		if err := formatter.Format(&buf, style, iterator); err != nil {
-			return strings.Split(content, "\n")
+			return raw
 		}
 
 		// Split the ANSI output by newlines
@@ -46,6 +50,19 @@ func newCodeHighlighter(filename string) func(string) []string {
 			lines = lines[:len(lines)-1]
 		}
 
+		// A lexer that merges or splits lines would misplace the rest of the
+		// file, so prefer unstyled lines that stay aligned.
+		if len(lines) != len(trimTrailingEmpty(raw)) {
+			return raw
+		}
+
 		return lines
 	}
+}
+
+func trimTrailingEmpty(lines []string) []string {
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		return lines[:len(lines)-1]
+	}
+	return lines
 }

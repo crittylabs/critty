@@ -327,9 +327,9 @@ func isearchLineText(t *FileTab) func(lineRef) string {
 	}
 	return func(ref lineRef) string {
 		if ref.side == "" {
-			return expandDisplayTabs(t.doc.LineAt(ref.line))
+			return displaySourceText(t.doc.LineAt(ref.line))
 		}
-		return expandDisplayTabs(deleted[ref.line])
+		return displaySourceText(deleted[ref.line])
 	}
 }
 

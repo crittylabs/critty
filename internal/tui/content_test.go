@@ -189,3 +189,18 @@ func TestRenderAnnotationBoxCollapsesResolvedThread(t *testing.T) {
 		t.Fatalf("resolved annotation box height = %d lines, want 3", got)
 	}
 }
+
+func TestDisplaySourceTextEscapesControlCharacters(t *testing.T) {
+	for _, tt := range []struct{ in, want string }{
+		{"plain", "plain"},
+		{"a\tb", "a    b"},
+		{"s/\r$//", "s/^M$//"},
+		{"x\x00y\x7f", "x^@y^?"},
+		{"one\ntwo", "one\ntwo"},
+		{"\x1b[31mred\x1b[0m\t日本語", "\x1b[31mred\x1b[0m    日本語"},
+	} {
+		if got := displaySourceText(tt.in); got != tt.want {
+			t.Errorf("displaySourceText(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}

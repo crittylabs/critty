@@ -4335,7 +4335,7 @@ func (m AppModel) renderContextPreview(side string, start, end, maxWidth, maxLin
 		maxLineText = 10
 	}
 	for i := start; i <= end; i++ {
-		lineText := expandDisplayTabs(m.anchorText(&t, side, i, i))
+		lineText := displaySourceText(m.anchorText(&t, side, i, i))
 		if lineText == "" {
 			continue
 		}
