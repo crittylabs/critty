@@ -13,7 +13,7 @@ import (
 // Run this test binary as an editor so help probing is tested without depending
 // on an installed editor or starting a GUI.
 func TestSourceEditorHelper(t *testing.T) {
-	mode := os.Getenv("TCRIT_TEST_EDITOR")
+	mode := os.Getenv("CRITTY_TEST_EDITOR")
 	if mode == "" {
 		return
 	}
@@ -38,7 +38,7 @@ func TestSourceEditorHelper(t *testing.T) {
 func TestSourceEditorArgumentsAndProbeCache(t *testing.T) {
 	for _, mode := range []string{"code", "stderr", "nvi", "plain", "slow"} {
 		t.Run(mode, func(t *testing.T) {
-			t.Setenv("TCRIT_TEST_EDITOR", mode)
+			t.Setenv("CRITTY_TEST_EDITOR", mode)
 			editor := fmt.Sprintf("%q -test.run=TestSourceEditorHelper -- --profile 'Review Profile'", os.Args[0])
 			editorGotoCache.Delete(editor)
 			t.Cleanup(func() { editorGotoCache.Delete(editor) })
@@ -61,7 +61,7 @@ func TestSourceEditorArgumentsAndProbeCache(t *testing.T) {
 				t.Fatal("probe was not cached")
 			}
 			// A second launch must reuse the result even if the helper changes.
-			t.Setenv("TCRIT_TEST_EDITOR", "plain")
+			t.Setenv("CRITTY_TEST_EDITOR", "plain")
 			again, err := sourceEditorCommand(path, 40)
 			if err != nil || !reflect.DeepEqual(again.Args, want) {
 				t.Fatal("probe cache was not reused")

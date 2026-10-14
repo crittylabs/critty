@@ -144,7 +144,7 @@ exit 127
 				if string(b) != "/test/socket,1,0\n%42\n"+dir+"\n" {
 					t.Fatalf("environment/cwd changed: %q", b)
 				}
-				registration := filepath.Join(dir, "state", "tcrit", "terminals", fmt.Sprintf("launcher-%d.json", cmd.Process.Pid))
+				registration := filepath.Join(dir, "state", "critty", "terminals", fmt.Sprintf("launcher-%d.json", cmd.Process.Pid))
 				b, err = os.ReadFile(registration)
 				if err != nil {
 					t.Fatal(err)

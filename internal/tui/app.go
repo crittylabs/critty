@@ -280,7 +280,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		author:          cfg.Author,
 		authorColors:    make(map[string]int),
 		finishCh:        cfg.FinishCh,
-		host:            os.Getenv("TCRIT_HOST"),
+		host:            reviewHost(),
 		initialFocus:    startupLocation(cfg),
 		contentViewport: viewport.New(),
 		commentViewport: viewport.New(),
@@ -360,7 +360,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		staged:          cfg.Staged,
 		patch:           cfg.Patch,
 		source:          cfg.Source,
-		host:            os.Getenv("TCRIT_HOST"),
+		host:            reviewHost(),
 		initialFocus:    startupLocation(cfg),
 		contentViewport: viewport.New(),
 		commentViewport: viewport.New(),
@@ -4684,4 +4684,11 @@ func countNoun(n int, singular, plural string) string {
 		return "1 " + singular
 	}
 	return fmt.Sprintf("%d %s", n, plural)
+}
+
+func reviewHost() string {
+	if host, ok := os.LookupEnv("CRITTY_HOST"); ok {
+		return host
+	}
+	return os.Getenv("TCRIT_HOST")
 }

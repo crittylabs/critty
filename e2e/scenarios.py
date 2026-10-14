@@ -35,7 +35,7 @@ def environment() -> dict[str, str]:
     env = {
         k: v
         for k, v in os.environ.items()
-        if not k.startswith(("HERDR_", "TMUX", "CRITTY_"))
+        if not k.startswith(("HERDR_", "TMUX", "CRITTY_", "TCRIT_"))
     }
     env.update(
         XDG_STATE_HOME=str(STATE),
@@ -249,11 +249,11 @@ def report(message: str) -> None:
 
 
 def scenarios() -> None:
-    for path in [WORK, STATE, CONFIG / "tcrit", ROOT / "bin"]:
+    for path in [WORK, STATE, CONFIG / "critty", ROOT / "bin"]:
         path.mkdir(parents=True, exist_ok=True)
     if not (ROOT / "bin" / "tmux").exists():
         (ROOT / "bin" / "tmux").symlink_to(TMUX)
-    (CONFIG / "tcrit" / "config.json").write_text(
+    (CONFIG / "critty" / "config.json").write_text(
         json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": False})
     )
     (WORK / "plan.md").write_text(

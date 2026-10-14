@@ -182,7 +182,7 @@ func TestSpawnTUIPaneCodeMode(t *testing.T) {
 		t.Fatalf("expected 1 tmux call, got %d", len(*calls))
 	}
 	cmd := (*calls)[0][len((*calls)[0])-1]
-	for _, want := range []string{"TCRIT_HOST='tmux'", "_tui", "--session"} {
+	for _, want := range []string{"CRITTY_HOST='tmux'", "_tui", "--session"} {
 		if !strings.Contains(cmd, want) {
 			t.Errorf("pane command missing %q: %s", want, cmd)
 		}

@@ -20,6 +20,33 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
+func TestReviewHost(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		host *string
+		want string
+	}{
+		{name: "legacy fallback", want: "tmux"},
+		{name: "current takes precedence", host: new("Herdr"), want: "Herdr"},
+		{name: "explicit empty overrides legacy", host: new(""), want: ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("TCRIT_HOST", "tmux")
+			t.Setenv("CRITTY_HOST", "")
+			if tt.host == nil {
+				if err := os.Unsetenv("CRITTY_HOST"); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				t.Setenv("CRITTY_HOST", *tt.host)
+			}
+			if got := reviewHost(); got != tt.want {
+				t.Fatalf("reviewHost() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRenderHeaderUsesCrittyBrand(t *testing.T) {
 	tests := []struct {
 		name  string

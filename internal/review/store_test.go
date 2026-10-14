@@ -4,9 +4,56 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestLegacyRoundStateMigration(t *testing.T) {
+	state := RoundState{
+		Verdict: VerdictComment, ReviewCommentDraft: "draft", Finished: true,
+		Files:            map[string]SnapshotFile{"a.md": {Content: "original"}},
+		SubmittedReplies: []string{},
+	}
+	encoded, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"tcrit_state", "critty_state"} {
+		var cj CritJSON
+		input := `{"review_round":3,"files":{},"` + key + `":` + string(encoded) + `}`
+		if err := json.Unmarshal([]byte(input), &cj); err != nil {
+			t.Fatal(err)
+		}
+		if cj.ReviewRound != 3 || !reflect.DeepEqual(cj.RoundState, state) {
+			t.Fatalf("state lost: %+v", cj)
+		}
+		output, err := json.Marshal(cj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(output), "critty_state") {
+			t.Fatalf("wrong saved key: %s", output)
+		}
+		var legacyReader struct {
+			State RoundState `json:"tcrit_state"`
+		}
+		if err := json.Unmarshal(output, &legacyReader); err != nil || !reflect.DeepEqual(legacyReader.State, state) {
+			t.Fatalf("old reader lost state: %+v, %v", legacyReader.State, err)
+		}
+		var reloaded CritJSON
+		if err := json.Unmarshal(output, &reloaded); err != nil || !reflect.DeepEqual(cj, reloaded) {
+			t.Fatalf("round trip lost data: %+v, %v", reloaded, err)
+		}
+	}
+	for _, current := range []string{`{}`, `null`} {
+		var cj CritJSON
+		input := `{"critty_state":` + current + `,"tcrit_state":{"review_comment_draft":"old"}}`
+		if err := json.Unmarshal([]byte(input), &cj); err != nil || cj.RoundState.ReviewCommentDraft != "" {
+			t.Fatalf("legacy overrides current: %+v, %v", cj, err)
+		}
+	}
+}
 
 func setupStateDir(t *testing.T) {
 	t.Helper()

@@ -3,6 +3,7 @@ package review
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"time"
 )
 
@@ -86,7 +87,7 @@ type CritJSONFile struct {
 
 // CritJSON is the top-level review.json document.
 type CritJSON struct {
-	RoundState     RoundState              `json:"tcrit_state,omitempty"`
+	RoundState     RoundState              `json:"critty_state,omitempty"`
 	Branch         string                  `json:"branch"`
 	BaseRef        string                  `json:"base_ref"`
 	UpdatedAt      string                  `json:"updated_at"`
@@ -106,6 +107,37 @@ type CritJSON struct {
 	// ActiveDiffScope mirrors Crit's current range focus ("layer" or
 	// "full_stack").  It is empty for working-tree reviews, including staged.
 	ActiveDiffScope string `json:"active_diff_scope,omitempty"`
+}
+
+// MarshalJSON keeps older running reviews able to read the same round state.
+func (cj CritJSON) MarshalJSON() ([]byte, error) {
+	type document CritJSON
+	return json.Marshal(struct {
+		document
+		LegacyState RoundState `json:"tcrit_state,omitempty"`
+	}{document: document(cj), LegacyState: cj.RoundState})
+}
+
+// UnmarshalJSON reads the former state key only when the current key is absent.
+func (cj *CritJSON) UnmarshalJSON(data []byte) error {
+	type document CritJSON
+	var decoded document
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return err
+	}
+	if _, ok := keys["critty_state"]; !ok {
+		if legacy, ok := keys["tcrit_state"]; ok {
+			if err := json.Unmarshal(legacy, &decoded.RoundState); err != nil {
+				return err
+			}
+		}
+	}
+	*cj = CritJSON(decoded)
+	return nil
 }
 
 // NewCritJSON returns an empty review document at round 1.

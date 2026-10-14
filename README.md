@@ -40,7 +40,7 @@ Press `I` or click **Images** to toggle previews or recheck support when images 
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
 
-Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Existing reviews remain in their TCrit paths.  Configuration and custom prompts use Critty paths, with the TCrit paths supported as lower-priority fallbacks at each level.  If tfil reports terminal markers, update it to 0.4.1 or later.
+Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Review data uses `~/.local/state/critty` (or `$XDG_STATE_HOME/critty`), linked to the old state path when upgrading so saved reviews and running sessions keep working.  If linking fails or the paths contain independent directories, Critty keeps using the legacy directory without merging or deleting data.  Configuration and custom prompts use Critty paths, with the TCrit paths supported as lower-priority fallbacks at each level.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
 After upgrading to v1.1.0, rerun `critty install` for your agent to add the experimental AI review skills and update the bundled review, CLI reference, and approval skills.
 

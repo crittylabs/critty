@@ -489,7 +489,7 @@ func buildTUICommand(mode *reviewMode, host string) (string, error) {
 
 	// Multiplexer panes inherit their host's environment, not necessarily the
 	// caller's, so pass through the variables that locate review state.
-	envPrefix := "env TCRIT_HOST=" + shellEscape(host)
+	envPrefix := "env CRITTY_HOST=" + shellEscape(host)
 	for _, name := range []string{"XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
 		if val := os.Getenv(name); val != "" {
 			envPrefix += " " + name + "=" + shellEscape(val)
