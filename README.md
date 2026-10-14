@@ -140,7 +140,7 @@ If you used the earlier `@tcrit` subagent integration, remove the old `.gemini/a
 ```bash
 cd ~ && critty install prompts        # Install global templates under ~/.config/critty/prompts/
 critty install prompts                # From a repo root: install under .critty/prompts/
-critty check                         # Report stale installed integrations
+critty doctor                        # Diagnose integrations and review prerequisites
 ```
 
 Configuration files are `~/.config/critty/config.json` (or `$XDG_CONFIG_HOME/critty/config.json`) and `.critty.config.json` in the project root.  Project settings override global settings.  Each level reads its legacy TCrit file only when the Critty file is absent.  See the [CLI skill](internal/cli/skill/critty-cli/SKILL.md#local-storage-and-command-effects) for details.
@@ -177,6 +177,8 @@ If you installed the earlier `crit-ai-review` and `crit-ai-cowork` skills, reins
 If any integration file is skipped because its content differs, old skills remain until all files for that agent are up to date.  This keeps existing references usable during a partial upgrade.
 
 The workflow requires an existing Critty session and authorized access to the selected AI through a host that can enforce restricted reviewer tools or return findings for your agent to post.  Reviewers inspect the workspace, post findings under their tool and model name, and can resolve their own findings after verification while preserving other participants' concerns.  Your agent makes edits and runs checks; human approval remains part of the workflow.
+
+Run `critty doctor` to check installed integrations, AI review prerequisites, and image forwarding settings.  For a dedicated Python environment, use `critty doctor --python /path/to/venv/bin/python`.  `critty check` remains an alias.
 
 Bundled restricted CLI setups cover Claude Code with Python 3.10+ and Codex with Python 3.11+ and the MCP Python SDK.  The installer copies their setup resources; it does not install Python dependencies.  Interfaces and supported launch configurations may change.  See the [AI review skill](internal/cli/skill/critty-ai-review/SKILL.md) for setup and the [cowork skill](internal/cli/skill/critty-ai-cowork/SKILL.md) for the collaboration loop.
 

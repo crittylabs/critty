@@ -45,6 +45,8 @@ Select implementation and review models independently.  For example, the user ma
 
 ### Prepare the assignment
 
+Use `critty doctor --python /path/to/review/venv/bin/python` to diagnose local Python/MCP prerequisites and installed resources.  Check authentication and the effective reviewer tool surface at launch.
+
 Give the reviewer a self-contained request containing:
 
 - A unique request ID, the original requirement or specification, and the questions or risks to review.

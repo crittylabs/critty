@@ -14,6 +14,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/gofrs/flock v0.13.1
 	github.com/mattn/go-shellwords v1.0.16
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/sahilm/fuzzy v0.1.3
 	github.com/spf13/cobra v1.10.2
 	github.com/tklauser/ps v0.0.4
