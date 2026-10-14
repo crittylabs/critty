@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -44,10 +45,10 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
 	for _, rel := range []string{
-		"crit-ai-review/SKILL.md", "crit-ai-cowork/SKILL.md",
-		"crit-ai-review/references/restricted-cli.md", "crit-ai-review/scripts/claude_review_gate.py",
-		"crit-ai-review/references/codex-cli.md", "crit-ai-review/scripts/codex_review_server.py",
-		"crit-ai-review/scripts/codex-review-requirements.txt",
+		"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
+		"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
+		"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
+		"critty-ai-review/scripts/codex-review-requirements.txt",
 	} {
 		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
 	}
@@ -88,10 +89,10 @@ func TestIntegrationLayouts(t *testing.T) {
 	for target, dests := range want {
 		dir := map[string]string{"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini"}[target]
 		for _, rel := range []string{
-			"crit-ai-review/SKILL.md", "crit-ai-cowork/SKILL.md",
-			"crit-ai-review/references/restricted-cli.md", "crit-ai-review/scripts/claude_review_gate.py",
-			"crit-ai-review/references/codex-cli.md", "crit-ai-review/scripts/codex_review_server.py",
-			"crit-ai-review/scripts/codex-review-requirements.txt",
+			"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
+			"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
+			"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
+			"critty-ai-review/scripts/codex-review-requirements.txt",
 		} {
 			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
 		}
@@ -263,17 +264,17 @@ func TestApprovalSkillReferencesUseAgentConventions(t *testing.T) {
 func TestAIReviewSkillResources(t *testing.T) {
 	for agent, variant := range skillVariants {
 		t.Run(agent, func(t *testing.T) {
-			for _, name := range []string{"crit-ai-review", "crit-ai-cowork"} {
+			for _, name := range []string{"critty-ai-review", "critty-ai-cowork"} {
 				data, err := renderSkill(name, agent)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !bytes.Contains(data, []byte("`"+variant.skillRef("crit-ai-cowork")+"` with `Astra`")) {
+				if !bytes.Contains(data, []byte("`"+variant.skillRef("critty-ai-cowork")+"` with `Astra`")) {
 					t.Errorf("%s has the wrong invocation example for %s", name, agent)
 				}
 			}
 			for _, f := range integrations()[agent] {
-				if !strings.Contains(filepath.ToSlash(f.dest), "/crit-ai-review/") {
+				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") {
 					continue
 				}
 				data, err := f.content()
@@ -293,8 +294,8 @@ func TestAIReviewSkillResources(t *testing.T) {
 					t.Errorf("installed asset %s differs", dest)
 				}
 				if filepath.Base(dest) != "SKILL.md" {
-					_, resource, _ := strings.Cut(filepath.ToSlash(dest), "/crit-ai-review/")
-					embedded, err := skillContent.ReadFile("skill/crit-ai-review/" + resource)
+					_, resource, _ := strings.Cut(filepath.ToSlash(dest), "/critty-ai-review/")
+					embedded, err := skillContent.ReadFile("skill/critty-ai-review/" + resource)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -302,6 +303,188 @@ func TestAIReviewSkillResources(t *testing.T) {
 						t.Error("review resource changed during rendering")
 					}
 				}
+			}
+		})
+	}
+}
+
+func seedLegacyAISkill(t *testing.T, f integrationFile, global bool) string {
+	t.Helper()
+	dest, err := integrationDest(f, global)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := filepath.Base(filepath.Dir(dest))
+	legacy := strings.Replace(name, "critty-ai-", "crit-ai-", 1)
+	dir := filepath.Join(filepath.Dir(filepath.Dir(dest)), legacy)
+	data, err := f.content()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte("critty-ai-"), []byte("crit-ai-"))
+	data = append(data, []byte("\nCustomized installation.\n")...)
+	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "scripts", "review.py"), []byte("legacy resource\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestInstallRetiresLegacyAISkills(t *testing.T) {
+	for _, agent := range agentTargets {
+		for _, global := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/global=%t", agent, global), func(t *testing.T) {
+				home := t.TempDir()
+				t.Setenv("HOME", home)
+				t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+				if global {
+					t.Chdir(home)
+				} else {
+					t.Chdir(t.TempDir())
+				}
+				var legacyDirs []string
+				for _, f := range integrations()[agent] {
+					name := filepath.Base(filepath.Dir(f.dest))
+					if filepath.Base(f.dest) == "SKILL.md" && (name == "critty-ai-review" || name == "critty-ai-cowork") {
+						legacyDirs = append(legacyDirs, seedLegacyAISkill(t, f, global))
+					}
+				}
+				if err := installCmd.RunE(installCmd, []string{agent}); err != nil {
+					t.Fatal(err)
+				}
+				for _, dir := range legacyDirs {
+					if _, err := os.Stat(dir); !os.IsNotExist(err) {
+						t.Errorf("legacy skill still exists: %s (%v)", dir, err)
+					}
+				}
+				for _, f := range integrations()[agent] {
+					dest, err := integrationDest(f, global)
+					if err != nil {
+						t.Fatal(err)
+					}
+					got, err := os.ReadFile(dest)
+					if err != nil {
+						t.Fatal(err)
+					}
+					want, err := f.content()
+					if err != nil || !bytes.Equal(got, want) {
+						t.Errorf("replacement differs: %s (%v)", dest, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestInstallPreservesUnsafeOrUnreplacedLegacySkills(t *testing.T) {
+	for _, scenario := range []string{"unrecognized", "wrong name", "different replacement", "stale caller", "failed install"} {
+		t.Run(scenario, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			previousForce := installForce
+			installForce = false
+			t.Cleanup(func() { installForce = previousForce })
+			f := skillFile("critty-ai-review", "claude-code", ".claude")
+			dir := seedLegacyAISkill(t, f, false)
+			file := filepath.Join(dir, "SKILL.md")
+			switch scenario {
+			case "unrecognized", "wrong name":
+				data := "---\nname: crit-ai-review\n---\nAn unrelated skill mentioning critty.\n"
+				if scenario == "wrong name" {
+					data = "---\nname: unrelated\n---\n# AI Review with Critty\n"
+				}
+				if err := os.WriteFile(file, []byte(data), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "different replacement":
+				if err := os.MkdirAll(filepath.Dir(f.dest), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(f.dest, []byte("custom replacement\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "stale caller":
+				caller := skillFile("critty", "claude-code", ".claude")
+				data, err := caller.content()
+				if err != nil {
+					t.Fatal(err)
+				}
+				data = bytes.ReplaceAll(data, []byte("critty-ai-"), []byte("crit-ai-"))
+				if err := os.MkdirAll(filepath.Dir(caller.dest), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(caller.dest, data, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "failed install":
+				blocker := filepath.Join(filepath.Dir(f.dest), "scripts", "codex-review-requirements.txt")
+				if err := os.MkdirAll(blocker, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			before, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = installCmd.RunE(installCmd, []string{"claude-code"})
+			if (err != nil) != (scenario == "failed install") {
+				t.Fatalf("unexpected install result: %v", err)
+			}
+			after, err := os.ReadFile(file)
+			if err != nil || !bytes.Equal(after, before) {
+				t.Fatalf("legacy skill was changed or removed: %v", err)
+			}
+			if scenario == "stale caller" {
+				installForce = true
+				if err := installCmd.RunE(installCmd, []string{"claude-code"}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := os.Stat(dir); !os.IsNotExist(err) {
+					t.Fatalf("legacy skill still exists after forced upgrade: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestInstallRetiresLegacyLinksWithoutDeletingTargets(t *testing.T) {
+	for _, directory := range []bool{false, true} {
+		t.Run(fmt.Sprintf("directory=%t", directory), func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			f := skillFile("critty-ai-review", "claude-code", ".claude")
+			dir := seedLegacyAISkill(t, f, false)
+			file := filepath.Join(dir, "SKILL.md")
+			before, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source := file
+			if directory {
+				source = dir
+			}
+			external := filepath.Join(t.TempDir(), "original")
+			if err := os.Rename(source, external); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(external, source); err != nil {
+				t.Fatal(err)
+			}
+			if err := installCmd.RunE(installCmd, []string{"claude-code"}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Lstat(dir); !os.IsNotExist(err) {
+				t.Errorf("legacy path still exists: %v", err)
+			}
+			if directory {
+				external = filepath.Join(external, "SKILL.md")
+			}
+			after, err := os.ReadFile(external)
+			if err != nil || !bytes.Equal(after, before) {
+				t.Fatalf("symlink target was changed or removed: %v", err)
 			}
 		})
 	}

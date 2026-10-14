@@ -15,8 +15,8 @@ import (
 	"github.com/crittylabs/critty/internal/xdg"
 )
 
-//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md skill/crit-ai-review/SKILL.md skill/crit-ai-review/references/restricted-cli.md skill/crit-ai-review/scripts/claude_review_gate.py skill/crit-ai-cowork/SKILL.md
-//go:embed skill/crit-ai-review/references/codex-cli.md skill/crit-ai-review/scripts/codex_review_server.py skill/crit-ai-review/scripts/codex-review-requirements.txt
+//go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md skill/critty-ai-review/SKILL.md skill/critty-ai-review/references/restricted-cli.md skill/critty-ai-review/scripts/claude_review_gate.py skill/critty-ai-cowork/SKILL.md
+//go:embed skill/critty-ai-review/references/codex-cli.md skill/critty-ai-review/scripts/codex_review_server.py skill/critty-ai-review/scripts/codex-review-requirements.txt
 var skillContent embed.FS
 
 var installForce bool
@@ -70,7 +70,7 @@ var skillVariants = map[string]skillVariant{
 	},
 }
 
-var skillNames = []string{"critty", "critty-cli", "critty-approval", "crit-ai-review", "crit-ai-cowork"}
+var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork"}
 
 // renderSkill returns the embedded skill rewritten for the named agent.
 func renderSkill(name, agent string) ([]byte, error) {
@@ -197,13 +197,13 @@ func integrations() map[string][]integrationFile {
 		"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini",
 	} {
 		files := []integrationFile{
-			skillFile("crit-ai-review", agent, dir),
-			skillFile("crit-ai-cowork", agent, dir),
-			skillResource("crit-ai-review", "references/restricted-cli.md", dir),
-			skillResource("crit-ai-review", "scripts/claude_review_gate.py", dir),
-			skillResource("crit-ai-review", "references/codex-cli.md", dir),
-			skillResource("crit-ai-review", "scripts/codex_review_server.py", dir),
-			skillResource("crit-ai-review", "scripts/codex-review-requirements.txt", dir),
+			skillFile("critty-ai-review", agent, dir),
+			skillFile("critty-ai-cowork", agent, dir),
+			skillResource("critty-ai-review", "references/restricted-cli.md", dir),
+			skillResource("critty-ai-review", "scripts/claude_review_gate.py", dir),
+			skillResource("critty-ai-review", "references/codex-cli.md", dir),
+			skillResource("critty-ai-review", "scripts/codex_review_server.py", dir),
+			skillResource("critty-ai-review", "scripts/codex-review-requirements.txt", dir),
 		}
 		if agent == "opencode" {
 			for i := range files {
@@ -269,9 +269,13 @@ Targets:
   prompts      Stock finish prompt templates (customize after copying)
   all          claude-code + codex + opencode + gemini
 
-Agent targets include critty-cli, critty-approval, crit-ai-review, and
-crit-ai-cowork, with their reference files and review gate. The interactive
-critty workflow is a skill except in OpenCode, where it is a command.`,
+Agent targets include critty-cli, critty-approval, critty-ai-review, and
+critty-ai-cowork, with their reference files and review gate. The interactive
+critty workflow is a skill except in OpenCode, where it is a command.
+
+After installing replacements, recognized legacy crit-ai-review and
+crit-ai-cowork skill folders and their resources are removed once all
+integration files are up to date.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := args[0]
@@ -288,6 +292,24 @@ critty workflow is a skill except in OpenCode, where it is a command.`,
 		for _, name := range names {
 			for _, f := range reg[name] {
 				if err := installIntegrationFile(f, global); err != nil {
+					return err
+				}
+			}
+		}
+		for _, name := range names {
+			if name == "prompts" {
+				continue
+			}
+			current, err := integrationFilesCurrent(reg[name], global)
+			if err != nil {
+				return err
+			}
+			if !current {
+				fmt.Printf("Skipping legacy cleanup for %s (integration files differ, reinstall with --force)\n", name)
+				continue
+			}
+			for _, f := range reg[name] {
+				if err := removeLegacyAISkill(f, global); err != nil {
 					return err
 				}
 			}
@@ -352,6 +374,66 @@ func installIntegrationFile(f integrationFile, global bool) error {
 		return fmt.Errorf("writing %s: %w", dest, err)
 	}
 	fmt.Printf("Installed %s\n", dest)
+	return nil
+}
+
+func integrationFilesCurrent(files []integrationFile, global bool) (bool, error) {
+	for _, f := range files {
+		dest, err := integrationDest(f, global)
+		if err != nil {
+			return false, err
+		}
+		installed, err := os.ReadFile(dest)
+		if err != nil {
+			return false, err
+		}
+		want, err := f.content()
+		if err != nil {
+			return false, err
+		}
+		if !bytes.Equal(installed, want) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func removeLegacyAISkill(f integrationFile, global bool) error {
+	if filepath.Base(f.dest) != "SKILL.md" {
+		return nil
+	}
+	name := filepath.Base(filepath.Dir(f.dest))
+	var marker string
+	switch name {
+	case "critty-ai-review":
+		marker = "# AI Review with Critty\n"
+	case "critty-ai-cowork":
+		marker = "Read [crit-ai-review](../crit-ai-review/SKILL.md)"
+	default:
+		return nil
+	}
+	dest, err := integrationDest(f, global)
+	if err != nil {
+		return err
+	}
+	legacyName := strings.Replace(name, "critty-ai-", "crit-ai-", 1)
+	legacyDir := filepath.Join(filepath.Dir(filepath.Dir(dest)), legacyName)
+	legacyFile := filepath.Join(legacyDir, "SKILL.md")
+	legacy, err := os.ReadFile(legacyFile)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !bytes.Contains(legacy, []byte("\nname: "+legacyName+"\n")) || !bytes.Contains(legacy, []byte(marker)) {
+		return nil
+	}
+	// RemoveAll removes symlinks themselves without traversing their targets.
+	if err := os.RemoveAll(legacyDir); err != nil {
+		return fmt.Errorf("removing %s: %w", legacyDir, err)
+	}
+	fmt.Printf("Removed legacy skill: %s\n", legacyDir)
 	return nil
 }
 

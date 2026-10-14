@@ -1,15 +1,15 @@
 ---
-name: crit-ai-cowork
-description: Work with another AI through Critty to refine requested work, including human review comments asking for collaboration with a named AI such as Claude or Codex, then present it for final human review. Use crit-ai-review for a second opinion or consultation with human input between rounds.
+name: critty-ai-cowork
+description: Work with another AI through Critty to refine requested work, including human review comments asking for collaboration with a named AI such as Claude or Codex, then present it for final human review. Use critty-ai-review for a second opinion or consultation with human input between rounds.
 ---
 
 # Cowork with Another AI
 
 Experimental: interfaces and supported launch configurations may change.
 
-Read [crit-ai-review](../crit-ai-review/SKILL.md) and follow its requester workflow, request identity, snapshot, posting, and completion contracts.  This skill changes only how the requester acts between AI review rounds.  Keep its reviewer role unchanged.
+Read [critty-ai-review](../critty-ai-review/SKILL.md) and follow its requester workflow, request identity, snapshot, posting, and completion contracts.  This skill changes only how the requester acts between AI review rounds.  Keep its reviewer role unchanged.
 
-A request such as `/crit-ai-cowork` with `Astra` selects a collaborator for the current task and authorizes in-scope fixes and follow-up between agents.  Follow the shared skill's `with` argument handling.  Establish the target outcome and acceptance checks before dispatch, using existing task context.  If the request only asks for an opinion, use `crit-ai-review` instead.  Preserve the user's selected collaborator and the caller's execution permissions.
+A request such as `/critty-ai-cowork` with `Astra` selects a collaborator for the current task and authorizes in-scope fixes and follow-up between agents.  Follow the shared skill's `with` argument handling.  Establish the target outcome and acceptance checks before dispatch, using existing task context.  If the request only asks for an opinion, use `critty-ai-review` instead.  Preserve the user's selected collaborator and the caller's execution permissions.
 
 ## Replace the per-round checkpoint
 

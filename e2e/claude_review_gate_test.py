@@ -11,7 +11,7 @@ from pathlib import Path
 
 SCRIPT = (
     Path(__file__).resolve().parents[1]
-    / "internal/cli/skill/crit-ai-review/scripts/claude_review_gate.py"
+    / "internal/cli/skill/critty-ai-review/scripts/claude_review_gate.py"
 )
 spec = importlib.util.spec_from_file_location("claude_review_gate", SCRIPT)
 gate = importlib.util.module_from_spec(spec)

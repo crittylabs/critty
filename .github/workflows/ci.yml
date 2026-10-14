@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           python3 e2e/claude_review_gate_test.py
           python3 -m venv "$RUNNER_TEMP/review-venv"
-          "$RUNNER_TEMP/review-venv/bin/python3" -m pip install -r internal/cli/skill/crit-ai-review/scripts/codex-review-requirements.txt
+          "$RUNNER_TEMP/review-venv/bin/python3" -m pip install -r internal/cli/skill/critty-ai-review/scripts/codex-review-requirements.txt
           "$RUNNER_TEMP/review-venv/bin/python3" e2e/codex_review_server_test.py
 
       - name: Install tmux for E2E scenarios

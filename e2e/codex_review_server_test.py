@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 SCRIPTS = (
-    Path(__file__).resolve().parents[1] / "internal/cli/skill/crit-ai-review/scripts"
+    Path(__file__).resolve().parents[1] / "internal/cli/skill/critty-ai-review/scripts"
 )
 sys.path.insert(0, str(SCRIPTS))
 from codex_review_server import ReviewTools

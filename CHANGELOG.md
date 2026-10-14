@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- AI review and collaboration skills are now named `critty-ai-review` and `critty-ai-cowork`, matching the other Critty skills.  Reinstall with `critty install --force <agent>` to update references and automatically remove recognized old `crit-ai-review` and `crit-ai-cowork` skill folders after installing their replacements.  See the [upgrade instructions](https://github.com/crittylabs/critty#ai-review-and-collaboration-experimental).
+
 ## 1.1.1
 
 ### Fixed

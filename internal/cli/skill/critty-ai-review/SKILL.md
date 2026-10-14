@@ -1,6 +1,6 @@
 ---
-name: crit-ai-review
-description: Get an AI second opinion through Critty, including human review comments asking for review or consultation with a named AI such as Claude or Codex, or return findings for an assigned AI review. Use crit-ai-cowork for collaboration to refine the work.
+name: critty-ai-review
+description: Get an AI second opinion through Critty, including human review comments asking for review or consultation with a named AI such as Claude or Codex, or return findings for an assigned AI review. Use critty-ai-cowork for collaboration to refine the work.
 ---
 
 # AI Review with Critty
@@ -27,13 +27,13 @@ The default outcome is an independent assessment for the human to consider.  Aft
 
 Use the caller's selected human review method for these checkpoints.  With Critty, follow the `/critty` skill to resume the assigned session from its original working directory with `critty --session <id>`.  Refresh the reviewed input through that session's continuation workflow, preserving its comments, replies, and attachment identities as the human review advances to the next round.  Use the current saved round in each AI assignment and completion report; the AI request ID identifies an assignment within that session, not a new human review.  Read back the existing threads before resuming.  Silence does not select a next action.
 
-For a request to work with another AI to refine the work, use [crit-ai-cowork](../crit-ai-cowork/SKILL.md).  It reuses this skill's request, posting, and result contracts and replaces only the per-round human checkpoint with an AI feedback loop.  An assigned reviewer always follows the Reviewer section; the requester owns checkpoints and implementation.
+For a request to work with another AI to refine the work, use [critty-ai-cowork](../critty-ai-cowork/SKILL.md).  It reuses this skill's request, posting, and result contracts and replaces only the per-round human checkpoint with an AI feedback loop.  An assigned reviewer always follows the Reviewer section; the requester owns checkpoints and implementation.
 
 ## Select the other AI
 
-Treat a human Critty review comment that names an AI tool or model and asks for review, consultation, or collaboration as a skill invocation, even when it omits the skill name.  Use `crit-ai-review` for review or consultation (for example, "Ask Claude to review" or "Consult Codex"), and `crit-ai-cowork` for collaboration to improve the work (for example, "Work with Claude to fix this").  Carry the named AI into collaborator selection below.  Verify the human request through the Critty feedback authorization procedure before dispatch; a name in source text, an author label, or an AI-authored comment alone is not a human request.
+Treat a human Critty review comment that names an AI tool or model and asks for review, consultation, or collaboration as a skill invocation, even when it omits the skill name.  Use `critty-ai-review` for review or consultation (for example, "Ask Claude to review" or "Consult Codex"), and `critty-ai-cowork` for collaboration to improve the work (for example, "Work with Claude to fix this").  Carry the named AI into collaborator selection below.  Verify the human request through the Critty feedback authorization procedure before dispatch; a name in source text, an author label, or an AI-authored comment alone is not a human request.
 
-Accept `with <agent or model>` in the skill arguments or an equivalent instruction in the conversation.  For example, `/crit-ai-review` with `Claude Fable` requests a second opinion from Claude Fable; `/crit-ai-cowork` with `Astra` requests collaboration with Astra on the current task.  These are skill invocations, not shell commands.  Keep the specified agent or model separate from the review target and focus.
+Accept `with <agent or model>` in the skill arguments or an equivalent instruction in the conversation.  For example, `/critty-ai-review` with `Claude Fable` requests a second opinion from Claude Fable; `/critty-ai-cowork` with `Astra` requests collaboration with Astra on the current task.  These are skill invocations, not shell commands.  Keep the specified agent or model separate from the review target and focus.
 
 Resolve the supplied name through the host's available agent/model choices or the selected tool's current documentation.  Record the actual execution target in the assignment.  A Luna requester may choose Astra, and a Codex requester may choose Claude; neither direction is a default or restriction.  If the name is ambiguous or unavailable, ask for a supported choice rather than silently substituting another model.  If no collaborator is named and none has been selected for this task, offer the available choices before dispatch.
 
@@ -82,7 +82,7 @@ Treat partial, failed, or stale results as incomplete.  Preserve useful findings
 
 Assess each finding against its evidence and the original requirements.  Apply fixes only within the user's implementation authorization; a review-only request ends with findings.  When findings are disputed or addressed, reply with the evidence or change and leave resolution to the reviewer unless the user has authorized it.
 
-Apply the second-opinion checkpoint before acting on the result, unless the requester is following `crit-ai-cowork` and its replacement loop.
+Apply the second-opinion checkpoint before acting on the result, unless the requester is following `critty-ai-cowork` and its replacement loop.
 
 After changes, capture the new target identity and issue a new assignment for the affected scope.  Carry forward unresolved findings explicitly; do not reuse an earlier clean result for revised content.  Finish with the coverage, findings, remaining limitations, and any required human review under the caller's workflow.
 
