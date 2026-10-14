@@ -230,6 +230,7 @@ func (m *AppModel) rebuildContent() {
 		isSidebarHighlight := sidebarHighlightSide == "" && sidebarHighlightStart > 0 && lineNum >= sidebarHighlightStart && lineNum <= sidebarHighlightEnd
 		isChanged := t.changedLines != nil && t.changedLines[lineNum]
 		inlineChanges := t.inlineChanges[lineNum]
+		formBackground := formLineBackground(isSelected, isSidebarHighlight)
 		decorate := m.isearchDecorator(lineRef{line: lineNum})
 		highlight := func(s string) string {
 			if decorate != nil {
@@ -304,11 +305,9 @@ func (m *AppModel) rebuildContent() {
 					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wrappedLine), lineTarget)
 				}
 			}
-		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line); interactive {
-			if isSelected {
-				formLine = inlineBackground(selectedLineBg, formLine)
-			} else if isSidebarHighlight {
-				formLine = inlineBackground(sidebarHighlightBg, formLine)
+		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
+			if isSelected || isSidebarHighlight {
+				formLine = inlineBackground(formBackground, formLine)
 			}
 			for wi, row := range strings.Split(lipgloss.Wrap(highlight(formLine), textWidth, ""), "\n") {
 				if checkboxX >= 0 {
@@ -322,6 +321,7 @@ func (m *AppModel) rebuildContent() {
 						layout.formControls = append(layout.formControls, formControl{line: lineNum,
 							rect: mouseRect{left: gutterWidth + start, right: gutterWidth + end, top: len(layout.rows), bottom: len(layout.rows) + 1}})
 					}
+					row += formBackground.Render(strings.Repeat(" ", max(0, textWidth-lipgloss.Width(row))))
 				}
 				if wi == 0 {
 					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, row), lineTarget)
@@ -452,6 +452,18 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 
 func (m *AppModel) collapseResolved(resolved bool, round int) bool {
 	return resolved && (m.foldResolved || round == 0 || round < m.reviewRound())
+}
+
+// formLineBackground returns the background of form labels, which yields to
+// selection and sidebar highlights.
+func formLineBackground(selected, highlighted bool) lipgloss.Style {
+	switch {
+	case selected:
+		return selectedLineBg
+	case highlighted:
+		return sidebarHighlightBg
+	}
+	return formChip.label
 }
 
 // renderResolution renders the resolution checkbox followed by label.  With
@@ -608,38 +620,60 @@ func highlightMarkdown(line string) string {
 }
 
 func inlineBackground(style lipgloss.Style, content string) string {
+	return inlineColors(style, content, false)
+}
+
+// inlineColors applies style's background, and its foreground when
+// foreground is true, across content, restoring them after inner resets.
+func inlineColors(style lipgloss.Style, content string, foreground bool) string {
 	bgAnsi := bgToAnsi(style.GetBackground())
-	if bgAnsi == "" {
+	fgAnsi := ""
+	if foreground {
+		fgAnsi = fgToAnsi(style.GetForeground())
+	}
+	if bgAnsi == "" && fgAnsi == "" {
 		return style.Render(content)
 	}
 	var patched strings.Builder
-	patched.Grow(len(content) + len(bgAnsi))
-	reapply := false
+	patched.Grow(len(content) + len(bgAnsi) + len(fgAnsi))
+	reapplyBg, reapplyFg := false, false
 	parser := ansi.GetParser()
 	defer ansi.PutParser(parser)
 	parser.SetHandler(ansi.Handler{HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
 		if cmd != 'm' {
 			return
 		}
-		reapply = len(params) == 0
+		if len(params) == 0 {
+			reapplyBg, reapplyFg = true, true
+		}
 		params.ForEach(0, func(_ int, param int, _ bool) {
 			switch {
-			case param == 0 || param == 49:
-				reapply = true
+			case param == 0:
+				reapplyBg, reapplyFg = true, true
+			case param == 49:
+				reapplyBg = true
+			case param == 39:
+				reapplyFg = true
 			case param == 48, param >= 40 && param <= 47, param >= 100 && param <= 107:
-				reapply = false
+				reapplyBg = false
+			case param == 38, param >= 30 && param <= 37, param >= 90 && param <= 97:
+				reapplyFg = false
 			}
 		})
 	}})
 	for i := range len(content) {
 		parser.Advance(content[i])
 		patched.WriteByte(content[i])
-		if reapply {
+		if reapplyBg {
 			patched.WriteString(bgAnsi)
-			reapply = false
+			reapplyBg = false
+		}
+		if reapplyFg {
+			patched.WriteString(fgAnsi)
+			reapplyFg = false
 		}
 	}
-	return bgAnsi + patched.String() + "\033[0m"
+	return bgAnsi + fgAnsi + patched.String() + "\033[0m"
 }
 
 // inlineDiffDisplayLines renders an inline diff wrapped to width.  decorate,
@@ -783,6 +817,10 @@ func formatTableSep(colWidths []int) string {
 }
 
 func highlightInline(line string) string {
+	return highlightInlineWith(line, mdLinkStyle, mdCodeStyle)
+}
+
+func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) string {
 	// Render links before injecting any ANSI styles. CSI sequences also start
 	// with "[", so running the Markdown link regexp afterward can mistake an
 	// escape sequence followed by a link for part of the link label.
@@ -792,12 +830,12 @@ func highlightInline(line string) string {
 			return match
 		}
 		text := match[1:idx]
-		return mdLinkStyle.Render(text)
+		return linkStyle.Render(text)
 	})
 
 	line = reCode.ReplaceAllStringFunc(line, func(match string) string {
 		inner := match[1 : len(match)-1]
-		return mdCodeStyle.Render(" " + inner + " ")
+		return codeStyle.Render(" " + inner + " ")
 	})
 
 	line = reBold.ReplaceAllStringFunc(line, func(match string) string {

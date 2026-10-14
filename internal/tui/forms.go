@@ -3,6 +3,7 @@ package tui
 import (
 	"crypto/sha256"
 	"fmt"
+	"image/color"
 	"sort"
 	"strings"
 
@@ -211,7 +212,9 @@ func (m *AppModel) toggleForm(line int) bool {
 }
 
 // formDisplayLine hides only parsed metadata and retains each original line.
-func (m *AppModel) formDisplayLine(line int, raw string) (string, int, bool) {
+// Labels of form items are drawn on background, which the caller extends to
+// the end of each row.
+func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Style) (string, int, bool) {
 	d := m.forms.Document(m.tab().path)
 	if d == nil || len(d.Items) == 0 {
 		return "", 0, false
@@ -229,23 +232,27 @@ func (m *AppModel) formDisplayLine(line int, raw string) (string, int, bool) {
 		return strings.TrimRight(raw, " \t\r"), -1, true
 	}
 	if checkbox.Line != line {
-		label := highlightInline(strings.TrimRight(raw, " \t\r"))
+		label := highlightInlineWith(strings.TrimSpace(raw), formChip.link, formChip.code)
 		if checkbox.Required {
 			label = lipgloss.NewStyle().Bold(true).Render(label)
 		}
-		indent := lipgloss.Width(expandDisplayTabs(raw[:len(raw)-len(strings.TrimLeft(raw, " \t"))]))
-		return label, indent, true
+		indent := expandDisplayTabs(raw[:len(raw)-len(strings.TrimLeft(raw, " \t"))])
+		return indent + inlineColors(background, label, true), lipgloss.Width(indent), true
 	}
 	column := checkbox.Offset - row.offset
 	// Preserve nesting without treating an ordered-list marker as indentation.
 	prefix := raw[:column]
 	indent := expandDisplayTabs(prefix[:len(prefix)-len(strings.TrimLeft(prefix, " \t"))]) + "  "
-	label := highlightInline(strings.TrimSpace(raw[column+3:]))
+	label := highlightInlineWith(strings.TrimSpace(raw[column+3:]), formChip.link, formChip.code)
 	answer := d.Answers[checkbox.ID]
 	selected := form.Selected(*checkbox, answer)
-	style := lipgloss.NewStyle().Foreground(lipgloss.Cyan)
-	if checkbox.Required && !form.Satisfied(*checkbox, answer) {
-		style = style.Foreground(lipgloss.Red)
+	// The badge uses the terminal's ANSI color, except for required items;
+	// tags on the chip use the chip's matching shade.
+	tint, tagColor := color.Color(lipgloss.Cyan), formChip.cyan
+	if selected {
+		tint, tagColor = lipgloss.Green, formChip.green
+	} else if checkbox.Required && !form.Satisfied(*checkbox, answer) {
+		tint, tagColor = formChip.requiredBadge, formChip.red
 	}
 	symbol := "☐"
 	if checkbox.Choice {
@@ -254,15 +261,17 @@ func (m *AppModel) formDisplayLine(line int, raw string) (string, int, bool) {
 			symbol = "●"
 		}
 	} else if selected {
-		symbol = "☑"
+		symbol = "✓"
 	}
+	tag := lipgloss.NewStyle().Foreground(tagColor).Bold(true)
 	if checkbox.Required {
-		label = lipgloss.NewStyle().Bold(true).Render(label) + " " + style.Bold(true).Render("Required")
+		label = lipgloss.NewStyle().Bold(true).Render(label) + " " + tag.Render("Required")
 	}
 	if checkbox.Consent {
-		label += " " + style.Render("Consent")
+		label += " " + tag.Render("Consent")
 	}
-	return indent + style.Bold(true).Render(symbol) + " " + label, lipgloss.Width(indent), true
+	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
+	return indent + badge + inlineColors(background, " "+label, true), lipgloss.Width(indent), true
 }
 
 func (m *AppModel) formSummary(width int) string {

@@ -240,6 +240,8 @@ var (
 				Foreground(lipgloss.Magenta).
 				Bold(true)
 
+	formChip = newFormChipPalette(lipgloss.LightDark(true))
+
 	mdCheckboxOpen = lipgloss.NewStyle().
 			Foreground(subtle)
 
@@ -432,6 +434,8 @@ func initAdaptiveStyles(hasDarkBG bool) {
 		Foreground(lipgloss.BrightYellow).
 		Background(ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#3a3a3a")))
 
+	formChip = newFormChipPalette(ld)
+
 	diffChangedLineBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#D8F0D8"), lipgloss.Color("#1A3A1A")))
 
@@ -448,26 +452,69 @@ func initAdaptiveStyles(hasDarkBG bool) {
 		Background(ld(lipgloss.Color("#E8A8A8"), lipgloss.Color("#682828")))
 }
 
+// formChipPalette styles form labels, which sit on a gray chip after a
+// colored badge.  On light backgrounds, colored text on the chip uses darker
+// shades than the ANSI colors to keep its contrast.
+type formChipPalette struct {
+	label, code, link lipgloss.Style
+	cyan, green, red  color.Color
+	// requiredBadge is the background of unanswered required badges, where
+	// ANSI red looks muddy on light backgrounds.
+	requiredBadge color.Color
+	// badgeSymbol draws the symbol on every badge.
+	badgeSymbol color.Color
+}
+
+func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
+	return formChipPalette{
+		label: lipgloss.NewStyle().
+			Foreground(ld(lipgloss.Black, lipgloss.BrightWhite)).
+			Background(ld(lipgloss.Color("#D9D9D9"), lipgloss.Color("#3a3a3a"))),
+		code: lipgloss.NewStyle().
+			Foreground(ld(lipgloss.Color("#6B5200"), lipgloss.BrightYellow)).
+			Background(ld(lipgloss.Color("#C4C4C4"), lipgloss.Color("#3a3a3a"))),
+		link: lipgloss.NewStyle().
+			Foreground(ld(lipgloss.Color("#005A80"), lipgloss.BrightCyan)).
+			Underline(true),
+		cyan:  ld(lipgloss.Color("#00646E"), lipgloss.Cyan),
+		green: ld(lipgloss.Color("#22652A"), lipgloss.Green),
+		red:   ld(lipgloss.Color("#A8201A"), lipgloss.Red),
+
+		requiredBadge: ld(lipgloss.Color("#E09494"), lipgloss.Red),
+		badgeSymbol:   ld(lipgloss.Color("#FFFFFF"), lipgloss.Black),
+	}
+}
+
 // bgToAnsi converts a lipgloss color to a raw ANSI background escape
 // sequence.  Palette colors keep their index so the terminal theme applies,
 // and other colors become truecolor.  Returns "" if the color is nil or
 // zero-alpha.
 func bgToAnsi(c color.Color) string {
+	return colorToAnsi(c, 40)
+}
+
+func fgToAnsi(c color.Color) string {
+	return colorToAnsi(c, 30)
+}
+
+// colorToAnsi returns the SGR sequence for c, with base 30 for the
+// foreground or 40 for the background.
+func colorToAnsi(c color.Color, base int) string {
 	switch c := c.(type) {
 	case nil:
 		return ""
 	case ansi.BasicColor:
 		if c < 8 {
-			return fmt.Sprintf("\033[%dm", 40+int(c))
+			return fmt.Sprintf("\033[%dm", base+int(c))
 		}
-		return fmt.Sprintf("\033[%dm", 92+int(c))
+		return fmt.Sprintf("\033[%dm", base+52+int(c))
 	case ansi.IndexedColor:
-		return fmt.Sprintf("\033[48;5;%dm", int(c))
+		return fmt.Sprintf("\033[%d;5;%dm", base+8, int(c))
 	}
 	r, g, b, a := c.RGBA()
 	if a == 0 {
 		return ""
 	}
 	// RGBA() returns 16-bit values; scale to 8-bit.
-	return fmt.Sprintf("\033[48;2;%d;%d;%dm", r>>8, g>>8, b>>8)
+	return fmt.Sprintf("\033[%d;2;%d;%d;%dm", base+8, r>>8, g>>8, b>>8)
 }
