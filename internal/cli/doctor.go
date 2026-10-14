@@ -18,7 +18,11 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+
+	"github.com/crittylabs/critty/internal/tui"
 )
+
+var checkTerminalImages = tui.CheckTerminalImages
 
 type diagnostic struct {
 	Check   string `json:"check"`
@@ -80,9 +84,9 @@ func newDoctorCommand() *cobra.Command {
 requirements for restricted AI reviews, and available multiplexer image settings.
 Use --python to check the dedicated Python environment used for Codex reviews.
 
-No AI service is contacted and no settings are changed. Herdr checks read local
+No AI service is contacted and no persistent settings are changed. Herdr checks read local
 configuration, not the running server or a remote client's configuration. Image
-support must still be confirmed in the review TUI on the actual terminal.
+support is probed on the current foreground TTY; without one, the check is skipped.
 Errors return exit status 1; optional features and unverified settings produce
 warnings or informational results. The former check command remains an alias.`,
 		Args: cobra.NoArgs,
@@ -286,6 +290,18 @@ func mcpInstallAdvice(python, version string, requirements []byte) string {
 }
 
 func (r *doctorReport) checkImages() {
+	result, err := checkTerminalImages()
+	switch {
+	case err != nil:
+		r.add("images/terminal", "warn", "image check failed: "+err.Error(), "Retry from the review terminal. If terminal input remains altered, run `stty sane`.")
+	case !result.Checked:
+		r.add("images/terminal", "info", "skipped: "+result.Reason, "Run `critty doctor` in the foreground of the review terminal.")
+	case result.Supported:
+		r.add("images/terminal", "ok", result.Reason, "")
+	default:
+		r.add("images/terminal", "warn", result.Reason, "Check image forwarding settings and the terminal's Kitty graphics support with Unicode placeholders. Use Images (`I`) in the review to retry.")
+	}
+
 	if os.Getenv("TMUX") != "" {
 		args := []string{"show-options", "-g", "-v", "allow-passthrough"}
 		label := "global setting (no pane identity available)"
@@ -308,7 +324,7 @@ func (r *doctorReport) checkImages() {
 	if _, err := lookPath("herdr"); err == nil || (herdrDetector{}).environmentPresent() {
 		r.checkHerdrImages()
 	}
-	r.add("images/terminal", "info", "outer terminal graphics support is unverified", "Critty requires Kitty graphics with Unicode image placeholders. Open a review on the actual terminal and use Images (`I`) to probe or retry; forwarding settings alone do not prove support.")
+
 }
 
 func (r *doctorReport) checkHerdrImages() {

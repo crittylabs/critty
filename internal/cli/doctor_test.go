@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/crittylabs/critty/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -191,6 +192,7 @@ func TestDoctorPythonProbeRuns(t *testing.T) {
 }
 
 func TestDoctorTmuxInheritedSetting(t *testing.T) {
+	stubDoctorTerminal(t)
 	oldOutput, oldLook := commandOutput, lookPath
 	t.Cleanup(func() { commandOutput, lookPath = oldOutput, oldLook })
 	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
@@ -244,6 +246,7 @@ func TestDoctorHerdrConfig(t *testing.T) {
 }
 
 func TestDoctorAliasAndJSON(t *testing.T) {
+	stubDoctorTerminal(t)
 	t.Chdir(t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -294,6 +297,46 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 	}
 	if len(r.Checks) == 0 || r.Checks[1].Status != "error" {
 		t.Fatalf("missing resources not reported: %+v", r)
+	}
+}
+
+func stubDoctorTerminal(t *testing.T) {
+	t.Helper()
+	old := checkTerminalImages
+	t.Cleanup(func() { checkTerminalImages = old })
+	checkTerminalImages = func() (tui.ImageCapability, error) {
+		return tui.ImageCapability{Reason: "no current TTY available"}, nil
+	}
+}
+
+func TestDoctorTerminalImageStatus(t *testing.T) {
+	stubDoctorTerminal(t)
+	oldLook := lookPath
+	t.Cleanup(func() { lookPath = oldLook })
+	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
+	for _, name := range []string{"TMUX", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
+		t.Setenv(name, "")
+	}
+	for _, tt := range []struct {
+		result tui.ImageCapability
+		err    error
+		status string
+	}{
+		{tui.ImageCapability{Reason: "no current TTY available"}, nil, "info"},
+		{tui.ImageCapability{Checked: true, Supported: true, Reason: "accepted"}, nil, "ok"},
+		{tui.ImageCapability{Checked: true, Reason: "unconfirmed"}, nil, "warn"},
+		{tui.ImageCapability{Checked: true}, fmt.Errorf("read failed"), "warn"},
+	} {
+		checkTerminalImages = func() (tui.ImageCapability, error) { return tt.result, tt.err }
+		r := doctorReport{}
+		r.checkImages()
+		d := diagnosticFor(t, r, "images/terminal")
+		if d.Status != tt.status {
+			t.Fatalf("wrong status: %+v", d)
+		}
+		if !tt.result.Checked && !strings.HasPrefix(d.Message, "skipped:") {
+			t.Fatalf("skip not reported: %+v", d)
+		}
 	}
 }
 

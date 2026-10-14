@@ -178,7 +178,7 @@ If any integration file is skipped because its content differs, old skills remai
 
 The workflow requires an existing Critty session and authorized access to the selected AI through a host that can enforce restricted reviewer tools or return findings for your agent to post.  Reviewers inspect the workspace, post findings under their tool and model name, and can resolve their own findings after verification while preserving other participants' concerns.  Your agent makes edits and runs checks; human approval remains part of the workflow.
 
-Run `critty doctor` to check installed integrations, AI review prerequisites, and image forwarding settings.  For a dedicated Python environment, use `critty doctor --python /path/to/venv/bin/python`.  `critty check` remains an alias.
+Run `critty doctor` to check installed integrations, AI review prerequisites, and image forwarding settings.  For a dedicated Python environment, use `critty doctor --python /path/to/venv/bin/python`.  `critty check` remains an alias.  In the current foreground terminal on macOS or Linux, it also probes image support; without an available TTY, it reports a skipped check.
 
 Bundled restricted CLI setups cover Claude Code with Python 3.10+ and Codex with Python 3.11+ and the MCP Python SDK.  The installer copies their setup resources; it does not install Python dependencies.  Interfaces and supported launch configurations may change.  See the [AI review skill](internal/cli/skill/critty-ai-review/SKILL.md) for setup and the [cowork skill](internal/cli/skill/critty-ai-cowork/SKILL.md) for the collaboration loop.
 
@@ -434,6 +434,8 @@ The README animation and the MP4 clips are recorded with VHS from the tapes in `
 ### End-to-end scenarios
 
 With Python 3.10+ and tmux on PATH, run `python3 e2e/scenarios.py` to build the current checkout and test review rounds, concurrent CLI replies, stopping and resuming, forms, and save/export failures.  It uses an isolated tmux server and temporary state, records no video, and requires no agent accounts.  Use `--binary PATH` to test an existing binary, `--tmux PATH` to select tmux, or `--keep` to retain fixtures and logs.
+
+Run `python3 e2e/doctor_images_test.py` to verify image capability replies, TTY skip behavior, and terminal restoration using isolated foreground PTYs.  It accepts `--binary PATH` and needs no graphics-capable terminal or AI account.
 
 ## License
 

@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Diagnose installed integrations, AI review Python/MCP prerequisites, and image forwarding settings with `critty doctor`; `critty check` remains an alias.  Partial installations report missing resources, `--python` selects a dedicated review environment, and color-coded text or `--json` reports present the results.  tmux pane settings and local Herdr configuration include advice without changing settings or claiming that the outer terminal supports images.
+- Diagnose installed integrations, AI review Python/MCP prerequisites, and image forwarding settings with `critty doctor`; `critty check` remains an alias.  Partial installations report missing resources, `--python` selects a dedicated review environment, and color-coded text or `--json` reports present the results.  tmux pane settings and local Herdr configuration include advice without changing stored settings.  On macOS and Linux, image support is probed on the current foreground TTY; an unavailable TTY reports a skipped check without an error.
 
 - AI review and collaboration skills are now named `critty-ai-review` and `critty-ai-cowork`, matching the other Critty skills.  Reinstall with `critty install --force <agent>` to update references and automatically remove recognized old `crit-ai-review` and `crit-ai-cowork` skill folders after installing their replacements.  See the [upgrade instructions](https://github.com/crittylabs/critty#ai-review-and-collaboration-experimental).
 

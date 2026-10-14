@@ -15,7 +15,7 @@ Critty is a local CLI and human review TUI, not a hosted review service.  Review
 | Command | Effects |
 | --- | --- |
 | `comments`, `status` | Read local review state. |
-| `doctor` (`check` alias) | Compare installed integrations with embedded files and inspect local Python/MCP prerequisites and image forwarding settings.  Runs a bounded Python import probe; does not start a reviewer, contact a model or package registry, or change settings. |
+| `doctor` (`check` alias) | Compare installed integrations with embedded files and inspect local Python/MCP prerequisites and image forwarding settings.  Runs bounded Python imports and an image capability probe on its foreground controlling TTY.  Temporarily uses raw terminal input, then restores it; sends a transparent virtual placement, deletes it, and restores the cursor.  Does not start a reviewer, contact a model or package registry, or change stored settings. |
 | `terminal prepare` | Remove expired local marker requests, save a random marker with a two-minute expiry, and print its JSON.  No review content is read and no external service is contacted. |
 | `terminal notify` | Record a local terminal destination supplied by the terminal filter. |
 | `review`, `plan`, `--session` | Read the selected input, save local review state, and open the human TUI, using tmux or Herdr when applicable.  Terminal-marker resolution can read visible text in registered panes. |
@@ -85,7 +85,7 @@ Use `--python /absolute/path/to/venv/bin/python` to inspect the interpreter sele
 
 `--json` returns an object with `version` and `checks`.  Each check has `check`, `status` (`ok`, `info`, `warn`, or `error`), `message`, and optional `advice`.  A report is still written when errors cause a nonzero exit.
 
-Image diagnostics read tmux pane settings, including inherited options, when its environment identifies the pane; otherwise they label a global setting or report unknown context.  Herdr diagnostics parse local config with the current `terminal.kitty_graphics` key taking precedence over legacy `experimental.kitty_graphics`.  These do not verify a running server, remote client, or outer terminal.  Run from the actual review terminal and use the TUI Images control to confirm support.
+Image diagnostics read tmux pane settings, including inherited options, when its environment identifies the pane; otherwise they label a global setting or report unknown context.  Herdr diagnostics parse local config with the current `terminal.kitty_graphics` key taking precedence over legacy `experimental.kitty_graphics`.  Configuration checks do not verify a running server or remote client.  On macOS and Linux, `images/terminal` probes the current foreground controlling TTY using the same virtual-placement and cursor-position test as the TUI, including tmux extended-key replies.  A missing, inaccessible, busy, or background TTY reports `info` with a `skipped:` message and adds no error.  Negative or incomplete replies are warnings; an unanswered probe retries up to three times.  Probe traffic uses the TTY directly, so redirected text and JSON contain only the diagnostic report.  Run from the actual review terminal; the TUI Images control can retry support checks later.
 
 ## Listing comments
 
