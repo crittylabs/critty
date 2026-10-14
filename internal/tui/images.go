@@ -148,17 +148,47 @@ func (d imageDisplay) wrap(sequence string) string {
 }
 
 func (d imageDisplay) probe() tea.Cmd {
+	sequence := d.probeSequence()
+	if sequence == "" {
+		return nil
+	}
+	return tea.Raw(sequence)
+}
+
+func (d imageDisplay) probeSequence() string {
 	// A virtual placement leaves the cursor unchanged.  Terminals that ignore
 	// U=1 instead display the image and advance the cursor, even when replying OK.
 	// Row two avoids the ambiguous F3 input event produced by row-one reports.
 	if d.probeID == 0 || strings.HasPrefix(os.Getenv("TERM"), "screen") && !d.tmux {
-		return nil
+		return ""
 	}
 	sequence := ansi.SaveCursor + ansi.CursorPosition(1, imageProbeRow) + ansi.KittyGraphics([]byte("AAAAAA=="),
 		"a=T", "f=32", "s=1", "v=1", "U=1", "c=1", "r=1",
 		fmt.Sprintf("i=%d", d.probeID)) + ansi.RequestCursorPositionReport +
 		ansi.KittyGraphics(nil, "a=d", "d=I", "q=2", fmt.Sprintf("i=%d", d.probeID)) + ansi.RestoreCursor
-	return tea.Raw(d.wrap(sequence))
+	return d.wrap(sequence)
+}
+
+func (d *imageDisplay) acceptProbeResponse(msg tea.Msg) {
+	switch msg := msg.(type) {
+	case uv.KittyGraphicsEvent:
+		if d.attempts == 0 || msg.Options.ID != d.probeID || d.probeReply != "" {
+			return
+		}
+		d.probeReply = string(msg.Payload)
+		if d.probeReply != "OK" {
+			d.checking = false
+		}
+	case tea.CursorPositionMsg:
+		// Only a cursor report after this placement's reply belongs to the probe.
+		if d.probeReply != "OK" || d.probeCursor != nil {
+			return
+		}
+		d.probeCursor = &msg
+		d.checking = false
+	}
+	d.enabled = d.probeReply == "OK" && d.probeCursor != nil &&
+		d.probeCursor.X == 0 && d.probeCursor.Y == imageProbeRow-1
 }
 
 func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -184,29 +214,12 @@ func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m, nil
-	case uv.KittyGraphicsEvent:
-		if m.images.attempts == 0 || msg.Options.ID != m.images.probeID || m.images.probeReply != "" {
-			return m, nil
-		}
-		m.images.probeReply = string(msg.Payload)
-		if m.images.probeReply != "OK" {
-			m.images.checking = false
-			return m, nil
-		}
-	case tea.CursorPositionMsg:
-		// The placement reply precedes its cursor report in the terminal input
-		// stream.  Ignore reports from earlier queries before that reply.
-		if m.images.probeReply != "OK" || m.images.probeCursor != nil {
-			return m, nil
-		}
-		m.images.probeCursor = &msg
-		m.images.checking = false
+	case uv.KittyGraphicsEvent, tea.CursorPositionMsg:
+		m.images.acceptProbeResponse(msg)
 	}
-	if m.images.probeReply != "OK" || m.images.probeCursor == nil ||
-		m.images.probeCursor.X != 0 || m.images.probeCursor.Y != imageProbeRow-1 {
+	if !m.images.enabled {
 		return m, nil
 	}
-	m.images.enabled = true
 	if len(m.tabs) > 0 && m.tab().state != nil {
 		m.rebuildContent()
 		m.updateCommentSidebar()

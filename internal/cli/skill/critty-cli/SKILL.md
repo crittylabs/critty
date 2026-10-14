@@ -14,7 +14,8 @@ Critty is a local CLI and human review TUI, not a hosted review service.  Review
 
 | Command | Effects |
 | --- | --- |
-| `comments`, `status`, `check` | Read local review state or compare installed integrations with the binary's embedded files.  `check` does not query a package registry. |
+| `comments`, `status` | Read local review state. |
+| `doctor` (`check` alias) | Compare installed integrations with embedded files and inspect local Python/MCP prerequisites and image forwarding settings.  Runs bounded Python imports and an image capability probe on its foreground controlling TTY.  Temporarily uses raw terminal input, then restores it; sends a transparent virtual placement, deletes it, and restores the cursor.  Does not start a reviewer, contact a model or package registry, or change stored settings. |
 | `terminal prepare` | Remove expired local marker requests, save a random marker with a two-minute expiry, and print its JSON.  No review content is read and no external service is contacted. |
 | `terminal notify` | Record a local terminal destination supplied by the terminal filter. |
 | `review`, `plan`, `--session` | Read the selected input, save local review state, and open the human TUI, using tmux or Herdr when applicable.  Terminal-marker resolution can read visible text in registered panes. |
@@ -75,6 +76,16 @@ On submission, stdout contains the finish prompt, threads, and attached document
 Use a fresh path for each invocation and verify exit 0, session, round, and the reviewed inputs before acting.  The parent directory must exist; the file must be outside the session directory and must not overwrite reviewed input or the `--result` file.  Summary export failure returns nonzero without printing approval or cleaning up the review.  Keep full finish output for additional instructions and evidence; a summary does not contain form answers or individual consents.  Use `--result` and `/critty-approval` for those decisions.
 
 Ordinary approved reviews may be cleaned up immediately.  Preserve the finish output; the session ID alone is insufficient to recover it later.  Form results and comment images defer cleanup as described in their finish output.  Use `/critty` for launch, wait, and recovery decisions.
+
+## Environment diagnostics
+
+Run `critty doctor` before troubleshooting integration or image setup.  Missing files in a partially installed integration and stale or unreadable files are errors.  Absent integrations and optional reviewers are informational.  Python/MCP or image setup problems are warnings; they do not block unrelated review modes.  Errors return exit status 1; warnings alone return 0.  Color-capable terminals show green `ok`, red `error`, and yellow `info`/`warn` labels; `NO_COLOR`, redirected output, and JSON retain plain text.
+
+Use `--python /absolute/path/to/venv/bin/python` to inspect the interpreter selected for restricted AI review; the default is `python3` on PATH.  Codex requires Python 3.11+ and the bundled MCP SDK pin and server API; Claude requires Python 3.10+.  MCP advice includes a quoted install command using an absolute path to a matching installed requirements file, or the bundled package pin when no current copy exists.  CLI availability does not certify authentication, supported flags, or the effective restricted tool surface.  Validate those at reviewer launch.
+
+`--json` returns an object with `version` and `checks`.  Each check has `check`, `status` (`ok`, `info`, `warn`, or `error`), `message`, and optional `advice`.  A report is still written when errors cause a nonzero exit.
+
+Image diagnostics read tmux pane settings, including inherited options, when its environment identifies the pane; otherwise they label a global setting or report unknown context.  Herdr diagnostics parse local config with the current `terminal.kitty_graphics` key taking precedence over legacy `experimental.kitty_graphics`.  Configuration checks do not verify a running server or remote client.  On macOS and Linux, `images/terminal` probes the current foreground controlling TTY using the same virtual-placement and cursor-position test as the TUI, including tmux extended-key replies.  A missing, inaccessible, busy, or background TTY reports `info` with a `skipped:` message and adds no error.  Negative or incomplete replies are warnings; an unanswered probe retries up to three times.  Probe traffic uses the TTY directly, so redirected text and JSON contain only the diagnostic report.  Run from the actual review terminal; the TUI Images control can retry support checks later.
 
 ## Listing comments
 

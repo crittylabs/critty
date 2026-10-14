@@ -437,58 +437,7 @@ func removeLegacyAISkill(f integrationFile, global bool) error {
 	return nil
 }
 
-var checkCmd = &cobra.Command{
-	Use:   "check",
-	Short: "Check installed integrations for missing or stale files",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		reg := integrations()
-		names := make([]string, 0, len(reg))
-		for name := range reg {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-
-		stale := 0
-		for _, name := range names {
-			// Prompt templates are meant to be customized after copying,
-			// so differing content is not staleness.
-			if name == "prompts" {
-				continue
-			}
-			for _, f := range reg[name] {
-				for _, global := range []bool{false, true} {
-					dest, err := integrationDest(f, global)
-					if err != nil {
-						continue
-					}
-					existing, err := os.ReadFile(dest)
-					if err != nil {
-						continue // not installed here — not an error
-					}
-					data, err := f.content()
-					if err != nil {
-						continue
-					}
-					if bytes.Equal(existing, data) {
-						fmt.Printf("ok:    %s\n", dest)
-					} else {
-						fmt.Printf("stale: %s (reinstall with `critty install --force %s`)\n", dest, name)
-						stale++
-					}
-				}
-			}
-		}
-		if stale > 0 {
-			return fmt.Errorf("%d stale integration file(s)", stale)
-		}
-		fmt.Println("All installed integrations are up to date.")
-		return nil
-	},
-}
-
 func init() {
 	rootCmd.AddCommand(installCmd)
-	rootCmd.AddCommand(checkCmd)
 	installCmd.Flags().BoolVarP(&installForce, "force", "f", false, "overwrite files that differ")
 }
