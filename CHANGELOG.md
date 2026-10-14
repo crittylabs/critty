@@ -8,6 +8,8 @@
 
 - AI review and collaboration skills are now named `critty-ai-review` and `critty-ai-cowork`, matching the other Critty skills.  Reinstall with `critty install --force <agent>` to update references and automatically remove recognized old `crit-ai-review` and `crit-ai-cowork` skill folders after installing their replacements.  See the [upgrade instructions](https://github.com/crittylabs/critty#ai-review-and-collaboration-experimental).
 
+- Checkboxes and choices in attachments stand out with colored badges and highlighted labels.  Submitting asks for confirmation when an unanswered item has never scrolled into view, so items below the visible area are not missed.  You can review the item, submit anyway, or cancel.
+
 - Review data now uses the `critty` state directory, with a compatibility link preserving old paths and running sessions.  If the directories conflict or cannot be linked, Critty keeps using the legacy directory.  Saved reviews use `critty_state`, with the old `tcrit_state` key retained for compatibility.  Review launchers use `CRITTY_HOST`, with `TCRIT_HOST` supported as a fallback.
 
 ## 1.1.1

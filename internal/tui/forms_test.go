@@ -245,6 +245,7 @@ func formTestAppWithContent(t *testing.T, content string) (AppModel, chan Finish
 	app.recalculateLayout()
 	app.tab().ensureHighlightCache()
 	app.rebuildContent()
+	app.markVisibleForms()
 	return app, ch
 }
 

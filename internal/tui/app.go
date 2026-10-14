@@ -88,6 +88,7 @@ type AppModel struct {
 	imageBodies   map[string][]markdownImageRef
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
+	formViewed    map[string]map[int]bool
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
@@ -462,11 +463,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
+		app.markVisibleForms()
 		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
+		app.markVisibleForms()
 		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
 	}
 	return model, cmd
@@ -1932,15 +1935,31 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 			m.finishSaveFailed = true
 			return m, nil
 		}
-		m.finishVerdict = verdict
 		if len(m.missingForms()) > 0 {
+			m.finishVerdict = verdict
 			m.modal, m.modalFocus = finishFormsModal, finishReviewForms
 			m.modalTextarea.Blur()
 			return m, nil
 		}
+	}
+	m.finishVerdict = verdict
+	if len(m.unviewedForms()) > 0 {
+		m.modal, m.modalFocus = finishFormsModal, finishReviewForms
+		m.modalTextarea.Blur()
+		return m, nil
+	}
+	return m.continueFinish()
+}
+
+// continueFinish submits the selected verdict after form checks.
+func (m *AppModel) continueFinish() (tea.Model, tea.Cmd) {
+	if m.finishVerdict == review.VerdictApprove {
 		return m.confirmFormApproval()
 	}
-	return m.submitReview(verdict)
+	if m.modal == finishFormsModal {
+		m.modal = finishModal
+	}
+	return m.submitReview(m.finishVerdict)
 }
 
 func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {

@@ -300,7 +300,7 @@ Attached Markdown can include checkboxes for confirmations and permissions, and 
 
 Required confirmations must be answered before approval.  Permission checkboxes apply to specific operations; approving the review leaves unchecked operations unauthorized.
 
-Approving with unanswered required items offers **Review** to visit an unanswered item or **Cancel** to return to Submit.  Unanswered optional items are highlighted but do not block approval.
+Approving with unanswered required items offers **Review** to visit an unanswered item or **Cancel** to return to Submit.  Unanswered optional items are highlighted but do not block approval.  If any unanswered item has never scrolled into view, submitting with any decision first asks you to **Review** it, **Submit** anyway, or **Cancel**.
 
 Ask your agent to use the [approval skill](internal/cli/skill/critty-approval/SKILL.md) to prepare forms.  Form syntax and exported results are documented in the [CLI reference](internal/cli/skill/critty-cli/SKILL.md).
 
