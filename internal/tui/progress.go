@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"image/color"
 
 	"charm.land/lipgloss/v2"
 
@@ -92,9 +91,9 @@ func (m *AppModel) tabFormIndicators() []string {
 			if kind == progressRequiredChoices || kind == progressOptionalChoices {
 				symbol = "○"
 			}
-			foreground := color.Color(warning)
+			foreground := progressColors.pending
 			if kind <= progressRequiredChoices {
-				foreground = lipgloss.Red
+				foreground = progressColors.required
 			}
 			indicators[tab] += lipgloss.NewStyle().Foreground(foreground).Render(symbol)
 		}
@@ -103,11 +102,11 @@ func (m *AppModel) tabFormIndicators() []string {
 }
 
 func (p progressCount) render(focused bool) string {
-	foreground := color.Color(warning)
+	foreground := progressColors.pending
 	if p.kind <= progressRequiredChoices {
-		foreground = lipgloss.Red
+		foreground = progressColors.required
 		if p.complete == p.total {
-			foreground = success
+			foreground = progressColors.complete
 		}
 	}
 	symbol := "☐"
@@ -125,10 +124,9 @@ func (p progressCount) render(focused bool) string {
 			symbol = "●"
 		}
 	}
-	style := lipgloss.NewStyle().Foreground(foreground).Bold(true).Underline(focused)
-	if focused {
-		style = style.Background(buttonBackground)
-	}
+	// Counters are clickable, so they share the gray background of buttons;
+	// the focused one is underlined.
+	style := lipgloss.NewStyle().Foreground(foreground).Background(buttonBackground).Bold(true).Underline(focused)
 	return style.Render(fmt.Sprintf("%d/%d %s", p.complete, p.total, symbol))
 }
 

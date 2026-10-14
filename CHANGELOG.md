@@ -12,6 +12,10 @@
 
 - Review data now uses the `critty` state directory, with a compatibility link preserving old paths and running sessions.  If the directories conflict or cannot be linked, Critty keeps using the legacy directory.  Saved reviews use `critty_state`, with the old `tcrit_state` key retained for compatibility.  Review launchers use `CRITTY_HOST`, with `TCRIT_HOST` supported as a fallback.
 
+### Fixed
+
+- Improved readability on light terminal backgrounds.  Text that used pale ANSI colors, such as cursor markers, item counts, warnings, attachment names, Markdown code, links, and headings, now uses darker shades.  Code is highlighted with a light color scheme, line numbers are a subdued gray, and button keys are white on dark yellow.  Item counts in dialogs share the gray background of the header counts.
+
 ## 1.1.1
 
 ### Fixed

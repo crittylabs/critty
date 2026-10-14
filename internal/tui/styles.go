@@ -51,12 +51,17 @@ var (
 )
 
 // ANSI 16 named colors — these adapt to the user's terminal color scheme.
+// initAdaptiveStyles replaces success and warning with textColors' shades on
+// a light background, where the ANSI colors are too pale to read.
 var (
-	subtle  = lipgloss.BrightBlack
-	accent  = lipgloss.Magenta
-	success = lipgloss.Green
-	warning = lipgloss.Yellow
-	muted   = lipgloss.White // normal white (dimmer than BrightWhite)
+	subtle                 = lipgloss.BrightBlack
+	accent                 = lipgloss.Magenta
+	textColors             = newTextPalette(lipgloss.LightDark(true))
+	success    color.Color = lipgloss.Green
+	warning    color.Color = lipgloss.Yellow
+	// activeAttachmentColor marks the current attachment in the file tree.
+	activeAttachmentColor color.Color = lipgloss.Yellow
+	muted                             = lipgloss.White // normal white (dimmer than BrightWhite)
 
 	// textPrimary and textSecondary are the foregrounds of emphasized and
 	// regular text on the terminal background.  initAdaptiveStyles swaps
@@ -242,6 +247,8 @@ var (
 
 	formChip = newFormChipPalette(lipgloss.LightDark(true))
 
+	progressColors = newProgressPalette()
+
 	mdCheckboxOpen = lipgloss.NewStyle().
 			Foreground(subtle)
 
@@ -392,9 +399,28 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	terminalIsDark = hasDarkBG
 	textPrimary = ld(lipgloss.Black, lipgloss.BrightWhite)
 	textSecondary = ld(lipgloss.BrightBlack, muted)
+	textColors = newTextPalette(ld)
+	success = textColors.green
+	warning = textColors.yellow
+	mdCheckboxDone = mdCheckboxDone.Foreground(success)
+	fileMatchStyle = fileMatchStyle.Foreground(warning)
+	activeAttachmentColor = ld(textColors.brightYellow, lipgloss.Yellow)
+	mdH3Style = mdH3Style.Foreground(textColors.cyan)
+	mdH4Style = mdH4Style.Foreground(textColors.cyan)
+	mdLinkStyle = mdLinkStyle.Foreground(textColors.brightCyan)
+	helpHeadingStyle = helpHeadingStyle.Foreground(textColors.brightYellow)
+	helpKeyStyle = helpKeyStyle.Foreground(textColors.brightCyan)
+	annotationGutter = annotationGutter.Foreground(textColors.brightCyan)
+	isearchPromptStyle = isearchPromptStyle.Foreground(textColors.cyan)
+	resolvedBadge = resolvedBadge.Foreground(textColors.green)
+	diffAddedGutter = diffAddedGutter.Foreground(textColors.green)
+	diffDeletedGutter = diffDeletedGutter.Foreground(textColors.red)
+	diffDeletedLineNum = diffDeletedLineNum.Foreground(textColors.red)
+	tabAddedCount = tabAddedCount.Foreground(textColors.green)
+	tabDeletedCount = tabDeletedCount.Foreground(textColors.red)
 	buttonBackground = ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#3a3a3a"))
 	closeButtonStyle = closeButtonStyle.Background(buttonBackground)
-	commentNavButtonStyle = commentNavButtonStyle.Background(buttonBackground)
+	commentNavButtonStyle = commentNavButtonStyle.Foreground(textColors.cyan).Background(buttonBackground)
 	modalBtnNormal = modalBtnNormal.Background(buttonBackground)
 	modalDeleteBtnLabel = modalDeleteBtnLabel.Background(buttonBackground)
 	commentStyle = commentStyle.Foreground(textSecondary)
@@ -412,6 +438,27 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	activeTabStyle = activeTabStyle.Foreground(textPrimary)
 	tabCountDelimiter = tabCountDelimiter.Foreground(textSecondary)
 	contextBoxStyle = contextBoxStyle.Foreground(textPrimary)
+	cursorColor := ld(textColors.brightYellow, warning)
+	cursorLineNumStyle = cursorLineNumStyle.Foreground(cursorColor)
+	cursorMarker = cursorMarker.Foreground(cursorColor)
+	commentGutterMarker = commentGutterMarker.Foreground(cursorColor)
+	// Black on yellow looks smudged on a light background; use white keys
+	// on dark yellow there instead.
+	keyForeground := ld(lipgloss.Color("#FFFFFF"), lipgloss.Black)
+	modalBtnNormalKey = modalBtnNormalKey.
+		Foreground(keyForeground).
+		Background(ld(lipgloss.Color("#A38A00"), lipgloss.Yellow))
+	modalBtnFocusedKey = modalBtnFocusedKey.
+		Foreground(keyForeground).
+		Background(ld(lipgloss.Color("#C0A300"), lipgloss.BrightYellow))
+	// Light themes often render ANSI bright black nearly as dark as text.
+	gutterColor := ld(lipgloss.Color("#A0A0A0"), subtle)
+	lineNumStyle = lineNumStyle.Foreground(gutterColor)
+	continuationGutter = lipgloss.NewStyle().
+		Foreground(gutterColor).
+		Width(5).
+		Align(lipgloss.Right).
+		Render("↪")
 	modalBtnFocusedLabel = lipgloss.NewStyle().
 		Foreground(ld(lipgloss.BrightWhite, lipgloss.Black)).
 		Background(ld(lipgloss.Black, lipgloss.White)).
@@ -431,10 +478,11 @@ func initAdaptiveStyles(hasDarkBG bool) {
 		Padding(0, 1)
 
 	mdCodeStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.BrightYellow).
+		Foreground(textColors.brightYellow).
 		Background(ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#3a3a3a")))
 
 	formChip = newFormChipPalette(ld)
+	progressColors = newProgressPalette()
 
 	diffChangedLineBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#D8F0D8"), lipgloss.Color("#1A3A1A")))
@@ -478,10 +526,45 @@ func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
 			Underline(true),
 		cyan:  ld(lipgloss.Color("#00646E"), lipgloss.Cyan),
 		green: ld(lipgloss.Color("#22652A"), lipgloss.Green),
-		red:   ld(lipgloss.Color("#A8201A"), lipgloss.Red),
+		red:   textColors.red,
 
 		requiredBadge: ld(lipgloss.Color("#E09494"), lipgloss.Red),
 		badgeSymbol:   ld(lipgloss.Color("#FFFFFF"), lipgloss.Black),
+	}
+}
+
+// textPalette holds foregrounds for text on the terminal background.  On
+// dark backgrounds they are the ANSI colors, whose bright variants stand
+// out.  On light backgrounds, where ANSI colors are too pale to read, they
+// are fixed shades, and the bright variants are darker so they stand out
+// there in the same way.
+type textPalette struct {
+	red, green, yellow, cyan color.Color
+	brightYellow, brightCyan color.Color
+}
+
+func newTextPalette(ld lipgloss.LightDarkFunc) textPalette {
+	return textPalette{
+		red:          ld(lipgloss.Color("#E8604A"), lipgloss.Red),
+		green:        ld(lipgloss.Color("#4CAF50"), lipgloss.Green),
+		yellow:       ld(lipgloss.Color("#E0A100"), lipgloss.Yellow),
+		cyan:         ld(lipgloss.Color("#1A9BAE"), lipgloss.Cyan),
+		brightYellow: ld(lipgloss.Color("#D29600"), lipgloss.BrightYellow),
+		brightCyan:   ld(lipgloss.Color("#00768A"), lipgloss.BrightCyan),
+	}
+}
+
+// progressPalette colors item counts and tab markers by completion state.
+// On light backgrounds, ANSI colors are too pale on the gray summary chip.
+type progressPalette struct {
+	required, pending, complete color.Color
+}
+
+func newProgressPalette() progressPalette {
+	return progressPalette{
+		required: textColors.red,
+		pending:  warning,
+		complete: success,
 	}
 }
 
