@@ -247,6 +247,8 @@ Browse the changed files, leave comments, and press `q` or click **Submit** to f
 
 Comments follow source edits across rounds.  If a comment can no longer be matched, a `💬` marker keeps its original context accessible.
 
+Source lines display carriage returns and other control characters in caret notation, such as `^M`, so line numbers and diff markers stay aligned.
+
 Actionable counters in the main screen and decision dialogs show item counts and completion status.  Click a counter to jump to an item.  Prominent messages and colors highlight unresolved threads and unanswered items to help prevent omissions.
 
 ### Supplied diffs
