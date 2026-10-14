@@ -26,6 +26,7 @@ const (
 
 const (
 	finishReviewForms = iota
+	finishSubmitForms
 	finishCancelForms
 )
 
@@ -491,6 +492,9 @@ func (m *AppModel) finishFormsAction() (tea.Model, tea.Cmd) {
 	switch m.modalFocus {
 	case finishReviewForms:
 		pending := m.pendingForms()
+		if m.canSubmitWithForms() {
+			pending = m.unviewedForms()
+		}
 		m.closeFinishModal()
 		if m.modal != noModal {
 			return m, nil
@@ -498,6 +502,10 @@ func (m *AppModel) finishFormsAction() (tea.Model, tea.Cmd) {
 		if len(pending) > 0 {
 			first := pending[0]
 			m.selectComment(first.tab, commentTarget{formID: first.item.ID, line: first.item.Line})
+		}
+	case finishSubmitForms:
+		if m.canSubmitWithForms() {
+			return m.continueFinish()
 		}
 	case finishCancelForms:
 		m.backFromFinishConfirmation()
@@ -514,10 +522,18 @@ func (m *AppModel) handleFinishFormsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 	case "r", "R":
 		m.modalFocus = finishReviewForms
 		return m.finishFormsAction()
+	case "s", "S":
+		if m.canSubmitWithForms() {
+			m.modalFocus = finishSubmitForms
+			return m.finishFormsAction()
+		}
 	case "c", "C", "n", "N", "esc":
 		m.backFromFinishConfirmation()
 	case "tab", "shift+tab", "left", "right", "up", "down", "h", "j", "k", "l":
 		order := []int{finishReviewForms, finishCancelForms}
+		if m.canSubmitWithForms() {
+			order = []int{finishReviewForms, finishSubmitForms, finishCancelForms}
+		}
 		for _, count := range m.progressCounts() {
 			if count.total > 0 {
 				order = append(order, finishProgressStart+int(count.kind))
@@ -555,20 +571,34 @@ func (m *AppModel) handleFinishFormsMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
+// canSubmitWithForms reports whether the forms dialog only asks for
+// confirmation, rather than blocking approval on required items.
+func (m AppModel) canSubmitWithForms() bool {
+	return m.finishVerdict != review.VerdictApprove || len(m.missingForms()) == 0
+}
+
 func (m AppModel) finishFormsContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(warning).Render("Unanswered form items"), width)
 	prefix := title + "\n"
-	required := len(m.missingForms()) > 0
-	if required {
-		prefix += lipgloss.Wrap(lipgloss.NewStyle().Foreground(lipgloss.Red).Bold(true).Render("Required items must be completed."), width, "") + "\n"
+	if m.canSubmitWithForms() {
+		count := len(m.unviewedForms())
+		text := fmt.Sprintf("%d unanswered items have not been viewed yet.", count)
+		if count == 1 {
+			text = "1 unanswered item has not been viewed yet."
+		}
+		prefix += lipgloss.Wrap(text+" Review them before submitting?", width, "") + "\n"
 	} else {
-		prefix += lipgloss.Wrap("Review unanswered items before approving.", width, "") + "\n"
+		prefix += lipgloss.Wrap(lipgloss.NewStyle().Foreground(lipgloss.Red).Bold(true).Render("Required items must be completed."), width, "") + "\n"
 	}
 	prefix += "\n"
-	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
+	specs := []modalButtonSpec{
 		{rendered: m.renderModalButton("Review", "r", m.modalFocus == finishReviewForms), action: modalMouseAction{focus: finishReviewForms}},
-		{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == finishCancelForms), action: modalMouseAction{focus: finishCancelForms}},
-	}, width, strings.Count(prefix, "\n"))
+	}
+	if m.canSubmitWithForms() {
+		specs = append(specs, modalButtonSpec{rendered: m.renderModalButton("Submit", "s", m.modalFocus == finishSubmitForms), action: modalMouseAction{focus: finishSubmitForms}})
+	}
+	specs = append(specs, modalButtonSpec{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == finishCancelForms), action: modalMouseAction{focus: finishCancelForms}})
+	buttons, regions := layoutModalButtonRow(specs, width, strings.Count(prefix, "\n"))
 	content := prefix + buttons + "\n"
 	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n"), progressKind(m.modalFocus-finishProgressStart))
 	for _, region := range progressRegions {

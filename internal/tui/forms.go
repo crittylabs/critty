@@ -29,6 +29,9 @@ type formReviewItem struct {
 	tab      int
 	item     form.Item
 	answered bool
+	// viewed reports whether every option of the item has been shown in the
+	// content viewport.
+	viewed bool
 }
 
 // formReviewItems represents each choice group once, at its first option.
@@ -41,6 +44,13 @@ func (m *AppModel) formReviewItems() []formReviewItem {
 		d := m.forms.Document(tab.path)
 		if d == nil {
 			continue
+		}
+		viewed := m.formViewed[d.Path()]
+		unviewed := map[string]bool{}
+		for _, item := range d.Items {
+			if !viewed[item.Line] {
+				unviewed[item.ID] = true
+			}
 		}
 		seen := map[string]bool{}
 		for _, item := range d.Items {
@@ -57,7 +67,7 @@ func (m *AppModel) formReviewItems() []formReviewItem {
 			if item.Required || item.Consent {
 				answered = form.Satisfied(item, answer)
 			}
-			items = append(items, formReviewItem{tab: tabIndex, item: item, answered: answered})
+			items = append(items, formReviewItem{tab: tabIndex, item: item, answered: answered, viewed: !unviewed[item.ID]})
 		}
 	}
 	return items
@@ -73,8 +83,46 @@ func (m *AppModel) pendingForms() []formReviewItem {
 	return pending
 }
 
+// unviewedForms returns unanswered items that have never been shown.
+func (m *AppModel) unviewedForms() []formReviewItem {
+	var unviewed []formReviewItem
+	for _, item := range m.pendingForms() {
+		if !item.viewed {
+			unviewed = append(unviewed, item)
+		}
+	}
+	return unviewed
+}
+
+// markVisibleForms records the form lines shown in the content viewport.
+// Content behind a modal is not counted because the modal may cover it.
+func (m *AppModel) markVisibleForms() {
+	if m.forms == nil || len(m.tabs) == 0 || m.modal != noModal {
+		return
+	}
+	d := m.forms.Document(m.tab().path)
+	if d == nil {
+		return
+	}
+	top := m.contentViewport.YOffset()
+	bottom := top + m.contentViewport.Height()
+	for _, control := range m.contentLayout.formControls {
+		if control.rect.top < top || control.rect.top >= bottom {
+			continue
+		}
+		if m.formViewed == nil {
+			m.formViewed = map[string]map[int]bool{}
+		}
+		if m.formViewed[d.Path()] == nil {
+			m.formViewed[d.Path()] = map[int]bool{}
+		}
+		m.formViewed[d.Path()][control.line] = true
+	}
+}
+
 func (m *AppModel) indexForms() {
 	m.formRows = map[string]map[int]formRow{}
+	m.formViewed = nil
 	for i := range m.forms.Documents {
 		d := &m.forms.Documents[i]
 		starts := []int{0}

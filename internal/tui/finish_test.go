@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"image/color"
 	"strings"
 	"testing"
@@ -159,6 +160,40 @@ func TestFinishFormsReviewAndCancelPreserveDraft(t *testing.T) {
 		}
 		if err := app.SaveUnsubmittedDraft(); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+func TestFinishConfirmsUnviewedOptionalForms(t *testing.T) {
+	content := "# Form\n" + strings.Repeat("filler\n", 40) + "- [ ] Extra <!-- form: id=extra -->\n"
+	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictReject} {
+		for _, action := range []rune{'s', 'r'} {
+			t.Run(fmt.Sprintf("%s/%c", verdict, action), func(t *testing.T) {
+				app, ch := formTestAppWithContent(t, content)
+				app.openFinishModal()
+				app.modalTextarea.SetValue("Keep this overall comment.")
+				app.finishVerdict = verdict
+				_, cmd := app.doFinish()
+				if isQuit(cmd) || app.modal != finishFormsModal || !strings.Contains(ansi.Strip(app.View().Content), "not been viewed") {
+					t.Fatal("unviewed optional item did not ask for confirmation")
+				}
+				app, cmd = pressKeyCmd(app, action)
+				if action == 'r' {
+					if isQuit(cmd) || app.modal != noModal || app.tab().cursorLine != 42 || len(app.unviewedForms()) != 0 {
+						t.Fatal("Review did not show the unviewed item")
+					}
+					app.openFinishModal()
+					app.finishVerdict = verdict
+					_, cmd = app.doFinish()
+				}
+				if !isQuit(cmd) {
+					t.Fatalf("submission did not continue: modal %v, err %v", app.modal, app.err)
+				}
+				event := takeEvent(t, ch)
+				if event.Approved != (verdict == review.VerdictApprove) || app.session.CJ.RoundState.ReviewCommentDraft != "Keep this overall comment." {
+					t.Fatalf("unexpected submission: %+v", event)
+				}
+			})
 		}
 	}
 }
