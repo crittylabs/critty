@@ -95,13 +95,17 @@ Keep the one-time marker shown by the Critty skill visible so the review opens i
 
 When you submit a round, the agent receives your comments and continues the workflow.  If its wait times out, send `hey` after submitting.
 
-Run the installer from your home directory to install globally, or from a repository root to install for that project only.
+Use `critty install --user <target>` or run the installer from your home directory to install for your user.  Otherwise, run from a repository root to install for that project only.
+
+`critty install agents` installs shared skills in the project's `.agents/skills/`; `critty install --user agents` installs them in `~/.agents/skills/`.  This variant refers to skills by name and asks the agent to use its own comment author name.  Choose it when sharing one installation across agent hosts.
+
+Use a shared installation or the variants for your chosen hosts.  Some hosts also discover other hosts' directories, so installing multiple variants can expose duplicate skill names.  `install all` installs all agent-specific variants, excluding `agents` and prompt templates.  Existing files in old locations are left in place: remove obsolete Codex skills from `.agents/skills` or `~/.agents/skills` after checking that you no longer need them.
 
 #### Claude Code
 
 ```bash
-cd ~ && critty install claude-code   # Global skills under ~/.claude/skills/
-critty install claude-code           # From a repo root: install for that project
+critty install --user claude-code   # User skills under ~/.claude/skills/
+critty install claude-code          # From a repo root: install for that project
 ```
 
 Then use `/critty [file]`.
@@ -109,8 +113,8 @@ Then use `/critty [file]`.
 #### Codex
 
 ```bash
-cd ~ && critty install codex        # Global skills under ~/.agents/skills/
-critty install codex                # From a repo root: install for that project
+critty install --user codex        # User skills under ~/.codex/skills/
+critty install codex               # Project skills under .codex/skills/
 ```
 
 Then use `$critty`.
@@ -118,8 +122,8 @@ Then use `$critty`.
 #### OpenCode
 
 ```bash
-cd ~ && critty install opencode     # Global command and skills under ~/.config/opencode/
-critty install opencode             # From a repo root: install for that project
+critty install --user opencode     # User command and skills under ~/.config/opencode/
+critty install opencode            # From a repo root: install for that project
 ```
 
 Then use `/critty [file]`.
@@ -127,8 +131,8 @@ Then use `/critty [file]`.
 #### Gemini CLI
 
 ```bash
-cd ~ && critty install gemini        # Global skills under ~/.gemini/skills/
-critty install gemini                # From a repo root: install for that project
+critty install --user gemini        # User skills under ~/.gemini/skills/
+critty install gemini               # From a repo root: install for that project
 ```
 
 Ask Gemini to use the `critty` skill to review your changes or a document.  Use `/skills reload` if Gemini CLI is already running.

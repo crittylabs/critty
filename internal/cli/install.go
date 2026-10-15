@@ -20,6 +20,7 @@ import (
 var skillContent embed.FS
 
 var installForce bool
+var installUser bool
 
 // integrationFile is one installable asset with its project- and
 // global-relative destinations.
@@ -68,6 +69,12 @@ var skillVariants = map[string]skillVariant{
 		argumentsToken: "<arguments>",
 		dropKeys:       []string{"allowed-tools", "argument-hint", "user-invocable"},
 	},
+	"agents": {
+		author:         "<agent-name>",
+		skillRef:       func(name string) string { return name },
+		argumentsToken: "<arguments>",
+		dropKeys:       []string{"allowed-tools", "argument-hint", "user-invocable"},
+	},
 }
 
 var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork"}
@@ -92,6 +99,10 @@ func renderSkill(name, agent string) ([]byte, error) {
 		data = bytes.ReplaceAll(data, []byte(quote+base.author+quote), []byte(quote+variant.author+quote))
 	}
 	data = bytes.ReplaceAll(data, []byte(base.argumentsToken), []byte(variant.argumentsToken))
+	if agent == "agents" {
+		data = bytes.Replace(data, []byte("\n---\n"), []byte("\n---\n\nReplace `<agent-name>` in command examples with your actual agent name.  Load referenced skills by name using your host's skill mechanism.\n"), 1)
+	}
+
 	return dropFrontmatterKeys(data, variant.dropKeys), nil
 }
 
@@ -159,9 +170,14 @@ func integrations() map[string][]integrationFile {
 	}
 
 	m["codex"] = []integrationFile{
-		skillFile("critty", "codex", ".agents"),
-		skillFile("critty-cli", "codex", ".agents"),
-		skillFile("critty-approval", "codex", ".agents"),
+		skillFile("critty", "codex", ".codex"),
+		skillFile("critty-cli", "codex", ".codex"),
+		skillFile("critty-approval", "codex", ".codex"),
+	}
+	m["agents"] = []integrationFile{
+		skillFile("critty", "agents", ".agents"),
+		skillFile("critty-cli", "agents", ".agents"),
+		skillFile("critty-approval", "agents", ".agents"),
 	}
 
 	// OpenCode reads project files from .opencode/ but global ones from its
@@ -194,7 +210,7 @@ func integrations() map[string][]integrationFile {
 	}
 
 	for agent, dir := range map[string]string{
-		"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini",
+		"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents",
 	} {
 		files := []integrationFile{
 			skillFile("critty-ai-review", agent, dir),
@@ -253,25 +269,32 @@ func integrationTargets(target string, reg map[string][]integrationFile) ([]stri
 }
 
 var installCmd = &cobra.Command{
-	Use:   "install [--force] <claude-code|codex|opencode|gemini|prompts|all>",
+	Use:   "install [--user] [--force] <claude-code|codex|opencode|gemini|agents|prompts|all>",
 	Short: "Install agent integrations or stock prompt templates",
 	Long: `Install agent integrations (skills) or the stock finish prompt
 templates.
 
-Run from your home directory to install globally, or from a repository
-root to install for that project only, following crit's convention.
+Use --user or run from your home directory to install for your user.
+Otherwise, run from a repository root to install for that project only.
 
 Targets:
   claude-code  Claude Code skills
   codex        Codex skills
   opencode     OpenCode command (/critty) and skills
   gemini       Gemini CLI skills
+  agents       Shared, agent-neutral skills under .agents/skills
   prompts      Stock finish prompt templates (customize after copying)
   all          claude-code + codex + opencode + gemini
 
 Agent targets include critty-cli, critty-approval, critty-ai-review, and
 critty-ai-cowork, with their reference files and review gate. The interactive
 critty workflow is a skill except in OpenCode, where it is a command.
+
+Codex uses .codex/skills in either scope. OpenCode uses .opencode in
+projects and its XDG config directory for users. The agents target uses
+.agents/skills in either scope. Prefer a shared installation or selected
+host variants to avoid duplicate skill names.
+Existing files in old locations are left untouched.
 
 After installing replacements, recognized legacy crit-ai-review and
 crit-ai-cowork skill folders and their resources are removed once all
@@ -318,9 +341,11 @@ integration files are up to date.`,
 	},
 }
 
-// isGlobalInstall reports whether the install targets global locations:
-// crit's rule is simply "run from $HOME".
+// isGlobalInstall selects user scope explicitly or when run from $HOME.
 func isGlobalInstall() (bool, error) {
+	if installUser {
+		return true, nil
+	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return false, err
@@ -440,4 +465,5 @@ func removeLegacyAISkill(f integrationFile, global bool) error {
 func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.Flags().BoolVarP(&installForce, "force", "f", false, "overwrite files that differ")
+	installCmd.Flags().BoolVar(&installUser, "user", false, "install for the current user from any directory")
 }

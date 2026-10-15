@@ -27,6 +27,16 @@ Critty is a local CLI and human review TUI, not a hosted review service.  Review
 
 External editors launched from the TUI likewise have their own behavior.  Describe the selected command's actual reads, writes, and subprocesses when an approval request needs clarification; do not treat all Critty commands as read-only or as external publication.
 
+`install --user <target>` selects user scope from any directory; running from the home directory also selects user scope.  Otherwise, installation is relative to the current project root.
+
+| Target | Project | User |
+| --- | --- | --- |
+| `codex` | `.codex/skills` | `~/.codex/skills` |
+| `opencode` | `.opencode` | OpenCode's XDG config directory |
+| `agents` | `.agents/skills` | `~/.agents/skills` |
+
+`agents` provides shared, host-neutral skill references and comment attribution.  Prefer a shared installation or selected host variants, because hosts may discover duplicate names across directories.  Existing installations in old locations are left untouched.
+
 ## Review inputs
 
 | Input | Command and source |
