@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -131,8 +130,8 @@ func (s *Store) candidates() ([]Target, error) {
 			}
 			continue
 		}
-		if !slices.Contains(targets, r.Target) {
-			targets = append(targets, r.Target)
+		if r.Target.Kind != "terminal" {
+			targets = addTarget(targets, r.Target)
 		}
 	}
 	return targets, nil
@@ -209,8 +208,9 @@ func (s *Store) Notify(id string, target Target) error {
 		if err != nil {
 			return err
 		}
-		if !slices.Contains(p.Notifications, target) {
-			p.Notifications = append(p.Notifications, target)
+		before := len(p.Notifications)
+		p.Notifications = addTarget(p.Notifications, target)
+		if len(p.Notifications) != before {
 			p.NotifiedAt = time.Now()
 		}
 		return s.write("request-"+id+".json", p)

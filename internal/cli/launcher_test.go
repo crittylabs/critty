@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,6 +80,9 @@ func launcherScript(t *testing.T, path, body string) string {
 }
 
 func TestLauncherSelection(t *testing.T) {
+	previousOrigin := reviewOrigin
+	reviewOrigin = terminalbinding.Origin{SSH: true, PID: 2}
+	t.Cleanup(func() { reviewOrigin = previousOrigin })
 	originalPath, originalRequest, originalOutput := lookPath, terminalRequest, commandOutput
 	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
 	terminalRequest = "marker-bound"
@@ -216,6 +220,9 @@ esac
 }
 
 func TestCustomLauncherFailureStages(t *testing.T) {
+	previousOrigin := reviewOrigin
+	reviewOrigin = terminalbinding.Origin{SSH: true, PID: 2}
+	t.Cleanup(func() { reviewOrigin = previousOrigin })
 	dir := t.TempDir()
 	t.Setenv("PATH", "/usr/bin:/bin")
 	for _, operation := range []string{"check", "open", "close"} {

@@ -44,6 +44,8 @@ func TestTerminalNotificationRoutesReview(t *testing.T) {
 	t.Setenv("TMUX", "/stale/socket,987,0")
 	t.Setenv("TMUX_PANE", "%99")
 	t.Setenv("PATH", t.TempDir())
+	previousOrigin := reviewOrigin
+	t.Cleanup(func() { reviewOrigin = previousOrigin })
 	previous := terminalRequest
 	terminalRequest = request.ID
 	t.Cleanup(func() { terminalRequest = previous })

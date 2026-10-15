@@ -19,7 +19,7 @@ var reviewLauncherNames []string
 var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux): mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, desktop-terminal, xdg-terminal, ghostty-window, iterm-window, terminal-app-window, windows-terminal-wsl, or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
@@ -31,11 +31,7 @@ type reviewLauncher struct {
 // Selection checks availability before opening anything.  Once open starts,
 // failures must be returned rather than risk creating a second review.
 func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mode *reviewMode) (*reviewLauncher, error) {
-	// An explicit mux position is authoritative.  Otherwise it is the fallback.
-	names = slices.Clone(names)
-	if !slices.Contains(names, "mux") {
-		names = append(names, "mux")
-	}
+	names = defaultLauncherOrder(names)
 	groups := make([][]reviewLauncher, len(names))
 	for i, name := range names {
 		candidates, err := launcherCandidates(name, terminal, mode)
@@ -69,6 +65,9 @@ func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mod
 }
 
 func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *reviewMode) ([]reviewLauncher, error) {
+	if name == "desktop-terminal" || slices.Contains(desktopNames, name) {
+		return desktopCandidates(name, terminal)
+	}
 	if name == "mux" {
 		if terminal == nil {
 			return nil, nil
@@ -119,7 +118,7 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 	default:
 		file, custom := strings.CutPrefix(name, "custom:")
 		if !custom || file == "" {
-			return nil, fmt.Errorf("unknown launcher %q; use mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE", name)
+			return nil, fmt.Errorf("unknown launcher %q; use mux, tmux, tmux-floating, tmux-split, herdr, desktop-terminal, a named desktop launcher, or custom:EXECUTABLE", name)
 		}
 		launcher, err := newCustomLauncher(file, terminal, mode)
 		if err != nil {
@@ -209,7 +208,7 @@ func launcherEnvironment(vars []envVar) []string {
 	var environment []string
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
-		if key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || strings.HasPrefix(key, "HERDR_") {
+		if key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || key == "CRITTY_SSH" || key == "CRITTY_TERMINAL_APP" || strings.HasPrefix(key, "HERDR_") {
 			continue
 		}
 		environment = append(environment, value)
