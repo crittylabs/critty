@@ -8,7 +8,7 @@
 
 ### Changed
 
-- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  Missing applications or launch prerequisites produce warnings and setup advice.
+- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies the Codex wrapper selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.
 
 ### Fixed
 

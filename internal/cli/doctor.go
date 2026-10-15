@@ -79,6 +79,7 @@ func (r doctorReport) writeText(w io.Writer, useColor bool) error {
 func newDoctorCommand() *cobra.Command {
 	var asJSON bool
 	var python string
+	var request string
 	cmd := &cobra.Command{
 		Use: "doctor", Aliases: []string{"check"},
 		Short: "Diagnose integrations, review launchers and image settings",
@@ -86,6 +87,8 @@ func newDoctorCommand() *cobra.Command {
 requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
 image settings. Desktop checks inspect installed applications and commands without
 opening windows or testing automation permission.
+Use --terminal-request with a prepared, displayed marker to test terminal binding.
+This consumes that one-time request; no review is opened.
 Use --python to check the dedicated Python environment used for Codex reviews.
 
 No AI service is contacted and no persistent settings are changed. Herdr checks read local
@@ -99,6 +102,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkIntegrations(integrations())
 			r.checkAI(python)
 			r.checkImages()
+			r.checkTerminalBinding(request)
 			origin := terminalbinding.CaptureOrigin(os.Getpid())
 			r.checkDesktopLaunchers(runtime.GOOS, origin, func(name string) error {
 				return (&desktopLaunch{name: name, origin: origin}).check()
@@ -118,6 +122,7 @@ warnings or informational results. The former check command remains an alias.`,
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&request, "terminal-request", "", "test a prepared visible terminal marker without opening a review")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print a structured diagnostic report")
 	cmd.Flags().StringVar(&python, "python", "python3", "Python executable used for restricted AI reviews")
 	return cmd
