@@ -79,6 +79,42 @@ Summary: 1 error, 1 warning, 1 info, 2 ok
 	}
 }
 
+func TestStyledDoctorNewIntegrationPaths(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	reg := integrations()
+	for _, target := range []string{"antigravity", "codex", "agents"} {
+		for _, f := range reg[target] {
+			if err := installIntegrationFile(f, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	r := doctorReport{Version: "v1.2.3"}
+	r.checkIntegrations(reg)
+	for _, d := range r.Checks {
+		if d.Status != "ok" {
+			t.Fatalf("installed integration: %+v", d)
+		}
+	}
+	for _, dark := range []bool{true, false} {
+		var out bytes.Buffer
+		if err := r.writeText(&out, outputStyle{profile: colorprofile.TrueColor, dark: dark}, 0); err != nil {
+			t.Fatal(err)
+		}
+		plain := ansi.Strip(out.String())
+		for _, path := range []string{".gemini/antigravity-cli/skills/critty/SKILL.md", ".codex/skills/critty/SKILL.md", ".agents/skills/critty/SKILL.md"} {
+			if !strings.Contains(plain, path) {
+				t.Fatalf("dark=%t: doctor lacks %q:\n%s", dark, path, plain)
+			}
+		}
+		if !strings.Contains(plain, "\nIntegrations\n") || !strings.Contains(plain, "Summary:") || !strings.Contains(out.String(), "\x1b[") {
+			t.Fatalf("dark=%t: doctor lost its styled layout:\n%s", dark, out.String())
+		}
+	}
+}
+
 func TestDoctorMCPInstallAdvice(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("HOME", t.TempDir())

@@ -391,7 +391,12 @@ print(json.dumps({"major": sys.version_info.major, "minor": sys.version_info.min
 
 func mcpInstallAdvice(python, version string, requirements []byte) string {
 	reg := integrations()
-	for _, name := range agentTargets {
+	names := make([]string, 0, len(reg))
+	for name := range reg {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
 		for _, f := range reg[name] {
 			if filepath.Base(f.dest) != "codex-review-requirements.txt" {
 				continue
