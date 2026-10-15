@@ -613,3 +613,65 @@ func TestCommentNavigationVisitsFileComments(t *testing.T) {
 		t.Fatalf("wrapped previous = tab %d, line %d; want tab 2, line 3", app.activeTab, app.tab().cursorLine)
 	}
 }
+
+func TestFinishDialogBracketNavigationRoundTrips(t *testing.T) {
+	app := newCommentNavigationTestApp()
+	app.tabs[2].state.Comments[1].Resolved = true
+	selected := func() string {
+		targets := app.commentTargets(app.activeTab)
+		current := app.currentCommentTarget(targets)
+		if current < 0 {
+			return ""
+		}
+		return targets[current].id
+	}
+	for _, step := range []struct {
+		key   rune
+		id    string
+		modal modalType
+	}{
+		// ] visits every thread, then opens the dialog and wraps from it.
+		{']', "first-a", noModal}, {']', "first-b", noModal}, {']', "first-c", noModal},
+		{']', "last-a", noModal}, {']', "last-b", noModal}, {']', "last-b", finishModal},
+		{']', "first-a", noModal},
+		// [ from the dialog returns to the last thread.
+		{'q', "first-a", finishModal}, {'[', "last-b", noModal},
+		// Braces skip the resolved thread in both directions.
+		{'}', "last-b", finishModal}, {'}', "first-a", noModal},
+		{'q', "first-a", finishModal}, {'{', "last-a", noModal},
+	} {
+		app = pressKey(app, step.key)
+		if app.modal != step.modal || selected() != step.id {
+			t.Fatalf("key %c: modal %v on %q, want modal %v on %q", step.key, app.modal, selected(), step.modal, step.id)
+		}
+	}
+
+	// Brackets typed into the overall comment stay in the editor.
+	app = pressKey(app, 'q')
+	app = pressKey(app, tea.KeyTab)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: ']', Text: "]"})
+	if app.modal != finishModal || app.modalTextarea.Value() != "]" {
+		t.Fatalf("] in the editor: modal %v, text %q; want the dialog to keep the input", app.modal, app.modalTextarea.Value())
+	}
+
+	// Without a matching target, the dialog is the only stop: the keys open
+	// it from the review and close it from the dialog.
+	app = pressKey(app, tea.KeyEscape)
+	for i := range app.tabs {
+		for j := range app.tabs[i].state.Comments {
+			app.tabs[i].state.Comments[j].Resolved = true
+		}
+	}
+	app.tab().cursorOnAnnotation = false
+	line := app.tab().cursorLine
+	for _, key := range []rune{'}', '{', '{', '}'} {
+		app = pressKey(app, key)
+		if app.modal != finishModal {
+			t.Fatalf("key %c in an entirely resolved review did not open the dialog", key)
+		}
+		app = pressKey(app, key)
+		if app.modal != noModal || app.activeTab != 2 || app.tab().cursorLine != line || app.tab().cursorOnAnnotation {
+			t.Fatalf("key %c in the dialog of an entirely resolved review: modal %v, tab %d, line %d; want the dialog closed in place", key, app.modal, app.activeTab, app.tab().cursorLine)
+		}
+	}
+}

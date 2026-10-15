@@ -240,6 +240,10 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.closeFinishModal()
 	case "q":
 		return m.requestFinishAbort()
+	case "]", "}":
+		m.jumpFromFinish(1, msg.String() == "]")
+	case "[", "{":
+		m.jumpFromFinish(-1, msg.String() == "[")
 	case "left", "h":
 		if m.modalFocus >= finishApprove && m.modalFocus <= finishReject {
 			m.modalFocus = finishApprove + (m.modalFocus-finishApprove+2)%3

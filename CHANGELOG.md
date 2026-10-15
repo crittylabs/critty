@@ -6,6 +6,8 @@
 
 - The Submit dialog starts on a single Approve/Comment/Reject choice group.  Use left/right arrows or `a`/`c`/`r` to select, then Tab or down to edit the overall comment.  Up from Submit, Back, or Abort also focuses the editor; Shift+Tab from the choices focuses Abort.
 
+- Bracket navigation continues through the Submit dialog.  While its choices or buttons have focus, `]` or `}` closes the dialog and wraps to the first thread or form item, and `[` or `{` returns to the last one, so a dialog opened by moving past the last item is easy to leave and the review can be cycled without stopping.  When no thread or form item matches, the keys open the dialog from the review and close it from the dialog.
+
 ## 1.1.3
 
 ### Fixed

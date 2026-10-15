@@ -238,17 +238,56 @@ func (m *AppModel) jumpToComment(step int, includeResolved bool) bool {
 	return ok
 }
 
-// nextCommentOrFinish moves to the next comment like jumpToComment, except
-// that on the last matching target it opens the finish dialog instead of
-// wrapping around to the first.
-func (m *AppModel) nextCommentOrFinish(includeResolved bool) {
-	if m.currentCommentTarget(m.reviewTargets(m.activeTab)) >= 0 {
+// jumpToCommentOrFinish moves like jumpToComment, except that forward from
+// the last matching target it opens the finish dialog instead of wrapping
+// around to the first.  Without any matching target, the dialog is the only
+// stop, so either direction opens it.
+func (m *AppModel) jumpToCommentOrFinish(step int, includeResolved bool) {
+	if step > 0 && m.currentCommentTarget(m.reviewTargets(m.activeTab)) >= 0 {
 		if _, _, ok := m.adjacentCommentNoWrap(1, includeResolved); !ok {
 			m.openFinishModal()
 			return
 		}
 	}
-	m.jumpToComment(1, includeResolved)
+	if !m.jumpToComment(step, includeResolved) {
+		m.openFinishModal()
+	}
+}
+
+// jumpFromFinish treats the finish dialog as the stop after the last target:
+// moving forward wraps to the first target of the review, and moving backward
+// returns to the last one.  Without any matching target, the dialog closes
+// and the cursor stays where it was.
+func (m *AppModel) jumpFromFinish(step int, includeResolved bool) {
+	tabIndex, target, ok := m.endComment(step, includeResolved)
+	m.closeFinishModal()
+	if !ok || m.modal != noModal {
+		return
+	}
+	m.tabs[tabIndex].selecting = false
+	m.selectComment(tabIndex, target)
+}
+
+// endComment returns the first matching target of the review for a forward
+// step and the last one for a backward step.
+func (m *AppModel) endComment(step int, includeResolved bool) (int, commentTarget, bool) {
+	for offset := range m.tabs {
+		tabIndex := offset
+		if step < 0 {
+			tabIndex = len(m.tabs) - 1 - offset
+		}
+		targets := m.reviewTargets(tabIndex)
+		start := 0
+		if step < 0 {
+			start = len(targets) - 1
+		}
+		for i := start; i >= 0 && i < len(targets); i += step {
+			if includeResolved || targets[i].unresolved() {
+				return tabIndex, targets[i], true
+			}
+		}
+	}
+	return 0, commentTarget{}, false
 }
 
 func (m *AppModel) adjacentComment(step int, includeResolved bool) (int, commentTarget, bool) {

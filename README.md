@@ -361,7 +361,9 @@ Required checkboxes are unresolved until confirmed by a human for the current re
 
 `n` / `N` and `{` / `}` stop once per unanswered required choice group, on its first option.  `[` / `]` visit each option separately so you can change an answer.  Controls precede comments on the same source row; a hunk starting there precedes both.
 
-`n` / `N` stop at the ends of the review.  From the last matching thread or form item, `]` or `}` opens the finish dialog.  `[` and `{` wrap from the first matching target to the last.  From ordinary content, bracket navigation wraps to find a matching target.
+`n` / `N` stop at the ends of the review.  From the last matching thread or form item, `]` or `}` opens the finish dialog.  `[` and `{` wrap from the first matching target to the last.  From ordinary content, bracket navigation wraps to find a matching target.  Without one, all four keys open the finish dialog.
+
+The finish dialog is the stop after the last target.  While its choices or buttons have focus, `]` or `}` closes it and wraps to the first matching target, and `[` or `{` returns to the last one.  Without a matching target, the keys close the dialog.
 
 Changed binary files have a file-level stop for `n` / `N`.  Any tab without hunks, unresolved threads, unanswered required items, or optional form items also has a whole-file stop.  This includes attachments and files retained outside the current diff.  Threads and form items within these tabs follow the same rules as in other files.
 

@@ -1050,16 +1050,16 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.focused == contentPane && !t.selecting {
 		switch {
 		case key.Matches(msg, keys.NextUnresolved):
-			m.nextCommentOrFinish(false)
+			m.jumpToCommentOrFinish(1, false)
 			return m, nil
 		case key.Matches(msg, keys.PrevUnresolved):
-			m.jumpToComment(-1, false)
+			m.jumpToCommentOrFinish(-1, false)
 			return m, nil
 		case key.Matches(msg, keys.NextComment):
-			m.nextCommentOrFinish(true)
+			m.jumpToCommentOrFinish(1, true)
 			return m, nil
 		case key.Matches(msg, keys.PrevComment):
-			m.jumpToComment(-1, true)
+			m.jumpToCommentOrFinish(-1, true)
 			return m, nil
 		}
 	}
@@ -1198,16 +1198,16 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.focused == commentPane {
 		switch {
 		case key.Matches(msg, keys.NextUnresolved):
-			m.nextCommentOrFinish(false)
+			m.jumpToCommentOrFinish(1, false)
 			return m, nil
 		case key.Matches(msg, keys.PrevUnresolved):
-			m.jumpToComment(-1, false)
+			m.jumpToCommentOrFinish(-1, false)
 			return m, nil
 		case key.Matches(msg, keys.NextComment):
-			m.nextCommentOrFinish(true)
+			m.jumpToCommentOrFinish(1, true)
 			return m, nil
 		case key.Matches(msg, keys.PrevComment):
-			m.jumpToComment(-1, true)
+			m.jumpToCommentOrFinish(-1, true)
 			return m, nil
 		}
 	}
@@ -3263,7 +3263,7 @@ func (m *AppModel) handleCommentHeaderClick(region commentHeaderRegion, point te
 	case region.up.contains(point):
 		m.jumpToComment(-1, true)
 	case region.down.contains(point):
-		m.nextCommentOrFinish(true)
+		m.jumpToCommentOrFinish(1, true)
 	case region.delete.contains(point):
 		m.openCommentDelete(region.id)
 	default:
@@ -4073,6 +4073,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
 		{keys: "←/→ (verdict) · ↓ · ↑ (buttons)", desc: "select approve/comment/reject · edit overall comment"},
+		{keys: "]/} · [/{ (outside input)", desc: "first thread/form item · last one; braces skip resolved; close without one"},
 		{keys: "r/esc (forms)", desc: "review/cancel"},
 		{keys: "tab · enter (dialog counters)", desc: "focus count · jump to first pending/completed item"},
 	}, innerWidth)
