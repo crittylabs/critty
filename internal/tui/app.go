@@ -853,7 +853,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.String() == "alt+o" && !t.selecting {
-		return m, m.openImageAtCursor()
+		return m, m.openReferenceAtCursor()
 	}
 	if msg.String() == "alt+p" && m.multiFile {
 		return m, m.openFileSelect()
@@ -2052,7 +2052,7 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.clipboardStatus = ""
 	if msg.String() == "alt+o" && m.modalFocus == 0 {
-		return m, m.openImageAtCursor()
+		return m, m.openReferenceAtCursor()
 	}
 	if msg.String() == "alt+r" && m.hasModalResolution() {
 		m.toggleResolve(m.editingID)
@@ -4072,7 +4072,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "r/R", desc: "resolve/+next"},
 		{keys: "h/H", desc: "fold/hide"},
 		{keys: "w / I", desc: "WS / images"},
-		{keys: "alt+o", desc: "enlarge image"},
+		{keys: "alt+o", desc: "open image/link"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
 		{keys: "q/C-c", desc: "submit review"},
