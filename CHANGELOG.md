@@ -12,9 +12,11 @@
 
 ### Changed
 
+- `critty --version` shows the brand mark and version in the Help dialog's colors when printed to a terminal, matching the detected background.  `critty --help` and `critty help <command>` open a colored usage page in your pager, chosen like Git from `PAGER` with `less` as the default; `less` receives `-R`, and `LESS` defaults to `FRX` when unset.  Redirected output, `NO_COLOR`, and agent tools still receive the plain `critty version ...` line and Cobra's plain help.
+
 - The Submit dialog starts on a single Approve/Comment/Reject choice group, with keyboard navigation between the choices, overall comment, and action buttons.  Bracket navigation continues through the dialog, wrapping to the first or last matching thread or form item so reviews can be cycled without stopping.
 
-- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies Critty and tfil-generated Codex wrappers selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review, and `--terminal-notify-only` verifies the filter notification path without falling back to registered pane screens.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.
+- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies Critty and tfil-generated Codex wrappers selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review, and `--terminal-notify-only` verifies the filter notification path without falling back to registered pane screens.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.  The text report now groups checks by area under the brand header, marks each line with a colored status, indents advice beneath its check, wraps to the terminal width, ends with a summary count, and opens in the same pager as `--help`.
 
 ### Fixed
 

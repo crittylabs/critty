@@ -247,7 +247,7 @@ Without Herdr or tmux, launch critty yourself in an interactive terminal when an
 
 Use `critty notes.md:42` or `critty --focus path/to/file:42` to start at a particular line.
 
-For all commands and options, run `critty --help` or see the [CLI reference skill](internal/cli/skill/critty-cli/SKILL.md).
+For all commands and options, run `critty --help` or see the [CLI reference skill](internal/cli/skill/critty-cli/SKILL.md).  In a terminal, help and `critty doctor` open in your pager (`PAGER`, default `less`); set `PAGER=cat` to print them directly.
 
 ## Code Review (multi-file)
 
