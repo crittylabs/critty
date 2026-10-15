@@ -189,3 +189,30 @@ func TestConcurrentNotificationsPreserveConflicts(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestResolveNotificationRequiresCallback(t *testing.T) {
+	s := testStore(t)
+	r := prepare(t, s)
+	target := testTarget("%1")
+	if err := s.Register(target); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	if _, err := s.ResolveNotification(ctx, r.ID); err == nil || !strings.Contains(err.Error(), "no terminal filter notification") {
+		t.Fatalf("registration satisfied notification-only probe: %v", err)
+	}
+	// Failure must leave the request available for a real notification.
+	if err := s.Notify(r.ID, target); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got, err := s.ResolveNotification(ctx, r.ID)
+	if err != nil || got != target {
+		t.Fatalf("notification: %+v, %v", got, err)
+	}
+	if _, err := s.read(r.ID); err == nil {
+		t.Fatal("successful notification was not consumed")
+	}
+}

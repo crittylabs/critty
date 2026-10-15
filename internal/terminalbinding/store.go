@@ -220,6 +220,16 @@ func (s *Store) Notify(id string, target Target) error {
 // Resolve prefers notifications and otherwise scans only live registrations' visible screens.
 // It consumes the request once a destination is selected, before the caller launches its UI.
 func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error)) (Target, error) {
+	return s.resolve(ctx, id, snapshot, false)
+}
+
+// ResolveNotification tests the terminal filter callback without falling back to
+// registered pane screens. It consumes the request only after a notification.
+func (s *Store) ResolveNotification(ctx context.Context, id string) (Target, error) {
+	return s.resolve(ctx, id, nil, true)
+}
+
+func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error), notifyOnly bool) (Target, error) {
 	// Let a notification arriving with the just-rendered marker reach the intake first.
 	if err := pause(ctx, 150*time.Millisecond); err != nil {
 		return Target{}, err
@@ -234,7 +244,7 @@ func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Co
 			if err != nil {
 				return err
 			}
-			if len(p.Notifications) == 0 {
+			if len(p.Notifications) == 0 && !notifyOnly {
 				targets, err = s.candidates()
 			}
 			return err
@@ -289,6 +299,9 @@ func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Co
 			return selected, nil
 		}
 		if err := pause(ctx, 100*time.Millisecond); err != nil {
+			if notifyOnly {
+				return Target{}, fmt.Errorf("no terminal filter notification received; check tfil --critty-notify and its Critty executable and XDG_STATE_HOME")
+			}
 			if lastErr != nil {
 				return Target{}, fmt.Errorf("cannot read registered terminal screens (check socket access): %w", lastErr)
 			}

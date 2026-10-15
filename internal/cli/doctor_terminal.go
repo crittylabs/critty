@@ -4,6 +4,7 @@ import (
 	"context"
 	"debug/buildinfo"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/tklauser/ps"
 )
 
-func (r *doctorReport) checkTerminalBinding(request string) {
+func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 	r.checkCodexWrapper()
 	origin := terminalbinding.CaptureOrigin(os.Getpid())
 	resolved := false
@@ -21,14 +22,24 @@ func (r *doctorReport) checkTerminalBinding(request string) {
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		target, err := terminalbinding.DefaultStore().Resolve(ctx, request, terminalbinding.Snapshot)
+		var target terminalbinding.Target
+		var err error
+		if notifyOnly {
+			target, err = terminalbinding.DefaultStore().ResolveNotification(ctx, request)
+		} else {
+			target, err = terminalbinding.DefaultStore().Resolve(ctx, request, terminalbinding.Snapshot)
+		}
 		if err != nil {
-			r.add("terminal/marker", "warn", err.Error(), "Start Codex through `critty codex` or tfil with --critty-notify, then prepare and display a new marker. Use the same XDG_STATE_HOME in the agent and terminal filter.")
+			advice := "Start Codex through `critty codex` or tfil with --critty-notify, then prepare and display a new marker. Use the same XDG_STATE_HOME in the agent and terminal filter."
+			if notifyOnly {
+				advice = "Enable tfil --critty-notify with Critty on its PATH and the same XDG_STATE_HOME as the agent, then prepare and display a new marker."
+			}
+			r.add("terminal/marker", "warn", err.Error(), advice)
 		} else {
 			origin = target.Origin
 			resolved = true
 			message := "visible marker resolved to " + target.Kind
-			if target.Kind == "terminal" {
+			if notifyOnly || target.Kind == "terminal" {
 				message = "visible marker resolved through a terminal filter notification"
 			}
 			r.add("terminal/marker", "ok", message, "")
@@ -63,12 +74,16 @@ func (r *doctorReport) checkCodexWrapper() {
 		r.add("terminal/codex-wrapper", "info", "codex is not available on PATH", "The Codex wrapper is optional for other agents.")
 		return
 	}
+	if isTfilWrapper(bin) {
+		r.add("terminal/codex-wrapper", "ok", "PATH selects a tfil-generated Codex wrapper at "+bin, "Wrapper detection does not verify --critty-notify. Test a displayed marker with --terminal-request ID --terminal-notify-only.")
+		return
+	}
 	bi, err := buildinfo.ReadFile(bin)
 	if err == nil && bi.Path == "github.com/crittylabs/critty/cmd/codex" {
 		r.add("terminal/codex-wrapper", "ok", "PATH selects the Critty Codex wrapper at "+bin, "A marker test verifies the current session; PATH selection applies to future launches.")
 		return
 	}
-	r.add("terminal/codex-wrapper", "info", "PATH selects "+bin+"; not identified as the Critty wrapper", "A shim, custom wrapper, or tfil may still provide terminal binding. Use a marker test, or launch with `critty codex`.")
+	r.add("terminal/codex-wrapper", "info", "PATH selects "+bin+"; not identified as a Critty or tfil wrapper", "A shim, custom wrapper, or tfil may still provide terminal binding. Use a marker test, or launch with `critty codex`.")
 }
 
 func tfilAncestor(pid int, inspect func(int) (int, string, error)) (int, error) {
@@ -85,4 +100,17 @@ func tfilAncestor(pid int, inspect func(int) (int, string, error)) (int, error) 
 		pid = parent
 	}
 	return 0, nil
+}
+
+// tfil uses this exact prefix to recognize its own generated wrappers.
+func isTfilWrapper(path string) bool {
+	const marker = "#!/bin/sh\n# tfil-wrapper\n"
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	var header [len(marker)]byte
+	_, err = io.ReadFull(f, header[:])
+	return err == nil && string(header[:]) == marker
 }
