@@ -374,10 +374,11 @@ func TestFinishModalConfirmation(t *testing.T) {
 			app, ch := newFinishTestApp(t, tt.comments)
 			app.newFeedback = tt.newFeedback
 			app = pressKey(app, 'q')
-			wantFocus := finishSubmit
+			wantFocus := finishComment
 			wantVerdict := review.VerdictComment
 			if tt.approved {
 				wantVerdict = review.VerdictApprove
+				wantFocus = finishApprove
 			}
 			if app.finishVerdict != wantVerdict {
 				t.Fatalf("default verdict = %s, want %s", app.finishVerdict, wantVerdict)
@@ -961,6 +962,73 @@ func TestFinishCtrlSOnlyFocusesSubmitFromEditor(t *testing.T) {
 	_, cmd = pressKeyCmd(app, tea.KeyEnter)
 	if !isQuit(cmd) || takeEvent(t, ch).Approved || app.session.CJ.RoundState.Verdict != review.VerdictComment {
 		t.Fatal("Enter did not send the automatic Comment verdict after C-s")
+	}
+}
+
+func TestFinishVerdictGroupNavigation(t *testing.T) {
+	for _, initial := range []review.Verdict{review.VerdictApprove, review.VerdictComment} {
+		t.Run(string(initial), func(t *testing.T) {
+			app, ch := newFinishTestApp(t, nil)
+			if initial == review.VerdictComment {
+				app.tab().state.Comments = []review.Comment{{ID: "new", Author: app.author, Body: "Feedback", ReviewRound: app.reviewRound()}}
+			}
+			app.openFinishModal()
+			if app.finishVerdict != initial || app.modalFocus != app.finishVerdictFocus() {
+				t.Fatal("initial focus does not match the default verdict")
+			}
+			content, _ := app.finishChoices(80, 0)
+			plain := ansi.Strip(content)
+			if strings.Index(plain, "Approve") > strings.Index(plain, "Comment") || strings.Index(plain, "Comment") > strings.Index(plain, "Reject") {
+				t.Fatalf("wrong choice order: %s", plain)
+			}
+			for _, step := range []struct {
+				key     rune
+				verdict review.Verdict
+			}{
+				{'a', review.VerdictApprove},
+				{tea.KeyRight, review.VerdictComment},
+				{tea.KeyRight, review.VerdictReject},
+				{tea.KeyRight, review.VerdictApprove},
+				{tea.KeyLeft, review.VerdictReject},
+				{tea.KeyLeft, review.VerdictComment},
+				{tea.KeyLeft, review.VerdictApprove},
+				{'c', review.VerdictComment},
+				{'r', review.VerdictReject},
+			} {
+				app = pressKey(app, step.key)
+				if app.finishVerdict != step.verdict || app.modalFocus != app.finishVerdictFocus() {
+					t.Fatalf("key %d: verdict = %s, focus = %d", step.key, app.finishVerdict, app.modalFocus)
+				}
+				for _, key := range []rune{tea.KeyTab, tea.KeyDown} {
+					app = pressKey(app, key)
+					if app.modalFocus != finishText || !app.modalTextarea.Focused() {
+						t.Fatal("Tab/Down did not focus the editor")
+					}
+					app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+					if app.modalFocus != app.finishVerdictFocus() || app.modalTextarea.Focused() {
+						t.Fatal("Shift+Tab did not return to the selected verdict")
+					}
+				}
+			}
+			select {
+			case <-ch:
+				t.Fatal("navigation submitted the review")
+			default:
+			}
+		})
+	}
+}
+
+func TestFinishButtonsUpFocusesEditor(t *testing.T) {
+	for _, focus := range []int{finishSubmit, finishBack, finishAbort} {
+		app, _ := newFinishTestApp(t, nil)
+		app.openFinishModal()
+		app.modalTextarea.SetValue("Preserved draft")
+		app.modalFocus = focus
+		app = pressKey(app, tea.KeyUp)
+		if app.modalFocus != finishText || !app.modalTextarea.Focused() || app.modalTextarea.Value() != "Preserved draft" {
+			t.Fatalf("Up from %d did not focus the editor with its draft", focus)
+		}
 	}
 }
 

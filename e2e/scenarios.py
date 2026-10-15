@@ -299,7 +299,7 @@ def scenarios() -> None:
             "plan.md",
             "Existing feedback.",
         )
-        unchanged.keys("q", "BTab")
+        unchanged.keys("q", "Tab")
         unchanged.text("Preserve draft.")
         unchanged.keys("Tab", "a", "Enter")
         wait_until(
@@ -323,7 +323,7 @@ def scenarios() -> None:
 
         for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:
             submission = Round(f"submit-{verdict}", ["plan.md"])
-            submission.keys("q", "BTab")
+            submission.keys("q", "Down")
             body = f"Overall comment: {verdict}."
             submission.text(body)
             assert "● Comment" in submission.screen(), (
@@ -368,7 +368,7 @@ def scenarios() -> None:
         )
 
         draft = Round("submit-draft", ["plan.md"])
-        draft.keys("q", "BTab")
+        draft.keys("q", "Tab")
         draft.text("Saved draft.")
         draft.keys("Escape")
         draft.keys("q", "q")
@@ -386,7 +386,7 @@ def scenarios() -> None:
         wait_until(
             lambda: "Saved draft" in resumed_draft.screen(), "restored overall draft"
         )
-        resumed_draft.keys("BTab")
+        resumed_draft.keys("Tab")
         resumed_draft.text(" Updated draft.")
         cli("stop", "--session", draft.session)
         resumed_draft.completed(None)
@@ -532,7 +532,7 @@ def scenarios() -> None:
         form.text("Keep this form review draft.")
         form.click(r"1/1 💬", last=True)
         assert not form.result.exists(), "counter click submitted the review"
-        form.keys("q", "Tab", "Tab", "Tab", "Tab", "Tab", "Enter")
+        form.keys("q", "Down", "C-s", "Tab", "Tab", "Tab", "Tab", "Tab", "Enter")
         assert "L5/" in form.screen(), "Submit counter did not focus unchecked consent"
         form.keys("q")
         assert "Optional items remain unanswered" in form.screen(), form.screen()

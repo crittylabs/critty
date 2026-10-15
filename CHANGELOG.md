@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The Submit dialog starts on a single Approve/Comment/Reject choice group.  Use left/right arrows or `a`/`c`/`r` to select, then Tab or down to edit the overall comment.  Up from Submit, Back, or Abort also focuses the editor; Shift+Tab from the choices focuses Abort.
+
 ## 1.1.3
 
 ### Fixed

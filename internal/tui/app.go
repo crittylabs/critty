@@ -4072,6 +4072,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
+		{keys: "←/→ (verdict) · ↓ · ↑ (buttons)", desc: "select approve/comment/reject · edit overall comment"},
 		{keys: "r/esc (forms)", desc: "review/cancel"},
 		{keys: "tab · enter (dialog counters)", desc: "focus count · jump to first pending/completed item"},
 	}, innerWidth)

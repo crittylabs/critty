@@ -16,8 +16,8 @@ import (
 const (
 	finishText = iota
 	finishApprove
-	finishReject
 	finishComment
+	finishReject
 	finishSubmit
 	finishBack
 	finishAbort
@@ -110,7 +110,7 @@ func (m *AppModel) openFinishModal() {
 	m.modalTextarea.SetValue(m.finishDraft)
 	m.modalTextarea.Placeholder = "Overall comment (optional)..."
 	m.modalTextarea.Blur()
-	m.modalFocus = finishSubmit
+	m.modalFocus = m.finishVerdictFocus()
 	m.modalReferenceOffset = -1
 	m.clipboardStatus = ""
 	m.recalculateLayout()
@@ -163,7 +163,7 @@ func (m *AppModel) finishFocusedAction() (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) finishFocusOrder() []int {
-	order := []int{finishApprove, finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort}
+	order := []int{m.finishVerdictFocus(), finishText, finishSubmit, finishBack, finishAbort}
 	for _, count := range m.progressCounts() {
 		if count.total > 0 {
 			order = append(order, finishProgressStart+int(count.kind))
@@ -197,6 +197,9 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		order := m.finishFocusOrder()
 		index := slices.Index(order, m.modalFocus)
 		m.modalFocus = order[(index+delta+len(order))%len(order)]
+		if index == 0 && delta == -1 {
+			m.modalFocus = finishAbort
+		}
 		if m.modalFocus == finishText {
 			return m, m.modalTextarea.Focus()
 		}
@@ -228,7 +231,7 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			focus = finishComment
 		}
 		m.selectFinishVerdict(focus)
-		m.modalFocus = finishSubmit
+		m.modalFocus = focus
 	case "space", " ":
 		m.selectFinishVerdict(m.modalFocus)
 	case "y", "Y":
@@ -238,16 +241,38 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m.requestFinishAbort()
 	case "left", "h":
+		if m.modalFocus >= finishApprove && m.modalFocus <= finishReject {
+			m.modalFocus = finishApprove + (m.modalFocus-finishApprove+2)%3
+			m.selectFinishVerdict(m.modalFocus)
+			break
+		}
 		order := m.finishFocusOrder()
 		m.modalFocus = order[max(0, slices.Index(order, m.modalFocus)-1)]
 		m.selectFinishVerdict(m.modalFocus)
 	case "right", "l":
+		if m.modalFocus >= finishApprove && m.modalFocus <= finishReject {
+			m.modalFocus = finishApprove + (m.modalFocus-finishApprove+1)%3
+			m.selectFinishVerdict(m.modalFocus)
+			break
+		}
 		order := m.finishFocusOrder()
 		m.modalFocus = order[min(len(order)-1, slices.Index(order, m.modalFocus)+1)]
 		m.selectFinishVerdict(m.modalFocus)
-	case "up", "k":
+	case "up":
+		if m.modalFocus == finishSubmit || m.modalFocus == finishBack || m.modalFocus == finishAbort {
+			m.modalFocus = finishText
+			return m, m.modalTextarea.Focus()
+		}
 		m.scrollFinishReference(-1)
-	case "down", "j":
+	case "k":
+		m.scrollFinishReference(-1)
+	case "down":
+		if m.modalFocus >= finishApprove && m.modalFocus <= finishReject {
+			m.modalFocus = finishText
+			return m, m.modalTextarea.Focus()
+		}
+		m.scrollFinishReference(1)
+	case "j":
 		m.scrollFinishReference(1)
 	case "enter":
 		return m.finishFocusedAction()
@@ -430,6 +455,17 @@ func (m *AppModel) selectFinishVerdict(focus int) {
 	}
 }
 
+func (m AppModel) finishVerdictFocus() int {
+	switch m.finishVerdict {
+	case review.VerdictComment:
+		return finishComment
+	case review.VerdictReject:
+		return finishReject
+	default:
+		return finishApprove
+	}
+}
+
 func finishColor(verdict review.Verdict) color.Color {
 	switch verdict {
 	case review.VerdictApprove:
@@ -448,8 +484,8 @@ func (m AppModel) finishChoices(width, top int) (string, []modalMouseRegion) {
 		label   string
 	}{
 		{review.VerdictApprove, "Approve"},
-		{review.VerdictReject, "Reject"},
 		{review.VerdictComment, "Comment"},
+		{review.VerdictReject, "Reject"},
 	} {
 		selected := m.finishVerdict == option.verdict
 		symbol := "○"

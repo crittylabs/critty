@@ -146,8 +146,10 @@ func TestFinishTabOrderPlacesInputBeforeSubmit(t *testing.T) {
 			if thread && !strings.Contains(app.View().Content, "Previous overall feedback") {
 				t.Fatal("previous thread is not visible")
 			}
-			app.modalFocus = finishApprove
-			forward := []int{finishReject, finishComment, finishText, finishSubmit, finishBack, finishAbort}
+			if app.modalFocus != finishApprove || app.modalTextarea.Focused() {
+				t.Fatal("initial focus is not on the verdict group")
+			}
+			forward := []int{finishText, finishSubmit, finishBack, finishAbort}
 			if thread {
 				forward = append(forward, finishProgressStart+int(progressThreads))
 			}
@@ -159,11 +161,7 @@ func TestFinishTabOrderPlacesInputBeforeSubmit(t *testing.T) {
 				}
 			}
 			app.modalFocus = finishSubmit
-			backward := []int{finishText, finishComment, finishReject, finishApprove}
-			if thread {
-				backward = append(backward, finishProgressStart+int(progressThreads))
-			}
-			backward = append(backward, finishAbort, finishBack, finishSubmit)
+			backward := []int{finishText, finishApprove, finishAbort, finishBack, finishSubmit}
 			for _, focus := range backward {
 				app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 				if app.modalFocus != focus || app.modalTextarea.Focused() != (focus == finishText) {
