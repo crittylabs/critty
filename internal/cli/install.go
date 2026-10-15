@@ -20,6 +20,7 @@ import (
 var skillContent embed.FS
 
 var installForce bool
+var installUser bool
 
 // integrationFile is one installable asset with its project- and
 // global-relative destinations.
@@ -40,6 +41,12 @@ type skillVariant struct {
 }
 
 var skillVariants = map[string]skillVariant{
+	"antigravity": {
+		author:         "Antigravity CLI",
+		skillRef:       func(name string) string { return "/" + name },
+		argumentsToken: "<arguments>",
+		dropKeys:       []string{"allowed-tools", "argument-hint", "user-invocable"},
+	},
 	"claude-code": {
 		author:         "Claude Code",
 		skillRef:       func(name string) string { return "/" + name },
@@ -68,6 +75,12 @@ var skillVariants = map[string]skillVariant{
 		argumentsToken: "<arguments>",
 		dropKeys:       []string{"allowed-tools", "argument-hint", "user-invocable"},
 	},
+	"agents": {
+		author:         "<agent-name>",
+		skillRef:       func(name string) string { return name },
+		argumentsToken: "<arguments>",
+		dropKeys:       []string{"allowed-tools", "argument-hint", "user-invocable"},
+	},
 }
 
 var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork"}
@@ -92,6 +105,10 @@ func renderSkill(name, agent string) ([]byte, error) {
 		data = bytes.ReplaceAll(data, []byte(quote+base.author+quote), []byte(quote+variant.author+quote))
 	}
 	data = bytes.ReplaceAll(data, []byte(base.argumentsToken), []byte(variant.argumentsToken))
+	if agent == "agents" {
+		data = bytes.Replace(data, []byte("\n---\n"), []byte("\n---\n\nReplace `<agent-name>` in command examples with your actual agent name.  Load referenced skills by name using your host's skill mechanism.\n"), 1)
+	}
+
 	return dropFrontmatterKeys(data, variant.dropKeys), nil
 }
 
@@ -159,9 +176,14 @@ func integrations() map[string][]integrationFile {
 	}
 
 	m["codex"] = []integrationFile{
-		skillFile("critty", "codex", ".agents"),
-		skillFile("critty-cli", "codex", ".agents"),
-		skillFile("critty-approval", "codex", ".agents"),
+		skillFile("critty", "codex", ".codex"),
+		skillFile("critty-cli", "codex", ".codex"),
+		skillFile("critty-approval", "codex", ".codex"),
+	}
+	m["agents"] = []integrationFile{
+		skillFile("critty", "agents", ".agents"),
+		skillFile("critty-cli", "agents", ".agents"),
+		skillFile("critty-approval", "agents", ".agents"),
 	}
 
 	// OpenCode reads project files from .opencode/ but global ones from its
@@ -193,8 +215,14 @@ func integrations() map[string][]integrationFile {
 		skillFile("critty-approval", "gemini", ".gemini"),
 	}
 
+	m["antigravity"] = []integrationFile{
+		skillFile("critty", "antigravity", ".agents"),
+		skillFile("critty-cli", "antigravity", ".agents"),
+		skillFile("critty-approval", "antigravity", ".agents"),
+	}
+
 	for agent, dir := range map[string]string{
-		"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini",
+		"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents", "antigravity": ".agents",
 	} {
 		files := []integrationFile{
 			skillFile("critty-ai-review", agent, dir),
@@ -212,6 +240,12 @@ func integrations() map[string][]integrationFile {
 			}
 		}
 		m[agent] = append(m[agent], files...)
+	}
+
+	for i := range m["antigravity"] {
+		f := &m["antigravity"][i]
+		rel := strings.TrimPrefix(f.dest, ".agents"+string(filepath.Separator))
+		f.globalDest = filepath.Join(".gemini", "antigravity-cli", rel)
 	}
 
 	var prompts []integrationFile
@@ -234,9 +268,12 @@ func integrations() map[string][]integrationFile {
 	return m
 }
 
-var agentTargets = []string{"claude-code", "codex", "opencode", "gemini"}
+var agentTargets = []string{"claude-code", "codex", "opencode", "antigravity"}
 
 func integrationTargets(target string, reg map[string][]integrationFile) ([]string, error) {
+	if target == "agy" {
+		target = "antigravity"
+	}
 	if target == "all" {
 		return agentTargets, nil
 	}
@@ -244,7 +281,8 @@ func integrationTargets(target string, reg map[string][]integrationFile) ([]stri
 		return []string{target}, nil
 	}
 
-	available := make([]string, 0, len(reg)+1)
+	available := make([]string, 0, len(reg)+2)
+	available = append(available, "agy")
 	for name := range reg {
 		available = append(available, name)
 	}
@@ -253,25 +291,35 @@ func integrationTargets(target string, reg map[string][]integrationFile) ([]stri
 }
 
 var installCmd = &cobra.Command{
-	Use:   "install [--force] <claude-code|codex|opencode|gemini|prompts|all>",
+	Use:   "install [--user] [--force] <claude-code|codex|opencode|antigravity|agy|gemini|agents|prompts|all>",
 	Short: "Install agent integrations or stock prompt templates",
 	Long: `Install agent integrations (skills) or the stock finish prompt
 templates.
 
-Run from your home directory to install globally, or from a repository
-root to install for that project only, following crit's convention.
+Use --user or run from your home directory to install for your user.
+Otherwise, run from a repository root to install for that project only.
 
 Targets:
   claude-code  Claude Code skills
   codex        Codex skills
   opencode     OpenCode command (/critty) and skills
-  gemini       Gemini CLI skills
+  antigravity  Antigravity CLI (agy) skills
+  agy          Alias for antigravity
+  gemini       Legacy Gemini CLI skills (explicit installation only)
+  agents       Shared, agent-neutral skills under .agents/skills
   prompts      Stock finish prompt templates (customize after copying)
-  all          claude-code + codex + opencode + gemini
+  all          claude-code + codex + opencode + antigravity
 
 Agent targets include critty-cli, critty-approval, critty-ai-review, and
 critty-ai-cowork, with their reference files and review gate. The interactive
 critty workflow is a skill except in OpenCode, where it is a command.
+
+Codex uses .codex/skills in either scope. OpenCode uses .opencode in
+projects and its XDG config directory for users. Antigravity uses
+.agents/skills in projects and ~/.gemini/antigravity-cli/skills for users.
+The agents target uses .agents/skills in either scope. Prefer a shared
+installation or selected host variants to avoid duplicate skill names.
+Existing files in old locations are left untouched.
 
 After installing replacements, recognized legacy crit-ai-review and
 crit-ai-cowork skill folders and their resources are removed once all
@@ -318,9 +366,11 @@ integration files are up to date.`,
 	},
 }
 
-// isGlobalInstall reports whether the install targets global locations:
-// crit's rule is simply "run from $HOME".
+// isGlobalInstall selects user scope explicitly or when run from $HOME.
 func isGlobalInstall() (bool, error) {
+	if installUser {
+		return true, nil
+	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return false, err
@@ -440,4 +490,5 @@ func removeLegacyAISkill(f integrationFile, global bool) error {
 func init() {
 	rootCmd.AddCommand(installCmd)
 	installCmd.Flags().BoolVarP(&installForce, "force", "f", false, "overwrite files that differ")
+	installCmd.Flags().BoolVar(&installUser, "user", false, "install for the current user from any directory")
 }
