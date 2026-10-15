@@ -493,3 +493,25 @@ func hideImagePlaceholders(content string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func packImageBlocks(blocks []string, width int) []string {
+	var rows, row []string
+	used := 0
+	flush := func() {
+		if len(row) > 0 {
+			rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, row...))
+			row = nil
+			used = 0
+		}
+	}
+	for _, block := range blocks {
+		w := lipgloss.Width(block)
+		if used > 0 && used+w > width {
+			flush()
+		}
+		row = append(row, block)
+		used += w
+	}
+	flush()
+	return rows
+}

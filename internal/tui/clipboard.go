@@ -70,7 +70,7 @@ func (m *AppModel) finishClipboardImage(msg clipboardImageMsg) tea.Cmd {
 }
 
 func (m AppModel) clipboardTextareaView() string {
-	view := m.modalTextarea.View()
+	view, _ := m.editorView()
 	if m.clipboardStatus != "" {
 		view += "\n" + footerStyle.Render(m.clipboardStatus)
 	}

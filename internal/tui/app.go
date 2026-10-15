@@ -86,6 +86,7 @@ type AppModel struct {
 	images        imageDisplay
 	commentImages map[commentImageKey]*previewSide
 	imageBodies   map[string][]markdownImageRef
+	editorImages  editorImageState
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
 	formViewed    map[string]map[int]bool
@@ -464,13 +465,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.prepareCommentImages())
+		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.scheduleEditorImages(), app.prepareCommentImages())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.prepareCommentImages())
+		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.scheduleEditorImages(), app.prepareCommentImages())
 	}
 	return model, cmd
 }
@@ -572,6 +573,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tabs[i].markdownImages = msg.images
 			}
 		}
+		return m, nil
+	case editorImagesMsg:
+		m.finishEditorImagesDelay(msg)
 		return m, nil
 	case tea.BackgroundColorMsg:
 		recolor := msg.IsDark() != terminalIsDark
@@ -2757,7 +2761,7 @@ func (m AppModel) View() tea.View {
 }
 
 func (m AppModel) placeModalCursor(v *tea.View, regions []modalMouseRegion) {
-	cursor := m.modalTextarea.Cursor()
+	cursor := m.editorCursor()
 	switch m.modal {
 	case gotoLineModal:
 		cursor = m.lineInput.Cursor()
@@ -3334,7 +3338,11 @@ func (m *AppModel) handleTextModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) focusTextareaAt(mouse tea.Mouse, rect mouseRect) {
-	targetRow := m.modalTextarea.ScrollYOffset() + mouse.Y - rect.top
+	viewRow := m.editorTextRow(mouse.Y - rect.top)
+	if viewRow < 0 {
+		return
+	}
+	targetRow := m.modalTextarea.ScrollYOffset() + viewRow
 	m.modalTextarea.MoveToBegin()
 	for range targetRow {
 		line, column := m.modalTextarea.Line(), m.modalTextarea.Column()

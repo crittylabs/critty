@@ -36,6 +36,8 @@ PNG, JPEG, GIF, and WebP previews work in terminals that implement the [Kitty gr
 
 Press `I` or click **Images** to toggle previews, or to check support when the control shows `N/A`.  Detection starts when a local image preview is needed, retries unanswered queries, and checks again when you select a tab containing a local image if support remains unconfirmed.  Typing and ordinary navigation do not trigger detection.  In tmux, queries require the review pane to be selected in the server's sole attached client so replies reach the review.  Markdown and comment previews use local images; remote URLs are not fetched.  [See local images in an attached document](#attached-checklist-with-an-inline-image).
 
+While writing a comment, previews appear under its image references after a brief typing pause.
+
 ## Install
 
 Install the `critty` binary, then install the review skills for your agent with `critty install`.
