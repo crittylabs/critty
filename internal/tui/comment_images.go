@@ -38,7 +38,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 	style := m.commentAuthorStyle(author)
 	width = max(1, width)
 	var refs []markdownImageRef
-	if m.images.enabled && !m.images.hidden && m.modal == noModal {
+	if !m.images.hidden && m.modal == noModal {
 		if m.imageBodies == nil {
 			m.imageBodies = make(map[string][]markdownImageRef)
 		}
@@ -116,7 +116,16 @@ func (m AppModel) loadCommentImage(key commentImageKey) tea.Cmd {
 }
 
 func (m *AppModel) prepareCommentImages() tea.Cmd {
-	if !m.images.enabled || m.images.hidden || m.modal != noModal {
+	if m.session != nil && m.session.CJ.RoundState.Finished {
+		return nil
+	}
+	if m.images.hidden || m.modal != noModal {
+		return nil
+	}
+	if !m.images.enabled {
+		if len(m.commentImages) > 0 {
+			return m.requestImageProbe()
+		}
 		return nil
 	}
 	loading := 0

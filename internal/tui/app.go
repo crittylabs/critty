@@ -398,7 +398,7 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, m.images.scheduleProbe())
+	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor)
 }
 
 func (m AppModel) loadDocuments() tea.Cmd {
@@ -464,13 +464,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
+		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.prepareCommentImages())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.prepareImage(), app.prepareCommentImages())
+		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.prepareCommentImages())
 	}
 	return model, cmd
 }
@@ -491,7 +491,7 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if replay, ok := msg.(imageResponseReplayMsg); ok {
 		var commands []tea.Cmd
 		for _, key := range replay.keys {
-			model, cmd := m.updateKeyPress(key)
+			model, cmd := m.updateMessage(key)
 			switch app := model.(type) {
 			case AppModel:
 				m = app
@@ -502,30 +502,7 @@ func (m AppModel) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(commands...)
 	}
-	if key, ok := msg.(tea.KeyPressMsg); ok {
-		return m.updateKeyPress(key)
-	}
 	return m.updateMessage(msg)
-}
-
-func (m AppModel) updateKeyPress(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	previousID := m.images.probeID
-	model, cmd := m.updateMessage(key)
-	switch app := model.(type) {
-	case AppModel:
-		probe := app.images.retryOnKey(previousID)
-		if probe != nil {
-			cmd = tea.Batch(cmd, probe)
-		}
-		return app, cmd
-	case *AppModel:
-		probe := app.images.retryOnKey(previousID)
-		if probe != nil {
-			cmd = tea.Batch(cmd, probe)
-		}
-		return app, cmd
-	}
-	return model, cmd
 }
 
 func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -544,6 +521,11 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case uv.KittyGraphicsEvent, tea.CursorPositionMsg, imageProbeMsg, imageProbeTimeoutMsg:
 		return m.updateImageCapability(msg)
+	case imageProbeSkippedMsg:
+		if msg.id == m.images.probeID {
+			m.images.checking = false
+		}
+		return m, nil
 	case imageLoadedMsg:
 		return m.finishImageLoad(msg)
 	case imageTransmittedMsg:

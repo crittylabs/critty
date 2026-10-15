@@ -32,18 +32,18 @@ const imageProbeRow = 2
 
 type imageProbeMsg struct{ id int }
 type imageProbeTimeoutMsg struct{ id int }
+type imageProbeSkippedMsg struct{ id int }
 
 type imageDisplay struct {
-	probeID      int
-	probeReply   string
-	probeCursor  *tea.CursorPositionMsg
-	checking     bool
-	attempts     int
-	retriedOnKey bool
-	input        imageResponseInput
-	enabled      bool
-	hidden       bool
-	tmux         bool
+	probeID     int
+	probeReply  string
+	probeCursor *tea.CursorPositionMsg
+	checking    bool
+	attempts    int
+	input       imageResponseInput
+	enabled     bool
+	hidden      bool
+	tmux        bool
 }
 
 type inlineImage struct {
@@ -102,22 +102,37 @@ type imageReadyMsg struct {
 }
 
 func newImageDisplay() imageDisplay {
-	return imageDisplay{probeID: newImageID(), checking: true, tmux: os.Getenv("TMUX") != ""}
+	return imageDisplay{probeID: newImageID(), tmux: os.Getenv("TMUX") != ""}
 }
 
 func (d imageDisplay) scheduleProbe() tea.Cmd {
 	return tea.Tick(imageProbeDelay, func(time.Time) tea.Msg { return imageProbeMsg{d.probeID} })
 }
 
-func (d *imageDisplay) retryOnKey(previousID int) tea.Cmd {
-	if d.enabled || d.retriedOnKey {
+func (m *AppModel) recheckImagesOnSelection(previousTab int, msg tea.Msg) tea.Cmd {
+	if m.activeTab == previousTab || m.images.enabled || m.images.checking || m.images.hidden || len(m.tabs) == 0 {
 		return nil
 	}
-	d.retriedOnKey = true
-	if d.probeID != previousID {
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.MouseClickMsg:
+	default:
 		return nil
 	}
-	return d.restartProbe()
+	t := m.tab()
+	if t.outsideChanges {
+		return nil
+	}
+	if t.isBinary && imagePath(t.path) && m.patch == nil {
+		return m.images.restartProbe()
+	}
+	if t.isMarkdown && t.doc != nil && (m.patch == nil || t.attachment != nil) {
+		for _, ref := range markdownImageRefs(t.doc.Content) {
+			if _, ok := localImagePath(t.path, ref.destination); ok {
+				return m.images.restartProbe()
+			}
+		}
+	}
+	return nil
 }
 
 func (d *imageDisplay) restartProbe() tea.Cmd {
@@ -152,7 +167,12 @@ func (d imageDisplay) probe() tea.Cmd {
 	if sequence == "" {
 		return nil
 	}
-	return tea.Raw(sequence)
+	return func() tea.Msg {
+		if !imageProbeAllowed() {
+			return imageProbeSkippedMsg{d.probeID}
+		}
+		return tea.RawMsg{Msg: sequence}
+	}
 }
 
 func (d imageDisplay) probeSequence() string {
@@ -255,17 +275,33 @@ func decodePreview(data []byte) (image.Image, error) {
 }
 
 func (m *AppModel) prepareImage() tea.Cmd {
-	if !m.images.enabled || m.images.hidden || len(m.tabs) == 0 || m.tab().state == nil {
+	if m.session != nil && m.session.CJ.RoundState.Finished {
+		return nil
+	}
+	if m.images.hidden || len(m.tabs) == 0 || m.tab().state == nil {
 		return nil
 	}
 	t := m.tab()
 	// Supplied diffs carry no files to resolve against, but attachments
 	// keep their original location.
 	if t.isMarkdown && !t.isBinary && !t.outsideChanges && (m.patch == nil || t.attachment != nil) {
+		if !t.markdownImagesPending {
+			t.markdownImagesPending = true
+			return m.findMarkdownImages()
+		}
+		if !m.images.enabled {
+			if len(t.markdownImages) > 0 {
+				return m.requestImageProbe()
+			}
+			return nil
+		}
 		return m.prepareMarkdownImages()
 	}
 	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil {
 		return nil
+	}
+	if !m.images.enabled {
+		return m.requestImageProbe()
 	}
 	width, height, _ := m.imagePreviewLayout()
 	var cmds []tea.Cmd
@@ -289,6 +325,14 @@ func (m *AppModel) prepareImage() tea.Cmd {
 		m.rebuildContent()
 	}
 	return tea.Batch(cmds...)
+}
+
+func (m *AppModel) requestImageProbe() tea.Cmd {
+	if m.images.checking || m.images.attempts != 0 {
+		return nil
+	}
+	m.images.checking = true
+	return m.images.scheduleProbe()
 }
 
 func (m AppModel) loadImage(before bool) tea.Cmd {

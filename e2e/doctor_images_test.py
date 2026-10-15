@@ -34,6 +34,14 @@ class DoctorImagesTest(unittest.TestCase):
                 check=True,
             )
         (cls.root / "home").mkdir()
+        cls.tmux_bin = cls.root / "bin"
+        cls.tmux_bin.mkdir()
+        fake_tmux = cls.tmux_bin / "tmux"
+        fake_tmux.write_text(
+            '#!/bin/sh\n[ "$3" = list-clients ] || exit 1\n'
+            'printf "%s\\n" "$CRITTY_TEST_CLIENT_PANE"\n'
+        )
+        fake_tmux.chmod(0o700)
         cls.env = {
             k: v
             for k, v in os.environ.items()
@@ -78,6 +86,7 @@ class DoctorImagesTest(unittest.TestCase):
             "signal",
             "busy",
             "background",
+            "unselected",
         ):
             with self.subTest(mode=mode):
                 self.check_pty(mode)
@@ -98,8 +107,11 @@ class DoctorImagesTest(unittest.TestCase):
                     os._exit(os.waitstatus_to_exitcode(status))
                 os.setpgrp()
             env = dict(self.env)
-            if mode == "encoded":
+            if mode in ("encoded", "unselected"):
                 env["TMUX"] = "/not-running,123,0"
+                env["TMUX_PANE"] = "%1"
+                env["PATH"] = str(self.tmux_bin) + os.pathsep + env["PATH"]
+                env["CRITTY_TEST_CLIENT_PANE"] = "%2" if mode == "unselected" else "%1"
             os.execve(self.binary, self.argv, env)
         fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
         before = termios.tcgetattr(master)
@@ -148,10 +160,10 @@ class DoctorImagesTest(unittest.TestCase):
             self.assertNotIn(b"\x1b", output)
             item = self.terminal_result(json.loads(output))
             expected = "ok" if mode in ("supported", "encoded", "lost-two") else "warn"
-            if mode in ("busy", "background"):
+            if mode in ("busy", "background", "unselected"):
                 expected = "info"
             self.assertEqual(item["status"], expected, item)
-            if mode in ("busy", "background"):
+            if mode in ("busy", "background", "unselected"):
                 self.assertTrue(item["message"].startswith("skipped:"), item)
             if mode == "silent":
                 self.assertEqual(len(seen), 3)
