@@ -285,6 +285,46 @@ func TestImageProbeRetriesAndIgnoresStaleResponses(t *testing.T) {
 	}
 }
 
+func TestImageProbeRetriesAfterSkippedQuery(t *testing.T) {
+	app := setupAppWithDoc(t, "source\n")
+	app.images = newImageDisplay()
+	app.images.checking = true
+	for attempt := 1; attempt <= maxImageProbeAttempts; attempt++ {
+		id := app.images.probeID
+		app, _ = updateApp(app, imageProbeMsg{id})
+		app, _ = updateApp(app, imageProbeSkippedMsg{id})
+		if !app.images.checking || app.images.attempts != attempt {
+			t.Fatalf("attempt %d: skipped query ended the check: %+v", attempt, app.images)
+		}
+		var cmd tea.Cmd
+		app, cmd = updateApp(app, imageProbeTimeoutMsg{id})
+		if attempt < maxImageProbeAttempts && (cmd == nil || !app.images.checking || app.images.probeID == id) {
+			t.Fatalf("attempt %d: no retry after the skipped query", attempt)
+		}
+	}
+	if app.images.checking || !strings.Contains(app.imagesButton(), "N/A") {
+		t.Fatal("repeatedly skipped queries did not finish")
+	}
+	app, _ = updateApp(app, imageProbeSkippedMsg{app.images.probeID})
+	if app.images.checking {
+		t.Fatal("a late skip restarted the check")
+	}
+	// Input shows the pane is in view now, so the check starts over.
+	for _, msg := range []tea.Msg{tea.KeyPressMsg{Code: 'j'}, tea.MouseClickMsg{X: 1, Y: 1, Button: tea.MouseLeft}} {
+		app.images.skipped, app.images.checking = true, false
+		var cmd tea.Cmd
+		app, cmd = updateApp(app, msg)
+		if cmd == nil || !app.images.checking || app.images.attempts != 0 || app.images.skipped {
+			t.Fatalf("%T after skipped queries did not restart the check: %+v", msg, app.images)
+		}
+	}
+	app.images.checking = false
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'j'})
+	if app.images.checking {
+		t.Fatal("input restarted a check that was answered or unanswered rather than skipped")
+	}
+}
+
 func TestImageProbeExhaustionAndManualRecheck(t *testing.T) {
 	for _, mouse := range []bool{false, true} {
 		t.Run(fmt.Sprintf("mouse=%t", mouse), func(t *testing.T) {
@@ -296,7 +336,7 @@ func TestImageProbeExhaustionAndManualRecheck(t *testing.T) {
 				app, _ = updateApp(app, imageProbeMsg{id})
 				app, _ = updateApp(app, imageProbeTimeoutMsg{id})
 			}
-			if app.images.checking || !strings.Contains(app.imagesButton(), "unavailable") {
+			if app.images.checking || !strings.Contains(app.imagesButton(), "N/A") {
 				t.Fatal("unanswered probes did not finish")
 			}
 			oldID := app.images.probeID

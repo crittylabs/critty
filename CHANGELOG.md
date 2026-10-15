@@ -14,7 +14,7 @@
 
 ### Fixed
 
-- Delayed image capability replies and mouse reports no longer spill into text fields when their sequences arrive in separate reads, including tmux extended-key input.  Image detection runs only when a preview is needed or explicitly requested, and tmux queries require the review pane to be selected in the server's sole attached client.  Selecting a tab containing a local image rechecks unconfirmed support; ordinary typing no longer triggers detection.
+- Delayed image capability replies and mouse reports no longer spill into text fields when their sequences arrive in separate reads, including tmux extended-key input.  Image detection runs only when a preview is needed or explicitly requested, and tmux queries require the review pane to be selected in the server's sole attached client; a query withheld because the pane was not in view is retried like an unanswered one, and again on the next key or click.  The Images control shows `N/A` rather than `unavailable` while previews are inactive, as no check may have run yet.  Selecting a tab containing a local image rechecks unconfirmed support; ordinary typing no longer triggers detection.
 
 ## 1.1.3
 

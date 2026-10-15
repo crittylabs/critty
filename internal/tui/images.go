@@ -32,6 +32,9 @@ const imageProbeRow = 2
 
 type imageProbeMsg struct{ id int }
 type imageProbeTimeoutMsg struct{ id int }
+
+// imageProbeSkippedMsg reports a query withheld because the tmux pane was
+// not the selected one; the probe's timeout retries it.
 type imageProbeSkippedMsg struct{ id int }
 
 type imageDisplay struct {
@@ -40,10 +43,13 @@ type imageDisplay struct {
 	probeCursor *tea.CursorPositionMsg
 	checking    bool
 	attempts    int
-	input       imageResponseInput
-	enabled     bool
-	hidden      bool
-	tmux        bool
+	// skipped records that the last check ended with queries withheld
+	// because the tmux pane was not the client's selected pane.
+	skipped bool
+	input   imageResponseInput
+	enabled bool
+	hidden  bool
+	tmux    bool
 }
 
 type inlineImage struct {
@@ -109,13 +115,22 @@ func (d imageDisplay) scheduleProbe() tea.Cmd {
 	return tea.Tick(imageProbeDelay, func(time.Time) tea.Msg { return imageProbeMsg{d.probeID} })
 }
 
+// recheckImagesOnSelection restarts an unconfirmed check when a key or click
+// selects a tab holding a local image, or arrives after a check whose queries
+// were withheld: input proves the pane is now the one in view.
 func (m *AppModel) recheckImagesOnSelection(previousTab int, msg tea.Msg) tea.Cmd {
-	if m.activeTab == previousTab || m.images.enabled || m.images.checking || m.images.hidden || len(m.tabs) == 0 {
+	if m.images.enabled || m.images.checking || m.images.hidden || len(m.tabs) == 0 {
 		return nil
 	}
 	switch msg.(type) {
 	case tea.KeyPressMsg, tea.MouseClickMsg:
 	default:
+		return nil
+	}
+	if m.images.skipped {
+		return m.images.restartProbe()
+	}
+	if m.activeTab == previousTab {
 		return nil
 	}
 	t := m.tab()
@@ -137,6 +152,7 @@ func (m *AppModel) recheckImagesOnSelection(previousTab int, msg tea.Msg) tea.Cm
 
 func (d *imageDisplay) restartProbe() tea.Cmd {
 	d.attempts = 0
+	d.skipped = false
 	return d.nextProbe()
 }
 

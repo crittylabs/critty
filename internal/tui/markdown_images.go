@@ -308,7 +308,7 @@ func (m AppModel) imagesButton() string {
 	} else if !m.images.enabled && m.images.checking {
 		state = "checking"
 	} else if !m.images.enabled {
-		state = "unavailable"
+		state = "N/A"
 	}
 	return renderAccessKeyBarButton(fmt.Sprintf("Images: %s", state))
 }

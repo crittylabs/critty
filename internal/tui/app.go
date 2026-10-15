@@ -522,8 +522,11 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case uv.KittyGraphicsEvent, tea.CursorPositionMsg, imageProbeMsg, imageProbeTimeoutMsg:
 		return m.updateImageCapability(msg)
 	case imageProbeSkippedMsg:
+		// The pane may be selected moments later, as a launcher focuses it
+		// after creation, so the pending timeout retries like an unanswered
+		// query instead of ending the check.
 		if msg.id == m.images.probeID {
-			m.images.checking = false
+			m.images.skipped = true
 		}
 		return m, nil
 	case imageLoadedMsg:
