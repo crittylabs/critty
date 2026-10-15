@@ -9,14 +9,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
 
-var reviewLauncherName string
+var reviewLauncherNames []string
+
+var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&reviewLauncherName, "launcher", "mux", "review launcher: mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", []string{"mux"}, "review launcher (repeat to set priority): mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
@@ -27,37 +30,42 @@ type reviewLauncher struct {
 
 // Selection checks availability before opening anything.  Once open starts,
 // failures must be returned rather than risk creating a second review.
-func selectReviewLauncher(name string, terminal reviewMultiplexerContext, mode *reviewMode) (*reviewLauncher, error) {
-	candidates, err := launcherCandidates(name, terminal, mode)
-	if err != nil {
-		return nil, err
+func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mode *reviewMode) (*reviewLauncher, error) {
+	// An explicit mux position is authoritative.  Otherwise it is the fallback.
+	names = slices.Clone(names)
+	if !slices.Contains(names, "mux") {
+		names = append(names, "mux")
 	}
-	if name != "mux" {
-		automatic, err := launcherCandidates("mux", terminal, mode)
+	groups := make([][]reviewLauncher, len(names))
+	for i, name := range names {
+		candidates, err := launcherCandidates(name, terminal, mode)
 		if err != nil {
 			return nil, err
 		}
-		candidates = append(candidates, automatic...)
+		groups[i] = candidates
 	}
-	seen := make(map[string]bool)
+	checked := make(map[string]bool)
 	var unavailable []error
-	for _, candidate := range candidates {
-		if seen[candidate.name] {
-			continue
+	for i, candidates := range groups {
+		if names[i] == "mux" && terminal == nil {
+			if !checked["mux"] {
+				unavailable = append(unavailable, errors.New("launcher mux: no tmux or Herdr terminal detected"))
+				checked["mux"] = true
+			}
 		}
-		seen[candidate.name] = true
-		if err := candidate.check(); err != nil {
-			unavailable = append(unavailable, fmt.Errorf("launcher %s: %w", candidate.name, err))
-			fmt.Fprintf(os.Stderr, "critty: launcher %s unavailable: %v\n", candidate.name, err)
-			continue
+		for _, candidate := range candidates {
+			if checked[candidate.name] {
+				continue
+			}
+			checked[candidate.name] = true
+			if err := candidate.check(); err != nil {
+				unavailable = append(unavailable, fmt.Errorf("launcher %s: %w", candidate.name, err))
+				continue
+			}
+			return &candidate, nil
 		}
-		return &candidate, nil
 	}
-	// Without a multiplexer, mux retains the current-terminal workflow.
-	if terminal == nil {
-		return nil, nil
-	}
-	return nil, errors.Join(unavailable...)
+	return nil, fmt.Errorf("%w: %w", errNoReviewLauncher, errors.Join(unavailable...))
 }
 
 func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *reviewMode) ([]reviewLauncher, error) {
@@ -215,8 +223,15 @@ func (l *customLaunch) call(operation string, input []byte) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, l.executable, operation)
 	cmd.WaitDelay = time.Second
 	cmd.Env, cmd.Stdin, cmd.Stderr = l.environment, bytes.NewReader(input), os.Stderr
+	var diagnostic bytes.Buffer
+	if operation == "check" {
+		cmd.Stderr = &diagnostic
+	}
 	output, err := cmd.Output()
 	if err != nil {
+		if detail := strings.TrimSpace(diagnostic.String()); detail != "" {
+			return nil, fmt.Errorf("custom launcher %s: %w: %s", operation, err, detail)
+		}
 		return nil, fmt.Errorf("custom launcher %s: %w", operation, err)
 	}
 	return output, nil

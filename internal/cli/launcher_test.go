@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,63 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestLauncherOrderAndFinalError(t *testing.T) {
+	dir := t.TempDir()
+	usable := "custom:" + launcherScript(t, filepath.Join(dir, "usable,launcher"), "echo checking >&2\nexit 0\n")
+	failed := "custom:" + launcherScript(t, filepath.Join(dir, "failed"), "echo custom unavailable >&2\nexit 1\n")
+	originalPath, originalRequest, originalStderr := lookPath, terminalRequest, os.Stderr
+	lookPath = func(name string) (string, error) { return "", fmt.Errorf("%s executable missing", name) }
+	terminalRequest = "marker-bound"
+	stderr, err := os.CreateTemp(dir, "stderr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = stderr
+	t.Cleanup(func() {
+		lookPath, terminalRequest, os.Stderr = originalPath, originalRequest, originalStderr
+		if err := stderr.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	for _, tc := range []struct {
+		name     string
+		order    []string
+		terminal reviewMultiplexerContext
+		want     string
+		error    string
+	}{
+		{"mux then custom", []string{"mux", usable}, nil, usable, ""},
+		{"custom then mux", []string{usable, "mux"}, nil, usable, ""},
+		{"failed then usable", []string{failed, usable}, nil, usable, ""},
+		{"custom is final", []string{"mux", failed}, nil, "", "custom unavailable"},
+		{"mux is final", []string{failed, "mux"}, tmuxContext{pane: "%1"}, "", "no usable review launcher"},
+		{"implicit mux", []string{failed}, tmuxContext{pane: "%1"}, "", "no usable review launcher"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := selectReviewLauncher(tc.order, tc.terminal, &reviewMode{sessionKey: "0123456789ab"})
+			if tc.error != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.error) || got != nil {
+					t.Fatalf("selection = %+v, %v; want %q", got, err, tc.error)
+				}
+				if !strings.Contains(err.Error(), "launcher mux:") && tc.terminal == nil {
+					t.Fatalf("missing multiplexer detection failure: %v", err)
+				}
+				return
+			}
+			if err != nil || got == nil || got.name != tc.want {
+				t.Fatalf("selection = %+v, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+	output, err := os.ReadFile(stderr.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(output) != 0 {
+		t.Fatalf("availability checks wrote to stderr: %s", output)
+	}
+}
 
 func launcherScript(t *testing.T, path, body string) string {
 	t.Helper()
@@ -40,21 +99,21 @@ func TestLauncherSelection(t *testing.T) {
 		{"mux", nil, ""},
 	} {
 		t.Run(tc.name+tc.want, func(t *testing.T) {
-			got, err := selectReviewLauncher(tc.name, tc.terminal, &reviewMode{sessionKey: "0123456789ab"})
-			if err != nil {
-				t.Fatal(err)
-			}
+			got, err := selectReviewLauncher([]string{tc.name}, tc.terminal, &reviewMode{sessionKey: "0123456789ab"})
 			if tc.want == "" {
+				if !errors.Is(err, errNoReviewLauncher) {
+					t.Fatalf("missing unavailability error: %v", err)
+				}
 				if got != nil {
 					t.Fatalf("expected inline review, got %s", got.name)
 				}
-			} else if got == nil || got.name != tc.want {
+			} else if err != nil || got == nil || got.name != tc.want {
 				t.Fatalf("launcher = %+v, want %s", got, tc.want)
 			}
 		})
 	}
 	for _, name := range []string{"unknown", "custom:"} {
-		if _, err := selectReviewLauncher(name, nil, &reviewMode{}); err == nil {
+		if _, err := selectReviewLauncher([]string{name}, nil, &reviewMode{}); err == nil {
 			t.Fatalf("accepted invalid launcher %q", name)
 		}
 	}
@@ -98,7 +157,7 @@ func TestTMUXLauncherFallback(t *testing.T) {
 				}
 				return original(cmd)
 			}
-			launcher, err := selectReviewLauncher(name, tmuxContext{pane: "%7"}, &reviewMode{sessionKey: "0123456789ab"})
+			launcher, err := selectReviewLauncher([]string{name}, tmuxContext{pane: "%7"}, &reviewMode{sessionKey: "0123456789ab"})
 			if err != nil || launcher == nil || launcher.name != "tmux-split" {
 				t.Fatalf("old server selection = %+v, %v", launcher, err)
 			}
@@ -171,9 +230,9 @@ func TestCustomLauncherFailureStages(t *testing.T) {
 				if err == nil {
 					t.Fatal("check failure lost")
 				}
-				got, err := selectReviewLauncher("custom:"+file, nil, &reviewMode{sessionKey: "0123456789ab"})
-				if err != nil || got != nil {
-					t.Fatalf("check did not fall back to inline mux: %v %v", got, err)
+				got, err := selectReviewLauncher([]string{"custom:" + file}, nil, &reviewMode{sessionKey: "0123456789ab"})
+				if !errors.Is(err, errNoReviewLauncher) || got != nil {
+					t.Fatalf("check failure lost: %v %v", got, err)
 				}
 				return
 			}

@@ -655,9 +655,17 @@ elif operation == "close":
         )
         launcher.chmod(0o755)
         custom = Round(
-            "custom-launcher", ["plan.md", "--launcher", f"custom:{launcher}"]
+            "custom-launcher",
+            [
+                "plan.md",
+                "--launcher",
+                "custom:/missing/launcher",
+                "--launcher",
+                f"custom:{launcher}",
+            ],
         )
         custom.finish(True)
+        assert "unavailable" not in custom.err.read_text()
         closed = json.loads((WORK / "launcher-close.json").read_text())
         assert closed["pane"] == custom.pane
         assert (
@@ -667,7 +675,7 @@ elif operation == "close":
             "launcher-fallback", ["plan.md", "--launcher", "custom:/missing/launcher"]
         )
         fallback.finish(True)
-        assert "unavailable" in fallback.err.read_text()
+        assert "unavailable" not in fallback.err.read_text()
         report("custom launcher check/open/close round trip and unavailable fallback")
     finally:
         tmux("kill-server")

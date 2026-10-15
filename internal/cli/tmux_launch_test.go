@@ -97,7 +97,7 @@ func TestBuiltinTMUXOpeningFailureDoesNotSplit(t *testing.T) {
 		}
 		return original(cmd)
 	}
-	launcher, err := selectReviewLauncher("tmux", tmuxContext{pane: "%7"}, &reviewMode{sessionKey: "0123456789ab"})
+	launcher, err := selectReviewLauncher([]string{"tmux"}, tmuxContext{pane: "%7"}, &reviewMode{sessionKey: "0123456789ab"})
 	if err != nil {
 		t.Fatal(err)
 	}

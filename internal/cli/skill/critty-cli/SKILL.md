@@ -279,7 +279,7 @@ For Codex review launches, the interactive `critty` skill prepares and displays 
 
 ## Review launchers
 
-`--launcher` selects `mux` (default), `tmux`, `tmux-floating`, `tmux-split`, `herdr`, or `custom:EXECUTABLE`.  It applies to code, document, plan, and resumed reviews; pass it again when resuming.  `mux` selects the nearest detected terminal multiplexer (currently tmux or Herdr), retaining current-terminal operation when neither exists.  An unavailable explicit launcher falls back to `mux`.  Opening errors stop the review rather than starting another launcher.
+`--launcher` selects `mux` (default), `tmux`, `tmux-floating`, `tmux-split`, `herdr`, or `custom:EXECUTABLE`.  It applies to code, document, plan, and resumed reviews; pass it again when resuming.  `mux` selects the nearest detected terminal multiplexer (currently tmux or Herdr), retaining current-terminal operation when neither exists.  Repeat `--launcher` to try launchers in the given order.  If `mux` is not listed, it is appended as the final fallback; an explicit `mux` position is preserved.  Availability failures stay silent when a later launcher succeeds.  If all launchers are unavailable, the error reports their failures, including failed multiplexer detection.  Opening errors stop the review rather than starting another launcher.
 
 `tmux` tries `tmux-floating` first, then `tmux-split`.  Floating panes require the tmux 3.8+ `new-pane` controls; Critty checks the server's command capabilities.  They are nonmodal and centred against the whole window at 90% width and 85% height.  `tmux-split` explicitly selects the traditional split.  An unavailable `tmux-floating` also falls back through `mux`, allowing a split on older servers.  It selects the review within the source window when that window still selects the source pane and the session has one attached client.  This also applies while the client views another window or the terminal is inactive; the displayed window and OS focus stay unchanged.  On finish, it restores the source only while the review remains selected in the sole attached client, that client is focused, and focus events are enabled, then removes its own pane.  A selection made elsewhere is preserved.
 
@@ -289,11 +289,11 @@ Critty invokes the executable with one operation argument:
 
 | Operation | Standard input | Result |
 | --- | --- | --- |
-| `check` | JSON with `session`, `command`, and `cwd` | Exit 0 when usable; nonzero tries `mux`. |
+| `check` | JSON with `session`, `command`, and `cwd` | Exit 0 when usable; nonzero tries the next launcher. |
 | `open` | The same JSON | Return promptly after launching; stdout is the opaque close token. |
 | `close` | Exactly the bytes returned by `open` | Close owned resources and restore focus as appropriate; nonzero fails the command. |
 
-`command` is a shell-quoted TUI command; run it in `cwd`.  Each operation has a 10-second deadline.  Write diagnostics to stderr, keeping `open` stdout exclusively for the token.  If `open` fails after creating resources, the launcher must clean them up itself.  After a successful `open`, Critty calls `close` even if the TUI fails to become ready.
+`command` is a shell-quoted TUI command; run it in `cwd`.  Each operation has a 10-second deadline.  Write diagnostics to stderr; check diagnostics are reported only if all launchers fail.  Keep `open` stdout exclusively for the token.  If `open` fails after creating resources, the launcher must clean them up itself.  After a successful `open`, Critty calls `close` even if the TUI fails to become ready.
 
 Each operation inherits the caller's environment with stale `TMUX`, `TMUX_PANE`, `HERDR_*`, and `TTY` replaced by the detected terminal context.  Other variables, including the state/config locations, are preserved.  Use `critty env` to inspect or reuse the same detection.
 

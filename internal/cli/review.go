@@ -209,8 +209,8 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 	if err != nil {
 		return err
 	}
-	launcher, err := selectReviewLauncher(reviewLauncherName, multiplexer, mode)
-	if err != nil {
+	launcher, err := selectReviewLauncher(reviewLauncherNames, multiplexer, mode)
+	if err != nil && (!errors.Is(err, errNoReviewLauncher) || multiplexer != nil) {
 		return err
 	}
 	if launcher != nil {
@@ -244,7 +244,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 		return nil
 	}
 
-	return withCodexWrapperHint(fmt.Errorf("no Herdr or tmux session and no terminal to open the TUI in; run inside Herdr or tmux, or have the reviewer run `critty%s` in a terminal", reviewArgSuffix(mode)))
+	return withCodexWrapperHint(fmt.Errorf("%w; no terminal to open the TUI in; run inside tmux or Herdr, or have the reviewer run `critty%s` in a terminal", err, reviewArgSuffix(mode)))
 }
 
 func reviewArgSuffix(mode *reviewMode) string {
