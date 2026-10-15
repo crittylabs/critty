@@ -4092,12 +4092,7 @@ func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegi
 		{rendered: m.renderModalButton("Up", "↑/PgUp", false), action: modalMouseAction{scrollable: true, scrollOffset: -pageSize}},
 		{rendered: m.renderModalButton("Down", "↓/PgDn", false), action: modalMouseAction{scrollable: true, scrollOffset: pageSize}},
 	}, width, top+1)
-	brand := renderBrand()
-	if m.version != "" {
-		ld := lipgloss.LightDark(terminalIsDark)
-		brand += lipgloss.NewStyle().Bold(true).Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue)).Render(m.version)
-	}
-	brand = ansi.Truncate(brand, width, "…")
+	brand := ansi.Truncate(BrandVersion(m.version, terminalIsDark), width, "…")
 	if lipgloss.Height(buttons) == 1 && lipgloss.Width(buttons)+2+lipgloss.Width(brand) <= width {
 		return "\n" + buttons + strings.Repeat(" ", width-lipgloss.Width(buttons)-lipgloss.Width(brand)) + brand, regions
 	}

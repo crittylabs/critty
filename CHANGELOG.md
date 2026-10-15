@@ -8,6 +8,8 @@
 
 ### Changed
 
+- `critty --version` shows the brand mark and version in the Help dialog's colors when printed to a terminal, matching the detected background.  Redirected output, `NO_COLOR`, and agent tools still receive the plain `critty version ...` line.
+
 - The Submit dialog starts on a single Approve/Comment/Reject choice group, with keyboard navigation between the choices, overall comment, and action buttons.  Bracket navigation continues through the dialog, wrapping to the first or last matching thread or form item so reviews can be cycled without stopping.
 
 - `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies Critty and tfil-generated Codex wrappers selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review, and `--terminal-notify-only` verifies the filter notification path without falling back to registered pane screens.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.
