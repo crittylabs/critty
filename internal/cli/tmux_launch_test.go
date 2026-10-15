@@ -77,7 +77,7 @@ func TestBuiltinTMUXFloatingGeometry(t *testing.T) {
 		t.Fatal(err)
 	}
 	spawn := tmuxCall(*calls, "new-pane")
-	for option, value := range map[string]string{"-x": "162", "-y": "51", "-X": "9", "-Y": "4", "-B": "rounded"} {
+	for option, value := range map[string]string{"-x": "162", "-y": "51", "-X": "9", "-Y": "4", "-B": "single"} {
 		i := slices.Index(spawn, option)
 		if i < 0 || spawn[i+1] != value {
 			t.Errorf("wrong window-relative geometry: %v", spawn)

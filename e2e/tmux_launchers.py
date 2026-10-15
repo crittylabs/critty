@@ -5,14 +5,17 @@ Also runs after scenarios.py.  No user terminal or tmux settings are changed.
 """
 
 import argparse
+import fcntl
 import os
 import pty
 import re
 import select
 import shutil
 import signal
+import struct
 import subprocess
 import tempfile
+import termios
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -98,6 +101,7 @@ def verify(binary: Path, tmux_binary: Path) -> None:
             env.update(TMUX=f"{socket},{server_pid},{session[1:]}", TMUX_PANE=source)
             pid, master = pty.fork()
             if pid == 0:
+                fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 60, 180, 0, 0))
                 os.execve(
                     tmux_binary,
                     [

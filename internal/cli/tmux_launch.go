@@ -41,7 +41,8 @@ func spawnTMUXPane(mode *reviewMode, target tmuxContext, floating bool) (tmuxLau
 	if floating {
 		width := min(source.width, max(3, source.width*90/100))
 		height := min(source.height, max(3, source.height*85/100))
-		args = []string{"new-pane", "-A", "-B", "rounded", "-T", "Critty",
+		// tmux 3.8 rejects popup-only border styles such as rounded.
+		args = []string{"new-pane", "-A", "-B", "single", "-T", "Critty",
 			"-x", strconv.Itoa(width), "-y", strconv.Itoa(height),
 			"-X", strconv.Itoa((source.width - width) / 2), "-Y", strconv.Itoa((source.height - height) / 2)}
 		label = "floating"
