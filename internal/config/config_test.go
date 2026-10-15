@@ -5,8 +5,34 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
+
+func TestLauncherConfigPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name, project string
+		want          []string
+	}{
+		{"inherit", `{}`, []string{"mux", "custom:global"}},
+		{"override", `{"launchers":["custom:project","mux"]}`, []string{"custom:project", "mux"}},
+		{"clear", `{"launchers":[]}`, []string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home, project := t.TempDir(), t.TempDir()
+			t.Setenv("XDG_CONFIG_HOME", home)
+			writeConfig(t, filepath.Join(home, "critty", "config.json"), `{"launchers":["mux","custom:global"]}`)
+			writeConfig(t, ProjectPath(project), tc.project)
+			cfg, err := Load(project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(cfg.Launchers, tc.want) {
+				t.Fatalf("Launchers = %v, want %v", cfg.Launchers, tc.want)
+			}
+		})
+	}
+}
 
 func writeConfig(t *testing.T, path, content string) {
 	t.Helper()

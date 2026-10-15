@@ -20,6 +20,7 @@ type Config struct {
 	Output           string            `json:"output,omitempty"`
 	Author           string            `json:"author,omitempty"`
 	IgnorePatterns   []string          `json:"ignore_patterns,omitempty"`
+	Launchers        []string          `json:"launchers,omitempty"`
 	Quiet            bool              `json:"quiet,omitempty"`
 	CleanupOnApprove bool              `json:"cleanup_on_approve,omitempty"`
 	DisableStats     bool              `json:"disable_stats,omitempty"`
@@ -36,6 +37,7 @@ type fileConfig struct {
 	Output           string            `json:"output"`
 	Author           string            `json:"author"`
 	IgnorePatterns   []string          `json:"ignore_patterns"`
+	Launchers        []string          `json:"launchers"`
 	Quiet            *bool             `json:"quiet"`
 	CleanupOnApprove *bool             `json:"cleanup_on_approve"`
 	DisableStats     *bool             `json:"disable_stats"`
@@ -130,6 +132,9 @@ func apply(cfg *Config, fc *fileConfig) {
 	}
 	// Pattern lists are unioned across levels, like crit.
 	cfg.IgnorePatterns = appendUnique(cfg.IgnorePatterns, fc.IgnorePatterns)
+	if fc.Launchers != nil {
+		cfg.Launchers = slices.Clone(fc.Launchers)
+	}
 	if fc.Quiet != nil {
 		cfg.Quiet = *fc.Quiet
 	}

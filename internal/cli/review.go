@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -209,7 +210,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 	if err != nil {
 		return err
 	}
-	launcher, err := selectReviewLauncher(reviewLauncherNames, multiplexer, mode)
+	launcher, err := selectReviewLauncher(slices.Concat(reviewLauncherNames, cfg.Launchers), multiplexer, mode)
 	if err != nil && (!errors.Is(err, errNoReviewLauncher) || multiplexer != nil) {
 		return err
 	}

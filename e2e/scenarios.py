@@ -671,6 +671,30 @@ elif operation == "close":
         assert (
             custom.pane not in tmux("list-panes", "-a", "-F", "#{pane_id}").splitlines()
         )
+        project_config = WORK / ".critty.config.json"
+        project_config.write_text(json.dumps({"launchers": [f"custom:{launcher}"]}))
+        try:
+            (WORK / "launcher-check.json").unlink()
+            cli_first = Round("launcher-cli-priority", ["plan.md", "--launcher", "mux"])
+            cli_first.finish(True)
+            assert not (WORK / "launcher-check.json").exists()
+            for name, args in [
+                ("launcher-config-only", ["plan.md"]),
+                (
+                    "launcher-config-fallback",
+                    ["plan.md", "--launcher", "custom:/missing/launcher"],
+                ),
+            ]:
+                configured = Round(name, args)
+                configured.finish(True)
+                assert (
+                    json.loads((WORK / "launcher-close.json").read_text())["pane"]
+                    == configured.pane
+                )
+                assert "unavailable" not in configured.err.read_text()
+        finally:
+            project_config.unlink()
+        report("configured launchers follow CLI choices and precede implicit mux")
         fallback = Round(
             "launcher-fallback", ["plan.md", "--launcher", "custom:/missing/launcher"]
         )

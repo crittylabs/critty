@@ -19,7 +19,7 @@ var reviewLauncherNames []string
 var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", []string{"mux"}, "review launcher (repeat to set priority): mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux): mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
