@@ -277,6 +277,26 @@ For Codex review launches, the interactive `critty` skill prepares and displays 
 
 `critty terminal notify <id>` is a terminal-filter callback, not an agent-side workaround.  It reads the filter's original tmux/Herdr environment and records the destination before or during review startup.  Duplicate notifications from one pane are accepted; different panes are ambiguous.  Expired or consumed requests fail.  Without a notification, Critty reads only the visible text in live registered panes.  It never broadens a failed search to all panes or scrollback.
 
+## Review launchers
+
+`--launcher` selects `mux` (default), `tmux`, `herdr`, or `custom:EXECUTABLE`.  It applies to code, document, plan, and resumed reviews; pass it again when resuming.  `mux` selects the nearest detected terminal multiplexer (currently tmux or Herdr), retaining current-terminal operation when neither exists.  An unavailable explicit launcher falls back to `mux`.  Opening errors stop the review rather than starting another launcher.
+
+The tmux launcher opens a split.  It moves focus only when the source pane is selected in a focused client, focus events are enabled, and that session has one attached client.  On finish, it restores the source only while the review remains selected under those conditions, then removes its own pane.  A selection made elsewhere is preserved.
+
+For `custom:EXECUTABLE`, a name containing `/` is an explicit path, relative to the caller's working directory when needed.  Otherwise Critty searches PATH, including the current directory only when PATH explicitly contains `.` or an empty element.  The name is one executable, not a shell expression or an argument list.
+
+Critty invokes the executable with one operation argument:
+
+| Operation | Standard input | Result |
+| --- | --- | --- |
+| `check` | JSON with `session`, `command`, and `cwd` | Exit 0 when usable; nonzero tries `mux`. |
+| `open` | The same JSON | Return promptly after launching; stdout is the opaque close token. |
+| `close` | Exactly the bytes returned by `open` | Close owned resources and restore focus as appropriate; nonzero fails the command. |
+
+`command` is a shell-quoted TUI command; run it in `cwd`.  Each operation has a 10-second deadline.  Write diagnostics to stderr, keeping `open` stdout exclusively for the token.  If `open` fails after creating resources, the launcher must clean them up itself.  After a successful `open`, Critty calls `close` even if the TUI fails to become ready.
+
+Each operation inherits the caller's environment with stale `TMUX`, `TMUX_PANE`, `HERDR_*`, and `TTY` replaced by the detected terminal context.  Other variables, including the state/config locations, are preserved.  Use `critty env` to inspect or reuse the same detection.
+
 ## Terminal environment
 
 `critty env` locates the Herdr or tmux pane the same way a review launch does, from the multiplexer environment or from process ancestry, and prints the variables that address it.

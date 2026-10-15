@@ -621,6 +621,50 @@ def scenarios() -> None:
         report(
             "failed summary export grants no approval; same-session retry saves a fresh result"
         )
+
+        launcher = WORK / "custom launcher"
+        launcher.write_text(
+            f"#!{sys.executable}\n"
+            + """import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+operation = sys.argv[1]
+request = json.load(sys.stdin)
+if operation == "check":
+    assert os.environ["TMUX_PANE"].startswith("%")
+    Path("launcher-check.json").write_text(json.dumps(request))
+elif operation == "open":
+    assert request == json.loads(Path("launcher-check.json").read_text())
+    command = 'tmux set-option -p -t "$TMUX_PANE" remain-on-exit on && exec ' + request["command"]
+    pane = subprocess.check_output([
+        "tmux", "split-window", "-h", "-d", "-P", "-F", "#{pane_id}",
+        "-t", os.environ["TMUX_PANE"], "-c", request["cwd"], command,
+    ], text=True).strip()
+    print(json.dumps({"pane": pane}))
+elif operation == "close":
+    Path("launcher-close.json").write_text(json.dumps(request))
+    subprocess.run(["tmux", "kill-pane", "-t", request["pane"]], check=True)
+"""
+        )
+        launcher.chmod(0o755)
+        custom = Round(
+            "custom-launcher", ["plan.md", "--launcher", f"custom:{launcher}"]
+        )
+        custom.finish(True)
+        closed = json.loads((WORK / "launcher-close.json").read_text())
+        assert closed["pane"] == custom.pane
+        assert (
+            custom.pane not in tmux("list-panes", "-a", "-F", "#{pane_id}").splitlines()
+        )
+        fallback = Round(
+            "launcher-fallback", ["plan.md", "--launcher", "custom:/missing/launcher"]
+        )
+        fallback.finish(True)
+        assert "unavailable" in fallback.err.read_text()
+        report("custom launcher check/open/close round trip and unavailable fallback")
     finally:
         tmux("kill-server")
 

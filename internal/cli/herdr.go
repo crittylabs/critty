@@ -45,17 +45,7 @@ func (herdrDetector) processContexts() map[int]reviewMultiplexerContext {
 	return contexts
 }
 
-func (c herdrContext) launchReview(mode *reviewMode) (reviewMultiplexerLaunch, error) {
-	return spawnTUIHerdrTab(mode, c)
-}
-
-func (c herdrContext) restoreFocus() {
-	herdrBin, err := lookPath("herdr")
-	if err != nil {
-		return
-	}
-	_ = runCommand(c.command(herdrBin, "tab", "focus", c.tab))
-}
+func (herdrContext) kind() string { return "herdr" }
 
 func (c herdrContext) active() bool {
 	return c.workspace != "" && c.tab != "" && c.pane != ""
@@ -68,8 +58,8 @@ type herdrLaunch struct {
 	sourceTab string
 }
 
-func (l herdrLaunch) close() {
-	_ = runCommand(l.context.command(l.bin, "tab", "close", l.tab))
+func (l herdrLaunch) close() error {
+	return runCommand(l.context.command(l.bin, "tab", "close", l.tab))
 }
 
 func (l herdrLaunch) restoreFocus() {

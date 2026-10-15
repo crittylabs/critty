@@ -119,6 +119,15 @@ func terminalEnvironment() ([]envVar, error) {
 	if err != nil {
 		return nil, err
 	}
+	vars, err := environmentForTerminal(ctx)
+	if err == nil && len(vars) == 0 {
+		return nil, fmt.Errorf("no Herdr or tmux terminal found and no controlling terminal")
+	}
+	return vars, err
+}
+
+func environmentForTerminal(ctx reviewMultiplexerContext) ([]envVar, error) {
+	var err error
 	var vars []envVar
 	switch ctx := ctx.(type) {
 	case tmuxContext:
@@ -133,9 +142,6 @@ func terminalEnvironment() ([]envVar, error) {
 		if tty := fallbackTTY(); tty != "" {
 			vars = append(vars, envVar{"TTY", tty})
 		}
-	}
-	if len(vars) == 0 {
-		return nil, fmt.Errorf("no Herdr or tmux terminal found and no controlling terminal")
 	}
 	return vars, nil
 }

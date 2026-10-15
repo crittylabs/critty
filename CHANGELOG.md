@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Choose how reviews open with `--launcher`: automatic selection, tmux splits, Herdr tabs, or `custom:EXECUTABLE` scripts with availability checks and paired open/close operations.  Unavailable choices fall back to automatic selection.  tmux reviews preserve background work and return focus to the source only while the review remains selected.  See the [launcher contract](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers).
+
 ### Fixed
 
 - Delayed image capability replies and mouse reports no longer spill into text fields when their sequences arrive in separate reads, including tmux extended-key input.  Image detection runs only when a preview is needed or explicitly requested, and tmux queries require the review pane to be selected in the server's sole attached client.  Selecting a tab containing a local image rechecks unconfirmed support; ordinary typing no longer triggers detection.

@@ -123,77 +123,8 @@ func TestRootCommandSupportsStagedFlag(t *testing.T) {
 	}
 }
 
-func TestSplitWindowArgsTargetsInvokingPaneAndCwd(t *testing.T) {
-	args := splitWindowArgs(true, "cmd", "%42")
-
-	idx := slices.Index(args, "-t")
-	if idx < 0 || args[idx+1] != "%42" {
-		t.Errorf("expected -t %%42 in %v", args)
-	}
-	cwd, _ := os.Getwd()
-	cIdx := slices.Index(args, "-c")
-	if cIdx < 0 || args[cIdx+1] != cwd {
-		t.Errorf("expected -c %s in %v", cwd, args)
-	}
-	if !slices.Contains(args, "-p") {
-		t.Errorf("expected -p in %v", args)
-	}
-	if args[len(args)-1] != "cmd" {
-		t.Errorf("expected command last in %v", args)
-	}
-}
-
-func TestSplitWindowArgsWithoutSize(t *testing.T) {
-	args := splitWindowArgs(false, "cmd", "")
-	if slices.Contains(args, "-p") {
-		t.Errorf("expected no -p in %v", args)
-	}
-	if slices.Contains(args, "-t") {
-		t.Errorf("expected no -t without TMUX_PANE in %v", args)
-	}
-}
-
-// captureSpawns replaces the shell seams and records tmux invocations.
-func captureSpawns(t *testing.T) *[][]string {
-	t.Helper()
-	var calls [][]string
-	origRun, origOutput, origLook, origResolve := runCommand, commandOutput, lookPath, resolveExec
-	commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
-		calls = append(calls, cmd.Args)
-		return []byte("%99\n"), nil
-	}
-	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
-	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
-	t.Cleanup(func() {
-		runCommand, commandOutput, lookPath, resolveExec = origRun, origOutput, origLook, origResolve
-	})
-	return &calls
-}
-
-func TestSpawnTUIPaneCodeMode(t *testing.T) {
-	calls := captureSpawns(t)
-
-	mode := &reviewMode{ref: "HEAD", sessionKey: "0123456789ab"}
-	if _, err := spawnTUIPane(mode, tmuxContext{session: "/tmp/tmux/default,100,1", pane: "%42"}); err != nil {
-		t.Fatalf("spawnTUIPane: %v", err)
-	}
-
-	if len(*calls) != 1 {
-		t.Fatalf("expected 1 tmux call, got %d", len(*calls))
-	}
-	cmd := (*calls)[0][len((*calls)[0])-1]
-	for _, want := range []string{"CRITTY_HOST='tmux'", "_tui", "--session"} {
-		if !strings.Contains(cmd, want) {
-			t.Errorf("pane command missing %q: %s", want, cmd)
-		}
-	}
-	if !slices.Contains((*calls)[0], "%42") {
-		t.Errorf("tmux call should target the resolved pane: %v", (*calls)[0])
-	}
-}
-
 func TestBuildTUICommandStagedMode(t *testing.T) {
-	captureSpawns(t)
+	mockTMUXLaunch(t, "")
 
 	cmd, err := buildTUICommand(&reviewMode{ref: "HEAD", staged: true, sessionKey: "0123456789ab"}, "tmux")
 	if err != nil {
@@ -204,53 +135,6 @@ func TestBuildTUICommandStagedMode(t *testing.T) {
 	}
 	if strings.Contains(cmd, "--base") {
 		t.Errorf("staged pane command should not include --base: %s", cmd)
-	}
-}
-
-func TestSpawnTUIPaneDocMode(t *testing.T) {
-	calls := captureSpawns(t)
-
-	mode := &reviewMode{docPath: "docs/it's plan.md", sessionKey: "0123456789ab"}
-	if _, err := spawnTUIPane(mode, tmuxContext{}); err != nil {
-		t.Fatalf("spawnTUIPane: %v", err)
-	}
-
-	cmd := (*calls)[0][len((*calls)[0])-1]
-	if !strings.Contains(cmd, "--session '0123456789ab'") {
-		t.Errorf("pane command should escape quotes: %s", cmd)
-	}
-	if strings.Contains(cmd, "--base") {
-		t.Errorf("doc mode should not pass --base: %s", cmd)
-	}
-}
-
-func TestSpawnTUIPaneRetriesWithoutPercentage(t *testing.T) {
-	var calls [][]string
-	origRun, origOutput, origLook, origResolve := runCommand, commandOutput, lookPath, resolveExec
-	commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
-		calls = append(calls, cmd.Args)
-		if len(calls) == 1 {
-			return nil, fmt.Errorf("size unavailable")
-		}
-		return []byte("%99\n"), nil
-	}
-	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
-	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
-	t.Cleanup(func() {
-		runCommand, commandOutput, lookPath, resolveExec = origRun, origOutput, origLook, origResolve
-	})
-
-	if _, err := spawnTUIPane(&reviewMode{ref: "HEAD", sessionKey: "0123456789ab"}, tmuxContext{}); err != nil {
-		t.Fatalf("spawnTUIPane: %v", err)
-	}
-	if len(calls) != 2 {
-		t.Fatalf("expected retry, got %d calls", len(calls))
-	}
-	if !slices.Contains(calls[0], "-p") {
-		t.Errorf("first attempt should include -p: %v", calls[0])
-	}
-	if slices.Contains(calls[1], "-p") {
-		t.Errorf("retry should omit -p: %v", calls[1])
 	}
 }
 
