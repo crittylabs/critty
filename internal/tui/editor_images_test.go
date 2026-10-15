@@ -53,14 +53,14 @@ func TestCommentEditorPreviewsImagesAfterTypingPause(t *testing.T) {
 		t.Fatal("editor image not loaded while the dialog is open")
 	}
 	img := &inlineImage{id: 0x123456, width: 160, height: 80}
-	img.columns, img.rows = img.size(min(44, key.width), 11)
+	img.columns, img.rows = img.size(min(44, key.width), 11, cellSize{})
 	img.ready = true
 	side.image = img
 
 	view := app.View().Content
-	imageCells := strings.Count(view, string(kitty.Placeholder))
-	if imageCells != img.columns*img.rows {
-		t.Fatalf("editor placeholders=%d want=%d", imageCells, img.columns*img.rows)
+	_, image := linkCells(view, "critty://image?path=")
+	if len(image) != img.columns*img.rows {
+		t.Fatalf("editor placeholders=%d want=%d", len(image), img.columns*img.rows)
 	}
 	cursor := app.editorCursor()
 	if cursor == nil || cursor.Y != 1+img.rows {
@@ -71,6 +71,17 @@ func TestCommentEditorPreviewsImagesAfterTypingPause(t *testing.T) {
 		t.Fatalf("text row mapping: %d %d", textRows, app.editorTextRow(1))
 	}
 
+	app, _ = clickMouseCmd(app, image[0].X, image[0].Y)
+	if app.modal != lightboxModal || app.lightbox.returnTo != commentModal || app.modalTextarea.Focused() {
+		t.Fatalf("lightbox from editor: modal=%v return=%v", app.modal, app.lightbox.returnTo)
+	}
+	if strings.ContainsRune(app.View().Content, kitty.Placeholder) && app.lightbox.image.ready {
+		t.Fatal("inline placeholders must hide beneath the lightbox")
+	}
+	app, _ = pressKeyCmd(app, tea.KeyEscape)
+	if app.modal != commentModal || !app.modalTextarea.Focused() || len(app.editorImages.refs) != 1 {
+		t.Fatalf("return to editor: modal=%v focused=%t refs=%d", app.modal, app.modalTextarea.Focused(), len(app.editorImages.refs))
+	}
 	app.discardTextModal()
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'j'})
 	if app.editorImages.active {

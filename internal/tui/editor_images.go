@@ -48,6 +48,8 @@ func (m AppModel) editorModal() modalType {
 		modal = m.discardReturn
 	case deleteConfirmModal:
 		modal = m.deleteReturn
+	case lightboxModal:
+		modal = m.lightbox.returnTo
 	}
 	switch modal {
 	case commentModal, fileCommentModal, replyModal, editModal:
@@ -126,7 +128,7 @@ func (m AppModel) editorImageBlocks() map[int][]string {
 		if side.failed {
 			byLine[ref.line] = append(byLine[ref.line], ansi.Truncate("  Image preview unavailable", s.width, ""))
 		} else if side.image != nil && side.image.ready {
-			byLine[ref.line] = append(byLine[ref.line], side.image.placeholder())
+			byLine[ref.line] = append(byLine[ref.line], side.image.linkedPlaceholder(imageTarget{path: ref.path}.uri()))
 		}
 	}
 	blocks := make(map[int][]string)

@@ -38,6 +38,7 @@ type imageProbeTimeoutMsg struct{ id int }
 type imageProbeSkippedMsg struct{ id int }
 
 type imageDisplay struct {
+	cell        cellSize
 	probeID     int
 	probeReply  string
 	probeCursor *tea.CursorPositionMsg
@@ -56,6 +57,16 @@ type inlineImage struct {
 	id, width, height int
 	columns, rows     int
 	ready             bool
+	// placementAlias names a second virtual placement for the lightbox; zero
+	// selects the inline placement, which shares the image ID.
+	placementAlias int
+}
+
+func (img inlineImage) placementID() int {
+	if img.placementAlias != 0 {
+		return img.placementAlias
+	}
+	return img.id
 }
 
 type previewSide struct {
@@ -108,7 +119,14 @@ type imageReadyMsg struct {
 }
 
 func newImageDisplay() imageDisplay {
-	return imageDisplay{probeID: newImageID(), tmux: os.Getenv("TMUX") != ""}
+	return imageDisplay{probeID: newImageID(), tmux: os.Getenv("TMUX") != "", cell: cellPixelSize()}
+}
+
+// cellSize is the terminal's cell size in pixels; zero means unknown.
+type cellSize struct{ width, height int }
+
+func (c cellSize) known() bool {
+	return c.width > 0 && c.height > 0
 }
 
 func (d imageDisplay) scheduleProbe() tea.Cmd {
@@ -306,7 +324,7 @@ func (m *AppModel) prepareImage() tea.Cmd {
 			return m.findMarkdownImages()
 		}
 		if !m.images.enabled {
-			if len(t.markdownImages) > 0 {
+			if t.hasLocalMarkdownImages() {
 				return m.requestImageProbe()
 			}
 			return nil
@@ -324,7 +342,7 @@ func (m *AppModel) prepareImage() tea.Cmd {
 	for _, before := range t.previewSides() {
 		side := t.preview.side(before)
 		if img := side.image; img != nil {
-			cols, rows := img.size(width, height)
+			cols, rows := img.size(width, height, m.images.cell)
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
 			}
@@ -427,73 +445,116 @@ func (m AppModel) renderImagePreview() string {
 	if !ready(t.preview.before) && !ready(t.preview.after) {
 		return ""
 	}
+	link := func(before bool) string { return imageTarget{path: t.path, before: before}.uri() }
 	if !t.compareImages() {
 		side := t.preview.side(t.isDeleted)
 		if ready(*side) {
-			return side.image.placeholder()
+			return side.image.linkedPlaceholder(link(t.isDeleted))
 		}
 		return ""
 	}
 	width, _, horizontal := m.imagePreviewLayout()
-	column := func(label string, side previewSide) string {
+	column := func(label string, before bool) string {
+		side := *t.preview.side(before)
 		content := "  Loading image…"
 		if side.failed {
 			content = "  Preview unavailable"
 		} else if ready(side) {
 			label += fmt.Sprintf(" (%d×%d)", side.image.width, side.image.height)
-			content = side.image.placeholder()
+			content = side.image.linkedPlaceholder(link(before))
 		}
 		return lipgloss.NewStyle().Width(width).Render("  " + label + "\n" + content)
 	}
-	before, after := column("Before", t.preview.before), column("After", t.preview.after)
+	before, after := column("Before", true), column("After", false)
 	if horizontal {
 		return lipgloss.JoinHorizontal(lipgloss.Top, before, "  ", after)
 	}
 	return before + "\n\n" + after
 }
 
-func (img inlineImage) size(width, height int) (int, int) {
+func (img inlineImage) size(width, height int, cell cellSize) (int, int) {
 	if width < 6 || height < 5 {
 		return 0, 0
 	}
-	cols := min(width-4, 128)
-	rows := max(1, min(height-3, 64, (cols*img.height+2*img.width-1)/(2*img.width)))
-	cols = max(1, min(cols, rows*2*img.width/img.height))
+	return img.fit(min(width-4, 128), min(height-3, 64), cell)
+}
+
+// nativeCells returns the cells the image covers at its pixel size, or no
+// limit when the cell size is unknown.
+func (img inlineImage) nativeCells(cell cellSize) (int, int) {
+	if !cell.known() {
+		return maxPlaceholderCells, maxPlaceholderCells
+	}
+	return max(1, (img.width+cell.width-1)/cell.width), max(1, (img.height+cell.height-1)/cell.height)
+}
+
+// maxPlaceholderCells is the number of rows or columns the Unicode
+// placeholder diacritics can address.
+const maxPlaceholderCells = 297
+
+// fit returns the largest cell size within width×height that keeps the image
+// proportions without enlarging it past its pixel size.  Cells are assumed
+// twice as tall as wide when their pixel size is unknown.
+func (img inlineImage) fit(width, height int, cell cellSize) (int, int) {
+	nativeCols, nativeRows := img.nativeCells(cell)
+	return img.fitAspect(min(width, nativeCols), min(height, nativeRows), cell)
+}
+
+// fitAspect returns the largest cell size within width×height that keeps the
+// image proportions for the given cell proportions.
+func (img inlineImage) fitAspect(width, height int, cell cellSize) (int, int) {
+	if width < 1 || height < 1 || img.width <= 0 || img.height <= 0 {
+		return 0, 0
+	}
+	cellWidth, cellHeight := 1, 2
+	if cell.known() {
+		cellWidth, cellHeight = cell.width, cell.height
+	}
+	cols := min(width, maxPlaceholderCells)
+	rows := max(1, min(height, maxPlaceholderCells, (cols*cellWidth*img.height+cellHeight*img.width-1)/(cellHeight*img.width)))
+	cols = max(1, min(cols, rows*cellHeight*img.width/(cellWidth*img.height)))
 	return cols, rows
 }
 
 func (img inlineImage) placement() string {
-	return ansi.KittyGraphics(nil, "a=p", "U=1", "q=2", fmt.Sprintf("p=%d", img.id),
+	return ansi.KittyGraphics(nil, "a=p", "U=1", "q=2", fmt.Sprintf("p=%d", img.placementID()),
 		fmt.Sprintf("i=%d", img.id), fmt.Sprintf("c=%d", img.columns), fmt.Sprintf("r=%d", img.rows))
 }
 
 func (img inlineImage) placeholder() string {
+	return img.linkedPlaceholder("")
+}
+
+// linkedPlaceholder renders the placeholder cells, each row wrapped in a
+// hyperlink to uri when given so clicks on the image can be located.
+func (img inlineImage) linkedPlaceholder(uri string) string {
+	placement := img.placementID()
 	var b strings.Builder
 	for row := range img.rows {
-		fmt.Fprintf(&b, "  \x1b[38;2;%d;%d;%dm\x1b[58;2;%d;%d;%dm",
+		b.WriteString("  ")
+		if uri != "" {
+			b.WriteString(ansi.SetHyperlink(uri))
+		}
+		fmt.Fprintf(&b, "\x1b[38;2;%d;%d;%dm\x1b[58;2;%d;%d;%dm",
 			img.id>>16&255, img.id>>8&255, img.id&255,
-			img.id>>16&255, img.id>>8&255, img.id&255)
+			placement>>16&255, placement>>8&255, placement&255)
 		for col := range img.columns {
 			b.WriteRune(kitty.Placeholder)
 			b.WriteRune(kitty.Diacritic(row))
 			b.WriteRune(kitty.Diacritic(col))
 			b.WriteRune(kitty.Diacritic(img.id >> 24))
 		}
-		b.WriteString("\x1b[39;59m\n")
+		b.WriteString("\x1b[39;59m")
+		if uri != "" {
+			b.WriteString(ansi.ResetHyperlink())
+		}
+		b.WriteString("\n")
 	}
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
-func hideImagePlaceholders(content string) string {
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if strings.ContainsRune(line, kitty.Placeholder) {
-			lines[i] = strings.Repeat(" ", lipgloss.Width(line))
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
+// packImageBlocks lays blocks out left to right, starting a new row when the
+// next block would not fit in width.
 func packImageBlocks(blocks []string, width int) []string {
 	var rows, row []string
 	used := 0

@@ -51,6 +51,7 @@ const (
 	gotoLineModal
 	openSourceModal
 	fileSelectModal
+	lightboxModal
 )
 
 // FinishEvent is emitted on the finish channel when the reviewer finishes a
@@ -87,6 +88,7 @@ type AppModel struct {
 	commentImages map[commentImageKey]*previewSide
 	imageBodies   map[string][]markdownImageRef
 	editorImages  editorImageState
+	lightbox      lightboxState
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
 	formViewed    map[string]map[int]bool
@@ -465,13 +467,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.scheduleEditorImages(), app.prepareCommentImages())
+		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
+			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(), app.scheduleEditorImages(), app.prepareCommentImages())
+		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
+			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	}
 	return model, cmd
 }
@@ -574,8 +578,16 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case lightboxReadyMsg:
+		m.finishLightboxPlacement(msg)
+		return m, nil
+	case lightboxLoadedMsg:
+		return m, m.finishLightboxLoad(msg)
 	case editorImagesMsg:
 		m.finishEditorImagesDelay(msg)
+		return m, nil
+	case externalOpenMsg:
+		m.locationError = msg.status
 		return m, nil
 	case tea.BackgroundColorMsg:
 		recolor := msg.IsDark() != terminalIsDark
@@ -596,6 +608,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.images.cell = cellPixelSize()
 		m.recalculateLayout()
 		if len(m.tabs) > 0 && m.tab().state != nil {
 			m.rebuildContent()
@@ -757,6 +770,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleFileSelectModal(msg)
 	}
 	m.locationError = ""
+	if m.modal == lightboxModal {
+		return m.handleLightboxKey(msg)
+	}
 	if m.hoveredGutterLine != 0 {
 		m.hoveredGutterLine = 0
 		m.hoveredGutterSide = ""
@@ -835,6 +851,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "alt+w" {
 		m.copyReference()
 		return m, nil
+	}
+	if msg.String() == "alt+o" && !t.selecting {
+		return m, m.openImageAtCursor()
 	}
 	if msg.String() == "alt+p" && m.multiFile {
 		return m, m.openFileSelect()
@@ -2032,6 +2051,9 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.clipboardStatus = ""
+	if msg.String() == "alt+o" && m.modalFocus == 0 {
+		return m, m.openImageAtCursor()
+	}
 	if msg.String() == "alt+r" && m.hasModalResolution() {
 		m.toggleResolve(m.editingID)
 		return m, nil
@@ -2843,12 +2865,14 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 			underlyingModal = m.discardReturn
 		case deleteConfirmModal:
 			underlyingModal = m.deleteReturn
+		case lightboxModal:
+			underlyingModal = m.lightbox.returnTo
 		}
 		if underlyingModal != noModal {
 			underlying := m
 			underlying.modal = underlyingModal
 			underlying.modalFocus = 0
-			full = underlying.renderWithModal(full)
+			full = hideImagePlaceholders(underlying.renderWithModal(full))
 		}
 		full, layout.modalRegions = m.renderWithModalLayout(full)
 	}
@@ -3056,7 +3080,13 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal == finishModal {
 		return m.handleFinishModalMouse(mouse)
 	}
+	if m.modal == lightboxModal {
+		return m.handleLightboxMouse(mouse)
+	}
 	if m.isTextModal() {
+		if cmd, ok := m.openImageLink(m.referenceAt(mouse.X, mouse.Y)); ok {
+			return m, cmd
+		}
 		return m.handleTextModalMouse(mouse)
 	}
 	if m.modal == discardChangesModal {
@@ -3075,6 +3105,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		}
 		if location, ok := sourceLink(uri); ok && regularFile(m.sourcePath(location.path)) {
 			return m, m.navigateSource(location)
+		}
+		if cmd, ok := m.openImageLink(uri); ok {
+			return m, cmd
 		}
 	}
 	if rect, ok := m.finishButtonRect(); ok && rect.contains(mouse) {
@@ -3272,6 +3305,7 @@ func (m *AppModel) selectTab(index int) {
 
 type modalMouseAction struct {
 	resolve         bool
+	openImage       bool
 	dialog          bool // the whole dialog frame
 	close           bool
 	lineInput       bool
@@ -3759,6 +3793,10 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	if m.isTextModal() {
 		return m.handleTextModalWheel(msg.Mouse())
 	}
+	if m.modal == lightboxModal {
+		m.handleLightboxWheel(msg.Mouse())
+		return m, nil
+	}
 	if m.modal == helpModal {
 		switch msg.Mouse().Button {
 		case tea.MouseWheelUp:
@@ -4034,6 +4072,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "r/R", desc: "resolve/+next"},
 		{keys: "h/H", desc: "fold/hide"},
 		{keys: "w / I", desc: "WS / images"},
+		{keys: "alt+o", desc: "enlarge image"},
+		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
 		{keys: "q/C-c", desc: "submit review"},
 	}, columnWidth)
@@ -4629,6 +4669,10 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		content, finishRegions := m.finishModalContent(innerWidth)
 		regions = append(regions, finishRegions...)
 		modalContent = frameStyle.Width(modalWidth).Render(content)
+	case lightboxModal:
+		content, width, lightboxRegions := m.lightboxContent()
+		regions = append(regions, lightboxRegions...)
+		modalContent = frameStyle.Width(width).Render(content)
 	}
 
 	modalW := lipgloss.Width(modalContent)

@@ -21,8 +21,18 @@ type markdownImage struct {
 	line   int
 	before bool
 	path   string
+	url    string // web URL that is linked but not previewed
 	local  bool
+	// start and end bound the reference text on its line.
+	start, end int
 	previewSide
+}
+
+func (ref markdownImage) target() imageTarget {
+	if ref.url != "" {
+		return imageTarget{url: ref.url, line: ref.line}
+	}
+	return imageTarget{path: ref.path, before: ref.before, line: ref.line}
 }
 
 type markdownImagesMsg struct {
@@ -33,16 +43,52 @@ type markdownImagesMsg struct {
 type markdownImageRef struct {
 	line        int
 	destination string
+	// start and end bound the reference text within its line.
+	start, end int
 }
 
 func markdownImageRefs(source string) []markdownImageRef {
 	data := []byte(source)
 	root := parser.New().Parse(data)
 	var refs []markdownImageRef
-	add := func(offset int, destination string) {
-		if offset >= 0 && offset <= len(source) {
-			refs = append(refs, markdownImageRef{strings.Count(source[:offset], "\n") + 1, destination})
+	add := func(offset, end int, destination string) {
+		if offset < 0 || offset > len(source) {
+			return
 		}
+		lineStart := strings.LastIndex(source[:offset], "\n") + 1
+		lineEnd := len(source)
+		if i := strings.IndexByte(source[offset:], '\n'); i >= 0 {
+			lineEnd = offset + i
+		}
+		end = max(offset, min(end, lineEnd))
+		refs = append(refs, markdownImageRef{strings.Count(source[:offset], "\n") + 1, destination, offset - lineStart, end - lineStart})
+	}
+	// Inline image syntax carries no end position; the reference closes at
+	// the parenthesis after the destination on the same line.
+	inlineEnd := func(offset int, destination string) int {
+		rest := source[offset:]
+		if i := strings.IndexByte(rest, '\n'); i >= 0 {
+			rest = rest[:i]
+		}
+		if at := strings.Index(rest, "]("); at >= 0 {
+			at += 2
+			if i := strings.Index(rest[at:], destination); destination != "" && i >= 0 {
+				at += i + len(destination)
+			}
+			if i := strings.IndexByte(rest[at:], ')'); i >= 0 {
+				return offset + at + i + 1
+			}
+			return offset + len(rest)
+		}
+		// Reference-style images end at the label's closing bracket.
+		at := 0
+		if i := strings.Index(rest, "]["); i >= 0 {
+			at = i + 2
+		}
+		if i := strings.IndexByte(rest[at:], ']'); i >= 0 {
+			return offset + at + i + 1
+		}
+		return offset + len(rest)
 	}
 	readHTML := func(start, end int) {
 		if start < 0 || end > len(source) || start > end {
@@ -61,7 +107,7 @@ func markdownImageRefs(source string) []markdownImageRef {
 				if token.Data == "img" {
 					for _, attr := range token.Attr {
 						if attr.Key == "src" {
-							add(offset, attr.Val)
+							add(offset, offset+len(raw), attr.Val)
 							break
 						}
 					}
@@ -76,7 +122,8 @@ func markdownImageRefs(source string) []markdownImageRef {
 		}
 		switch n := n.(type) {
 		case *ast.Image:
-			add(n.Pos(), n.Destination.Str(data))
+			destination := n.Destination.Str(data)
+			add(n.Pos(), inlineEnd(n.Pos(), destination), destination)
 		case *ast.RawHTML:
 			segments := n.Value.Indices()
 			if len(segments) > 0 {
@@ -107,6 +154,15 @@ func localImagePath(documentPath, destination string) (string, bool) {
 		path = filepath.Join(filepath.Dir(documentPath), path)
 	}
 	return filepath.Clean(path), imagePath(path)
+}
+
+func (t *FileTab) hasLocalMarkdownImages() bool {
+	for _, ref := range t.markdownImages {
+		if ref.url == "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *FileTab) imageSide(before bool, markdown int) *previewSide {
@@ -142,6 +198,12 @@ func (m AppModel) findMarkdownImages() tea.Cmd {
 				if len(msg.images) >= 64 {
 					break
 				}
+				img := markdownImage{line: ref.line, before: before, local: local, start: ref.start, end: ref.end}
+				if u, ok := webImageURL(ref.destination); ok {
+					img.url = u
+					msg.images = append(msg.images, img)
+					continue
+				}
 				imagePath, ok := localImagePath(path, ref.destination)
 				if !ok {
 					continue
@@ -160,7 +222,8 @@ func (m AppModel) findMarkdownImages() tea.Cmd {
 						continue
 					}
 				}
-				msg.images = append(msg.images, markdownImage{line: ref.line, before: before, path: imagePath, local: local})
+				img.path = imagePath
+				msg.images = append(msg.images, img)
 			}
 		}
 		if t.doc != nil {
@@ -209,7 +272,7 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 }
 
 func (m AppModel) markdownImageSize(img *inlineImage) (int, int) {
-	return img.size(min(44, m.contentViewport.Width()-gutterWidth), min(19, max(5, m.contentViewport.Height())))
+	return img.size(min(44, m.contentViewport.Width()-gutterWidth), min(19, max(5, m.contentViewport.Height())), m.images.cell)
 }
 
 func (m *AppModel) prepareMarkdownImages() tea.Cmd {
@@ -236,7 +299,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 			img.columns, img.rows, img.ready = cols, rows, false
 			msg := imageReadyMsg{path: t.path, before: ref.before, columns: cols, rows: rows, markdown: i + 1}
 			cmds = append(cmds, tea.Sequence(tea.Raw(m.images.wrap(img.placement())), func() tea.Msg { return msg }))
-		} else if !ref.attempted && loading < 2 {
+		} else if ref.url == "" && !ref.attempted && loading < 2 {
 			ref.attempted = true
 			loading++
 			cmds = append(cmds, m.loadMarkdownImage(i))
@@ -253,35 +316,18 @@ func (m AppModel) renderMarkdownImages(line int, before bool) string {
 		return ""
 	}
 	width := max(1, m.contentViewport.Width()-gutterWidth)
-	var rows, row []string
-	used := 0
-	flush := func() {
-		if len(row) > 0 {
-			rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, row...))
-			row = nil
-			used = 0
-		}
-	}
+	var blocks []string
 	for _, ref := range m.tab().markdownImages {
 		if ref.line != line || ref.before != before {
 			continue
 		}
-		block := ""
 		if ref.failed {
-			block = ansi.Truncate("  Image preview unavailable", width, "")
+			blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 		} else if ref.image != nil && ref.image.ready {
-			block = ref.image.placeholder()
-		} else {
-			continue
+			blocks = append(blocks, ref.image.linkedPlaceholder(ref.target().uri()))
 		}
-		w := lipgloss.Width(block)
-		if used > 0 && used+w > width {
-			flush()
-		}
-		row = append(row, block)
-		used += w
 	}
-	flush()
+	rows := packImageBlocks(blocks, width)
 	if len(rows) == 0 {
 		return ""
 	}

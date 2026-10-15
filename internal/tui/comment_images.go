@@ -36,7 +36,16 @@ func (m AppModel) commentImagePath(destination string) (string, bool) {
 
 // commentImageTarget resolves an image destination in a comment body to a
 // local image file or a web URL.
+func (m AppModel) commentImageTarget(destination string) (imageTarget, bool) {
+	if u, ok := webImageURL(destination); ok {
+		return imageTarget{url: u}, true
+	}
+	path, ok := m.commentImagePath(destination)
+	return imageTarget{path: path}, ok
+}
 
+// commentImageSide returns the preview state for a local comment image at
+// a width, registering it for loading when first seen.
 func (m *AppModel) commentImageSide(key commentImageKey) *previewSide {
 	if m.commentImages == nil {
 		m.commentImages = make(map[commentImageKey]*previewSide)
@@ -65,6 +74,18 @@ func (m *AppModel) commentImageRefs(body string) []markdownImageRef {
 
 // linkCommentLine links file references and the image references that refs
 // places on line number lineNumber.
+func (m *AppModel) linkCommentLine(line string, refs []markdownImageRef, lineNumber int) string {
+	var spans []linkSpan
+	for _, ref := range refs {
+		if ref.line != lineNumber {
+			continue
+		}
+		if target, ok := m.commentImageTarget(ref.destination); ok {
+			spans = append(spans, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
+		}
+	}
+	return linkedDisplayLine(line, spans, m.linkFileReferences)
+}
 
 func (m *AppModel) renderCommentContent(author, body, prefix string, width int) string {
 	style := m.commentAuthorStyle(author)
@@ -73,7 +94,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 	showImages := !m.images.hidden && m.modal == noModal
 	var lines []string
 	for i, line := range strings.Split(body, "\n") {
-		content := style.Render(m.linkFileReferences(line))
+		content := style.Render(m.linkCommentLine(line, refs, i+1))
 		if i == 0 && prefix != "" {
 			content = style.Bold(true).Render(prefix) + content
 		}
@@ -97,7 +118,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 			if side.failed {
 				blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 			} else if side.image != nil && side.image.ready {
-				blocks = append(blocks, side.image.placeholder())
+				blocks = append(blocks, side.image.linkedPlaceholder(imageTarget{path: path}.uri()))
 			}
 		}
 		for _, row := range packImageBlocks(blocks, width) {
@@ -136,7 +157,7 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 	var cmds []tea.Cmd
 	for key, side := range m.commentImages {
 		if img := side.image; img != nil {
-			cols, rows := img.size(min(44, key.width), 11)
+			cols, rows := img.size(min(44, key.width), 11, m.images.cell)
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
 			}

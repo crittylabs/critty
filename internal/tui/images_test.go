@@ -480,7 +480,7 @@ func TestImagePlaceholderSurvivesRendering(t *testing.T) {
 	app.width, app.height = 100, 30
 	app.recalculateLayout()
 	img := &inlineImage{id: 0x123456, width: 30, height: 20, ready: true}
-	img.columns, img.rows = img.size(app.contentViewport.Width(), app.contentViewport.Height())
+	img.columns, img.rows = img.size(app.contentViewport.Width(), app.contentViewport.Height(), cellSize{})
 	app.tab().isBinary, app.tab().doc, app.tab().preview.after.image = true, nil, img
 	app.rebuildContent()
 	view := app.View().Content
