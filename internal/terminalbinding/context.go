@@ -15,8 +15,9 @@ import (
 	"github.com/tklauser/ps"
 )
 
-// Target identifies a pane within one multiplexer instance.
+// Target identifies a multiplexer pane or a notifying client outside a multiplexer.
 type Target struct {
+	Origin    Origin `json:"origin,omitempty"`
 	Kind      string `json:"kind"`
 	Socket    string `json:"socket"`
 	Pane      string `json:"pane"`
@@ -25,6 +26,12 @@ type Target struct {
 }
 
 func (t Target) Validate() error {
+	if t.Kind == "terminal" {
+		if t.Socket != "" || t.Pane != "" || t.Workspace != "" || t.Tab != "" || t.Origin.PID < 2 || t.Origin.Started == "" {
+			return fmt.Errorf("invalid terminal origin")
+		}
+		return nil
+	}
 	if !filepath.IsAbs(t.Socket) || strings.ContainsAny(t.Socket+t.Pane+t.Workspace+t.Tab, "\x00\r\n") || t.Pane == "" {
 		return fmt.Errorf("invalid terminal target")
 	}
@@ -159,6 +166,9 @@ func collectOwners(v any, target Target, owners map[int]Target) {
 func Snapshot(ctx context.Context, t Target) (string, error) {
 	if err := t.Validate(); err != nil {
 		return "", err
+	}
+	if t.Kind == "terminal" {
+		return "", fmt.Errorf("terminal origin requires a filter notification")
 	}
 	if t.Kind == "tmux" {
 		out, err := t.Command(ctx, "capture-pane", "-p", "-J", "-t", t.Pane).Output()

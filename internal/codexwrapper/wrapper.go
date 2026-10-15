@@ -16,7 +16,11 @@ func Run(args []string, wrapped bool) error {
 		return err
 	}
 	target, err := terminalbinding.FromEnvironment()
-	if err == nil && target.Kind != "" {
+	if err == nil {
+		target.Origin = terminalbinding.CaptureOrigin(os.Getpid())
+		if target.Kind == "" {
+			target.Kind = "terminal"
+		}
 		err = terminalbinding.DefaultStore().Register(target)
 	}
 	if err != nil {

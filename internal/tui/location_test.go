@@ -39,7 +39,7 @@ func TestStartupFocus(t *testing.T) {
 				if app.activeTab != 1 || app.tab().cursorLine != max(1, line) || app.tab().cursorOnAnnotation {
 					t.Fatalf("focus = tab %d, line %d, annotation %t", app.activeTab, app.tab().cursorLine, app.tab().cursorOnAnnotation)
 				}
-				if app.images.retriedOnKey || app.images.probeID != probeID {
+				if app.images.probeID != probeID {
 					t.Fatal("startup focus retried image detection")
 				}
 				if line == 25 && app.contentViewport.YOffset() == 0 {

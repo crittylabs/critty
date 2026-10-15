@@ -1,11 +1,12 @@
 package cli
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -60,10 +61,12 @@ requiring a repository.  A file argument after --diff is also accepted.
 With --null, reviews only attachments without requiring a repository.
 
 Inside Herdr the TUI opens in a dedicated tab; inside tmux it opens in a
-split pane. This command blocks until the reviewer approves or finishes
+nonmodal floating pane on capable servers, with a split on older servers. This command blocks until the reviewer approves or finishes
 with comments, printing the resulting agent prompt on stdout and
 "approved: true|false" on stderr. Outside a multiplexer the TUI runs in
-the current terminal.`,
+the current terminal. Use --launcher to select auto, tmux, tmux-floating,
+tmux-split, herdr, or custom:EXECUTABLE. The tmux launcher tries floating
+panes first, then splits.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runReview(args)
@@ -164,7 +167,7 @@ func runReview(args []string) error {
 }
 
 // runReviewFlow opens one round in the caller's multiplexer or terminal.
-func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) error {
+func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (result error) {
 	if err := prepareDocuments(mode); err != nil {
 		return err
 	}
@@ -207,15 +210,18 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 	if err != nil {
 		return err
 	}
-	if multiplexer != nil {
-		launch, err := multiplexer.launchReview(mode)
+	launcher, err := selectReviewLauncher(slices.Concat(reviewLauncherNames, cfg.Launchers), multiplexer, mode)
+	if err != nil && (!errors.Is(err, errNoReviewLauncher) || multiplexer != nil) {
+		return err
+	}
+	if launcher != nil {
+		launch, err := launcher.open(mode)
 		if err != nil {
 			return err
 		}
 		defer launch.restoreFocus()
-		defer launch.close()
+		defer func() { result = errors.Join(result, launch.close()) }()
 		if err := ipc.WaitAlive(sock, 15*time.Second); err != nil {
-			launch.close()
 			return err
 		}
 		return runReviewCycle(cfg, sess, sock)
@@ -239,7 +245,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) e
 		return nil
 	}
 
-	return withCodexWrapperHint(fmt.Errorf("no Herdr or tmux session and no terminal to open the TUI in; run inside Herdr or tmux, or have the reviewer run `critty%s` in a terminal", reviewArgSuffix(mode)))
+	return withCodexWrapperHint(fmt.Errorf("%w; no terminal to open the TUI in; run inside tmux or Herdr, or have the reviewer run `critty%s` in a terminal", err, reviewArgSuffix(mode)))
 }
 
 func reviewArgSuffix(mode *reviewMode) string {
@@ -449,36 +455,6 @@ func cleanupOnApprove(cfg *config.Config, sess *review.Session) {
 	}
 }
 
-// spawnTUIPane opens the TUI in a tmux split pane running `critty _tui`.
-func spawnTUIPane(mode *reviewMode, tmux tmuxContext) (tmuxLaunch, error) {
-	tmuxBin, err := lookPath("tmux")
-	if err != nil {
-		return tmuxLaunch{}, err
-	}
-	tuiCmd, err := buildTUICommand(mode, "tmux")
-	if err != nil {
-		return tmuxLaunch{}, err
-	}
-	var out []byte
-	for _, withSize := range []bool{true, false} {
-		args := splitWindowArgs(withSize, tuiCmd, tmux.pane)
-		args = append(args[:1], append([]string{"-P", "-F", "#{pane_id}"}, args[1:]...)...)
-		out, err = commandOutput(tmuxCommand(tmuxBin, tmux, args...))
-		if err == nil {
-			break
-		}
-	}
-	if err != nil {
-		return tmuxLaunch{}, fmt.Errorf("opening tmux pane: %w", err)
-	}
-	pane := strings.TrimSpace(string(out))
-	if !strings.HasPrefix(pane, "%") || strings.ContainsAny(pane, " \t\n") {
-		return tmuxLaunch{}, fmt.Errorf("tmux did not return a pane ID")
-	}
-	fmt.Fprintln(os.Stderr, "Opened review in tmux pane")
-	return tmuxLaunch{bin: tmuxBin, context: tmux, pane: pane}, nil
-}
-
 // buildTUICommand builds the shell command that runs the TUI inside a pane
 // of host, the multiplexer named in the TUI's top bar.
 func buildTUICommand(mode *reviewMode, host string) (string, error) {
@@ -517,137 +493,6 @@ func resolveExecutable() (string, error) {
 		return "", err
 	}
 	return filepath.EvalSymlinks(exe)
-}
-
-// splitWindowArgs builds the tmux split-window arguments, targeting the
-// invoking pane via TMUX_PANE and pinning the pane's working directory to
-// the caller's so the TUI resolves source paths in the original directory.
-func splitWindowArgs(withSize bool, tuiCmd, pane string) []string {
-	args := []string{"split-window", "-h"}
-	if pane != "" {
-		args = append(args, "-t", pane)
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		args = append(args, "-c", cwd)
-	}
-	if withSize {
-		args = append(args, "-p", "70")
-	}
-	return append(args, tuiCmd)
-}
-
-type tmuxContext struct {
-	session string
-	pane    string
-	socket  string
-}
-
-type tmuxDetector struct{}
-
-func (tmuxDetector) environmentPresent() bool {
-	return os.Getenv("TMUX") != "" || os.Getenv("TMUX_PANE") != ""
-}
-
-func (tmuxDetector) environmentContext() reviewMultiplexerContext {
-	ctx := tmuxContext{session: os.Getenv("TMUX"), pane: os.Getenv("TMUX_PANE")}
-	if !ctx.active() {
-		return nil
-	}
-	return ctx
-}
-
-func (tmuxDetector) processContexts() map[int]reviewMultiplexerContext {
-	contexts := make(map[int]reviewMultiplexerContext)
-	for pid, ctx := range tmuxProcessContexts() {
-		contexts[pid] = ctx
-	}
-	return contexts
-}
-
-func (c tmuxContext) launchReview(mode *reviewMode) (reviewMultiplexerLaunch, error) {
-	return spawnTUIPane(mode, c)
-}
-
-func (tmuxContext) restoreFocus() {}
-
-type tmuxLaunch struct {
-	bin     string
-	context tmuxContext
-	pane    string
-}
-
-func (l tmuxLaunch) close()      { _ = runCommand(tmuxCommand(l.bin, l.context, "kill-pane", "-t", l.pane)) }
-func (tmuxLaunch) restoreFocus() {}
-
-func (c tmuxContext) active() bool {
-	return c.session != "" || c.socket != "" || c.pane != ""
-}
-
-func tmuxProcessContexts() map[int]tmuxContext {
-	tmuxBin, err := lookPath("tmux")
-	if err != nil {
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	panes := tmuxPIDContexts(ctx, tmuxBin, "list-panes", "-a", "-F", "#{pane_pid}\t#{socket_path}\t#{pid}\t#{session_id}\t#{pane_id}")
-	clients := tmuxPIDContexts(ctx, tmuxBin, "list-clients", "-F", "#{client_pid}\t#{socket_path}\t#{pid}\t#{session_id}")
-	if panes == nil {
-		panes = make(map[int]tmuxContext)
-	}
-	for pid, ctx := range clients {
-		if _, exists := panes[pid]; !exists {
-			panes[pid] = ctx
-		}
-	}
-	return panes
-}
-
-func tmuxPIDContexts(ctx context.Context, tmuxBin string, args ...string) map[int]tmuxContext {
-	out, err := commandOutput(exec.CommandContext(ctx, tmuxBin, args...))
-	if err != nil {
-		return nil
-	}
-	contexts := make(map[int]tmuxContext)
-	for line := range strings.Lines(string(out)) {
-		fields := strings.Split(strings.TrimSuffix(line, "\n"), "\t")
-		if len(fields) != 4 && len(fields) != 5 {
-			continue
-		}
-		processID, err := strconv.Atoi(fields[0])
-		if err != nil || processID < 2 {
-			continue
-		}
-		socket, serverPID, sessionID := fields[1], fields[2], strings.TrimPrefix(fields[3], "$")
-		if socket == "" || serverPID == "" || sessionID == "" {
-			continue
-		}
-		ctx := tmuxContext{session: strings.Join([]string{socket, serverPID, sessionID}, ",")}
-		if len(fields) == 5 {
-			ctx.pane = fields[4]
-		}
-		if _, exists := contexts[processID]; !exists {
-			contexts[processID] = ctx
-		}
-	}
-	return contexts
-}
-
-func tmuxCommand(tmuxBin string, tmux tmuxContext, args ...string) *exec.Cmd {
-	if tmux.socket != "" {
-		return exec.Command(tmuxBin, append([]string{"-S", tmux.socket}, args...)...)
-	}
-	cmd := exec.Command(tmuxBin, args...)
-	if os.Getenv("TMUX") == "" && tmux.session != "" {
-		for _, entry := range os.Environ() {
-			if !strings.HasPrefix(entry, "TMUX=") {
-				cmd.Env = append(cmd.Env, entry)
-			}
-		}
-		cmd.Env = append(cmd.Env, "TMUX="+tmux.session)
-	}
-	return cmd
 }
 
 // shellEscape escapes a string for safe embedding in a POSIX shell command.

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/crittylabs/critty/internal/tui"
 )
 
@@ -77,11 +79,18 @@ func (r doctorReport) writeText(w io.Writer, useColor bool) error {
 func newDoctorCommand() *cobra.Command {
 	var asJSON bool
 	var python string
+	var request string
+	var notifyOnly bool
 	cmd := &cobra.Command{
 		Use: "doctor", Aliases: []string{"check"},
-		Short: "Diagnose integrations, AI review prerequisites and image settings",
+		Short: "Diagnose integrations, review launchers and image settings",
 		Long: `Check project and global integrations against this build, Python and MCP
-requirements for restricted AI reviews, and available multiplexer image settings.
+requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
+image settings. Desktop checks inspect installed applications and commands without
+opening windows or testing automation permission.
+Use --terminal-request with a prepared, displayed marker to test terminal binding.
+Add --terminal-notify-only to require a filter notification and skip registered
+pane screens. This consumes that one-time request; no review is opened.
 Use --python to check the dedicated Python environment used for Codex reviews.
 
 No AI service is contacted and no persistent settings are changed. Herdr checks read local
@@ -91,10 +100,18 @@ Errors return exit status 1; optional features and unverified settings produce
 warnings or informational results. The former check command remains an alias.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if notifyOnly && request == "" {
+				return fmt.Errorf("--terminal-notify-only requires --terminal-request")
+			}
 			r := doctorReport{Version: versionString()}
 			r.checkIntegrations(integrations())
 			r.checkAI(python)
 			r.checkImages()
+			r.checkTerminalBinding(request, notifyOnly)
+			origin := terminalbinding.CaptureOrigin(os.Getpid())
+			r.checkDesktopLaunchers(runtime.GOOS, origin, func(name string) error {
+				return (&desktopLaunch{name: name, origin: origin}).check()
+			})
 			if err := r.write(cmd.OutOrStdout(), asJSON); err != nil {
 				return err
 			}
@@ -110,6 +127,8 @@ warnings or informational results. The former check command remains an alias.`,
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&notifyOnly, "terminal-notify-only", false, "require a terminal filter notification for the marker test")
+	cmd.Flags().StringVar(&request, "terminal-request", "", "test a prepared visible terminal marker without opening a review")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print a structured diagnostic report")
 	cmd.Flags().StringVar(&python, "python", "python3", "Python executable used for restricted AI reviews")
 	return cmd
@@ -372,6 +391,38 @@ func (r *doctorReport) checkHerdrImages() {
 		}
 	}
 	r.add("images/herdr", status, message, "Set `[terminal] kitty_graphics = true` for images. Restart the server or reattach the client after changing it. This checks local config only; remote server and client settings may differ.")
+}
+
+// Check every supported launcher for this platform, independently of launch priority
+// and the SSH policy. Availability does not establish permission to open a window.
+func (r *doctorReport) checkDesktopLaunchers(platform string, origin terminalbinding.Origin, check func(string) error) {
+	var names []string
+	switch platform {
+	case "darwin":
+		names = []string{"ghostty-window", "iterm-window", "terminal-app-window"}
+	case "linux":
+		names = []string{"xdg-terminal"}
+		if origin.WSLDistribution != "" {
+			names = append(names, "windows-terminal-wsl")
+		}
+	default:
+		r.add("launchers/desktop-terminal", "info", "no built-in desktop terminal launcher for "+platform, "Use a multiplexer or custom launcher.")
+		return
+	}
+	for _, name := range names {
+		if err := check(name); err != nil {
+			advice := "Install the application and its required scripting support, or use another launcher."
+			switch name {
+			case "xdg-terminal":
+				advice = "Install xdg-terminal-exec and configure a supported terminal desktop entry."
+			case "windows-terminal-wsl":
+				advice = "Install Windows Terminal and make wt.exe and wsl.exe available on the WSL PATH."
+			}
+			r.add("launchers/"+name, "warn", err.Error(), advice)
+			continue
+		}
+		r.add("launchers/"+name, "ok", "available (window creation is not tested)", "")
+	}
 }
 
 func init() { rootCmd.AddCommand(newDoctorCommand()) }

@@ -12,6 +12,11 @@ import (
 )
 
 func TestEnvCommandPrintsTMUXEnvironment(t *testing.T) {
+	for _, key := range []string{"TERMINAL_APP", "TERM_PROGRAM", "ITERM_SESSION_ID", "WT_SESSION", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"} {
+		t.Setenv(key, "")
+	}
+	previousOrigin := reviewOrigin
+	t.Cleanup(func() { reviewOrigin = previousOrigin })
 	t.Setenv("TMUX", "/tmp/tmux-501/default,100,2")
 	t.Setenv("TMUX_PANE", "%7")
 	for _, key := range []string{"HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
@@ -180,6 +185,11 @@ func TestMergeEnvironmentOverridesExistingVariables(t *testing.T) {
 }
 
 func TestTerminalEnvironmentFallsBackToAncestorTTY(t *testing.T) {
+	for _, key := range []string{"TERMINAL_APP", "TERM_PROGRAM", "ITERM_SESSION_ID", "WT_SESSION", "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY"} {
+		t.Setenv(key, "")
+	}
+	previousOrigin := reviewOrigin
+	t.Cleanup(func() { reviewOrigin = previousOrigin })
 	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
 		t.Setenv(key, "")
 	}
@@ -209,13 +219,13 @@ func TestTerminalEnvironmentFallsBackToAncestorTTY(t *testing.T) {
 	})
 
 	got, err := terminalEnvironment()
-	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/ttys005"}}) {
+	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/ttys005"}, {"CRITTY_SSH", "1"}}) {
 		t.Fatalf("terminalEnvironment() = %v, %v", got, err)
 	}
 
 	delete(ttys, "300")
 	got, err = terminalEnvironment()
-	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/pts/9"}}) {
+	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/pts/9"}, {"CRITTY_SSH", "1"}}) {
 		t.Fatalf("SSH_TTY fallback = %v, %v", got, err)
 	}
 

@@ -228,7 +228,6 @@ func formTestAppWithContent(t *testing.T, content string) (AppModel, chan Finish
 	doc := review.AttachedDocument{ID: "a", Source: "/missing/form.md", Name: "form.md", Content: content}
 	ch := make(chan FinishEvent, 1)
 	app := NewApp("target.md", AppConfig{Session: sess, Documents: []review.AttachedDocument{doc}, Author: "Human", FinishCh: ch})
-	app.images.retriedOnKey = true
 	for i := range app.tabs {
 		app.tabs[i].state = &fileReview{}
 		if app.tabs[i].attachment != nil {

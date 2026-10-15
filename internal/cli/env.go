@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,8 @@ var envCmd = &cobra.Command{
 	Long: `Locate the Herdr or tmux terminal the way review commands do, then print the
 variables a process needs to address it: TMUX, TMUX_PANE, and TTY for tmux,
 or HERDR_ENV, HERDR_SOCKET_PATH, HERDR_WORKSPACE_ID, HERDR_TAB_ID, HERDR_PANE_ID,
-and TTY for Herdr.  By default, or with all, each variable is printed as
+and TTY for Herdr.  CRITTY_TERMINAL_APP reports a known application and
+CRITTY_SSH=1 reports positive SSH evidence.  By default, or with all, each variable is printed as
 NAME=value; --json prints one JSON object instead.  tty prints only the
 terminal device.  Flags go before the mode word.  run <command>, or -- <command>, replaces this process with
 the command and those variables added to its environment.
@@ -119,6 +121,15 @@ func terminalEnvironment() ([]envVar, error) {
 	if err != nil {
 		return nil, err
 	}
+	vars, err := environmentForTerminal(ctx)
+	if err == nil && len(vars) == 0 {
+		return nil, fmt.Errorf("no review terminal or client hints found")
+	}
+	return vars, err
+}
+
+func environmentForTerminal(ctx reviewMultiplexerContext) ([]envVar, error) {
+	var err error
 	var vars []envVar
 	switch ctx := ctx.(type) {
 	case tmuxContext:
@@ -134,8 +145,12 @@ func terminalEnvironment() ([]envVar, error) {
 			vars = append(vars, envVar{"TTY", tty})
 		}
 	}
-	if len(vars) == 0 {
-		return nil, fmt.Errorf("no Herdr or tmux terminal found and no controlling terminal")
+	origin := originForReview()
+	if origin.Terminal != "" {
+		vars = append(vars, envVar{"CRITTY_TERMINAL_APP", origin.Terminal})
+	}
+	if terminalbinding.Remote(terminalTarget(ctx), origin) {
+		vars = append(vars, envVar{"CRITTY_SSH", "1"})
 	}
 	return vars, nil
 }

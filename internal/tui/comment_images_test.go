@@ -92,8 +92,13 @@ func TestCommentImagesPathsAndReplies(t *testing.T) {
 func TestCommentImagesFailuresAndUnsupportedTerminal(t *testing.T) {
 	app := setupAppWithDoc(t, "source\n")
 	app.renderCommentContent("Reviewer", "![missing](missing.png)", "", 30)
-	if len(app.commentImages) != 0 || app.prepareCommentImages() != nil {
-		t.Fatal("unsupported terminal loaded images")
+	if app.prepareCommentImages() == nil || !app.images.checking {
+		t.Fatal("comment image did not request capability detection")
+	}
+	for _, side := range app.commentImages {
+		if side.attempted {
+			t.Fatal("unsupported terminal loaded images")
+		}
 	}
 	app.images.enabled = true
 	app.renderCommentContent("Reviewer", "![missing](missing.png)", "", 30)

@@ -67,8 +67,17 @@ func TestCodexWrapperHint(t *testing.T) {
 	cmd := exec.Command(self, doc)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
-	if err == nil || !strings.Contains(string(out), "no Herdr or tmux session") || !strings.Contains(string(out), "hint:") {
+	if err == nil || !strings.Contains(string(out), "no tmux or Herdr terminal detected") || !strings.Contains(string(out), "hint:") {
 		t.Fatalf("review error = %v, output: %s", err, out)
+	}
+
+	failed := launcherScript(t, filepath.Join(dir, "failed,launcher"), "echo custom unavailable >&2\nexit 1\n")
+	cmd = exec.Command(self, doc, "--launcher", "mux", "--launcher", "custom:"+failed)
+	cmd.Dir = dir
+	out, err = cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "launcher mux: no tmux or Herdr terminal detected") ||
+		!strings.Contains(string(out), "launcher custom:"+failed) || strings.Count(string(out), "custom unavailable") != 1 {
+		t.Fatalf("combined launcher failure = %v, output: %s", err, out)
 	}
 
 	// Do not mistake an original Codex beside a critty-only install for our wrapper.

@@ -470,7 +470,11 @@ def scenarios() -> None:
             "# Mouse submission\n- [ ] Viewed <!-- form: id=viewed required -->\n"
         )
         mouse = Round("mouse-submit", ["--null", "--attachment", "mouse-approval.md"])
-        tmux("resize-pane", "-t", mouse.pane, "-x", "54")
+        floating = (
+            tmux("display-message", "-p", "-t", mouse.pane, "#{pane_floating_flag}")
+            == "1"
+        )
+        tmux("resize-pane", "-t", mouse.pane, "-x", "56" if floating else "54")
         assert tmux("display-message", "-p", "-t", mouse.pane, "#{pane_width}") == "54"
         mouse.comment("Existing feedback.")
         mouse.keys("r")
@@ -621,6 +625,82 @@ def scenarios() -> None:
         report(
             "failed summary export grants no approval; same-session retry saves a fresh result"
         )
+
+        launcher = WORK / "custom launcher"
+        launcher.write_text(
+            f"#!{sys.executable}\n"
+            + """import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+operation = sys.argv[1]
+request = json.load(sys.stdin)
+if operation == "check":
+    assert os.environ["TMUX_PANE"].startswith("%")
+    Path("launcher-check.json").write_text(json.dumps(request))
+elif operation == "open":
+    assert request == json.loads(Path("launcher-check.json").read_text())
+    command = 'tmux set-option -p -t "$TMUX_PANE" remain-on-exit on && exec ' + request["command"]
+    pane = subprocess.check_output([
+        "tmux", "split-window", "-h", "-d", "-P", "-F", "#{pane_id}",
+        "-t", os.environ["TMUX_PANE"], "-c", request["cwd"], command,
+    ], text=True).strip()
+    print(json.dumps({"pane": pane}))
+elif operation == "close":
+    Path("launcher-close.json").write_text(json.dumps(request))
+    subprocess.run(["tmux", "kill-pane", "-t", request["pane"]], check=True)
+"""
+        )
+        launcher.chmod(0o755)
+        custom = Round(
+            "custom-launcher",
+            [
+                "plan.md",
+                "--launcher",
+                "custom:/missing/launcher",
+                "--launcher",
+                f"custom:{launcher}",
+            ],
+        )
+        custom.finish(True)
+        assert "unavailable" not in custom.err.read_text()
+        closed = json.loads((WORK / "launcher-close.json").read_text())
+        assert closed["pane"] == custom.pane
+        assert (
+            custom.pane not in tmux("list-panes", "-a", "-F", "#{pane_id}").splitlines()
+        )
+        project_config = WORK / ".critty.config.json"
+        project_config.write_text(json.dumps({"launchers": [f"custom:{launcher}"]}))
+        try:
+            (WORK / "launcher-check.json").unlink()
+            cli_first = Round("launcher-cli-priority", ["plan.md", "--launcher", "mux"])
+            cli_first.finish(True)
+            assert not (WORK / "launcher-check.json").exists()
+            for name, args in [
+                ("launcher-config-only", ["plan.md"]),
+                (
+                    "launcher-config-fallback",
+                    ["plan.md", "--launcher", "custom:/missing/launcher"],
+                ),
+            ]:
+                configured = Round(name, args)
+                configured.finish(True)
+                assert (
+                    json.loads((WORK / "launcher-close.json").read_text())["pane"]
+                    == configured.pane
+                )
+                assert "unavailable" not in configured.err.read_text()
+        finally:
+            project_config.unlink()
+        report("configured launchers follow CLI choices and precede implicit mux")
+        fallback = Round(
+            "launcher-fallback", ["plan.md", "--launcher", "custom:/missing/launcher"]
+        )
+        fallback.finish(True)
+        assert "unavailable" not in fallback.err.read_text()
+        report("custom launcher check/open/close round trip and unavailable fallback")
     finally:
         tmux("kill-server")
 
@@ -659,6 +739,10 @@ if __name__ == "__main__":
                 )
             configure(root, binary, Path(args.tmux).resolve())
             scenarios()
+            sys.dont_write_bytecode = True
+            from tmux_launchers import verify
+
+            verify(binary, Path(args.tmux).resolve())
         finally:
             if args.keep:
                 print(f"Fixtures and logs: {root}")

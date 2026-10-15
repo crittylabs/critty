@@ -11,12 +11,11 @@ func inspectParentProcess(pid int) (int, error) {
 }
 
 type reviewMultiplexerContext interface {
-	launchReview(*reviewMode) (reviewMultiplexerLaunch, error)
-	restoreFocus()
+	kind() string
 }
 
-type reviewMultiplexerLaunch interface {
-	close()
+type reviewLaunch interface {
+	close() error
 	restoreFocus()
 }
 

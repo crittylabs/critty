@@ -19,6 +19,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
+	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
@@ -29,6 +30,21 @@ func previewPNG(t *testing.T, width, height int) []byte {
 		t.Fatal(err)
 	}
 	return b.Bytes()
+}
+
+func TestTextReviewDoesNotProbeImages(t *testing.T) {
+	t.Setenv("TMUX", "")
+	app := setupAppWithDoc(t, "# Text only\n\nNo image previews.\n")
+	out := &previewOutput{changed: make(chan struct{}, 1)}
+	p := tea.NewProgram(app, tea.WithInput(strings.NewReader("")), tea.WithOutput(out), tea.WithWindowSize(80, 24), tea.WithoutSignalHandler())
+	timer := time.AfterFunc(350*time.Millisecond, p.Quit)
+	defer timer.Stop()
+	if _, err := p.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.output(), "a=T,f=32") {
+		t.Fatal("text review sent an image capability query")
+	}
 }
 
 type previewOutput struct {
@@ -134,9 +150,6 @@ func testPreviewTerminalRoundTrip(t *testing.T, lost int, encoded bool) {
 					t.Fatal(finished.err)
 				}
 				img := finished.model.(AppModel).tabs[0].preview.after.image
-				if finished.model.(AppModel).images.retriedOnKey {
-					t.Fatal("terminal response triggered the first-key retry")
-				}
 				if img == nil || !img.ready {
 					t.Fatal("image displayed before transmission completed")
 				}
@@ -171,7 +184,7 @@ func TestPreviewDecodeLimits(t *testing.T) {
 func TestImageCapabilityAndPassthrough(t *testing.T) {
 	t.Setenv("TMUX", "test")
 	d := newImageDisplay()
-	sequence := d.probe()().(tea.RawMsg).Msg.(string)
+	sequence := d.probeSequence()
 	if !strings.HasPrefix(sequence, "\x1bPtmux;") || !strings.Contains(sequence, "U=1") {
 		t.Fatalf("probe not passed through tmux: %q", sequence)
 	}
@@ -189,6 +202,7 @@ func TestImageCapabilityAndPassthrough(t *testing.T) {
 		{d.probeID + 1, "OK", false}, {d.probeID, "EINVAL", false}, {d.probeID, "OK", false},
 	} {
 		app := AppModel{images: d}
+		app.images.checking = true
 		app.images.attempts = 1
 		model, _ := app.Update(uv.KittyGraphicsEvent{Options: kitty.Options{ID: tc.id}, Payload: []byte(tc.payload)})
 		if model.(AppModel).images.enabled != tc.enabled {
@@ -210,6 +224,7 @@ func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app := AppModel{images: newImageDisplay()}
+			app.images.checking = true
 			app.images.attempts = 1
 			messages := []tea.Msg{
 				uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte(tc.payload)},
@@ -232,6 +247,7 @@ func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
 
 func TestImageProbeRetriesAndIgnoresStaleResponses(t *testing.T) {
 	app := AppModel{images: newImageDisplay()}
+	app.images.checking = true
 	var previous int
 	var cmd tea.Cmd
 	for attempt := 1; attempt <= maxImageProbeAttempts; attempt++ {
@@ -274,6 +290,7 @@ func TestImageProbeExhaustionAndManualRecheck(t *testing.T) {
 		t.Run(fmt.Sprintf("mouse=%t", mouse), func(t *testing.T) {
 			app := setupAppWithDoc(t, "source\n")
 			app.images = newImageDisplay()
+			app.images.checking = true
 			for attempt := 0; attempt < maxImageProbeAttempts; attempt++ {
 				id := app.images.probeID
 				app, _ = updateApp(app, imageProbeMsg{id})
@@ -336,6 +353,7 @@ func TestImageManualRecheckHasNoAttemptLimit(t *testing.T) {
 
 func TestImageProbeIgnoresEarlierCursorReports(t *testing.T) {
 	app := AppModel{images: newImageDisplay()}
+	app.images.checking = true
 	id := app.images.probeID
 	app, _ = updateApp(app, imageProbeMsg{id})
 	app, _ = updateApp(app, tea.CursorPositionMsg{X: 7, Y: 3})
@@ -346,7 +364,7 @@ func TestImageProbeIgnoresEarlierCursorReports(t *testing.T) {
 	}
 }
 
-func TestImageProbeOnFirstKey(t *testing.T) {
+func TestImageProbeDoesNotRetryOnTextInput(t *testing.T) {
 	for _, checking := range []bool{false, true} {
 		t.Run(fmt.Sprintf("checking=%t", checking), func(t *testing.T) {
 			app := setupAppWithDoc(t, "source\n")
@@ -356,8 +374,8 @@ func TestImageProbeOnFirstKey(t *testing.T) {
 			app.modalTextarea.Focus()
 			previous := app.images.probeID
 			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'a', Text: "a"})
-			if !app.images.checking || !app.images.retriedOnKey || app.images.probeID == previous {
-				t.Fatal("first key did not restart unconfirmed detection")
+			if app.images.checking != checking || app.images.probeID != previous {
+				t.Fatal("text input restarted image detection")
 			}
 			id := app.images.probeID
 			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Text: "b"})
@@ -381,8 +399,39 @@ func TestImageProbeOnFirstKey(t *testing.T) {
 	app.images.enabled = true
 	id := app.images.probeID
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab})
-	if app.images.probeID != id || app.images.retriedOnKey {
+	if app.images.probeID != id {
 		t.Fatal("confirmed terminal was checked again")
+	}
+}
+
+func TestImageProbeRetriesWhenSelectingPreview(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, content string
+		binary, want        bool
+	}{
+		{"image", "image.png", "", true, true},
+		{"document image", "images.md", "![preview](image.png)", false, true},
+		{"document text", "text.md", "plain text", false, false},
+		{"remote image", "remote.md", "![remote](https://example.com/image.png)", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := setupAppWithDoc(t, "text\n")
+			app.multiFile = true
+			app.images.checking = false
+			app.tabs = append(app.tabs, FileTab{path: tc.path, isBinary: tc.binary, isMarkdown: !tc.binary, doc: document.FromContent(tc.path, []byte(tc.content)), state: &fileReview{}})
+			id := app.images.probeID
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab})
+			if got := app.images.probeID != id; got != tc.want {
+				t.Fatalf("selection retry = %t, want %t", got, tc.want)
+			}
+			if tc.want {
+				id = app.images.probeID
+				app, _ = updateApp(app, tea.KeyPressMsg{Code: 'j', Text: "j"})
+				if app.images.probeID != id {
+					t.Fatal("navigation restarted the pending preview check")
+				}
+			}
+		})
 	}
 }
 
@@ -604,8 +653,8 @@ func TestPreviewComparisonLayout(t *testing.T) {
 func TestPreviewFallbackAndResize(t *testing.T) {
 	app := setupAppWithDoc(t, "text\n")
 	app.tab().path, app.tab().isBinary = "file.png", true
-	if app.prepareImage() != nil {
-		t.Fatal("read image without terminal support")
+	if app.prepareImage() == nil || !app.images.checking || app.tab().preview.after.attempted {
+		t.Fatal("image must request detection before loading")
 	}
 	app.images.enabled = true
 	app.patch = &gitpkg.Patch{}

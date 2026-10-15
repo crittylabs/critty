@@ -159,7 +159,7 @@ func TestMarkdownImagesInAttachmentsWithoutGit(t *testing.T) {
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			doc := review.AttachedDocument{ID: "a_plan", Source: filepath.Join(docs, "plan.md"), Name: "plan.md", Content: "# Plan\n![shot](assets/shot.png)\n"}
 			app := NewCodeReviewApp(patch.Changes(), "", AppConfig{Patch: patch, Documents: []review.AttachedDocument{doc}})
-			updated, _ := app.Update(docRenderedMsg{})
+			updated, discovery := app.Update(docRenderedMsg{})
 			app = updated.(AppModel)
 			app.images.enabled = true
 			app.contentViewport.SetWidth(80)
@@ -167,7 +167,7 @@ func TestMarkdownImagesInAttachmentsWithoutGit(t *testing.T) {
 			if app.tab().attachment == nil {
 				t.Fatalf("active tab %q is not the attachment", app.tab().path)
 			}
-			cmd := app.prepareImage()
+			cmd := discovery
 			if cmd == nil {
 				t.Fatal("attachment images were not requested")
 			}

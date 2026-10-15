@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- Open reviews in a centred, nonmodal floating pane on capable tmux 3.8+ servers, with a split on older servers, or in a new desktop terminal window when no multiplexer is available.  The defaults are `mux` then `desktop-terminal`; repeat `--launcher` to set priorities or append configured `launchers` after CLI choices.  macOS supports Ghostty 1.3+, iTerm2, and Terminal.app; Linux supports `xdg-terminal-exec`, and WSL can open Windows Terminal.  GUI launchers skip known SSH connections using client hints, tmux, and process ancestry, including marker notifications from daemon-backed agents.  Custom scripts provide availability checks and paired open/close operations.  Availability failures appear only when all choices fail; opening errors stop further attempts.  tmux reviews preserve background work and restore the source only while the review remains selected.  See the [launcher contract](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers) and Help for tmux controls.
+
 ### Changed
 
-- The Submit dialog starts on a single Approve/Comment/Reject choice group.  Use left/right arrows or `a`/`c`/`r` to select, then Tab or down to edit the overall comment.  Up from Submit, Back, or Abort also focuses the editor; Shift+Tab from the choices focuses Abort.
+- The Submit dialog starts on a single Approve/Comment/Reject choice group, with keyboard navigation between the choices, overall comment, and action buttons.  Bracket navigation continues through the dialog, wrapping to the first or last matching thread or form item so reviews can be cycled without stopping.
 
-- Bracket navigation continues through the Submit dialog.  While its choices or buttons have focus, `]` or `}` closes the dialog and wraps to the first thread or form item, and `[` or `{` returns to the last one, so a dialog opened by moving past the last item is easy to leave and the review can be cycled without stopping.  When no thread or form item matches, the keys open the dialog from the review and close it from the dialog.
+- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies Critty and tfil-generated Codex wrappers selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review, and `--terminal-notify-only` verifies the filter notification path without falling back to registered pane screens.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.
+
+### Fixed
+
+- Delayed image capability replies and mouse reports no longer spill into text fields when their sequences arrive in separate reads, including tmux extended-key input.  Image detection runs only when a preview is needed or explicitly requested, and tmux queries require the review pane to be selected in the server's sole attached client.  Selecting a tab containing a local image rechecks unconfirmed support; ordinary typing no longer triggers detection.
 
 ## 1.1.3
 
