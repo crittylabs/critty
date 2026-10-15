@@ -129,9 +129,17 @@ func (l *desktopLaunch) check() error {
 		if runtime.GOOS != "linux" {
 			return fmt.Errorf("requires Linux")
 		}
+		if _, err := lookPath("xdg-terminal-exec"); err != nil {
+			return err
+		}
 	case "windows-terminal-wsl":
 		if runtime.GOOS != "linux" || l.origin.WSLDistribution == "" {
 			return fmt.Errorf("requires WSL")
+		}
+		for _, command := range []string{"wt.exe", "wsl.exe"} {
+			if _, err := lookPath(command); err != nil {
+				return err
+			}
 		}
 	default:
 		if runtime.GOOS != "darwin" {

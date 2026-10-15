@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/crittylabs/critty/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -352,5 +354,50 @@ func TestDoctorDeduplicatesHomeInstall(t *testing.T) {
 	r.checkIntegrations(map[string][]integrationFile{"codex": {f}})
 	if len(r.Checks) != 1 {
 		t.Fatalf("home install checked twice: %+v", r)
+	}
+}
+
+func TestDoctorDesktopLaunchers(t *testing.T) {
+	for _, tt := range []struct {
+		name, platform, wsl string
+		want                []string
+	}{
+		{"macOS", "darwin", "", []string{"ghostty-window", "iterm-window", "terminal-app-window"}},
+		{"Linux", "linux", "", []string{"xdg-terminal"}},
+		{"WSL", "linux", "Ubuntu", []string{"xdg-terminal", "windows-terminal-wsl"}},
+		{"unsupported", "freebsd", "", nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, available := range []bool{false, true} {
+				r := doctorReport{}
+				var checked []string
+				r.checkDesktopLaunchers(tt.platform, terminalbinding.Origin{WSLDistribution: tt.wsl}, func(name string) error {
+					checked = append(checked, name)
+					if !available {
+						return fmt.Errorf("missing %s", name)
+					}
+					return nil
+				})
+				if !slices.Equal(checked, tt.want) {
+					t.Fatalf("checked %v, want %v", checked, tt.want)
+				}
+				if len(tt.want) == 0 {
+					if d := diagnosticFor(t, r, "launchers/desktop-terminal"); d.Status != "info" {
+						t.Fatalf("unsupported: %+v", d)
+					}
+					continue
+				}
+				for _, name := range tt.want {
+					d := diagnosticFor(t, r, "launchers/"+name)
+					if available {
+						if d.Status != "ok" {
+							t.Fatalf("available: %+v", d)
+						}
+					} else if d.Status != "warn" || d.Advice == "" || d.Message != "missing "+name {
+						t.Fatalf("unavailable: %+v", d)
+					}
+				}
+			}
+		})
 	}
 }

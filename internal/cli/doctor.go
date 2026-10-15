@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/crittylabs/critty/internal/tui"
 )
 
@@ -79,9 +81,11 @@ func newDoctorCommand() *cobra.Command {
 	var python string
 	cmd := &cobra.Command{
 		Use: "doctor", Aliases: []string{"check"},
-		Short: "Diagnose integrations, AI review prerequisites and image settings",
+		Short: "Diagnose integrations, review launchers and image settings",
 		Long: `Check project and global integrations against this build, Python and MCP
-requirements for restricted AI reviews, and available multiplexer image settings.
+requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
+image settings. Desktop checks inspect installed applications and commands without
+opening windows or testing automation permission.
 Use --python to check the dedicated Python environment used for Codex reviews.
 
 No AI service is contacted and no persistent settings are changed. Herdr checks read local
@@ -95,6 +99,10 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkIntegrations(integrations())
 			r.checkAI(python)
 			r.checkImages()
+			origin := terminalbinding.CaptureOrigin(os.Getpid())
+			r.checkDesktopLaunchers(runtime.GOOS, origin, func(name string) error {
+				return (&desktopLaunch{name: name, origin: origin}).check()
+			})
 			if err := r.write(cmd.OutOrStdout(), asJSON); err != nil {
 				return err
 			}
@@ -372,6 +380,38 @@ func (r *doctorReport) checkHerdrImages() {
 		}
 	}
 	r.add("images/herdr", status, message, "Set `[terminal] kitty_graphics = true` for images. Restart the server or reattach the client after changing it. This checks local config only; remote server and client settings may differ.")
+}
+
+// Check every supported launcher for this platform, independently of launch priority
+// and the SSH policy. Availability does not establish permission to open a window.
+func (r *doctorReport) checkDesktopLaunchers(platform string, origin terminalbinding.Origin, check func(string) error) {
+	var names []string
+	switch platform {
+	case "darwin":
+		names = []string{"ghostty-window", "iterm-window", "terminal-app-window"}
+	case "linux":
+		names = []string{"xdg-terminal"}
+		if origin.WSLDistribution != "" {
+			names = append(names, "windows-terminal-wsl")
+		}
+	default:
+		r.add("launchers/desktop-terminal", "info", "no built-in desktop terminal launcher for "+platform, "Use a multiplexer or custom launcher.")
+		return
+	}
+	for _, name := range names {
+		if err := check(name); err != nil {
+			advice := "Install the application and its required scripting support, or use another launcher."
+			switch name {
+			case "xdg-terminal":
+				advice = "Install xdg-terminal-exec and configure a supported terminal desktop entry."
+			case "windows-terminal-wsl":
+				advice = "Install Windows Terminal and make wt.exe and wsl.exe available on the WSL PATH."
+			}
+			r.add("launchers/"+name, "warn", err.Error(), advice)
+			continue
+		}
+		r.add("launchers/"+name, "ok", "available (window creation is not tested)", "")
+	}
 }
 
 func init() { rootCmd.AddCommand(newDoctorCommand()) }

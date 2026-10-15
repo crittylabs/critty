@@ -6,6 +6,10 @@
 
 - Open reviews in a centred, nonmodal floating pane on capable tmux 3.8+ servers, with a split on older servers, or in a new desktop terminal window when no multiplexer is available.  The defaults are `mux` then `desktop-terminal`; repeat `--launcher` to set priorities or append configured `launchers` after CLI choices.  macOS supports Ghostty 1.3+, iTerm2, and Terminal.app; Linux supports `xdg-terminal-exec`, and WSL can open Windows Terminal.  GUI launchers skip known SSH connections using client hints, tmux, and process ancestry, including marker notifications from daemon-backed agents.  Custom scripts provide availability checks and paired open/close operations.  Availability failures appear only when all choices fail; opening errors stop further attempts.  tmux reviews preserve background work and restore the source only while the review remains selected.  See the [launcher contract](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers) and Help for tmux controls.
 
+### Changed
+
+- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  Missing applications or launch prerequisites produce warnings and setup advice.
+
 ### Fixed
 
 - Delayed image capability replies and mouse reports no longer spill into text fields when their sequences arrive in separate reads, including tmux extended-key input.  Image detection runs only when a preview is needed or explicitly requested, and tmux queries require the review pane to be selected in the server's sole attached client.  Selecting a tab containing a local image rechecks unconfirmed support; ordinary typing no longer triggers detection.
