@@ -33,9 +33,10 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 | --- | --- | --- |
 | `codex` | `.codex/skills` | `~/.codex/skills` |
 | `opencode` | `.opencode` | OpenCode's XDG config directory |
+| `antigravity` (`agy`) | `.agents/skills` | `~/.gemini/antigravity-cli/skills` |
 | `agents` | `.agents/skills` | `~/.agents/skills` |
 
-`agents` provides shared, host-neutral skill references and comment attribution.  Prefer a shared installation or selected host variants, because hosts may discover duplicate names across directories.  Existing installations in old locations are left untouched.
+`agents` provides shared, host-neutral skill references and comment attribution.  Antigravity skills use the ordinary `critty` names.  Prefer a shared installation or selected host variants, because hosts may discover duplicate names across directories.  Existing installations in old locations are left untouched.  `install all` includes Antigravity; legacy Gemini CLI skills remain available through `install gemini`.
 
 ## Review inputs
 

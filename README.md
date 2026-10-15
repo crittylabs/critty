@@ -99,7 +99,7 @@ Use `critty install --user <target>` or run the installer from your home directo
 
 `critty install agents` installs shared skills in the project's `.agents/skills/`; `critty install --user agents` installs them in `~/.agents/skills/`.  This variant refers to skills by name and asks the agent to use its own comment author name.  Choose it when sharing one installation across agent hosts.
 
-Use a shared installation or the variants for your chosen hosts.  Some hosts also discover other hosts' directories, so installing multiple variants can expose duplicate skill names.  `install all` installs all agent-specific variants, excluding `agents` and prompt templates.  Existing files in old locations are left in place: remove obsolete Codex skills from `.agents/skills` or `~/.agents/skills` after checking that you no longer need them.
+Use a shared installation or the variants for your chosen hosts.  Some hosts also discover other hosts' directories, so installing multiple variants can expose duplicate skill names.  `install all` installs all agent-specific variants, excluding `agents` and legacy Gemini.  Existing files in old locations are left in place: remove obsolete Codex skills from `.agents/skills` or `~/.agents/skills` after checking that you no longer need them.
 
 #### Claude Code
 
@@ -127,6 +127,17 @@ critty install opencode            # From a repo root: install for that project
 ```
 
 Then use `/critty [file]`.
+
+#### Antigravity CLI
+
+```bash
+critty install --user agy          # User: ~/.gemini/antigravity-cli/skills/
+critty install agy                 # Project-local: .agents/skills/
+```
+
+`agy` is an alias for the `antigravity` install target.  Use `/critty` for reviews and `/critty-approval` for approvals.  Skills keep the same names across install targets.  The AI review and cowork skills can request the existing Claude Code and Codex reviewers; launching `agy` as a restricted reviewer is not supported.
+
+See [Antigravity's skill locations](https://www.agy.dev/docs/skills/#cli-skill-locations).  `critty install all` includes Antigravity instead of legacy Gemini CLI.
 
 #### Gemini CLI
 

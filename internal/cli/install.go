@@ -41,6 +41,12 @@ type skillVariant struct {
 }
 
 var skillVariants = map[string]skillVariant{
+	"antigravity": {
+		author:         "Antigravity CLI",
+		skillRef:       func(name string) string { return "/" + name },
+		argumentsToken: "<arguments>",
+		dropKeys:       []string{"allowed-tools", "argument-hint", "user-invocable"},
+	},
 	"claude-code": {
 		author:         "Claude Code",
 		skillRef:       func(name string) string { return "/" + name },
@@ -209,8 +215,14 @@ func integrations() map[string][]integrationFile {
 		skillFile("critty-approval", "gemini", ".gemini"),
 	}
 
+	m["antigravity"] = []integrationFile{
+		skillFile("critty", "antigravity", ".agents"),
+		skillFile("critty-cli", "antigravity", ".agents"),
+		skillFile("critty-approval", "antigravity", ".agents"),
+	}
+
 	for agent, dir := range map[string]string{
-		"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents",
+		"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents", "antigravity": ".agents",
 	} {
 		files := []integrationFile{
 			skillFile("critty-ai-review", agent, dir),
@@ -228,6 +240,12 @@ func integrations() map[string][]integrationFile {
 			}
 		}
 		m[agent] = append(m[agent], files...)
+	}
+
+	for i := range m["antigravity"] {
+		f := &m["antigravity"][i]
+		rel := strings.TrimPrefix(f.dest, ".agents"+string(filepath.Separator))
+		f.globalDest = filepath.Join(".gemini", "antigravity-cli", rel)
 	}
 
 	var prompts []integrationFile
@@ -250,9 +268,12 @@ func integrations() map[string][]integrationFile {
 	return m
 }
 
-var agentTargets = []string{"claude-code", "codex", "opencode", "gemini"}
+var agentTargets = []string{"claude-code", "codex", "opencode", "antigravity"}
 
 func integrationTargets(target string, reg map[string][]integrationFile) ([]string, error) {
+	if target == "agy" {
+		target = "antigravity"
+	}
 	if target == "all" {
 		return agentTargets, nil
 	}
@@ -260,7 +281,8 @@ func integrationTargets(target string, reg map[string][]integrationFile) ([]stri
 		return []string{target}, nil
 	}
 
-	available := make([]string, 0, len(reg)+1)
+	available := make([]string, 0, len(reg)+2)
+	available = append(available, "agy")
 	for name := range reg {
 		available = append(available, name)
 	}
@@ -269,7 +291,7 @@ func integrationTargets(target string, reg map[string][]integrationFile) ([]stri
 }
 
 var installCmd = &cobra.Command{
-	Use:   "install [--user] [--force] <claude-code|codex|opencode|gemini|agents|prompts|all>",
+	Use:   "install [--user] [--force] <claude-code|codex|opencode|antigravity|agy|gemini|agents|prompts|all>",
 	Short: "Install agent integrations or stock prompt templates",
 	Long: `Install agent integrations (skills) or the stock finish prompt
 templates.
@@ -281,19 +303,22 @@ Targets:
   claude-code  Claude Code skills
   codex        Codex skills
   opencode     OpenCode command (/critty) and skills
-  gemini       Gemini CLI skills
+  antigravity  Antigravity CLI (agy) skills
+  agy          Alias for antigravity
+  gemini       Legacy Gemini CLI skills (explicit installation only)
   agents       Shared, agent-neutral skills under .agents/skills
   prompts      Stock finish prompt templates (customize after copying)
-  all          claude-code + codex + opencode + gemini
+  all          claude-code + codex + opencode + antigravity
 
 Agent targets include critty-cli, critty-approval, critty-ai-review, and
 critty-ai-cowork, with their reference files and review gate. The interactive
 critty workflow is a skill except in OpenCode, where it is a command.
 
 Codex uses .codex/skills in either scope. OpenCode uses .opencode in
-projects and its XDG config directory for users. The agents target uses
-.agents/skills in either scope. Prefer a shared installation or selected
-host variants to avoid duplicate skill names.
+projects and its XDG config directory for users. Antigravity uses
+.agents/skills in projects and ~/.gemini/antigravity-cli/skills for users.
+The agents target uses .agents/skills in either scope. Prefer a shared
+installation or selected host variants to avoid duplicate skill names.
 Existing files in old locations are left untouched.
 
 After installing replacements, recognized legacy crit-ai-review and

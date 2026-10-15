@@ -29,7 +29,7 @@ func destinations(t *testing.T, target string) []string {
 	t.Helper()
 	var dests []string
 	for _, f := range integrations()[target] {
-		if target != "opencode" && f.dest != f.globalDest {
+		if target != "opencode" && target != "antigravity" && f.dest != f.globalDest {
 			t.Errorf("%s %s: global destination %q differs", target, f.dest, f.globalDest)
 		}
 		dests = append(dests, f.dest)
@@ -112,13 +112,20 @@ func TestAllIncludesEveryAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, agent := range []string{"claude-code", "codex", "opencode", "gemini"} {
+	for _, agent := range []string{"claude-code", "codex", "opencode", "antigravity"} {
 		if !slices.Contains(names, agent) {
 			t.Errorf("all target %q lacks %s", names, agent)
 		}
 	}
 	if slices.Contains(names, "prompts") {
 		t.Errorf("all target %q must not install prompt templates", names)
+	}
+	if slices.Contains(names, "gemini") {
+		t.Errorf("all target %q must not install legacy Gemini skills", names)
+	}
+	legacy, err := integrationTargets("gemini", integrations())
+	if err != nil || !slices.Equal(legacy, []string{"gemini"}) {
+		t.Fatalf("explicit Gemini target = %v, %v", legacy, err)
 	}
 }
 
@@ -495,6 +502,69 @@ func TestInstallRetiresLegacyLinksWithoutDeletingTargets(t *testing.T) {
 	}
 }
 
+func TestAntigravityIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	reg := integrations()
+	names, err := integrationTargets("agy", reg)
+	if err != nil || !slices.Equal(names, []string{"antigravity"}) {
+		t.Fatalf("agy targets = %v, %v", names, err)
+	}
+	if len(reg["antigravity"]) != len(reg["codex"]) {
+		t.Fatal("Antigravity lacks bundled resources")
+	}
+	for _, agent := range []string{"codex", "antigravity"} {
+		for _, f := range reg[agent] {
+			if err := installIntegrationFile(f, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for i, f := range reg["antigravity"] {
+		original := reg["codex"][i]
+		rel, err := filepath.Rel(filepath.Join(".codex", "skills"), original.dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parts := strings.SplitN(rel, string(filepath.Separator), 2)
+		wantRel := filepath.Join(parts[0], parts[1])
+		if f.dest != filepath.Join(".agents", "skills", wantRel) || f.globalDest != filepath.Join(".gemini", "antigravity-cli", "skills", wantRel) {
+			t.Errorf("wrong destinations: %s, %s", f.dest, f.globalDest)
+		}
+		got, err := os.ReadFile(original.dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := original.content()
+		if err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("Codex content changed: %s", original.dest)
+		}
+		data, err := os.ReadFile(f.dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if parts[1] != "SKILL.md" {
+			if !bytes.Equal(data, want) {
+				t.Errorf("resource changed: %s", f.dest)
+			}
+			continue
+		}
+		content := string(data)
+		if !strings.Contains(content, "\nname: "+parts[0]+"\n") {
+			t.Errorf("wrong identity: %s", f.dest)
+		}
+		for _, unwanted := range []string{"$ARGUMENTS", "allowed-tools:", "argument-hint:", "user-invocable:", "'Claude Code'"} {
+			if strings.Contains(content, unwanted) {
+				t.Errorf("%s contains %q", f.dest, unwanted)
+			}
+		}
+		for _, skill := range skillNames {
+			if strings.Contains(content, "`$"+skill+"`") || strings.Contains(content, skill+"-antigravity") {
+				t.Errorf("unconverted skill reference in %s", f.dest)
+			}
+		}
+	}
+}
+
 func TestUserInstallScope(t *testing.T) {
 	home := t.TempDir()
 	project := t.TempDir()
@@ -553,6 +623,7 @@ func TestUserInstallTargetPaths(t *testing.T) {
 		{"claude-code", ".claude/skills/critty/SKILL.md"},
 		{"codex", ".codex/skills/critty/SKILL.md"},
 		{"opencode", "config/opencode/commands/critty.md"},
+		{"agy", ".gemini/antigravity-cli/skills/critty/SKILL.md"},
 		{"agents", ".agents/skills/critty/SKILL.md"},
 	} {
 		t.Run(tc.target, func(t *testing.T) {
