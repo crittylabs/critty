@@ -25,27 +25,45 @@ const helpWidth = 100
 func showHelp(cmd *cobra.Command, _ []string) {
 	out := cmd.OutOrStdout()
 	style := detectOutputStyle(out)
-	file, isFile := out.(*os.File)
-	if !style.color() || !isFile || !term.IsTerminal(int(file.Fd())) {
+	width, paged := pageWidth(out, style)
+	if !paged {
 		if _, err := io.WriteString(out, plainHelp(cmd)); err != nil {
 			cmd.PrintErrln(err)
 		}
 		return
 	}
-	width := 80
-	if w, _, err := term.GetSize(int(file.Fd())); err == nil && w > 0 {
-		width = w
-	}
 	var buf strings.Builder
-	if _, err := io.WriteString(style.writer(&buf), styledHelp(cmd, style.dark, min(width, helpWidth))); err != nil {
+	if _, err := io.WriteString(style.writer(&buf), styledHelp(cmd, style.dark, width)); err != nil {
 		cmd.PrintErrln(err)
 		return
 	}
-	if !showInPager(buf.String()) {
-		if _, err := io.WriteString(out, buf.String()); err != nil {
-			cmd.PrintErrln(err)
-		}
+	if err := pageOrPrint(out, buf.String()); err != nil {
+		cmd.PrintErrln(err)
 	}
+}
+
+// pageWidth reports whether out is a color-capable terminal whose output
+// should be styled and paged, and the width to wrap that output to.
+func pageWidth(out io.Writer, style outputStyle) (width int, paged bool) {
+	file, ok := out.(*os.File)
+	if !ok || !style.color() || !term.IsTerminal(int(file.Fd())) {
+		return 0, false
+	}
+	width = 80
+	if w, _, err := term.GetSize(int(file.Fd())); err == nil && w > 0 {
+		width = w
+	}
+	return min(width, helpWidth), true
+}
+
+// pageOrPrint shows text through the pager, or writes it to out when no
+// pager is available.
+func pageOrPrint(out io.Writer, text string) error {
+	if showInPager(text) {
+		return nil
+	}
+	_, err := io.WriteString(out, text)
+	return err
 }
 
 // plainHelp mirrors Cobra's default help output.

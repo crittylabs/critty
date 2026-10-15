@@ -12,7 +12,7 @@
 
 - The Submit dialog starts on a single Approve/Comment/Reject choice group, with keyboard navigation between the choices, overall comment, and action buttons.  Bracket navigation continues through the dialog, wrapping to the first or last matching thread or form item so reviews can be cycled without stopping.
 
-- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies Critty and tfil-generated Codex wrappers selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review, and `--terminal-notify-only` verifies the filter notification path without falling back to registered pane screens.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.
+- `critty doctor` checks every built-in desktop terminal launcher supported on the current platform without opening windows.  It also identifies Critty and tfil-generated Codex wrappers selected on PATH and tfil in terminal process ancestry; a prepared `--terminal-request` tests marker binding without opening a review, and `--terminal-notify-only` verifies the filter notification path without falling back to registered pane screens.  Missing applications, launch prerequisites, or a failed marker test produce warnings and setup advice.  The text report now groups checks by area under the brand header, marks each line with a colored status, indents advice beneath its check, wraps to the terminal width, ends with a summary count, and opens in the same pager as `--help`.
 
 ### Fixed
 
