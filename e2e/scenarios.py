@@ -470,7 +470,11 @@ def scenarios() -> None:
             "# Mouse submission\n- [ ] Viewed <!-- form: id=viewed required -->\n"
         )
         mouse = Round("mouse-submit", ["--null", "--attachment", "mouse-approval.md"])
-        tmux("resize-pane", "-t", mouse.pane, "-x", "54")
+        floating = (
+            tmux("display-message", "-p", "-t", mouse.pane, "#{pane_floating_flag}")
+            == "1"
+        )
+        tmux("resize-pane", "-t", mouse.pane, "-x", "56" if floating else "54")
         assert tmux("display-message", "-p", "-t", mouse.pane, "#{pane_width}") == "54"
         mouse.comment("Existing feedback.")
         mouse.keys("r")
@@ -703,6 +707,10 @@ if __name__ == "__main__":
                 )
             configure(root, binary, Path(args.tmux).resolve())
             scenarios()
+            sys.dont_write_bytecode = True
+            from tmux_launchers import verify
+
+            verify(binary, Path(args.tmux).resolve())
         finally:
             if args.keep:
                 print(f"Fixtures and logs: {root}")

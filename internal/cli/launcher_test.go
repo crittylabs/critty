@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,20 +20,23 @@ func launcherScript(t *testing.T, path, body string) string {
 }
 
 func TestLauncherSelection(t *testing.T) {
-	originalPath, originalRequest := lookPath, terminalRequest
+	originalPath, originalRequest, originalOutput := lookPath, terminalRequest, commandOutput
 	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
 	terminalRequest = "marker-bound"
-	t.Cleanup(func() { lookPath, terminalRequest = originalPath, originalRequest })
+	commandOutput = func(*exec.Cmd) ([]byte, error) { return []byte("new-pane\t[-AdP] [-B border-lines] [-T title]\n"), nil }
+	t.Cleanup(func() { lookPath, terminalRequest, commandOutput = originalPath, originalRequest, originalOutput })
 	for _, tc := range []struct {
 		name     string
 		terminal reviewMultiplexerContext
 		want     string
 	}{
-		{"mux", tmuxContext{pane: "%1"}, "tmux"},
+		{"mux", tmuxContext{pane: "%1"}, "tmux-floating"},
 		{"mux", herdrContext{pane: "p1"}, "herdr"},
-		{"herdr", tmuxContext{pane: "%1"}, "tmux"},
+		{"herdr", tmuxContext{pane: "%1"}, "tmux-floating"},
 		{"tmux", herdrContext{pane: "p1"}, "herdr"},
-		{"custom:/missing/launcher", tmuxContext{pane: "%1"}, "tmux"},
+		{"custom:/missing/launcher", tmuxContext{pane: "%1"}, "tmux-floating"},
+		{"tmux-split", tmuxContext{pane: "%1"}, "tmux-split"},
+		{"tmux", tmuxContext{pane: "%1"}, "tmux-floating"},
 		{"mux", nil, ""},
 	} {
 		t.Run(tc.name+tc.want, func(t *testing.T) {
@@ -78,6 +82,31 @@ func TestCustomLauncherPathSearch(t *testing.T) {
 			}
 			if err := launcher.check(); (err == nil) != tc.available {
 				t.Fatalf("availability = %v, want %t", err, tc.available)
+			}
+		})
+	}
+}
+
+func TestTMUXLauncherFallback(t *testing.T) {
+	for _, name := range []string{"mux", "tmux", "tmux-floating", "tmux-split"} {
+		t.Run(name, func(t *testing.T) {
+			calls := mockTMUXLaunch(t, "")
+			original := commandOutput
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				if slices.Contains(cmd.Args, "list-commands") {
+					return []byte("new-pane\t[-dP] [-x width] [-y height]\n"), nil
+				}
+				return original(cmd)
+			}
+			launcher, err := selectReviewLauncher(name, tmuxContext{pane: "%7"}, &reviewMode{sessionKey: "0123456789ab"})
+			if err != nil || launcher == nil || launcher.name != "tmux-split" {
+				t.Fatalf("old server selection = %+v, %v", launcher, err)
+			}
+			if _, err := launcher.open(&reviewMode{sessionKey: "0123456789ab"}); err != nil {
+				t.Fatal(err)
+			}
+			if tmuxCall(*calls, "new-pane") != nil || tmuxCall(*calls, "split-window") == nil {
+				t.Fatalf("did not use split: %v", *calls)
 			}
 		})
 	}

@@ -15,7 +15,7 @@ type tmuxPane struct {
 	width, height         int
 }
 
-func spawnTUIPane(mode *reviewMode, target tmuxContext) (tmuxLaunch, error) {
+func spawnTMUXPane(mode *reviewMode, target tmuxContext, floating bool) (tmuxLaunch, error) {
 	bin, err := lookPath("tmux")
 	if err != nil {
 		return tmuxLaunch{}, err
@@ -37,14 +37,23 @@ func spawnTUIPane(mode *reviewMode, target tmuxContext) (tmuxLaunch, error) {
 	// respawn-pane retains tmux's CRLF mode and breaks differential drawing.
 	command = shellEscape(bin) + " set-option -p -t \"$TMUX_PANE\" remain-on-exit on && exec " + command
 	args := []string{"split-window", "-h", "-p", "70"}
+	label := "split"
+	if floating {
+		width := min(source.width, max(3, source.width*90/100))
+		height := min(source.height, max(3, source.height*85/100))
+		args = []string{"new-pane", "-A", "-B", "rounded", "-T", "Critty",
+			"-x", strconv.Itoa(width), "-y", strconv.Itoa(height),
+			"-X", strconv.Itoa((source.width - width) / 2), "-Y", strconv.Itoa((source.height - height) / 2)}
+		label = "floating"
+	}
 	args = append(args, "-d", "-P", "-F", "#{pane_id}", "-t", source.pane, "-c", cwd, command)
 	out, err := commandOutput(tmuxCommand(bin, target, args...))
-	if err != nil {
+	if err != nil && !floating {
 		args = append([]string{"split-window", "-h"}, args[4:]...)
 		out, err = commandOutput(tmuxCommand(bin, target, args...))
 	}
 	if err != nil {
-		return tmuxLaunch{}, fmt.Errorf("opening tmux pane: %w", err)
+		return tmuxLaunch{}, fmt.Errorf("opening tmux %s pane: %w", label, err)
 	}
 	pane := strings.TrimSpace(string(out))
 	if !validTMUXPaneID(pane) {
@@ -57,7 +66,9 @@ func spawnTUIPane(mode *reviewMode, target tmuxContext) (tmuxLaunch, error) {
 			launch.close()
 		}
 	}()
-	client, err := focusedTMUXClient(bin, target, source.session, source.pane)
+	// Select within the source window even while the client views another one.
+	// select-pane does not switch the client window or activate its terminal.
+	client, err := tmuxClientWithSelectedPane(bin, target, source.session, source.pane, false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "critty: checking tmux focus: %v\n", err)
 	} else if client != "" {
@@ -66,7 +77,7 @@ func spawnTUIPane(mode *reviewMode, target tmuxContext) (tmuxLaunch, error) {
 		}
 	}
 	started = true
-	fmt.Fprintf(os.Stderr, "Opened review in tmux pane %s; focused: %t\n", pane, client != "")
+	fmt.Fprintf(os.Stderr, "Opened review in tmux %s pane %s; focused: %t\n", label, pane, client != "")
 	return launch, nil
 }
 
@@ -76,6 +87,22 @@ func validTMUXPaneID(pane string) bool {
 	}
 	_, err := strconv.ParseUint(strings.TrimPrefix(pane, "%"), 10, 64)
 	return err == nil
+}
+
+func supportsTMUXFloat(bin string, target tmuxContext) (bool, error) {
+	out, err := commandOutput(tmuxCommand(bin, target, "list-commands", "-F", "#{command_list_name}\t#{command_list_usage}"))
+	if err != nil {
+		return false, fmt.Errorf("querying tmux commands: %w", err)
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		name, usage, _ := strings.Cut(line, "\t")
+		if name == "new-pane" {
+			flags := strings.Fields(usage)
+			return len(flags) > 0 && strings.Contains(flags[0], "A") &&
+				strings.Contains(usage, "-B border-lines") && strings.Contains(usage, "-T title"), nil
+		}
+	}
+	return false, nil
 }
 
 func describeTMUXPane(bin string, target tmuxContext) (tmuxPane, error) {
@@ -100,15 +127,17 @@ func describeTMUXPane(bin string, target tmuxContext) (tmuxPane, error) {
 	return tmuxPane{fields[0], fields[1], fields[2], width, height}, nil
 }
 
-func focusedTMUXClient(bin string, target tmuxContext, session, pane string) (string, error) {
-	out, err := commandOutput(tmuxCommand(bin, target, "show-options", "-sv", "focus-events"))
-	if err != nil {
-		return "", err
+func tmuxClientWithSelectedPane(bin string, target tmuxContext, session, pane string, requireFocus bool) (string, error) {
+	if requireFocus {
+		out, err := commandOutput(tmuxCommand(bin, target, "show-options", "-sv", "focus-events"))
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(string(out)) != "on" {
+			return "", nil
+		}
 	}
-	if strings.TrimSpace(string(out)) != "on" {
-		return "", nil
-	}
-	out, err = commandOutput(tmuxCommand(bin, target, "list-clients", "-F", "#{client_name}\t#{session_id}\t#{pane_id}\t#{client_flags}"))
+	out, err := commandOutput(tmuxCommand(bin, target, "list-clients", "-F", "#{client_name}\t#{session_id}\t#{pane_id}\t#{client_flags}"))
 	if err != nil {
 		return "", err
 	}
@@ -119,7 +148,20 @@ func focusedTMUXClient(bin string, target tmuxContext, session, pane string) (st
 			clients = append(clients, fields)
 		}
 	}
-	if len(clients) != 1 || clients[0][2] != pane {
+	if len(clients) != 1 {
+		return "", nil
+	}
+	if !requireFocus {
+		out, err := commandOutput(tmuxCommand(bin, target, "display-message", "-p", "-t", pane, "#{pane_active}"))
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(string(out)) == "1" {
+			return clients[0][0], nil
+		}
+		return "", nil
+	}
+	if clients[0][2] != pane {
 		return "", nil
 	}
 	for flag := range strings.SplitSeq(clients[0][3], ",") {
@@ -169,7 +211,7 @@ type tmuxLaunch struct {
 
 func (l tmuxLaunch) close() error {
 	if l.source.pane != "" {
-		client, err := focusedTMUXClient(l.bin, l.context, l.source.session, l.pane)
+		client, err := tmuxClientWithSelectedPane(l.bin, l.context, l.source.session, l.pane, true)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "critty: checking tmux focus: %v\n", err)
 		} else if client != "" {

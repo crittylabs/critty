@@ -60,11 +60,12 @@ requiring a repository.  A file argument after --diff is also accepted.
 With --null, reviews only attachments without requiring a repository.
 
 Inside Herdr the TUI opens in a dedicated tab; inside tmux it opens in a
-split pane. This command blocks until the reviewer approves or finishes
+nonmodal floating pane on capable servers, with a split on older servers. This command blocks until the reviewer approves or finishes
 with comments, printing the resulting agent prompt on stdout and
 "approved: true|false" on stderr. Outside a multiplexer the TUI runs in
-the current terminal. Use --launcher auto, tmux, herdr, or custom:EXECUTABLE
-to choose how the review opens.`,
+the current terminal. Use --launcher to select auto, tmux, tmux-floating,
+tmux-split, herdr, or custom:EXECUTABLE. The tmux launcher tries floating
+panes first, then splits.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runReview(args)

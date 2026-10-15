@@ -16,7 +16,7 @@ import (
 var reviewLauncherName string
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&reviewLauncherName, "launcher", "mux", "review launcher: mux, tmux, herdr, or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringVar(&reviewLauncherName, "launcher", "mux", "review launcher: mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
@@ -69,15 +69,33 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 	}
 	switch name {
 	case "tmux":
-		ctx, ok := launcherTerminal(name, terminal).(tmuxContext)
+		floating, err := launcherCandidates("tmux-floating", terminal, mode)
+		if err != nil {
+			return nil, err
+		}
+		split, err := launcherCandidates("tmux-split", terminal, mode)
+		return append(floating, split...), err
+	case "tmux-floating", "tmux-split":
+		ctx, ok := launcherTerminal("tmux", terminal).(tmuxContext)
+		floating := name == "tmux-floating"
 		return []reviewLauncher{{name: name, check: func() error {
 			if !ok {
 				return fmt.Errorf("no tmux terminal")
 			}
-			_, err := lookPath("tmux")
-			return err
+			bin, err := lookPath("tmux")
+			if err != nil || !floating {
+				return err
+			}
+			supported, err := supportsTMUXFloat(bin, ctx)
+			if err != nil {
+				return err
+			}
+			if !supported {
+				return fmt.Errorf("floating panes require tmux 3.8+")
+			}
+			return nil
 		}, open: func(mode *reviewMode) (reviewLaunch, error) {
-			return spawnTUIPane(mode, ctx)
+			return spawnTMUXPane(mode, ctx, floating)
 		}}}, nil
 	case "herdr":
 		ctx, ok := launcherTerminal(name, terminal).(herdrContext)
@@ -93,7 +111,7 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 	default:
 		file, custom := strings.CutPrefix(name, "custom:")
 		if !custom || file == "" {
-			return nil, fmt.Errorf("unknown launcher %q; use mux, tmux, herdr, or custom:EXECUTABLE", name)
+			return nil, fmt.Errorf("unknown launcher %q; use mux, tmux, tmux-floating, tmux-split, herdr, or custom:EXECUTABLE", name)
 		}
 		launcher, err := newCustomLauncher(file, terminal, mode)
 		if err != nil {

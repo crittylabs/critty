@@ -18,7 +18,12 @@ func mockTMUXLaunch(t *testing.T, clientRows string) *[][]string {
 		args := cmd.Args[1:]
 		calls = append(calls, args)
 		switch args[0] {
+		case "list-commands":
+			return []byte("new-pane\t[-AdP] [-B border-lines] [-T title] [-x width] [-y height]\n"), nil
 		case "display-message":
+			if args[len(args)-1] == "#{pane_active}" {
+				return []byte("1\n"), nil
+			}
 			if args[len(args)-1] == "#{window_id}" {
 				return []byte("@1\n"), nil
 			}
@@ -53,7 +58,7 @@ func tmuxCall(calls [][]string, name string) []string {
 
 func TestBuiltinTMUXLaunch(t *testing.T) {
 	calls := mockTMUXLaunch(t, "")
-	launch, err := spawnTUIPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{})
+	launch, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,20 +71,66 @@ func TestBuiltinTMUXLaunch(t *testing.T) {
 	}
 }
 
+func TestBuiltinTMUXFloatingGeometry(t *testing.T) {
+	calls := mockTMUXLaunch(t, "")
+	if _, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, true); err != nil {
+		t.Fatal(err)
+	}
+	spawn := tmuxCall(*calls, "new-pane")
+	for option, value := range map[string]string{"-x": "162", "-y": "51", "-X": "9", "-Y": "4", "-B": "rounded"} {
+		i := slices.Index(spawn, option)
+		if i < 0 || spawn[i+1] != value {
+			t.Errorf("wrong window-relative geometry: %v", spawn)
+		}
+	}
+	if !slices.Contains(spawn, "-A") || !slices.Contains(spawn, "-d") || slices.Contains(spawn, "-O") {
+		t.Fatalf("float must remain detached and nonmodal: %v", spawn)
+	}
+}
+
+func TestBuiltinTMUXOpeningFailureDoesNotSplit(t *testing.T) {
+	calls := mockTMUXLaunch(t, "")
+	original := commandOutput
+	commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+		if cmd.Args[1] == "new-pane" {
+			return nil, fmt.Errorf("opening failed")
+		}
+		return original(cmd)
+	}
+	launcher, err := selectReviewLauncher("tmux", tmuxContext{pane: "%7"}, &reviewMode{sessionKey: "0123456789ab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := launcher.open(&reviewMode{sessionKey: "0123456789ab"}); err == nil {
+		t.Fatal("opening failure lost")
+	}
+	if tmuxCall(*calls, "split-window") != nil {
+		t.Fatalf("opening failure retried another launcher: %v", *calls)
+	}
+}
+
 func TestBuiltinTMUXFocusAndClose(t *testing.T) {
 	for _, tc := range []struct {
-		name, rows string
-		wantFocus  bool
+		name, rows              string
+		sourceActive, wantFocus bool
 	}{
-		{"source focused", "/dev/tty1\t$0\t%7\tattached,focused\n", true},
-		{"other pane focused", "/dev/tty1\t$0\t%8\tattached,focused\n", false},
-		{"terminal not focused", "/dev/tty1\t$0\t%7\tattached\n", false},
-		{"multiple clients", "/dev/tty1\t$0\t%7\tfocused\n/dev/tty2\t$0\t%7\tfocused\n", false},
-		{"no client", "", false},
+		{"source focused", "/dev/tty1\t$0\t%7\tattached,focused\n", true, true},
+		{"other pane focused", "/dev/tty1\t$0\t%8\tattached,focused\n", false, false},
+		{"other window focused", "/dev/tty1\t$0\t%8\tattached,focused\n", true, true},
+		{"terminal not focused", "/dev/tty1\t$0\t%7\tattached\n", true, true},
+		{"multiple clients", "/dev/tty1\t$0\t%7\tfocused\n/dev/tty2\t$0\t%7\tfocused\n", true, false},
+		{"no client", "", true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := mockTMUXLaunch(t, tc.rows)
-			launch, err := spawnTUIPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{})
+			original := commandOutput
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				if cmd.Args[len(cmd.Args)-1] == "#{pane_active}" && !tc.sourceActive {
+					return []byte("0\n"), nil
+				}
+				return original(cmd)
+			}
+			launch, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -95,10 +146,10 @@ func TestBuiltinTMUXFocusAndClose(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []string{"tmux"} {
-		t.Run("restore from "+name, func(t *testing.T) {
+	for _, floating := range []bool{false, true} {
+		t.Run(fmt.Sprintf("restore from floating=%t", floating), func(t *testing.T) {
 			calls := mockTMUXLaunch(t, "/dev/tty1\t$0\t%99\tattached,focused\n")
-			launch, err := spawnTUIPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{})
+			launch, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, floating)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -121,7 +172,7 @@ func TestBuiltinTMUXFocusFailureCleansUp(t *testing.T) {
 		}
 		return originalRun(cmd)
 	}
-	if _, err := spawnTUIPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}); err == nil ||
+	if _, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, false); err == nil ||
 		!slices.Equal(tmuxCall(*calls, "kill-pane"), []string{"kill-pane", "-t", "%99"}) {
 		t.Fatalf("failed startup leaked the review pane: calls=%v err=%v", *calls, err)
 	}
@@ -137,7 +188,7 @@ func TestBuiltinTMUXSplitRetriesWithoutPercentage(t *testing.T) {
 		}
 		return original(cmd)
 	}
-	if _, err := spawnTUIPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}); err != nil {
+	if _, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, false); err != nil {
 		t.Fatal(err)
 	}
 	var spawns [][]string
@@ -153,7 +204,7 @@ func TestBuiltinTMUXSplitRetriesWithoutPercentage(t *testing.T) {
 
 func TestBuiltinTMUXCloseAfterSourceRemoved(t *testing.T) {
 	calls := mockTMUXLaunch(t, "/dev/tty1\t$0\t%99\tfocused\n")
-	launch, err := spawnTUIPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{})
+	launch, err := spawnTMUXPane(&reviewMode{sessionKey: "0123456789ab"}, tmuxContext{}, false)
 	if err != nil {
 		t.Fatal(err)
 	}

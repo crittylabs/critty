@@ -4,7 +4,7 @@
 
 ### Added
 
-- Choose how reviews open with `--launcher`: automatic selection, tmux splits, Herdr tabs, or `custom:EXECUTABLE` scripts with availability checks and paired open/close operations.  Unavailable choices fall back to automatic selection.  tmux reviews preserve background work and return focus to the source only while the review remains selected.  See the [launcher contract](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers).
+- Review in a centred, nonmodal floating pane on capable tmux 3.8+ servers, with a split on older servers.  Choose `mux`, `tmux` (floating then split), `tmux-floating`, `tmux-split`, `herdr`, or `custom:EXECUTABLE` with `--launcher`.  Custom scripts have availability checks and paired open/close operations; unavailable choices fall back to automatic selection.  tmux reviews preserve background work and return focus to the source only while the review remains selected.  See the [launcher contract](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers) and Help for tmux controls.
 
 ### Fixed
 

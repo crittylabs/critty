@@ -4066,7 +4066,14 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
-	return columns + "\n\n" + search + "\n\n" + contexts
+	help := columns + "\n\n" + search + "\n\n" + contexts
+	if reviewHost() == "tmux" {
+		help += "\n\n" + renderHelpGroup("tmux controls (default bindings, 3.8+)", []helpItem{
+			{keys: "prefix @", desc: "toggle floating / tiled pane"},
+			{keys: "prefix ;", desc: "return to previous pane"},
+		}, innerWidth)
+	}
+	return help
 }
 
 func (m *AppModel) scrollHelp(delta int) {
