@@ -53,6 +53,16 @@ go install github.com/crittylabs/critty/cmd/critty@latest
 
 Release binaries are available for macOS and Linux on amd64 and arm64.  Building from source requires Go 1.27.2 or later.
 
+### Check prerequisites
+
+After installing the binary, run:
+
+```bash
+critty doctor
+```
+
+Run it in the terminal where you plan to use Critty.  It checks installed agent integrations, review launchers, image settings, and Python/MCP prerequisites for optional AI reviews.  Follow its suggestions for the features you plan to use, then rerun it after setup.
+
 ### Agent skills
 
 <a id="antigravity-cli"></a>
@@ -71,13 +81,21 @@ The `agy` target also accepts `antigravity`.  Omit `--user` to install for the c
 
 Rerun the installer after upgrading.  In v1.2.0, Codex skills use `.codex/skills` in projects and `~/.codex/skills` for users; remove obsolete copies from `.agents/skills` if needed.  When migrating from TCrit, use the new binary and skill names; see the [changelog](CHANGELOG.md) for migration details.
 
+After installing or upgrading the skills, run `critty doctor` from your project to check for missing or outdated integration files.
+
 ### Terminals and multiplexers
 
-Floating panes require tmux 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use tmux or Herdr for agent reviews, or run Critty directly.  Use `critty doctor` to check your setup and the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for configuration and supported terminals.
+Floating panes require tmux 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use tmux or Herdr for agent reviews, or run Critty directly.
+
+After setting up or switching your terminal or multiplexer, run `critty doctor` there to check review launchers and local image forwarding settings.  See the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for configuration and supported terminals.
 
 #### Image previews
 
-Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, or iTerm2.  Through tmux or Herdr, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.  PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
+Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, or iTerm2.  Through tmux or Herdr, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
+
+After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr checks read local configuration; running server and remote client settings may differ.
+
+PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
 
 <a id="codex-with-a-background-server"></a>
 
@@ -89,7 +107,7 @@ When using Codex in tmux or Herdr, start it through Critty so reviews can find t
 critty codex
 ```
 
-Alternatively, put the bundled `codex` wrapper ahead of Codex on your `PATH`.  See [terminal-filter integration](docs/terminal-filter.md) for setup details.
+Alternatively, put the bundled `codex` wrapper ahead of Codex on your `PATH`.  Run `critty doctor` to inspect wrapper and terminal-filter detection.  For an end-to-end binding test, use the [marker-based doctor check](internal/cli/skill/critty-cli/SKILL.md#environment-diagnostics).  See [terminal-filter integration](docs/terminal-filter.md) for setup.
 
 ## Basic workflow
 
@@ -154,7 +172,13 @@ For example:
 
 > Use critty-ai-review with Codex Astra to review these changes in the current session.
 
-AI review requires an existing Critty session and authorized access to the chosen reviewer.  The bundled restricted CLI setups support Claude Code with Python 3.10+, or Codex with Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies; `critty doctor` checks prerequisites.
+AI review requires an existing Critty session and authorized access to the chosen reviewer.  The bundled restricted CLI setups support Claude Code with Python 3.10+, or Codex with Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies.
+
+Before your first AI review, run `critty doctor` to check Python and MCP prerequisites.  If the reviewer uses a dedicated Python environment, check that interpreter explicitly:
+
+```bash
+critty doctor --python /absolute/path/to/venv/bin/python
+```
 
 If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinstall with `critty install --force <agent>` to update them.
 
