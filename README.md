@@ -11,7 +11,9 @@
 
 Review code, refine plans, make choices, and approve actions with your coding agent in the terminal.
 
-Read a proposal, leave inline feedback, choose an approach, or authorize a specific action.  These interactions can stand on their own or happen alongside code and document reviews.  Your agent continues from your responses and can return to the same session for another round.
+You can review a diff, file, or document on its own.  Your agent can also attach a document asking for your permission or a decision.  You can agree in advance on which actions need your approval, such as pushing code or deploying.
+
+When your agent needs your input, it prepares the request and opens the review in Critty.  You can comment on individual lines, use checkboxes to confirm details or allow actions, and choose options with radio buttons.  Your comments and answers go back to the agent.
 
 For example:
 
@@ -29,7 +31,7 @@ For example:
 ## Key Features
 
 - **Code and document reviews** — read multi-file diffs and documents with syntax highlighting and inline comments.
-- **Approvals and choices** — approve specific actions, complete required confirmations, and choose between alternatives, with or without a code or document review.
+- **Approvals and choices** — read requests in attached documents, confirm details or allow actions with checkboxes, and choose between alternatives with radio buttons.  These requests can accompany a code review or stand on their own.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
@@ -142,7 +144,9 @@ Reviews support mouse and keyboard navigation, search, inline comments, and your
 
 ### Review code and approve the next actions
 
-Use [critty-approval](internal/cli/skill/critty-approval/SKILL.md) to review code changes together with the actions that follow approval, such as committing, pushing a branch, or deploying.  The agent can attach the proposed commit message, push destination, or deployment plan to the same session as the diff.
+Agree with your agent on which actions need your approval, such as committing, pushing a branch, or deploying.  Keep your project rules for reviews, approvals, and choices in `CLAUDE.md` or `AGENTS.md`.
+
+When it needs your permission or a decision, the agent can use [critty-approval](internal/cli/skill/critty-approval/SKILL.md) to prepare a document with the details and open it in Critty.  That document can be attached to the same session as the diff, so you can review the changes and next steps together.  It can include the proposed commit message, push destination, or deployment plan.
 
 For example:
 
@@ -154,15 +158,13 @@ Required confirmations must be complete before approval.  Approving the review d
 
 ### Approvals and choices without a code diff
 
-The same `critty-approval` skill also works on its own.  You can choose an approach before implementation starts or approve an action that has no code changes to review:
+The agent can also open a request document on its own, without a code diff.  Use the same `critty-approval` skill to choose an approach before implementation starts or approve an action that has no code changes to review:
 
 > Use critty-approval to let me choose between these implementation approaches.
 >
 > Use critty-approval to show me the PR text and destination before publishing it.
 
-Read the supporting material, answer questions, and submit your decision.  The agent continues from your feedback and answers.
-
-Keep project policy for reviews, approvals, and choices in `CLAUDE.md` or `AGENTS.md`, and let the installed skills handle the interaction with Critty.
+Read the request and supporting material, leave comments, and use the checkboxes or radio buttons to give your answers.  Submit your decision, and the agent continues from your feedback and answers.  The installed skills handle the interaction with Critty.
 
 ### AI review and collaboration (Experimental)
 
