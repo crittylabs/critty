@@ -384,3 +384,148 @@ func TestImageFitStopsAtPixelSize(t *testing.T) {
 		t.Fatalf("icon preview: %dx%d", cols, rows)
 	}
 }
+
+func TestLightboxCyclesImageRevisions(t *testing.T) {
+	for _, tc := range []struct {
+		status gitpkg.ChangeStatus
+		before bool
+		count  int
+	}{
+		{gitpkg.StatusModified, true, 2},
+		{gitpkg.StatusRenamed, true, 2},
+		{gitpkg.StatusAdded, false, 1},
+		{gitpkg.StatusDeleted, true, 1},
+	} {
+		t.Run(tc.status.String(), func(t *testing.T) {
+			app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "image.png", Status: tc.status, Binary: true}}, "HEAD", AppConfig{})
+			app, _ = updateApp(app, docRenderedMsg{})
+			app.images.enabled = true
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
+			app.tab().preview.before.image = &inlineImage{id: 101, width: 160, height: 80, columns: 20, rows: 5, ready: true}
+			app.tab().preview.after.image = &inlineImage{id: 102, width: 160, height: 80, columns: 20, rows: 5, ready: true}
+			app.rebuildContent()
+			app, cmd := updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+			if app.modal != lightboxModal || cmd == nil || app.lightbox.target.before != tc.before || len(app.lightbox.siblings) != tc.count {
+				t.Fatalf("M-o did not open the first available revision: %+v", app.lightbox)
+			}
+			check := func(wantBefore bool) {
+				t.Helper()
+				label, id := "After", 102
+				if wantBefore {
+					label, id = "Before", 101
+				}
+				content, _, _ := app.lightboxContent()
+				if app.lightbox.image.id != id || !strings.Contains(ansi.Strip(content), "image.png ("+label+")") || strings.Contains(content, "on the line") {
+					t.Fatalf("wrong revision or caption: %+v %q", app.lightbox, ansi.Strip(content))
+				}
+			}
+			check(tc.before)
+			for _, key := range []rune{tea.KeyRight, tea.KeyLeft} {
+				app, _ = pressKeyCmd(app, key)
+				wantBefore := tc.before
+				if tc.count == 2 && key == tea.KeyRight {
+					wantBefore = false
+				}
+				check(wantBefore)
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+			check(tc.count == 1 && tc.before)
+			app, _ = pressKeyCmd(app, tea.KeyEscape)
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+			check(tc.before)
+			app, _ = pressKeyCmd(app, tea.KeyEscape)
+			for _, before := range app.tab().previewSides() {
+				for _, side := range app.tab().previewSides() {
+					img := app.tab().preview.side(side).image
+					app, _ = updateApp(app, imageReadyMsg{path: app.tab().path, before: side, columns: img.columns, rows: img.rows})
+				}
+				target := app.tab().imageTarget(before)
+				_, cells := linkCells(app.View().Content, target.uri())
+				var point tea.Mouse
+				found := false
+				for _, cell := range cells {
+					if app.referenceAt(cell.X, cell.Y) == target.uri() {
+						point, found = cell, true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("no clickable preview for %+v", target)
+				}
+				app, cmd = clickMouseCmd(app, point.X, point.Y)
+				if cmd == nil || app.modal != lightboxModal || len(app.lightbox.siblings) != tc.count {
+					t.Fatalf("preview click did not open the revision group: %+v", app.lightbox)
+				}
+				check(before)
+				app, _ = pressKeyCmd(app, tea.KeyEscape)
+			}
+		})
+	}
+}
+
+func TestLightboxLoadsRenamedBeforeImage(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	runGitIn(t, dir, "init", "-q")
+	runGitIn(t, dir, "config", "user.name", "Test")
+	runGitIn(t, dir, "config", "user.email", "test@example.com")
+	if err := os.WriteFile("old.png", previewPNG(t, 160, 80), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitIn(t, dir, "add", "old.png")
+	runGitIn(t, dir, "commit", "-qm", "base")
+	if err := os.Rename("old.png", "new.png"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("new.png", previewPNG(t, 320, 160), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	source := &gitpkg.ReviewSource{Scope: "all", Base: "HEAD"}
+	app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "new.png", OldPath: "old.png", Status: gitpkg.StatusRenamed, Binary: true}}, "HEAD", AppConfig{Source: source})
+	app, _ = updateApp(app, docRenderedMsg{})
+	app.images.enabled = true
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+	if app.modal != lightboxModal || app.lightbox.target.path != "old.png" || !app.lightbox.target.before {
+		t.Fatalf("renamed Before target: %+v", app.lightbox.target)
+	}
+	msg := app.loadLightboxImage(app.lightbox.target)().(lightboxLoadedMsg)
+	if msg.err != nil || msg.width != 160 || msg.height != 80 {
+		t.Fatalf("Before did not read the original Git image: %+v", msg)
+	}
+	app, cmd := updateApp(app, msg)
+	if app.lightbox.image.id == 0 || len(rawMessages(cmd)) < 2 {
+		t.Fatal("Before was not transmitted and placed")
+	}
+	app = pressKey(app, tea.KeyRight)
+	msg = app.loadLightboxImage(app.lightbox.target)().(lightboxLoadedMsg)
+	if app.lightbox.target.path != "new.png" || app.lightbox.target.before || msg.err != nil || msg.width != 320 {
+		t.Fatalf("After did not read the new image: target=%+v image=%+v", app.lightbox.target, msg)
+	}
+}
+
+func TestStandaloneImageLightbox(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "image.png")
+	if err := os.WriteFile(path, previewPNG(t, 160, 80), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(path, AppConfig{})
+	app, _ = updateApp(app, docRenderedMsg{})
+	app.images.enabled = true
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
+	app.tab().preview.after.image = &inlineImage{id: 101, width: 160, height: 80, columns: 20, rows: 5, ready: true}
+	app, cmd := updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+	if app.modal != lightboxModal || cmd == nil || len(app.lightbox.siblings) != 1 || app.lightbox.target.before {
+		t.Fatalf("standalone image did not open: %+v", app.lightbox)
+	}
+	content, _, _ := app.lightboxContent()
+	if strings.Contains(content, "(After)") || strings.Contains(content, "(Before)") {
+		t.Fatal("standalone image should have no diff-side caption")
+	}
+	app = pressKey(app, tea.KeyRight)
+	if app.lightbox.image.id != 101 {
+		t.Fatal("a standalone image has no other revision")
+	}
+}

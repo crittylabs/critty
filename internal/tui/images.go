@@ -445,7 +445,7 @@ func (m AppModel) renderImagePreview() string {
 	if !ready(t.preview.before) && !ready(t.preview.after) {
 		return ""
 	}
-	link := func(before bool) string { return imageTarget{path: t.path, before: before}.uri() }
+	link := func(before bool) string { return t.imageTarget(before).uri() }
 	if !t.compareImages() {
 		side := t.preview.side(t.isDeleted)
 		if ready(*side) {

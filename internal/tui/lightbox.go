@@ -27,7 +27,7 @@ type lightboxState struct {
 	target      imageTarget
 	image       inlineImage
 	zoom        int           // requested percent of the pixel size
-	siblings    []imageTarget // the images referenced on the same line
+	siblings    []imageTarget // file revisions or images referenced on one line
 	index       int           // position of target in siblings
 	returnTo    modalType
 	returnFocus int
@@ -72,8 +72,7 @@ func lightboxPlacement(id int) int {
 
 // openLightbox shows a transmitted image in a dialog at its pixel size, or
 // shrunk to fit the screen, returning to the current dialog when it closes.
-// siblings lists the images referenced on the same line, so `M-o` can move
-// between them.
+// siblings lists file revisions or images referenced on the same line.
 func (m *AppModel) openLightbox(target imageTarget, img inlineImage, siblings []imageTarget) tea.Cmd {
 	m.lightbox = lightboxState{returnTo: m.modal, returnFocus: m.modalFocus, siblings: siblings}
 	for i, sibling := range siblings {
@@ -96,7 +95,7 @@ func (m *AppModel) showLightboxImage(target imageTarget, img inlineImage) tea.Cm
 	return m.prepareLightbox()
 }
 
-// cycleLightbox moves to the next or previous previewed image on the line.
+// cycleLightbox moves to the next or previous image in the group.
 func (m *AppModel) cycleLightbox(step int) tea.Cmd {
 	s := &m.lightbox
 	for range max(0, len(s.siblings)-1) {
@@ -263,8 +262,12 @@ func (m AppModel) lightboxContent() (string, int, []modalMouseRegion) {
 	}
 	guide := fmt.Sprintf("%d%% · SPC/+: zoom in · BS/-: zoom out · RET/click: open with the system viewer · ESC: close", m.lightboxPercent())
 	if n := len(m.lightbox.siblings); n > 1 {
-		guide = fmt.Sprintf("%d%% · image %d of %d on the line · M-o/←/→: other images · SPC/+: zoom in · BS/-: zoom out · RET/click: open with the system viewer · ESC: close",
-			m.lightboxPercent(), m.lightbox.index+1, n)
+		group := fmt.Sprintf("image %d of %d", m.lightbox.index+1, n)
+		if !m.lightbox.target.compare {
+			group += " on the line"
+		}
+		guide = fmt.Sprintf("%d%% · %s · M-o/←/→: other images · SPC/+: zoom in · BS/-: zoom out · RET/click: open with the system viewer · ESC: close",
+			m.lightboxPercent(), group)
 	}
 	if m.locationError != "" {
 		guide += "\n" + m.locationError

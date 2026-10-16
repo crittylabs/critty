@@ -16,14 +16,18 @@ import (
 // the document line of the reference, when it comes from one, so the other
 // images on that line can be found.
 type imageTarget struct {
-	path   string
-	before bool
-	url    string
-	line   int
+	path    string
+	before  bool
+	compare bool // a file revision with a Before/After caption
+	url     string
+	line    int
 }
 
 func (t imageTarget) uri() string {
 	q := url.Values{}
+	if t.compare {
+		q.Set("compare", "1")
+	}
 	if t.url != "" {
 		q.Set("url", t.url)
 	} else {
@@ -44,7 +48,13 @@ func (t imageTarget) label() string {
 		return t.url
 	}
 	if t.before {
+		if t.compare {
+			return t.path + " (Before)"
+		}
 		return t.path + " (before)"
+	}
+	if t.compare {
+		return t.path + " (After)"
 	}
 	return t.path
 }
@@ -56,7 +66,7 @@ func imageLink(uri string) (imageTarget, bool) {
 	}
 	q := u.Query()
 	line, _ := strconv.Atoi(q.Get("line"))
-	t := imageTarget{path: q.Get("path"), before: q.Get("side") == "old", url: q.Get("url"), line: max(0, line)}
+	t := imageTarget{path: q.Get("path"), before: q.Get("side") == "old", compare: q.Get("compare") == "1", url: q.Get("url"), line: max(0, line)}
 	return t, t.path != "" || t.url != ""
 }
 
@@ -128,7 +138,7 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 	}
 	if len(m.tabs) > 0 {
 		t := m.tab()
-		if t.path == target.path {
+		if t.path == target.path || target.before && t.oldPath == target.path {
 			if img := loaded(t.preview.side(target.before)); img != nil {
 				return img
 			}
@@ -163,7 +173,35 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 // openImage enlarges a previewed image in the lightbox, or hands a web URL
 // or an image without a preview to the system opener.
 func (m *AppModel) openImage(target imageTarget) tea.Cmd {
+	if len(m.tabs) > 0 && m.tab().isBinary && target.line == 0 {
+		for _, candidate := range m.tab().imageTargets() {
+			if candidate == target {
+				return m.openImageWithSiblings(target, m.tab().imageTargets())
+			}
+		}
+	}
 	return m.openImageWithSiblings(target, m.lineImages(target))
+}
+
+func (t *FileTab) imageTarget(before bool) imageTarget {
+	path := t.path
+	if before && t.oldPath != "" {
+		path = t.oldPath
+	}
+	return imageTarget{path: path, before: before, compare: t.status != ""}
+}
+
+// imageTargets follows the same Before/After order as the inline preview.
+// A standalone image and an added or deleted file have only one target.
+func (t *FileTab) imageTargets() []imageTarget {
+	if !t.isBinary || !imagePath(t.path) || t.outsideChanges {
+		return nil
+	}
+	var targets []imageTarget
+	for _, before := range t.previewSides() {
+		targets = append(targets, t.imageTarget(before))
+	}
+	return targets
 }
 
 func (m *AppModel) openImageWithSiblings(target imageTarget, siblings []imageTarget) tea.Cmd {
@@ -232,7 +270,11 @@ func (m *AppModel) openImageAtCursor() tea.Cmd {
 	}
 	t := m.tab()
 	if t.isBinary && imagePath(t.path) {
-		return m.openImage(imageTarget{path: t.path, before: t.isDeleted})
+		targets := t.imageTargets()
+		if len(targets) > 0 {
+			return m.openImageWithSiblings(targets[0], targets)
+		}
+		return nil
 	}
 	if t.cursorOnAnnotation || t.cursorLine == 0 {
 		return nil
