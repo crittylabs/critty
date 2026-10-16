@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- `critty review --help` explains that reviews outside a multiplexer open a desktop terminal window when available, instead of listing the removed `auto` launcher.
+
 ## 1.2.0
 
 ### Added
