@@ -171,9 +171,10 @@ func (m *AppModel) zoomLightbox(in bool) {
 		if in && level <= current || !in && level >= current {
 			continue
 		}
-		if c, r := m.lightboxCells(level); c != cols || r != rows {
-			m.lightbox.zoom = level
+		if c, r := m.lightboxCells(level); c == cols && r == rows {
+			continue
 		}
+		m.lightbox.zoom = level
 		return
 	}
 }

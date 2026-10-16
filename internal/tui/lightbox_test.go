@@ -529,3 +529,53 @@ func TestStandaloneImageLightbox(t *testing.T) {
 		t.Fatal("a standalone image has no other revision")
 	}
 }
+
+func TestLightboxZoomReversesAtLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		width, height int
+	}{
+		{"icon", 16, 16},
+		{"uneven", 31, 31},
+		{"gradient", 960, 540},
+		{"banner", 1134, 340},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := NewApp("image.png", AppConfig{})
+			app, _ = updateApp(app, docRenderedMsg{})
+			app.images.enabled = true
+			app.images.cell = cellSize{width: 13, height: 27}
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 35})
+			app.openLightbox(imageTarget{path: "image.png"}, inlineImage{id: 101, width: tc.width, height: tc.height}, nil)
+			for _, wheel := range []bool{false, true} {
+				for _, in := range []bool{true, false, true, false} {
+					for range len(lightboxZoomLevels) + 2 {
+						var msg tea.Msg = tea.KeyPressMsg{Code: '-'}
+						if in {
+							msg = tea.KeyPressMsg{Code: '+'}
+						}
+						if wheel {
+							button := tea.MouseWheelDown
+							if in {
+								button = tea.MouseWheelUp
+							}
+							msg = tea.MouseWheelMsg{Button: button}
+						}
+						app, _ = updateApp(app, msg)
+						img := app.lightbox.image
+						app, _ = updateApp(app, lightboxReadyMsg{id: img.id, columns: img.columns, rows: img.rows})
+					}
+					level := lightboxZoomLevels[0]
+					if in {
+						level = lightboxZoomLevels[len(lightboxZoomLevels)-1]
+					}
+					cols, rows := app.lightboxCells(level)
+					img := app.lightbox.image
+					if img.columns != cols || img.rows != rows || !img.ready {
+						t.Fatalf("wheel=%v in=%v: zoom stuck at %d%% (%dx%d), want %dx%d", wheel, in, app.lightboxPercent(), img.columns, img.rows, cols, rows)
+					}
+				}
+			}
+		})
+	}
+}
