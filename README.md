@@ -9,11 +9,18 @@
   <a href="https://github.com/crittylabs/critty/actions/workflows/ci.yml"><img src="https://github.com/crittylabs/critty/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
 </p>
 
-A terminal UI for reviewing code and documents, approving actions, and making choices with your coding agent.
+Review code, refine plans, make choices, and approve actions with your coding agent in the terminal.
 
-Give inline feedback, approve a proposed action, or choose between alternatives.  Handle these decisions on their own or alongside code and document reviews, then let your agent continue from your feedback and answers.
+Read a proposal, leave inline feedback, choose an approach, or authorize a specific action.  These interactions can stand on their own or happen alongside code and document reviews.  Your agent continues from your responses and can return to the same session for another round.
 
-<video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
+For example:
+
+- Review code changes alongside screenshots and questions from your agent.
+- Leave inline feedback on a plan or document.
+- Choose an implementation approach before coding starts.
+- Check a proposed PR's text and destination before authorizing publication.
+
+![An approval checklist with required confirmations and an inline image](https://github.com/user-attachments/assets/d22e2123-92f9-400d-8b35-f20f4c010db2)
 
 [More videos and screenshots](#gallery).
 
@@ -21,9 +28,9 @@ Give inline feedback, approve a proposed action, or choose between alternatives.
 
 ## Key Features
 
-- **Review in the terminal** — read multi-file diffs and documents with syntax highlighting and inline comments.  Reviews open in a tmux floating pane or a Herdr tab, or in a new window of a supported terminal emulator when neither is running.
-- **Approvals and choices** — approve proposed actions, complete required confirmations, and choose between alternatives in the same session as a review or on their own.
-- **Round trips with your agent** — review, send feedback, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
+- **Code and document reviews** — read multi-file diffs and documents with syntax highlighting and inline comments.
+- **Approvals and choices** — approve specific actions, complete required confirmations, and choose between alternatives, with or without a code or document review.
+- **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
@@ -50,7 +57,7 @@ Release binaries are available for macOS and Linux on amd64 and arm64.  Building
 
 <a id="antigravity-cli"></a>
 
-Install the review skills for your agent:
+Install the skills for your agent.  The table shows how to start a review; use `critty-approval` for approvals and choices:
 
 | Agent | Install for your user | Start a review |
 | --- | --- | --- |
@@ -86,7 +93,17 @@ Alternatively, put the bundled `codex` wrapper ahead of Codex on your `PATH`.  S
 
 ## Basic workflow
 
-Ask your agent to use the `critty` skill to review its changes or a document.  Read the proposal, leave inline feedback, and submit Approve, Reject, or Comment.  The agent reads your verdict and comments, makes revisions, and reopens the same session.
+### Review code and documents
+
+Ask your agent to use the `critty` skill to review its changes, a plan, or a document.  For example:
+
+> Use critty to review these changes before committing.
+
+Critty opens in a tmux floating pane, a Herdr tab, or a new window of a supported terminal emulator when neither is running.  Read the diff or document, leave inline comments on the relevant lines, and submit Approve, Reject, or Comment.
+
+The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
+
+<video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
 
 For a manual review:
 
@@ -103,13 +120,31 @@ critty --session <id>      # Resume a saved review
 
 Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
-Keep project review policy in `CLAUDE.md` or `AGENTS.md`, and let the installed skills handle the review mechanics.
+<a id="approvals-and-choices"></a>
 
-### Approvals and choices
+### Review code and approve the next actions
 
-Ask your agent to use [critty-approval](internal/cli/skill/critty-approval/SKILL.md) to prepare an action for your review, such as publishing a PR, releasing software, or choosing the next step.  Supporting documents, confirmations, and individual permissions can be reviewed alongside code or on their own.
+Use [critty-approval](internal/cli/skill/critty-approval/SKILL.md) to review code changes together with the actions that follow approval, such as committing, pushing a branch, or deploying.  The agent can attach the proposed commit message, push destination, or deployment plan to the same session as the diff.
+
+For example:
+
+> Use critty-approval to review these changes and the proposed push together.  Include the commit message and exact repository and branch destination, and wait for my approval before pushing.
+
+For a deployment, include the target environment and exact deployment actions alongside the changes.  Review the code and proposed operations together, leave feedback where needed, and approve the operations you want the agent to carry out.
 
 Required confirmations must be complete before approval.  Approving the review does not authorize operations whose permission checkboxes remain unchecked.  Critty records your decisions; the agent executes the authorized actions.
+
+### Approvals and choices without a code diff
+
+The same `critty-approval` skill also works on its own.  You can choose an approach before implementation starts or approve an action that has no code changes to review:
+
+> Use critty-approval to let me choose between these implementation approaches.
+>
+> Use critty-approval to show me the PR text and destination before publishing it.
+
+Read the supporting material, answer questions, and submit your decision.  The agent continues from your feedback and answers.
+
+Keep project policy for reviews, approvals, and choices in `CLAUDE.md` or `AGENTS.md`, and let the installed skills handle the interaction with Critty.
 
 ### AI review and collaboration (Experimental)
 

@@ -15,8 +15,11 @@ var rootSession string
 var rootCmd = &cobra.Command{
 	Use:     "critty [file[:LINE]]",
 	Version: versionString(),
-	Short:   "Review code changes and documents from the terminal",
-	Long: "Critty is a terminal-based review tool for code changes and documents. " +
+	Short:   "Review code, make choices, and approve actions with your coding agent",
+	Long: "Critty is a terminal UI for reviewing code and documents, making choices, " +
+		"and approving actions with your coding agent. " +
+		"Leave inline feedback, choose between alternatives, and authorize specific actions, " +
+		"with or without a code diff. " +
 		"It provides an interactive TUI for humans and scriptable CLI commands for agents.\n\n" +
 		"Run `critty` to review the current git changes, `critty --staged` to review only the index, " +
 		"`critty <file>` to review a document, " +

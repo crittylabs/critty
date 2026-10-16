@@ -137,7 +137,7 @@ def logo(face: Face, theme: Theme, boxed: bool) -> str:
 
 PREVIEW_W, PREVIEW_H = 1280, 640
 TAGLINE = "Your agents work. You make the decisions."
-SUBTITLE = "Reviews and approvals in your terminal."
+SUBTITLE = "Code reviews, choices, and approvals in your terminal."
 AGENTS = ["Claude Code", "Codex", "OpenCode", "Antigravity", "Gemini CLI"]
 TERMINALS = ["tmux", "Herdr", "Desktop terminals"]
 TOOL, MUTED, QUIET = "#79c0ff", "#8b949e", "#6e7681"
