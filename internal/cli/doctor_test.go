@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/crittylabs/critty/internal/tui"
@@ -18,19 +19,55 @@ import (
 )
 
 func TestDoctorTextColorsAndPlainJSON(t *testing.T) {
-	r := doctorReport{}
-	for _, status := range []string{"ok", "error", "info", "warn"} {
-		r.add("test", status, "message", "")
-	}
+	r := doctorReport{Version: "v1.2.3"}
+	r.add("integrations", "ok", "/home/user/.claude/skills/critty/SKILL.md", "")
+	r.add("integrations", "error", "stale: /home/user/.claude/skills/critty-cli/SKILL.md", "Reinstall with `critty install --force claude-code`.")
+	r.add("ai/claude", "info", "not on PATH (optional reviewer)", "")
+	r.add("ai/mcp", "warn", "MCP SDK: unavailable", "Install it.")
+	r.add("custom/x", "ok", "fine", "")
 	var colored, plain, encoded bytes.Buffer
-	if err := r.writeText(&colored, true); err != nil {
+	if err := r.writeText(&colored, outputStyle{profile: colorprofile.TrueColor, dark: true}, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.writeText(&plain, false); err != nil {
+	if err := r.writeText(&plain, outputStyle{profile: colorprofile.NoTTY}, 0); err != nil {
 		t.Fatal(err)
 	}
-	if ansi.Strip(colored.String()) != plain.String() || !strings.Contains(colored.String(), "\x1b[32m") || !strings.Contains(colored.String(), "\x1b[31m") || !strings.Contains(colored.String(), "\x1b[33m") {
-		t.Fatalf("wrong colors: %q", colored.String())
+	want := `critty doctor v1.2.3
+
+Integrations
+  ✓ ok     /home/user/.claude/skills/critty/SKILL.md
+  ✗ error  stale: /home/user/.claude/skills/critty-cli/SKILL.md
+           ↳ Reinstall with ` + "`critty install --force claude-code`" + `.
+
+AI reviews
+  · info   claude  not on PATH (optional reviewer)
+  ! warn   mcp     MCP SDK: unavailable
+           ↳ Install it.
+
+custom
+  ✓ ok     x  fine
+
+Summary: 1 error, 1 warning, 1 info, 2 ok
+`
+	if plain.String() != want {
+		t.Fatalf("plain report:\n%s\nwant:\n%s", plain.String(), want)
+	}
+	_, body, _ := strings.Cut(ansi.Strip(colored.String()), "\n")
+	_, wantBody, _ := strings.Cut(strings.ReplaceAll(want, "`", ""), "\n")
+	if body != wantBody || !strings.HasPrefix(ansi.Strip(colored.String()), ">_ critty v1.2.3  doctor\n") {
+		t.Fatalf("colored report text:\n%s", ansi.Strip(colored.String()))
+	}
+	for _, sgr := range []string{"\x1b[1;32m", "\x1b[1;31m", "\x1b[1;33m", "\x1b[1;94m"} {
+		if !strings.Contains(colored.String(), sgr) {
+			t.Fatalf("missing status color %q: %q", sgr, colored.String())
+		}
+	}
+	var wrapped bytes.Buffer
+	if err := r.writeText(&wrapped, outputStyle{profile: colorprofile.NoTTY}, 48); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(wrapped.String(), "           ↳ Reinstall with `critty install\n             --force claude-code`.\n") {
+		t.Fatalf("advice not wrapped under its column:\n%s", wrapped.String())
 	}
 	t.Setenv("NO_COLOR", "1")
 	var disabled bytes.Buffer
@@ -39,6 +76,42 @@ func TestDoctorTextColorsAndPlainJSON(t *testing.T) {
 	}
 	if err := r.write(&encoded, true); err != nil || !json.Valid(encoded.Bytes()) || strings.Contains(encoded.String(), "\x1b") {
 		t.Fatalf("JSON contains formatting: %q, %v", encoded.String(), err)
+	}
+}
+
+func TestStyledDoctorNewIntegrationPaths(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	reg := integrations()
+	for _, target := range []string{"antigravity", "codex", "agents"} {
+		for _, f := range reg[target] {
+			if err := installIntegrationFile(f, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	r := doctorReport{Version: "v1.2.3"}
+	r.checkIntegrations(reg)
+	for _, d := range r.Checks {
+		if d.Status != "ok" {
+			t.Fatalf("installed integration: %+v", d)
+		}
+	}
+	for _, dark := range []bool{true, false} {
+		var out bytes.Buffer
+		if err := r.writeText(&out, outputStyle{profile: colorprofile.TrueColor, dark: dark}, 0); err != nil {
+			t.Fatal(err)
+		}
+		plain := ansi.Strip(out.String())
+		for _, path := range []string{".gemini/antigravity-cli/skills/critty/SKILL.md", ".codex/skills/critty/SKILL.md", ".agents/skills/critty/SKILL.md"} {
+			if !strings.Contains(plain, path) {
+				t.Fatalf("dark=%t: doctor lacks %q:\n%s", dark, path, plain)
+			}
+		}
+		if !strings.Contains(plain, "\nIntegrations\n") || !strings.Contains(plain, "Summary:") || !strings.Contains(out.String(), "\x1b[") {
+			t.Fatalf("dark=%t: doctor lost its styled layout:\n%s", dark, out.String())
+		}
 	}
 }
 

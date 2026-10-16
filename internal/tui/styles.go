@@ -10,7 +10,22 @@ import (
 )
 
 func renderBrand() string {
-	ld := lipgloss.LightDark(terminalIsDark)
+	return renderBrandFor(terminalIsDark)
+}
+
+// BrandVersion renders the Critty brand mark followed by the build version,
+// as shown in the Help dialog footer, for a dark or light background.
+func BrandVersion(version string, dark bool) string {
+	brand := renderBrandFor(dark)
+	if version == "" {
+		return brand
+	}
+	ld := lipgloss.LightDark(dark)
+	return brand + lipgloss.NewStyle().Bold(true).Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue)).Render(version)
+}
+
+func renderBrandFor(dark bool) string {
+	ld := lipgloss.LightDark(dark)
 	tile := lipgloss.NewStyle().Bold(true).Background(lipgloss.BrightBlack)
 	word := lipgloss.NewStyle().Bold(true).
 		Foreground(ld(lipgloss.Black, lipgloss.BrightWhite)).

@@ -14,11 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/colorprofile"
-	"github.com/charmbracelet/x/ansi"
+	"charm.land/lipgloss/v2"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/crittylabs/critty/internal/terminalbinding"
 	"github.com/crittylabs/critty/internal/tui"
@@ -46,34 +44,143 @@ func (r doctorReport) write(w io.Writer, asJSON bool) error {
 	if asJSON {
 		return printJSON(w, r)
 	}
-	file, isFile := w.(interface{ Fd() uintptr })
-	useColor := isFile && term.IsTerminal(int(file.Fd())) && os.Getenv("NO_COLOR") == "" && colorprofile.Env(os.Environ()) >= colorprofile.ANSI
-	return r.writeText(w, useColor)
+	style := detectOutputStyle(w)
+	width, paged := pageWidth(w, style)
+	if !paged {
+		return r.writeText(w, style, 0)
+	}
+	var b strings.Builder
+	if err := r.writeText(&b, style, width); err != nil {
+		return err
+	}
+	return pageOrPrint(w, b.String())
 }
 
-func (r doctorReport) writeText(w io.Writer, useColor bool) error {
-	for _, d := range r.Checks {
-		label := d.Status + ":"
-		if useColor {
-			color := ansi.Yellow
-			switch d.Status {
-			case "ok":
-				color = ansi.Green
-			case "error":
-				color = ansi.Red
+// doctorSections titles the check groups named before the slash in check
+// names; other groups use the name itself.
+var doctorSections = map[string]string{
+	"integrations": "Integrations",
+	"ai":           "AI reviews",
+	"images":       "Images",
+	"terminal":     "Terminal binding",
+	"launchers":    "Review launchers",
+}
+
+var doctorMarks = map[string]string{"ok": "✓", "error": "✗", "warn": "!", "info": "·"}
+
+// doctorStatusStyles colors the status column for a dark or light background.
+func doctorStatusStyles(dark bool) map[string]lipgloss.Style {
+	ld := lipgloss.LightDark(dark)
+	bold := lipgloss.NewStyle().Bold(true)
+	return map[string]lipgloss.Style{
+		"ok":    bold.Foreground(ld(lipgloss.Color("#4CAF50"), lipgloss.Green)),
+		"error": bold.Foreground(ld(lipgloss.Color("#E8604A"), lipgloss.Red)),
+		"warn":  bold.Foreground(ld(lipgloss.Color("#E0A100"), lipgloss.Yellow)),
+		"info":  bold.Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue)),
+	}
+}
+
+// writeText prints the report grouped by section with a status column,
+// advice beneath each check, and a summary.  width wraps messages and
+// advice when positive; plain output keeps every line whole.
+func (r doctorReport) writeText(w io.Writer, style outputStyle, width int) error {
+	hs := newHelpStyles(style.dark)
+	statuses := doctorStatusStyles(style.dark)
+	var b strings.Builder
+	if style.color() {
+		b.WriteString(tui.BrandVersion(r.Version, style.dark) + hs.meta.Render("  doctor") + "\n")
+	} else {
+		b.WriteString("critty doctor " + r.Version + "\n")
+	}
+	const column = 11 // "  ✓ error  "
+	for _, section := range r.sections() {
+		b.WriteString("\n" + hs.heading.Render(section.title) + "\n")
+		nameWidth := 0
+		for _, d := range section.checks {
+			nameWidth = max(nameWidth, len(checkName(d.Check)))
+		}
+		for _, d := range section.checks {
+			mark := statuses[d.Status].Render(doctorMarks[d.Status] + " " + d.Status)
+			fmt.Fprintf(&b, "  %s%s", mark, strings.Repeat(" ", 7-len(d.Status)))
+			indent := column
+			if nameWidth > 0 {
+				b.WriteString(hs.name.Width(nameWidth + 2).Render(checkName(d.Check)))
+				indent += nameWidth + 2
 			}
-			label = ansi.Style{}.ForegroundColor(color).Styled(label)
-		}
-		if _, err := fmt.Fprintf(w, "%s %s: %s\n", label, d.Check, d.Message); err != nil {
-			return err
-		}
-		if d.Advice != "" {
-			if _, err := fmt.Fprintf(w, "    %s\n", d.Advice); err != nil {
-				return err
+			b.WriteString(hanging(wrapDoctorText(d.Message, width-indent), indent) + "\n")
+			if d.Advice != "" {
+				advice := d.Advice
+				if style.color() {
+					advice = backquoted.ReplaceAllStringFunc(advice, func(m string) string { return hs.code.Render(m[1 : len(m)-1]) })
+				}
+				b.WriteString(strings.Repeat(" ", column) + hanging(hs.meta.Render("↳ ")+wrapDoctorText(advice, width-column-2), column+2) + "\n")
 			}
 		}
 	}
-	return nil
+	b.WriteString("\n" + r.summary(statuses) + "\n")
+	_, err := io.WriteString(style.writer(w), b.String())
+	return err
+}
+
+func wrapDoctorText(text string, limit int) string {
+	if limit < 20 {
+		return text
+	}
+	return wrapWords(text, limit)
+}
+
+type doctorSection struct {
+	title  string
+	checks []diagnostic
+}
+
+// sections groups checks by their name prefix in first-seen order.
+func (r doctorReport) sections() []doctorSection {
+	var sections []doctorSection
+	index := map[string]int{}
+	for _, d := range r.Checks {
+		group, _, _ := strings.Cut(d.Check, "/")
+		i, ok := index[group]
+		if !ok {
+			title := doctorSections[group]
+			if title == "" {
+				title = group
+			}
+			i = len(sections)
+			index[group] = i
+			sections = append(sections, doctorSection{title: title})
+		}
+		sections[i].checks = append(sections[i].checks, d)
+	}
+	return sections
+}
+
+func checkName(check string) string {
+	_, name, _ := strings.Cut(check, "/")
+	return name
+}
+
+func (r doctorReport) summary(statuses map[string]lipgloss.Style) string {
+	counts := map[string]int{}
+	for _, d := range r.Checks {
+		counts[d.Status]++
+	}
+	var parts []string
+	for _, s := range []struct{ status, singular, plural string }{
+		{"error", "error", "errors"}, {"warn", "warning", "warnings"}, {"info", "info", "info"}, {"ok", "ok", "ok"},
+	} {
+		if n := counts[s.status]; n > 0 {
+			noun := s.plural
+			if n == 1 {
+				noun = s.singular
+			}
+			parts = append(parts, statuses[s.status].Render(fmt.Sprintf("%d %s", n, noun)))
+		}
+	}
+	if len(parts) == 0 {
+		return "No checks ran."
+	}
+	return "Summary: " + strings.Join(parts, ", ")
 }
 
 func newDoctorCommand() *cobra.Command {
@@ -284,7 +391,12 @@ print(json.dumps({"major": sys.version_info.major, "minor": sys.version_info.min
 
 func mcpInstallAdvice(python, version string, requirements []byte) string {
 	reg := integrations()
-	for _, name := range agentTargets {
+	names := make([]string, 0, len(reg))
+	for name := range reg {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
 		for _, f := range reg[name] {
 			if filepath.Base(f.dest) != "codex-review-requirements.txt" {
 				continue

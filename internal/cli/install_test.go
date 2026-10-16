@@ -29,7 +29,7 @@ func destinations(t *testing.T, target string) []string {
 	t.Helper()
 	var dests []string
 	for _, f := range integrations()[target] {
-		if target != "opencode" && f.dest != f.globalDest {
+		if target != "opencode" && target != "antigravity" && f.dest != f.globalDest {
 			t.Errorf("%s %s: global destination %q differs", target, f.dest, f.globalDest)
 		}
 		dests = append(dests, f.dest)
@@ -71,9 +71,9 @@ func TestIntegrationLayouts(t *testing.T) {
 			filepath.Join(".claude", "skills", "critty-approval", "SKILL.md"),
 		},
 		"codex": {
-			filepath.Join(".agents", "skills", "critty", "SKILL.md"),
-			filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"),
-			filepath.Join(".agents", "skills", "critty-approval", "SKILL.md"),
+			filepath.Join(".codex", "skills", "critty", "SKILL.md"),
+			filepath.Join(".codex", "skills", "critty-cli", "SKILL.md"),
+			filepath.Join(".codex", "skills", "critty-approval", "SKILL.md"),
 		},
 		"opencode": {
 			filepath.Join(".opencode", "commands", "critty.md"),
@@ -85,9 +85,14 @@ func TestIntegrationLayouts(t *testing.T) {
 			filepath.Join(".gemini", "skills", "critty-cli", "SKILL.md"),
 			filepath.Join(".gemini", "skills", "critty-approval", "SKILL.md"),
 		},
+		"agents": {
+			filepath.Join(".agents", "skills", "critty", "SKILL.md"),
+			filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"),
+			filepath.Join(".agents", "skills", "critty-approval", "SKILL.md"),
+		},
 	}
 	for target, dests := range want {
-		dir := map[string]string{"claude-code": ".claude", "codex": ".agents", "opencode": ".opencode", "gemini": ".gemini"}[target]
+		dir := map[string]string{"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents"}[target]
 		for _, rel := range []string{
 			"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
 			"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
@@ -107,13 +112,20 @@ func TestAllIncludesEveryAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, agent := range []string{"claude-code", "codex", "opencode", "gemini"} {
+	for _, agent := range []string{"claude-code", "codex", "opencode", "antigravity"} {
 		if !slices.Contains(names, agent) {
 			t.Errorf("all target %q lacks %s", names, agent)
 		}
 	}
 	if slices.Contains(names, "prompts") {
 		t.Errorf("all target %q must not install prompt templates", names)
+	}
+	if slices.Contains(names, "gemini") {
+		t.Errorf("all target %q must not install legacy Gemini skills", names)
+	}
+	legacy, err := integrationTargets("gemini", integrations())
+	if err != nil || !slices.Equal(legacy, []string{"gemini"}) {
+		t.Fatalf("explicit Gemini target = %v, %v", legacy, err)
 	}
 }
 
@@ -145,8 +157,8 @@ func TestClaudeSkillsAreVerbatim(t *testing.T) {
 }
 
 func TestCodexSkillsUseCodexConventions(t *testing.T) {
-	skill := integrationContent(t, "codex", filepath.Join(".agents", "skills", "critty", "SKILL.md"))
-	cli := integrationContent(t, "codex", filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"))
+	skill := integrationContent(t, "codex", filepath.Join(".codex", "skills", "critty", "SKILL.md"))
+	cli := integrationContent(t, "codex", filepath.Join(".codex", "skills", "critty-cli", "SKILL.md"))
 
 	for _, unwanted := range []string{"`/critty`", "`/critty-cli`", "/critty ", "Claude Code", "$ARGUMENTS", "allowed-tools:", "argument-hint:", "user-invocable:"} {
 		for _, content := range []string{skill, cli} {
@@ -487,5 +499,144 @@ func TestInstallRetiresLegacyLinksWithoutDeletingTargets(t *testing.T) {
 				t.Fatalf("symlink target was changed or removed: %v", err)
 			}
 		})
+	}
+}
+
+func TestAntigravityIntegration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	reg := integrations()
+	names, err := integrationTargets("agy", reg)
+	if err != nil || !slices.Equal(names, []string{"antigravity"}) {
+		t.Fatalf("agy targets = %v, %v", names, err)
+	}
+	if len(reg["antigravity"]) != len(reg["codex"]) {
+		t.Fatal("Antigravity lacks bundled resources")
+	}
+	for _, agent := range []string{"codex", "antigravity"} {
+		for _, f := range reg[agent] {
+			if err := installIntegrationFile(f, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for i, f := range reg["antigravity"] {
+		original := reg["codex"][i]
+		rel, err := filepath.Rel(filepath.Join(".codex", "skills"), original.dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		parts := strings.SplitN(rel, string(filepath.Separator), 2)
+		wantRel := filepath.Join(parts[0], parts[1])
+		if f.dest != filepath.Join(".agents", "skills", wantRel) || f.globalDest != filepath.Join(".gemini", "antigravity-cli", "skills", wantRel) {
+			t.Errorf("wrong destinations: %s, %s", f.dest, f.globalDest)
+		}
+		got, err := os.ReadFile(original.dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := original.content()
+		if err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("Codex content changed: %s", original.dest)
+		}
+		data, err := os.ReadFile(f.dest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if parts[1] != "SKILL.md" {
+			if !bytes.Equal(data, want) {
+				t.Errorf("resource changed: %s", f.dest)
+			}
+			continue
+		}
+		content := string(data)
+		if !strings.Contains(content, "\nname: "+parts[0]+"\n") {
+			t.Errorf("wrong identity: %s", f.dest)
+		}
+		for _, unwanted := range []string{"$ARGUMENTS", "allowed-tools:", "argument-hint:", "user-invocable:", "'Claude Code'"} {
+			if strings.Contains(content, unwanted) {
+				t.Errorf("%s contains %q", f.dest, unwanted)
+			}
+		}
+		for _, skill := range skillNames {
+			if strings.Contains(content, "`$"+skill+"`") || strings.Contains(content, skill+"-antigravity") {
+				t.Errorf("unconverted skill reference in %s", f.dest)
+			}
+		}
+	}
+}
+
+func TestUserInstallScope(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("HOME", home)
+	previous := installUser
+	t.Cleanup(func() { installUser = previous })
+	for _, tc := range []struct {
+		name, cwd  string
+		user, want bool
+	}{
+		{"home", home, false, true},
+		{"project", project, false, false},
+		{"explicit-user", project, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(tc.cwd)
+			installUser = tc.user
+			got, err := isGlobalInstall()
+			if err != nil || got != tc.want {
+				t.Fatalf("global = %v, %v; want %v", got, err, tc.want)
+			}
+		})
+	}
+	t.Chdir(project)
+	installUser = true
+	if err := installCmd.RunE(installCmd, []string{"agents"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range skillNames {
+		global := filepath.Join(home, ".agents", "skills", name, "SKILL.md")
+		data, err := os.ReadFile(global)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "`$critty") || strings.Contains(string(data), "`/critty") {
+			t.Errorf("shared skill uses host-specific references: %s", name)
+		}
+		if _, err := os.Stat(filepath.Join(project, ".agents")); !os.IsNotExist(err) {
+			t.Fatalf("user install wrote project files: %v", err)
+		}
+	}
+}
+
+func TestUserInstallTargetPaths(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+	t.Chdir(project)
+	previous := installUser
+	t.Cleanup(func() { installUser = previous })
+	if err := installCmd.ParseFlags([]string{"--user"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ target, path string }{
+		{"claude-code", ".claude/skills/critty/SKILL.md"},
+		{"codex", ".codex/skills/critty/SKILL.md"},
+		{"opencode", "config/opencode/commands/critty.md"},
+		{"agy", ".gemini/antigravity-cli/skills/critty/SKILL.md"},
+		{"agents", ".agents/skills/critty/SKILL.md"},
+	} {
+		t.Run(tc.target, func(t *testing.T) {
+			if err := installCmd.RunE(installCmd, []string{tc.target}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(tc.path))); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	entries, err := os.ReadDir(project)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("user install changed project: %v, %v", entries, err)
 	}
 }

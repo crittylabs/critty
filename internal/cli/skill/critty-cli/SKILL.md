@@ -27,6 +27,17 @@ Critty is a local CLI and human review TUI, not a hosted review service.  Review
 
 External editors launched from the TUI likewise have their own behavior.  Describe the selected command's actual reads, writes, and subprocesses when an approval request needs clarification; do not treat all Critty commands as read-only or as external publication.
 
+`install --user <target>` selects user scope from any directory; running from the home directory also selects user scope.  Otherwise, installation is relative to the current project root.
+
+| Target | Project | User |
+| --- | --- | --- |
+| `codex` | `.codex/skills` | `~/.codex/skills` |
+| `opencode` | `.opencode` | OpenCode's XDG config directory |
+| `antigravity` (`agy`) | `.agents/skills` | `~/.gemini/antigravity-cli/skills` |
+| `agents` | `.agents/skills` | `~/.agents/skills` |
+
+`agents` provides shared, host-neutral skill references and comment attribution.  Antigravity skills use the ordinary `critty` names.  Prefer a shared installation or selected host variants, because hosts may discover duplicate names across directories.  Existing installations in old locations are left untouched.  `install all` includes Antigravity; legacy Gemini CLI skills remain available through `install gemini`.
+
 ## Review inputs
 
 | Input | Command and source |
@@ -79,7 +90,7 @@ Ordinary approved reviews may be cleaned up immediately.  Preserve the finish ou
 
 ## Environment diagnostics
 
-Run `critty doctor` before troubleshooting integration or image setup.  Missing files in a partially installed integration and stale or unreadable files are errors.  Absent integrations and optional reviewers are informational.  Desktop launcher availability is checked independently of launch priorities and SSH restrictions: all three macOS launchers, `xdg-terminal-exec` on Linux, and additionally Windows Terminal under WSL.  Missing or incompatible desktop launchers, Python/MCP problems, and image setup problems are warnings; they do not block unrelated review modes.  Errors return exit status 1; warnings alone return 0.  Color-capable terminals show green `ok`, red `error`, and yellow `info`/`warn` labels; `NO_COLOR`, redirected output, and JSON retain plain text.
+Run `critty doctor` before troubleshooting integration or image setup.  Missing files in a partially installed integration and stale or unreadable files are errors.  Absent integrations and optional reviewers are informational.  Desktop launcher availability is checked independently of launch priorities and SSH restrictions: all three macOS launchers, `xdg-terminal-exec` on Linux, and additionally Windows Terminal under WSL.  Missing or incompatible desktop launchers, Python/MCP problems, and image setup problems are warnings; they do not block unrelated review modes.  Errors return exit status 1; warnings alone return 0.  The text report groups checks by area under a version header, marks each line with its status (`ok`, `error`, `warn`, or `info`), indents advice beneath the check, and ends with a summary count; color-capable terminals color the statuses, and `NO_COLOR`, redirected output, and JSON retain plain text.
 
 Doctor distinguishes PATH selection from current-session behavior.  It identifies the bundled Codex wrapper from Go build metadata, tfil-generated wrappers from their exact `#!/bin/sh` and `# tfil-wrapper` header, and tfil in process ancestry; an installed executable alone does not establish an active wrapper.  Shims and custom wrappers remain unverified, not broken.  Without a marker request, terminal binding is reported as untested.  For an end-to-end check, run `critty terminal prepare`, display its marker verbatim in agent output, then run `critty doctor --terminal-request <id>` within two minutes.  This resolves and consumes the request without opening a review.  It uses a terminal filter notification or the visible screen of a live wrapper registration.  For daemon-backed agents, a resolved marker also supplies the client process ancestry for tfil detection.  Add `--terminal-notify-only` to require a terminal-filter callback instead of reading registered pane screens.  This verifies the notification path even inside tmux or Herdr.  With `tfil --critty-notify`, a missing callback reports a warning rather than succeeding through a registered pane.  Without this option, a successful binding test can also use registered multiplexer panes.
 
