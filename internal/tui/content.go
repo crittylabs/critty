@@ -366,6 +366,7 @@ func (m *AppModel) rebuildContent() {
 
 			styleFunc := func(s string) string { return s }
 			if isMarkdown {
+				displayLine = linkedDisplayLine(line, m.imageSpans(lineNum, false), displaySourceText)
 				styleFunc = func(s string) string { return highlightMarkdown(s) }
 			}
 			// Highlight search matches in the styled line before wrapping, so a

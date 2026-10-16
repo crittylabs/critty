@@ -34,39 +34,75 @@ func (m AppModel) commentImagePath(destination string) (string, bool) {
 	return localImagePath(filepath.Join(cwd, "comment.md"), destination)
 }
 
+// commentImageTarget resolves an image destination in a comment body to a
+// local image file or a web URL.
+func (m AppModel) commentImageTarget(destination string) (imageTarget, bool) {
+	if u, ok := webImageURL(destination); ok {
+		return imageTarget{url: u}, true
+	}
+	path, ok := m.commentImagePath(destination)
+	return imageTarget{path: path}, ok
+}
+
+// commentImageSide returns the preview state for a local comment image at
+// a width, registering it for loading when first seen.
+func (m *AppModel) commentImageSide(key commentImageKey) *previewSide {
+	if m.commentImages == nil {
+		m.commentImages = make(map[commentImageKey]*previewSide)
+	}
+	side := m.commentImages[key]
+	if side == nil && len(m.commentImages) < 128 {
+		side = &previewSide{}
+		m.commentImages[key] = side
+	}
+	return side
+}
+
+func (m *AppModel) commentImageRefs(body string) []markdownImageRef {
+	if m.imageBodies == nil {
+		m.imageBodies = make(map[string][]markdownImageRef)
+	}
+	refs, ok := m.imageBodies[body]
+	if !ok {
+		refs = markdownImageRefs(body)
+		if len(m.imageBodies) < 128 {
+			m.imageBodies[body] = refs
+		}
+	}
+	return refs
+}
+
+// linkCommentLine links file references and the image references that refs
+// places on line number lineNumber.
+func (m *AppModel) linkCommentLine(line string, refs []markdownImageRef, lineNumber int) string {
+	var spans []linkSpan
+	for _, ref := range refs {
+		if ref.line != lineNumber {
+			continue
+		}
+		if target, ok := m.commentImageTarget(ref.destination); ok {
+			spans = append(spans, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
+		}
+	}
+	return linkedDisplayLine(line, spans, m.linkFileReferences)
+}
+
 func (m *AppModel) renderCommentContent(author, body, prefix string, width int) string {
 	style := m.commentAuthorStyle(author)
 	width = max(1, width)
-	var refs []markdownImageRef
-	if !m.images.hidden && m.modal == noModal {
-		if m.imageBodies == nil {
-			m.imageBodies = make(map[string][]markdownImageRef)
-		}
-		var ok bool
-		refs, ok = m.imageBodies[body]
-		if !ok {
-			refs = markdownImageRefs(body)
-			if len(m.imageBodies) < 128 {
-				m.imageBodies[body] = refs
-			}
-		}
-	}
+	refs := m.commentImageRefs(body)
+	showImages := !m.images.hidden && m.modal == noModal
 	var lines []string
 	for i, line := range strings.Split(body, "\n") {
-		content := style.Render(m.linkFileReferences(line))
+		content := style.Render(m.linkCommentLine(line, refs, i+1))
 		if i == 0 && prefix != "" {
 			content = style.Bold(true).Render(prefix) + content
 		}
 		lines = append(lines, strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")...)
-		var row []string
-		used := 0
-		flush := func() {
-			if len(row) > 0 {
-				lines = append(lines, strings.Split(lipgloss.JoinHorizontal(lipgloss.Top, row...), "\n")...)
-				row = nil
-				used = 0
-			}
+		if !showImages {
+			continue
 		}
+		var blocks []string
 		for _, ref := range refs {
 			if ref.line != i+1 {
 				continue
@@ -75,35 +111,19 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 			if !ok {
 				continue
 			}
-			key := commentImageKey{path, width}
-			if m.commentImages == nil {
-				m.commentImages = make(map[commentImageKey]*previewSide)
-			}
-			side := m.commentImages[key]
-			if side == nil && len(m.commentImages) < 128 {
-				side = &previewSide{}
-				m.commentImages[key] = side
-			}
+			side := m.commentImageSide(commentImageKey{path, width})
 			if side == nil {
 				continue
 			}
-			block := ""
 			if side.failed {
-				block = ansi.Truncate("  Image preview unavailable", width, "")
+				blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 			} else if side.image != nil && side.image.ready {
-				block = side.image.placeholder()
+				blocks = append(blocks, side.image.linkedPlaceholder(imageTarget{path: path}.uri()))
 			}
-			if block == "" {
-				continue
-			}
-			w := lipgloss.Width(block)
-			if used > 0 && used+w > width {
-				flush()
-			}
-			row = append(row, block)
-			used += w
 		}
-		flush()
+		for _, row := range packImageBlocks(blocks, width) {
+			lines = append(lines, strings.Split(row, "\n")...)
+		}
 	}
 	return strings.Join(lines, "\n")
 }
@@ -119,7 +139,7 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 	if m.session != nil && m.session.CJ.RoundState.Finished {
 		return nil
 	}
-	if m.images.hidden || m.modal != noModal {
+	if m.images.hidden || m.modal != noModal && !m.editorImagesActive() {
 		return nil
 	}
 	if !m.images.enabled {
@@ -137,7 +157,7 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 	var cmds []tea.Cmd
 	for key, side := range m.commentImages {
 		if img := side.image; img != nil {
-			cols, rows := img.size(min(44, key.width), 11)
+			cols, rows := img.size(min(44, key.width), 11, m.images.cell)
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
 			}

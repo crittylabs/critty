@@ -13,8 +13,10 @@ require (
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/gofrs/flock v0.13.1
+	github.com/mattn/go-runewidth v0.0.31
 	github.com/mattn/go-shellwords v1.0.16
 	github.com/pelletier/go-toml/v2 v2.4.3
+	github.com/rivo/uniseg v0.4.7
 	github.com/sahilm/fuzzy v0.1.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -36,9 +38,7 @@ require (
 	github.com/dlclark/regexp2/v2 v2.8.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
-	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v1.2.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 )

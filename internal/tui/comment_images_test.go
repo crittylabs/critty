@@ -125,7 +125,7 @@ func TestCommentImageColorsAndModal(t *testing.T) {
 	app.updateCommentSidebar()
 	for key, side := range app.commentImages {
 		img := &inlineImage{id: 0x123456, width: 8, height: 4, ready: true}
-		img.columns, img.rows = img.size(min(44, key.width), 11)
+		img.columns, img.rows = img.size(min(44, key.width), 11, cellSize{})
 		side.image = img
 	}
 	app.rebuildContent()

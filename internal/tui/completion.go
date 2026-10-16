@@ -293,7 +293,7 @@ func (m AppModel) completionLayer(regions []modalMouseRegion, width, height int)
 	if !c.active() {
 		return nil
 	}
-	cursor := m.modalTextarea.Cursor()
+	cursor := m.editorCursor()
 	if cursor == nil {
 		return nil
 	}

@@ -24,7 +24,8 @@ func TestMarkdownImageRefs(t *testing.T) {
 		"<img SRC=\"a&amp;b.png\"> <img src='two.png'/>\n\n" +
 		"<img\n src=\"multi.png\">\n\n<!-- <img src='no.png'> -->\n" +
 		"<script>var x = '<img src=\"no.png\">';</script>\n"
-	want := []markdownImageRef{{1, "a.png"}, {1, "b%20c.png"}, {6, "猫.png"}, {10, "a&b.png"}, {10, "two.png"}, {12, "multi.png"}}
+	want := []markdownImageRef{{1, "a.png", 0, 13}, {1, "b%20c.png", 14, 31}, {6, "猫.png", 0, 15},
+		{10, "a&b.png", 0, 23}, {10, "two.png", 24, 44}, {12, "multi.png", 0, 4}}
 	if got := markdownImageRefs(source); !reflect.DeepEqual(got, want) {
 		t.Fatalf("refs = %#v, want %#v", got, want)
 	}
