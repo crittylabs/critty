@@ -15,7 +15,7 @@ A terminal UI for reviewing code and documents, approving actions, and making ch
 
 Give inline feedback, approve a proposed action, or choose between alternatives.  Handle these decisions on their own or alongside code and document reviews, then let your agent continue from your feedback and answers.
 
-<video controls src="https://github.com/user-attachments/assets/54676fec-c805-466e-90e2-20824f835ae5"></video>
+<video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
 
 [More videos and screenshots](#gallery).
 
@@ -23,7 +23,7 @@ Give inline feedback, approve a proposed action, or choose between alternatives.
 
 - **Review in the terminal** — read documents and multi-file diffs with syntax highlighting and inline comments.
 - **Approvals and choices** — approve proposed actions, complete required confirmations, and choose between alternatives in the same session as a review or on their own.
-- **Round trips with your agent** — review, send feedback, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Gemini CLI.
+- **Round trips with your agent** — review, send feedback, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
 - **Inline image previews** — compare image changes and view local images in Markdown and comments on supported terminals.  [See an image review](#reviewing-an-image-replacement).
 - **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
@@ -44,7 +44,7 @@ Install the `critty` binary, then install the review skills for your agent with 
 
 Critty was called TCrit until v0.17.0.  When switching from TCrit, install from `crittylabs/critty`, the new repository and Go module path, update scripts to call `critty`, reinstall the bundled skills, and remove the old `tcrit` and `tcrit-cli` skills.  Review data uses `~/.local/state/critty` (or `$XDG_STATE_HOME/critty`), linked to the old state path when upgrading so saved reviews and running sessions keep working.  If linking fails or the paths contain independent directories, Critty keeps using the legacy directory without merging or deleting data.  Configuration and custom prompts use Critty paths, with the TCrit paths supported as lower-priority fallbacks at each level.  If tfil reports terminal markers, update it to 0.4.1 or later.
 
-After upgrading to v1.1.0, rerun `critty install` for your agent to add the experimental AI review skills and update the bundled review, CLI reference, and approval skills.
+After upgrading to v1.2.0, rerun `critty install` for your agent to update the bundled skills.  Codex skills now use `.codex/skills`; check for obsolete copies in `.agents/skills` to avoid duplicate names.  See [agent skills](#agent-skills) for shared installations and user-scoped setup.
 
 ### Command-line binary
 
@@ -409,37 +409,57 @@ Shell completions are available through `critty completion <shell>` for Bash, Zs
 
 ## Gallery
 
+Recorded with the v1.2.0 candidate.
+
 ### Code review with inline comments
 
-<video controls src="https://github.com/user-attachments/assets/54676fec-c805-466e-90e2-20824f835ae5"></video>
+<video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
 
 ### Review round trips with Claude Code
 
-<video controls src="https://github.com/user-attachments/assets/55d9840f-72bd-4c23-bf40-12e4d60ca0e5"></video>
+<video controls src="https://github.com/user-attachments/assets/b78ebf6f-c406-44cd-b56d-b1793031f5b9"></video>
 
 ### Review round trips with Codex
 
-<video controls src="https://github.com/user-attachments/assets/1b89d0c7-dd79-42a7-abf4-d2c945949065"></video>
+<video controls src="https://github.com/user-attachments/assets/4e86ed2e-65c1-4aed-a499-e4d57e3736e2"></video>
+
+### Asking Codex Astra for a review from Claude Code
+
+A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
+
+<video controls src="https://github.com/user-attachments/assets/1e8f2467-27fb-4a83-9685-9aedc40e1c8d"></video>
+
+### Reviewing a document
+
+<video controls src="https://github.com/user-attachments/assets/d8cf18f7-aa1d-4985-a993-f4c522eaf28c"></video>
+
+### Previewing an image while writing a comment
+
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/5576979d-7943-4ae4-9578-37a9e01d8508)
+
+### Inspecting an attached image in the lightbox
+
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/af8b4612-b968-49d1-b18a-e0b3d3a6350a)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/0bf182e4-4b4b-4b47-a46b-66d56370a25d)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/76064e2d-e9f1-4c07-ae5d-4f7f3f1a16a7)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/95def963-d152-4543-960f-76349480921f)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/d22e2123-92f9-400d-8b35-f20f4c010db2)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/c3e16cc1-9e94-4d5b-9550-d8d8a92f4bde)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/8e52ed1c-3854-4786-9a9a-950efe4e79a7)
 
 ### Submitting with unfinished items
 
-![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/28b4b663-b7e3-417e-bfb6-a41f92fbbab3)
+![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/67093884-2089-4044-8b7e-2b9d2fbed91b)
 
 ### Incremental search
 
-![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/a2934ab7-c2dc-46d9-995e-e31b57b1a9f1)
+![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/c87a24e4-dbea-4c1f-996b-0cad6844d306)
 
 ## Development
 
