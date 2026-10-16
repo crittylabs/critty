@@ -136,9 +136,10 @@ def logo(face: Face, theme: Theme, boxed: bool) -> str:
 
 
 PREVIEW_W, PREVIEW_H = 1280, 640
-TAGLINE = "Review AI-generated code and plans in your terminal"
-AGENTS = ["Claude Code", "Codex", "OpenCode", "Gemini CLI"]
-TERMINALS = ["tmux", "Herdr"]
+TAGLINE = "Your agents work. You make the decisions."
+SUBTITLE = "Reviews and approvals in your terminal."
+AGENTS = ["Claude Code", "Codex", "OpenCode", "Antigravity", "Gemini CLI"]
+TERMINALS = ["tmux", "Herdr", "Desktop terminals"]
 TOOL, MUTED, QUIET = "#79c0ff", "#8b949e", "#6e7681"
 
 
@@ -183,10 +184,11 @@ def social_preview(mark: Face, body: Face) -> str:
     logo_body += wordmark(mark, PAD + TILE + GAP, base, theme.ink, theme.accent)
     x, y = (PREVIEW_W - w * scale) / 2, 235 - h * scale / 2
     out = f'<g transform="translate({x:.1f} {y:.1f}) scale({scale})">{logo_body}</g>'
-    out += text_line(body, [(TAGLINE, MUTED)], 34, 440)
-    out += text_line(body, tools(AGENTS), 28, 500)
+    out += text_line(body, [(TAGLINE, DARK_INK)], 38, 420)
+    out += text_line(body, [(SUBTITLE, MUTED)], 28, 467)
+    out += text_line(body, tools(AGENTS), 24, 520)
     # Give "on" a little more room than a single space before the terminals.
-    out += text_line(body, [("on", QUIET), ("1.6", None)] + tools(TERMINALS), 28, 546)
+    out += text_line(body, [("on", QUIET), ("1.6", None)] + tools(TERMINALS), 24, 560)
     return svg(PREVIEW_W, PREVIEW_H, out, theme.paper)
 
 
