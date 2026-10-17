@@ -3030,15 +3030,23 @@ func (m *AppModel) visibleTabWindow(labels []tabLabel) (int, int) {
 	}
 }
 
+// modalClickGuard is how long a click that opened a dialog blocks another
+// click at the same cell.
+const modalClickGuard = 500 * time.Millisecond
+
 func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
 	if mouse.Button != tea.MouseLeft {
 		return m, nil
 	}
-	// A double-click that opens a dialog must not activate the control
-	// newly placed beneath the pointer on its second click.
+	// Terminal mouse reports carry no click count, so a double-click that
+	// opens a dialog would let its second click activate the control newly
+	// placed beneath the pointer.  Ignore a click at the opening click's
+	// cell within modalClickGuard instead.  The guard checks only that cell
+	// and time, so it also applies after the dialog has been closed or
+	// replaced, for example by a dialog opened from the keyboard.
 	if m.modal != noModal && mouse.X == m.modalOpeningClick.X && mouse.Y == m.modalOpeningClick.Y &&
-		time.Since(m.modalOpenedAt) < 500*time.Millisecond {
+		time.Since(m.modalOpenedAt) < modalClickGuard {
 		return m, nil
 	}
 	previousModal := m.modal

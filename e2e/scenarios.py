@@ -506,7 +506,8 @@ def scenarios() -> None:
         mouse.click(r"Submit RET")
         mouse.wait_screen("Required items must be completed", "required items notice")
         assert not mouse.result.exists(), "missing confirmation allowed approval"
-        # Let the double-click guard at Submit's position expire before reuse.
+        # The notice opened from Submit's cell; clicking that cell again within
+        # the TUI's double-click guard (modalClickGuard) is ignored.
         time.sleep(0.5)
         mouse.click(r"Review r")
         screen = mouse.wait_screen("L2/", "Review focuses the first unchecked item")
