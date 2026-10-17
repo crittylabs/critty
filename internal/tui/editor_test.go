@@ -39,6 +39,11 @@ func TestSourceEditorArgumentsAndProbeCache(t *testing.T) {
 	for _, mode := range []string{"code", "stderr", "nvi", "plain", "slow"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("CRITTY_TEST_EDITOR", mode)
+			if mode == "slow" {
+				timeout := editorProbeTimeout
+				editorProbeTimeout = 100 * time.Millisecond
+				t.Cleanup(func() { editorProbeTimeout = timeout })
+			}
 			editor := fmt.Sprintf("%q -test.run=TestSourceEditorHelper -- --profile 'Review Profile'", os.Args[0])
 			editorGotoCache.Delete(editor)
 			t.Cleanup(func() { editorGotoCache.Delete(editor) })
@@ -97,7 +102,6 @@ func TestHelpHasGotoRequiresAnOption(t *testing.T) {
 
 func TestExternalEditorCommandParsesArguments(t *testing.T) {
 	t.Setenv("EDITOR", `code --wait --profile "Review Profile"`)
-
 	cmd, err := externalEditorCommand("comment.md")
 	if err != nil {
 		t.Fatalf("externalEditorCommand: %v", err)
@@ -106,11 +110,8 @@ func TestExternalEditorCommandParsesArguments(t *testing.T) {
 	if !reflect.DeepEqual(cmd.Args, want) {
 		t.Fatalf("editor args = %#v, want %#v", cmd.Args, want)
 	}
-}
 
-func TestExternalEditorCommandRejectsMalformedValue(t *testing.T) {
 	t.Setenv("EDITOR", `vim "unterminated`)
-
 	if _, err := externalEditorCommand("comment.md"); err == nil {
 		t.Fatal("externalEditorCommand accepted malformed $EDITOR")
 	}

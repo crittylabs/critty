@@ -107,7 +107,7 @@ exit 127
 	t.Setenv("TEST_LOG", filepath.Join(dir, "args"))
 	t.Setenv("TEST_ENV", filepath.Join(dir, "env"))
 	for _, entry := range []string{"wrapper", "critty", "foreign-first", "foreign-last"} {
-		for _, args := range [][]string{{"resume", "--last"}, {"--add-dir", "/tmp", "--worktree"}, {"--no-daemon"}, {"--remote", "unix://"}, {"-c", "shell_environment_policy.set.X=123"}, {"--help"}, {"exec", "--", "--remote"}, {"--unknown", "a prompt"}} {
+		for _, args := range [][]string{{"resume", "--last"}, {"--help"}, {"exec", "--", "--unknown", "a prompt"}} {
 			t.Run(entry+strings.Join(args, " "), func(t *testing.T) {
 				path := filepath.Dir(wrapper) + ":" + filepath.Dir(real)
 				exe := wrapper

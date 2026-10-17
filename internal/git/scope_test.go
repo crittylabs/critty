@@ -7,13 +7,7 @@ import (
 )
 
 func TestReviewSources(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	t.Chdir(dir)
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "user.email", "test@example.com")
+	dir := newRepo(t)
 	writeFile(t, dir, "file 日本語.txt", []byte("base\n"))
 	runGit(t, dir, "add", ".")
 	runGit(t, dir, "commit", "-qm", "base")
@@ -110,13 +104,7 @@ func TestReviewSources(t *testing.T) {
 }
 
 func TestBinaryChangeStatuses(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	t.Chdir(dir)
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "user.email", "test@example.com")
+	dir := newRepo(t)
 	writeFile(t, dir, "deleted.bin", []byte("\x00deleted"))
 	writeFile(t, dir, "modified.bin", []byte("\x00before"))
 	writeFile(t, dir, "old.bin", []byte("\x00renamed"))
@@ -148,8 +136,6 @@ func TestBinaryChangeStatuses(t *testing.T) {
 			}
 		}
 	}
-	check(ChangedFiles())
-	check(ChangedFilesStaged())
 	check((ReviewSource{Scope: "all"}).Files())
 	check((ReviewSource{Scope: "staged"}).Files())
 	runGit(t, dir, "commit", "-qm", "changes")
@@ -172,13 +158,7 @@ func TestBinaryChangeStatuses(t *testing.T) {
 }
 
 func TestDiffFollowsRenames(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	t.Chdir(dir)
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "user.email", "test@example.com")
+	dir := newRepo(t)
 	runGit(t, dir, "config", "diff.renames", "false")
 	writeFile(t, dir, "old name.txt", []byte("one\ntwo\n"))
 	runGit(t, dir, "add", ".")

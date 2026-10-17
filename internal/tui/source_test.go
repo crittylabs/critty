@@ -63,38 +63,29 @@ func TestEmptyReviewCanFinishByMouse(t *testing.T) {
 		t.Fatal("missing empty state")
 	}
 	app.openFinishModal()
-	_, regions := app.renderEmptyReview()
-	for _, region := range regions {
-		if region.action.focus != finishSubmit || region.action.dialog || region.action.textarea || region.action.close {
-			continue
-		}
-		_, cmd := app.handleMouseClick(tea.MouseClickMsg{X: region.rect.left, Y: region.rect.top, Button: tea.MouseLeft})
-		if cmd == nil {
-			t.Fatal("approve click did not finish")
-		}
-		if _, ok := cmd().(tea.QuitMsg); !ok {
-			t.Fatal("approve click did not quit")
-		}
-		return
-	}
-	t.Fatal("approve button missing")
-}
-
-func TestEmptyReviewRadioClickSelectsWithoutSubmitting(t *testing.T) {
-	app := NewCodeReviewApp(nil, "HEAD", AppConfig{Staged: true})
-	app.width, app.height = 100, 24
-	app.openFinishModal()
-	for _, region := range app.modalMouseRegions() {
-		if region.action.pick && region.action.focus == finishReject {
-			var cmd tea.Cmd
-			app, cmd = clickMouseCmd(app, region.rect.left, region.rect.top)
-			if isQuit(cmd) || app.modal != finishModal || app.finishVerdict != review.VerdictReject {
-				t.Fatal("radio click submitted or selected the wrong verdict")
+	click := func(match func(modalMouseRegion) bool) tea.Cmd {
+		t.Helper()
+		_, regions := app.renderEmptyReview()
+		for _, region := range regions {
+			if match(region) {
+				var cmd tea.Cmd
+				app, cmd = clickMouseCmd(app, region.rect.left, region.rect.top)
+				return cmd
 			}
-			return
 		}
+		t.Fatal("dialog control missing")
+		return nil
 	}
-	t.Fatal("Reject radio missing")
+	cmd := click(func(region modalMouseRegion) bool { return region.action.pick && region.action.focus == finishReject })
+	if isQuit(cmd) || app.modal != finishModal || app.finishVerdict != review.VerdictReject {
+		t.Fatal("radio click submitted or selected the wrong verdict")
+	}
+	cmd = click(func(region modalMouseRegion) bool {
+		return region.action.focus == finishSubmit && !region.action.dialog && !region.action.textarea && !region.action.close
+	})
+	if !isQuit(cmd) {
+		t.Fatal("Submit click did not finish")
+	}
 }
 
 func TestEmptyReviewSubmissionInputCursor(t *testing.T) {

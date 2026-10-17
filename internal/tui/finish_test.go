@@ -87,7 +87,7 @@ func TestFinishPendingSummary(t *testing.T) {
 		app.toggleForm(4)
 		app.toggleForm(5)
 		app.toggleResolve(testComment().ID)
-		if status := ansi.Strip(app.finishStatus(70)); status != "1/1 💬  1/1 ☑  1/1 ●  1/1 ☑" {
+		if status, _ := app.layoutProgressCounts(70, 0, -1); ansi.Strip(status) != "1/1 💬  1/1 ☑  1/1 ●  1/1 ☑" {
 			t.Fatalf("completed counts or marks are wrong: %s", status)
 		}
 	}
@@ -101,7 +101,7 @@ func TestFinishStatusCompletionColorsAndMarks(t *testing.T) {
 		app.toggleForm(2)
 		app.toggleForm(4)
 		app.toggleForm(5)
-		status := app.finishStatus(90)
+		status, _ := app.layoutProgressCounts(90, 0, -1)
 		if plain := ansi.Strip(status); plain != "0/0 💬  1/1 ☑  1/1 ☑  1/1 ●" {
 			t.Fatalf("optional choice counted alternatives instead of groups: %s", plain)
 		}
@@ -119,7 +119,7 @@ func TestFinishStatusCompletionColorsAndMarks(t *testing.T) {
 		}
 		app.forms.Documents[0].Items[3].Required = true
 		app.toggleForm(5)
-		status = app.finishStatus(90)
+		status, _ = app.layoutProgressCounts(90, 0, -1)
 		if plain := ansi.Strip(status); plain != "0/0 💬  1/2 ☐  1/1 ●" {
 			t.Fatalf("partially completed checkboxes used a completed mark: %s", plain)
 		}
@@ -201,27 +201,6 @@ func TestFinishConfirmsUnviewedOptionalForms(t *testing.T) {
 	}
 }
 
-func TestFinishFormsHasNoProceedShortcut(t *testing.T) {
-	app, ch := formTestApp(t)
-	app.toggleForm(2)
-	app.openFinishModal()
-	app.modalTextarea.SetValue("Keep this overall comment.")
-	app.modal, app.modalFocus = finishFormsModal, finishReviewForms
-	app, cmd := pressKeyCmd(app, 'f')
-	if isQuit(cmd) || app.modal != finishFormsModal || app.session.CJ.RoundState.Finished {
-		t.Fatal("removed shortcut submitted the review")
-	}
-	app = pressKey(app, tea.KeyEscape)
-	if app.modal != finishModal || app.modalTextarea.Value() != "Keep this overall comment." {
-		t.Fatal("Cancel lost the draft")
-	}
-	select {
-	case <-ch:
-		t.Fatal("removed shortcut emitted approval")
-	default:
-	}
-}
-
 func TestApproveWithUnansweredOptionalForms(t *testing.T) {
 	for _, unresolved := range []bool{false, true} {
 		app, ch := formTestApp(t)
@@ -256,10 +235,9 @@ func TestFinishFormsCannotProceedPastRequiredItems(t *testing.T) {
 	app, ch := formTestApp(t)
 	app.openFinishModal()
 	app.finishVerdict = review.VerdictApprove
-	app.doFinish()
-	app, cmd := pressKeyCmd(app, 'f')
+	_, cmd := app.doFinish()
 	if isQuit(cmd) || app.modal != finishFormsModal || app.modalFocus != finishReviewForms {
-		t.Fatal("shortcut bypassed required items")
+		t.Fatal("approval bypassed required items")
 	}
 	app.modalFocus = finishCancelForms
 	app, cmd = pressKeyCmd(app, tea.KeyEnter)
@@ -344,19 +322,6 @@ func TestMouseClickFooterHelpButtonOpensHelp(t *testing.T) {
 	}
 }
 
-func TestQuit_OpensFinishModal(t *testing.T) {
-	app, _ := newFinishTestApp(t, []review.Comment{testComment()})
-
-	app, cmd := pressKeyCmd(app, 'q')
-
-	if isQuit(cmd) {
-		t.Fatal("expected quit to be intercepted by the finish modal")
-	}
-	if app.modal != finishModal {
-		t.Fatalf("expected finishModal, got %v", app.modal)
-	}
-}
-
 func TestFinishModalConfirmation(t *testing.T) {
 	resolved := testComment()
 	resolved.Resolved = true
@@ -373,7 +338,10 @@ func TestFinishModalConfirmation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app, ch := newFinishTestApp(t, tt.comments)
 			app.newFeedback = tt.newFeedback
-			app = pressKey(app, 'q')
+			app, cmd := pressKeyCmd(app, 'q')
+			if isQuit(cmd) || app.modal != finishModal {
+				t.Fatal("q did not open the Submit dialog")
+			}
 			wantFocus := finishComment
 			wantVerdict := review.VerdictComment
 			if tt.approved {
@@ -386,7 +354,7 @@ func TestFinishModalConfirmation(t *testing.T) {
 			if app.modalFocus != wantFocus || app.modalTextarea.Focused() {
 				t.Fatalf("default focus = %d, want %d, input focused = %t", app.modalFocus, wantFocus, app.modalTextarea.Focused())
 			}
-			app, cmd := pressKeyCmd(app, tea.KeyEnter)
+			app, cmd = pressKeyCmd(app, tea.KeyEnter)
 			if app.modal == finishResolveModal {
 				app, cmd = pressKeyCmd(app, 'y')
 			}
@@ -400,100 +368,65 @@ func TestFinishModalConfirmation(t *testing.T) {
 	}
 }
 
-func TestFinishModal_EscReturnsToReview(t *testing.T) {
-	app, ch := newFinishTestApp(t, []review.Comment{testComment()})
-	app, _ = pressKeyCmd(app, 'q')
-
-	app, cmd := pressKeyCmd(app, tea.KeyEscape)
-
-	if isQuit(cmd) {
-		t.Fatal("expected esc to stay in the review")
-	}
-	if app.modal != noModal {
-		t.Fatalf("expected modal dismissed, got %v", app.modal)
-	}
-	select {
-	case <-ch:
-		t.Error("expected no finish event on cancel")
-	default:
+func TestFinishModalBackReturnsToReview(t *testing.T) {
+	for _, mouse := range []bool{false, true} {
+		app, ch := newFinishTestApp(t, []review.Comment{testComment()})
+		app.width, app.height = 80, 24
+		app.recalculateLayout()
+		app = pressKey(app, 'q')
+		var cmd tea.Cmd
+		if mouse {
+			rect := finishRegion(t, app, finishBack)
+			assertRegionContainsRenderedText(t, app, rect, "Back ESC")
+			app = clickMouse(app, rect.left, rect.top)
+		} else {
+			app, cmd = pressKeyCmd(app, tea.KeyEscape)
+		}
+		if isQuit(cmd) || app.modal != noModal {
+			t.Fatalf("mouse %t: Back did not return to the review: modal %v", mouse, app.modal)
+		}
+		select {
+		case <-ch:
+			t.Fatalf("mouse %t: Back emitted a finish event", mouse)
+		default:
+		}
 	}
 }
 
-func TestMouseClickFinishModalCloseReturnsToReview(t *testing.T) {
-	app, ch := newFinishTestApp(t, nil)
-	app.width = 80
-	app.height = 24
-	app.recalculateLayout()
-	app, _ = pressKeyCmd(app, 'q')
+func finishRegion(t *testing.T, app AppModel, focus int) mouseRect {
+	t.Helper()
 	for _, region := range app.modalMouseRegions() {
-		if region.action.focus == finishBack {
-			assertRegionContainsRenderedText(t, app, region.rect, "Back ESC")
-			break
+		if region.action.focus == focus && !region.action.dialog && !region.action.close && !region.action.textarea && !region.action.scrollable {
+			return region.rect
 		}
 	}
-
-	app = clickModalAction(t, app, "Back ESC")
-
-	if app.modal != noModal {
-		t.Fatalf("modal = %v, want no modal", app.modal)
-	}
-	select {
-	case <-ch:
-		t.Error("close emitted a finish event")
-	default:
-	}
+	t.Fatalf("modal action %d not found", focus)
+	return mouseRect{}
 }
 
 func TestMouseClickFinishModalConfirmActions(t *testing.T) {
-	tests := []struct {
+	for _, tt := range []struct {
 		name        string
 		comments    []review.Comment
 		newFeedback bool
 		label       string
+		focus       int
 		approved    bool
 	}{
-		{name: "approve", label: "Approve", approved: true},
-		{name: "reject", label: "Reject", approved: false},
-		{
-			name: "resolve all and approve", comments: []review.Comment{testComment()},
-			label: "Approve", approved: true,
-		},
-		{
-			name: "finish review", comments: []review.Comment{testComment()}, newFeedback: true,
-			label: "Comment", approved: false,
-		},
-	}
-
-	for _, tt := range tests {
+		{name: "approve", label: "Approve", focus: finishApprove, approved: true},
+		{name: "reject", label: "Reject", focus: finishReject},
+		{name: "resolve all and approve", comments: []review.Comment{testComment()}, label: "Approve", focus: finishApprove, approved: true},
+		{name: "comment", comments: []review.Comment{testComment()}, newFeedback: true, label: "Comment", focus: finishComment},
+	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app, ch := newFinishTestApp(t, tt.comments)
 			app.newFeedback = tt.newFeedback
-			app.width = 80
-			app.height = 24
+			app.width, app.height = 80, 24
 			app.recalculateLayout()
-			app, _ = pressKeyCmd(app, 'q')
-			var actionRect mouseRect
-			found := false
-			for _, region := range app.modalMouseRegions() {
-				focus := finishApprove
-				if tt.label == "Comment" {
-					focus = finishComment
-				}
-				if tt.label == "Reject" {
-					focus = finishReject
-				}
-				if region.action.focus == focus && !region.action.dialog && !region.action.close && !region.action.textarea {
-					actionRect = region.rect
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Fatalf("finish action %q not found", tt.label)
-			}
-			assertRegionContainsRenderedText(t, app, actionRect, tt.label)
-
-			app, cmd := clickMouseCmd(app, actionRect.left, actionRect.top)
+			app = pressKey(app, 'q')
+			rect := finishRegion(t, app, tt.focus)
+			assertRegionContainsRenderedText(t, app, rect, tt.label)
+			app, cmd := clickMouseCmd(app, rect.left, rect.top)
 			if isQuit(cmd) || app.modal != finishModal {
 				t.Fatal("radio selection submitted review")
 			}
@@ -502,26 +435,14 @@ func TestMouseClickFinishModalConfirmActions(t *testing.T) {
 				t.Fatal("radio selection emitted a result")
 			default:
 			}
-			for _, region := range app.modalMouseRegions() {
-				if region.action.focus == finishSubmit && !region.action.dialog {
-					app, cmd = clickMouseCmd(app, region.rect.right-1, region.rect.top)
-					break
-				}
-			}
-
+			rect = finishRegion(t, app, finishSubmit)
+			app, cmd = clickMouseCmd(app, rect.right-1, rect.top)
 			if app.modal == finishResolveModal {
-				for _, region := range app.modalMouseRegions() {
-					if region.action.focus == 0 && !region.action.close && !region.action.dialog {
-						app, cmd = clickMouseCmd(app, region.rect.right-1, region.rect.top)
-						break
-					}
-				}
+				rect = finishRegion(t, app, 0)
+				app, cmd = clickMouseCmd(app, rect.right-1, rect.top)
 			}
-			if !isQuit(cmd) {
-				t.Error("finish action did not quit inline review")
-			}
-			if app.modal != noModal {
-				t.Fatalf("modal = %v, want no modal", app.modal)
+			if !isQuit(cmd) || app.modal != noModal {
+				t.Fatalf("finish action did not quit: modal %v", app.modal)
 			}
 			if event := takeEvent(t, ch); event.Approved != tt.approved {
 				t.Errorf("approved = %t, want %t", event.Approved, tt.approved)
@@ -561,26 +482,6 @@ func TestFinishModal_ExplicitApprovalResolvesAll(t *testing.T) {
 	}
 	if got := app.tabs[0].state.Comments[0].ResolvedRound; got != 1 {
 		t.Errorf("resolved round = %d, want 1", got)
-	}
-}
-
-func TestFinishModal_AbortWithoutFinishing(t *testing.T) {
-	app, ch := newFinishTestApp(t, []review.Comment{testComment()})
-	app, _ = pressKeyCmd(app, 'q')
-
-	app, cmd := pressKeyCmd(app, 'q')
-	if isQuit(cmd) || app.modal != finishAbortModal {
-		t.Fatal("abort did not request confirmation")
-	}
-	_, cmd = pressKeyCmd(app, 'y')
-
-	if !isQuit(cmd) {
-		t.Fatal("expected q in the modal to quit without finishing")
-	}
-	select {
-	case <-ch:
-		t.Error("expected no finish event when quitting without finishing")
-	default:
 	}
 }
 

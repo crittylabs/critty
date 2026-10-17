@@ -77,7 +77,7 @@ func TestMuxlessNotificationAndPrivateOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if contains := string(data); contains != "" && strings.Contains(contains, "private-address-fixture") {
+	if strings.Contains(string(data), "private-address-fixture") {
 		t.Fatal("SSH addresses persisted")
 	}
 }

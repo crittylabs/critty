@@ -220,28 +220,6 @@ func TestNewCommentIsSelectedForImmediateDeletion(t *testing.T) {
 	}
 }
 
-func TestRenderModalButtonSeparatesShortcutKeys(t *testing.T) {
-	app := AppModel{}
-	tests := []struct {
-		name    string
-		label   string
-		hint    string
-		focused bool
-		want    string
-	}{
-		{name: "focused", label: "Approve", hint: "y", focused: true, want: " Approve y"},
-		{name: "multiple shortcuts", label: "Keep Editing", hint: "n / esc", want: " Keep Editing n / ESC"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ansi.Strip(app.renderModalButton(tt.label, tt.hint, tt.focused))
-			if got != tt.want {
-				t.Errorf("renderModalButton() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestMouseClickCommentTextareaFocusesAndMovesCursor(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
@@ -341,54 +319,67 @@ func TestMouseClickCommentModalSuggest(t *testing.T) {
 	}
 }
 
-func TestMouseClickCommentModalClose(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-	app.openLineComment()
+func TestMouseClickCommentModalCloseConfirmsUnsavedText(t *testing.T) {
+	for _, edit := range []bool{false, true} {
+		for _, dirty := range []bool{false, true} {
+			t.Run(fmt.Sprintf("edit=%t/dirty=%t", edit, dirty), func(t *testing.T) {
+				app := setupAppWithDoc(t, "first\nsecond\n")
+				app.width, app.height = 100, 24
+				app.recalculateLayout()
+				mode := commentModal
+				if edit {
+					mode = editModal
+					app.tabs[0].state.Comments = []review.Comment{{
+						ID: "c_edit", StartLine: 1, EndLine: 1, Body: "original",
+						Author: app.author, ReviewRound: app.reviewRound(),
+					}}
+					app.openCommentThread("c_edit")
+				} else {
+					app.openLineComment()
+				}
+				if dirty {
+					app.modalTextarea.SetValue("unsaved text")
+				}
 
-	app = clickModalAction(t, app, "Close ESC")
+				app = clickModalAction(t, app, "Close ESC")
+				if !dirty {
+					if app.modal != noModal {
+						t.Fatalf("modal = %v, want unchanged dialog closed directly", app.modal)
+					}
+					return
+				}
+				if app.modal != discardChangesModal || app.discardReturn != mode || app.modalTextarea.Value() != "unsaved text" {
+					t.Fatalf("modal = %v, return = %v, textarea = %q; want discard confirmation keeping the text",
+						app.modal, app.discardReturn, app.modalTextarea.Value())
+				}
+				for _, region := range app.modalMouseRegions() {
+					switch region.action.focus {
+					case 0:
+						assertRegionContainsRenderedText(t, app, region.rect, "Discard y")
+					case 1:
+						assertRegionContainsRenderedText(t, app, region.rect, "Keep Editing n / ESC")
+					}
+				}
 
-	if app.modal != noModal {
-		t.Fatalf("modal = %v, want closed", app.modal)
-	}
-}
+				app = clickModalAction(t, app, "Keep Editing n / ESC")
+				if app.modal != mode || app.modalTextarea.Value() != "unsaved text" || !app.modalTextarea.Focused() {
+					t.Fatalf("modal = %v, textarea = %q, focused = %t; want resumed editing",
+						app.modal, app.modalTextarea.Value(), app.modalTextarea.Focused())
+				}
 
-func TestMouseClickDirtyCommentModalCloseConfirmsDiscard(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.height = 24
-	app.recalculateLayout()
-	app.openLineComment()
-	app.modalTextarea.SetValue("unsaved comment")
-
-	app = clickModalAction(t, app, "Close ESC")
-
-	if app.modal != discardChangesModal || app.discardReturn != commentModal {
-		t.Fatalf("modal = %v, return = %v; want discard confirmation for comment", app.modal, app.discardReturn)
-	}
-	if got := app.modalTextarea.Value(); got != "unsaved comment" {
-		t.Fatalf("textarea = %q, want unsaved comment preserved", got)
-	}
-	for _, region := range app.modalMouseRegions() {
-		switch region.action.focus {
-		case 0:
-			assertRegionContainsRenderedText(t, app, region.rect, "Discard y")
-		case 1:
-			assertRegionContainsRenderedText(t, app, region.rect, "Keep Editing n / ESC")
+				app = clickModalAction(t, app, "Close ESC")
+				app = clickModalAction(t, app, "Discard y")
+				if app.modal != noModal || app.modalTextarea.Value() != "" {
+					t.Fatalf("modal = %v, textarea = %q; want discarded and closed", app.modal, app.modalTextarea.Value())
+				}
+				if edit && app.tab().state.Comments[0].Body != "original" {
+					t.Fatalf("comment body = %q, want original", app.tab().state.Comments[0].Body)
+				}
+				if !edit && len(app.tab().state.Comments) != 0 {
+					t.Fatalf("comments = %+v, want none", app.tab().state.Comments)
+				}
+			})
 		}
-	}
-
-	app = clickModalAction(t, app, "Keep Editing n / ESC")
-	if app.modal != commentModal || app.modalTextarea.Value() != "unsaved comment" || !app.modalTextarea.Focused() {
-		t.Fatalf("modal = %v, textarea = %q, focused = %t; want resumed editing",
-			app.modal, app.modalTextarea.Value(), app.modalTextarea.Focused())
-	}
-
-	app = clickModalAction(t, app, "Close ESC")
-	app = clickModalAction(t, app, "Discard y")
-	if app.modal != noModal || app.modalTextarea.Value() != "" {
-		t.Fatalf("modal = %v, textarea = %q; want discarded and closed", app.modal, app.modalTextarea.Value())
 	}
 }
 
@@ -406,49 +397,6 @@ func TestDirtyCommentModalEscapeReturnsToEditing(t *testing.T) {
 	if app.modal != commentModal || !app.modalTextarea.Focused() {
 		t.Fatalf("modal = %v, focused = %t; want resumed comment editing",
 			app.modal, app.modalTextarea.Focused())
-	}
-}
-
-func TestMouseClickDirtyEditModalCloseConfirmsDiscard(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.height = 24
-	app.recalculateLayout()
-	comment := review.Comment{
-		ID: "c_edit", StartLine: 1, EndLine: 1, Body: "original",
-		Author: app.author, ReviewRound: app.reviewRound(),
-	}
-	app.tabs[0].state.Comments = []review.Comment{comment}
-	app.openCommentThread(comment.ID)
-	app.modalTextarea.SetValue("changed")
-
-	app = clickModalAction(t, app, "Close ESC")
-	if app.modal != discardChangesModal || app.discardReturn != editModal {
-		t.Fatalf("modal = %v, return = %v; want discard confirmation for edit", app.modal, app.discardReturn)
-	}
-
-	app = clickModalAction(t, app, "Discard y")
-	if got := app.tab().state.Comments[0].Body; got != "original" {
-		t.Fatalf("comment body = %q, want original", got)
-	}
-}
-
-func TestMouseClickUnchangedEditModalCloseDoesNotConfirm(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.height = 24
-	app.recalculateLayout()
-	comment := review.Comment{
-		ID: "c_edit", StartLine: 1, EndLine: 1, Body: "original",
-		Author: app.author, ReviewRound: app.reviewRound(),
-	}
-	app.tabs[0].state.Comments = []review.Comment{comment}
-	app.openCommentThread(comment.ID)
-
-	app = clickModalAction(t, app, "Close ESC")
-
-	if app.modal != noModal {
-		t.Fatalf("modal = %v, want unchanged edit to close directly", app.modal)
 	}
 }
 
@@ -571,13 +519,19 @@ func TestAddCommentModalKeepsFullContextScrollable(t *testing.T) {
 	}
 }
 
-func TestSuggestionIsAvailableWhenReplyingToLineComment(t *testing.T) {
+func TestSuggestionInReplyFollowsThreadScope(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
 	comment := review.Comment{
 		ID: "c_agent", StartLine: 1, EndLine: 2, Scope: "line",
 		Body: "agent reply", Author: "Codex", ReviewRound: 1,
 	}
-	app.tabs[0].state.Comments = []review.Comment{comment}
+	fileComment := review.Comment{ID: "c_file", Scope: "file", Body: "whole file", Author: "Codex"}
+	app.tabs[0].state.Comments = []review.Comment{comment, fileComment}
+	app.openCommentThread(fileComment.ID)
+	if app.modal != replyModal || app.canSuggest() {
+		t.Fatalf("file reply modal = %v, canSuggest=%t", app.modal, app.canSuggest())
+	}
+	app.closeTextModal()
 	app.openCommentThread(comment.ID)
 	if app.modal != replyModal || !app.canSuggest() {
 		t.Fatalf("line reply modal = %v, canSuggest=%t", app.modal, app.canSuggest())
@@ -656,98 +610,100 @@ func TestSuggestionScrollsCursorIntoView(t *testing.T) {
 	}
 }
 
-func TestSuggestionIsUnavailableWhenReplyingToFileComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\n")
-	comment := review.Comment{ID: "c_file", Scope: "file", Body: "whole file", Author: "Codex"}
-	app.tabs[0].state.Comments = []review.Comment{comment}
-	app.openCommentThread(comment.ID)
+func TestOnlyOwnUnrepliedCurrentRoundParentIsEditable(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		author   string
+		round    int
+		replies  []review.Reply
+		editable bool
+	}{
+		{name: "own current", author: "Tester", round: 1, editable: true},
+		{name: "another author", author: "AI", round: 1},
+		{name: "previous round", author: "Tester", round: 0},
+		{name: "thread with reply", author: "Tester", round: 1, replies: []review.Reply{{ID: "rp_ai", Author: "AI", ReviewRound: 1}}},
+		{name: "own reply before a follow-up", author: "Tester", round: 1, replies: []review.Reply{
+			{ID: "rp_own", Author: "Tester", Body: "question", ReviewRound: 1},
+			{ID: "rp_ai", Author: "AI", Body: "answer", ReviewRound: 1},
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			comment := testComment()
+			comment.Author = tt.author
+			comment.ReviewRound = tt.round
+			comment.Replies = tt.replies
+			app, _ := newFinishTestApp(t, []review.Comment{comment})
 
-	if app.modal != replyModal || app.canSuggest() {
-		t.Fatalf("file reply modal = %v, canSuggest=%t", app.modal, app.canSuggest())
+			app.openCommentThread(comment.ID)
+			wantModal := replyModal
+			if tt.editable {
+				wantModal = editModal
+			}
+			if app.modal != wantModal || app.editingReplyID != "" {
+				t.Fatalf("modal = %v, editing reply = %q; want %v for the thread", app.modal, app.editingReplyID, wantModal)
+			}
+			app.modal = editModal
+			if got := len(app.modalDeleteTargets()) > 0; got != tt.editable {
+				t.Fatalf("delete targets offered = %t, want %t", got, tt.editable)
+			}
+
+			app.modal, app.editingID = noModal, ""
+			app.focused = commentPane
+			app.updateCommentSidebar()
+			app = pressKey(app, 'd')
+			if got := app.modal == deleteConfirmModal; got != tt.editable || (!tt.editable && app.editingID != "") {
+				t.Fatalf("d opened modal %v for %q, want delete confirmation %t", app.modal, app.editingID, tt.editable)
+			}
+		})
 	}
 }
 
-func TestEditModalDeletesOwnCurrentRoundParent(t *testing.T) {
-	comment := testComment()
-	comment.Author = "Tester"
-	comment.ReviewRound = 1
-	app, _ := newFinishTestApp(t, []review.Comment{comment})
-	app.modal = editModal
-	app.editingID = comment.ID
-	app.modalFocus = app.modalDeleteStartFocus()
+func TestDeleteOwnCurrentRoundCommentAfterConfirmation(t *testing.T) {
+	for _, via := range []string{"sidebar", "inline", "dialog"} {
+		t.Run(via, func(t *testing.T) {
+			comment := testComment()
+			comment.Author = "Tester"
+			comment.ReviewRound = 1
+			app, _ := newFinishTestApp(t, []review.Comment{comment})
+			app.tab().doc = document.FromContent("test.go", []byte("line\n"))
+			openDelete := func() {
+				switch via {
+				case "sidebar":
+					app.focused = commentPane
+					app.updateCommentSidebar()
+					app = pressKey(app, 'd')
+				case "inline":
+					app.focused = contentPane
+					app.tabs[0].cursorLine = comment.EndAt()
+					app.tabs[0].cursorOnAnnotation = true
+					app.tabs[0].cursorAnnoIdx = 0
+					app = pressKey(app, 'd')
+				case "dialog":
+					app.openCommentThread(comment.ID)
+					app.modalFocus = app.modalDeleteStartFocus()
+					app = pressKey(app, tea.KeyEnter)
+				}
+			}
 
-	app = pressKey(app, tea.KeyEnter)
-	if app.modal != deleteConfirmModal || len(app.tabs[0].state.Comments) != 1 {
-		t.Fatalf("modal = %v, comments = %+v; want delete confirmation", app.modal, app.tabs[0].state.Comments)
-	}
-	app = pressKey(app, 'y')
+			openDelete()
+			if app.modal != deleteConfirmModal || app.editingID != comment.ID {
+				t.Fatalf("modal = %v, editing ID = %q; want delete confirmation for %q", app.modal, app.editingID, comment.ID)
+			}
+			app = pressKey(app, 'n')
+			if len(app.tabs[0].state.Comments) != 1 || app.modal == deleteConfirmModal {
+				t.Fatalf("cancel left modal = %v, comments = %+v", app.modal, app.tabs[0].state.Comments)
+			}
+			if via == "dialog" {
+				app.closeTextModal()
+			}
 
-	if len(app.tabs[0].state.Comments) != 0 {
-		t.Fatalf("expected parent comment deleted, got %+v", app.tabs[0].state.Comments)
-	}
-}
-
-func TestDeleteKeyDeletesSelectedSidebarCommentAfterConfirmation(t *testing.T) {
-	comment := testComment()
-	comment.Author = "Tester"
-	comment.ReviewRound = 1
-	app, _ := newFinishTestApp(t, []review.Comment{comment})
-	app.focused = commentPane
-	app.updateCommentSidebar()
-
-	app = pressKey(app, 'd')
-	if app.modal != deleteConfirmModal || app.editingID != comment.ID {
-		t.Fatalf("modal = %v, editing ID = %q; want delete confirmation for %q",
-			app.modal, app.editingID, comment.ID)
-	}
-	app = pressKey(app, 'n')
-	if app.modal != noModal || app.editingID != "" || len(app.tabs[0].state.Comments) != 1 {
-		t.Fatalf("cancel left modal = %v, editing ID = %q, comments = %+v",
-			app.modal, app.editingID, app.tabs[0].state.Comments)
-	}
-
-	app = pressKey(app, 'd')
-	app = pressKey(app, 'y')
-	if app.modal != noModal || len(app.tabs[0].state.Comments) != 0 {
-		t.Fatalf("modal = %v, comments = %+v; want selected comment deleted",
-			app.modal, app.tabs[0].state.Comments)
-	}
-}
-
-func TestDeleteKeyDeletesFocusedInlineCommentAfterConfirmation(t *testing.T) {
-	comment := testComment()
-	comment.Author = "Tester"
-	comment.ReviewRound = 1
-	app, _ := newFinishTestApp(t, []review.Comment{comment})
-	app.tab().doc = document.FromContent("test.go", []byte("line\n"))
-	app.focused = contentPane
-	app.tabs[0].cursorLine = comment.EndAt()
-	app.tabs[0].cursorOnAnnotation = true
-	app.tabs[0].cursorAnnoIdx = 0
-
-	app = pressKey(app, 'd')
-	if app.modal != deleteConfirmModal {
-		t.Fatalf("modal = %v, want delete confirmation", app.modal)
-	}
-	app = pressKey(app, 'y')
-	if len(app.tabs[0].state.Comments) != 0 || app.tabs[0].cursorOnAnnotation {
-		t.Fatalf("comments = %+v, annotation focus = %t; want focused comment deleted",
-			app.tabs[0].state.Comments, app.tabs[0].cursorOnAnnotation)
-	}
-}
-
-func TestDeleteKeyIgnoresIneligibleSelectedComment(t *testing.T) {
-	comment := testComment()
-	comment.Author = "another reviewer"
-	comment.ReviewRound = 1
-	app, _ := newFinishTestApp(t, []review.Comment{comment})
-	app.focused = commentPane
-	app.updateCommentSidebar()
-
-	app = pressKey(app, 'd')
-	if app.modal != noModal || app.editingID != "" || len(app.tabs[0].state.Comments) != 1 {
-		t.Fatalf("modal = %v, editing ID = %q, comments = %+v; want no action",
-			app.modal, app.editingID, app.tabs[0].state.Comments)
+			openDelete()
+			app = pressKey(app, 'y')
+			if app.modal != noModal || len(app.tabs[0].state.Comments) != 0 || app.tabs[0].cursorOnAnnotation {
+				t.Fatalf("modal = %v, comments = %+v, annotation focus = %t; want comment deleted",
+					app.modal, app.tabs[0].state.Comments, app.tabs[0].cursorOnAnnotation)
+			}
+		})
 	}
 }
 
@@ -959,21 +915,13 @@ func TestKeyboardScrollsModalReferenceByPage(t *testing.T) {
 	}
 }
 
-func TestScrollableModalBoxHonorsMinimumHeight(t *testing.T) {
+func TestScrollableModalBoxFitsBounds(t *testing.T) {
 	box, _, maxOffset := renderScrollableModalBox(strings.Repeat("long content ", 20), 40, 3, 0)
-	if height := lipgloss.Height(box); height > 3 {
-		t.Fatalf("box height = %d, max height = 3", height)
+	if lipgloss.Height(box) > 3 || lipgloss.Width(box) != 40 || maxOffset == 0 {
+		t.Fatalf("box = %dx%d, max offset = %d; want 40 columns within 3 rows and scrollable",
+			lipgloss.Width(box), lipgloss.Height(box), maxOffset)
 	}
-	if width := lipgloss.Width(box); width != 40 {
-		t.Fatalf("box width = %d, want 40", width)
-	}
-	if maxOffset == 0 {
-		t.Fatal("clipped box is not scrollable")
-	}
-}
-
-func TestModalBoxKeepsTabbedLinesInsideBorders(t *testing.T) {
-	box, _, _ := renderScrollableModalBox("15 \t"+strings.Repeat("a", 23), 30, 10, 0)
+	box, _, _ = renderScrollableModalBox("15 \t"+strings.Repeat("a", 23), 30, 10, 0)
 	for i, row := range strings.Split(ansi.Strip(box), "\n") {
 		if width := lipgloss.Width(row); width != 30 {
 			t.Errorf("row %d width = %d, want 30: %q", i, width, row)
@@ -1060,75 +1008,5 @@ func TestEnterAddsThenEditsOwnCurrentRoundReply(t *testing.T) {
 	}
 	if !strings.Contains(plain, "addressed") {
 		t.Error("edit modal should preserve the preceding reply")
-	}
-}
-
-func TestEnterDoesNotEditOwnReplyAfterFollowup(t *testing.T) {
-	comment := testComment()
-	comment.Replies = []review.Reply{
-		{ID: "rp_own", Author: "Tester", Body: "question", ReviewRound: 1},
-		{ID: "rp_ai", Author: "AI", Body: "answer", ReviewRound: 1},
-	}
-	app, _ := newFinishTestApp(t, []review.Comment{comment})
-
-	app.openCommentThread(comment.ID)
-
-	if app.modal != replyModal || app.editingReplyID != "" {
-		t.Fatalf("modal = %v, editing reply = %q; want a new reply", app.modal, app.editingReplyID)
-	}
-}
-
-func TestEnterEditsOnlyOwnUnrepliedCurrentRoundParent(t *testing.T) {
-	tests := []struct {
-		name      string
-		author    string
-		round     int
-		wantModal modalType
-	}{
-		{name: "own current", author: "Tester", round: 1, wantModal: editModal},
-		{name: "another author", author: "AI", round: 1, wantModal: replyModal},
-		{name: "previous round", author: "Tester", round: 0, wantModal: replyModal},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			comment := testComment()
-			comment.Author = tt.author
-			comment.ReviewRound = tt.round
-			app, _ := newFinishTestApp(t, []review.Comment{comment})
-
-			app.openCommentThread(comment.ID)
-
-			if app.modal != tt.wantModal {
-				t.Errorf("modal = %v, want %v", app.modal, tt.wantModal)
-			}
-		})
-	}
-}
-
-func TestEditModalHidesDeleteForIneligibleParent(t *testing.T) {
-	tests := []struct {
-		name    string
-		author  string
-		round   int
-		replies []review.Reply
-	}{
-		{name: "another author", author: "AI", round: 1},
-		{name: "previous round", author: "Tester", round: 0},
-		{name: "thread with reply", author: "Tester", round: 1, replies: []review.Reply{{ID: "rp_1", Author: "AI"}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			comment := testComment()
-			comment.Author = tt.author
-			comment.ReviewRound = tt.round
-			comment.Replies = tt.replies
-			app, _ := newFinishTestApp(t, []review.Comment{comment})
-			app.modal = editModal
-			app.editingID = comment.ID
-
-			if targets := app.modalDeleteTargets(); len(targets) != 0 {
-				t.Fatalf("delete targets = %+v, want none", targets)
-			}
-		})
 	}
 }

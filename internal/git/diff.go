@@ -62,56 +62,6 @@ func (f FileChange) ReviewStatus() string {
 	return f.Status.String()
 }
 
-// ChangedFiles returns files with changes relative to HEAD (staged + unstaged + untracked).
-func ChangedFiles() ([]FileChange, error) {
-	return ChangedFilesFrom("HEAD")
-}
-
-// ChangedFilesStaged returns files changed in the index relative to HEAD.
-func ChangedFilesStaged() ([]FileChange, error) {
-	return changedFilesFrom("HEAD", true)
-}
-
-// ChangedFilesFrom returns files changed relative to a ref (branch, commit, HEAD~N).
-func ChangedFilesFrom(ref string) ([]FileChange, error) {
-	return changedFilesFrom(ref, false)
-}
-
-func changedFilesFrom(ref string, staged bool) ([]FileChange, error) {
-	files, err := diffNameStatus(ref, staged)
-	if err != nil {
-		return nil, err
-	}
-
-	// Detect binary files via --numstat (binary shows - - for counts)
-	binaries, err := detectBinaryFiles(ref, staged)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range files {
-		if binaries[files[i].Path] {
-			files[i].Binary = true
-		}
-	}
-
-	// Add untracked files (only for HEAD-based diffs)
-	if ref == "HEAD" && !staged {
-		untracked, err := untrackedFiles()
-		if err != nil {
-			return nil, err
-		}
-		for _, path := range untracked {
-			files = append(files, FileChange{
-				Path:   path,
-				Status: StatusUntracked,
-			})
-		}
-	}
-
-	return files, nil
-}
-
 // DiffInfo contains parsed diff information for a single file.
 type DiffInfo struct {
 	ChangedLines  map[int]bool            // added/modified line numbers (1-based) in new file
@@ -345,24 +295,6 @@ func setDeletedInline(info *DiffInfo, oldLine int, segments []InlineSegment) {
 	}
 }
 
-// diffNameStatus runs git diff --name-status and parses the output.
-// It uses -z so paths with spaces, tabs, or non-ASCII characters arrive
-// unquoted and NUL-separated.
-func diffNameStatus(ref string, staged bool) ([]FileChange, error) {
-	args := []string{"diff"}
-	if staged {
-		args = append(args, "--cached")
-	} else {
-		args = append(args, ref)
-	}
-	args = append(args, "--name-status", "-z")
-	out, err := gitCommand(args...)
-	if err != nil {
-		return nil, fmt.Errorf("git diff --name-status: %w", err)
-	}
-	return parseNameStatusZ(out), nil
-}
-
 // parseNameStatusZ parses NUL-separated `git diff --name-status -z` output:
 // each entry is a status token followed by one path, or two paths for
 // renames and copies.
@@ -399,22 +331,6 @@ func parseNameStatusZ(out string) []FileChange {
 	}
 
 	return files
-}
-
-// detectBinaryFiles returns a set of paths that are binary.
-func detectBinaryFiles(ref string, staged bool) (map[string]bool, error) {
-	args := []string{"diff"}
-	if staged {
-		args = append(args, "--cached")
-	} else {
-		args = append(args, ref)
-	}
-	args = append(args, "--numstat", "-z")
-	out, err := gitCommand(args...)
-	if err != nil {
-		return nil, fmt.Errorf("git diff --numstat: %w", err)
-	}
-	return parseNumstatZ(out), nil
 }
 
 // FileContentFromIndex returns a file's staged content.

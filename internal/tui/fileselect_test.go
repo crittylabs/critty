@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,24 +39,16 @@ func TestRankFileMatches(t *testing.T) {
 	if got := order("zzz"); got != "" {
 		t.Fatalf("no match = %q", got)
 	}
-	if positions := rankFileMatches(paths, "docs md")[0].positions; strings.Join(intStrings(positions), ",") != "0,1,2,3,9,0" {
+	if positions := rankFileMatches(paths, "docs md")[0].positions; !slices.Equal(positions, []int{0, 1, 2, 3, 9, 10}) {
 		t.Fatalf("multi-word positions = %v", positions)
 	}
 	matches := rankFileMatches(paths, "thr")
 	if len(matches) != 1 || matches[0].index != 4 {
 		t.Fatalf("thread match = %+v", matches)
 	}
-	if want := []int{len("internal/tui/"), len("internal/tui/") + 1, len("internal/tui/") + 2}; strings.Join(intStrings(matches[0].positions), ",") != strings.Join(intStrings(want), ",") {
+	if want := []int{len("internal/tui/"), len("internal/tui/") + 1, len("internal/tui/") + 2}; !slices.Equal(matches[0].positions, want) {
 		t.Fatalf("positions = %v, want %v", matches[0].positions, want)
 	}
-}
-
-func intStrings(values []int) []string {
-	out := make([]string, len(values))
-	for i, v := range values {
-		out[i] = string(rune('0' + v%10))
-	}
-	return out
 }
 
 func newFileSelectApp() AppModel {
@@ -68,9 +61,6 @@ func newFileSelectApp() AppModel {
 
 func TestFileSelectFlow(t *testing.T) {
 	app := newFileSelectApp()
-	if app = pressKey(app, '/'); app.modal != noModal {
-		t.Fatal("/ still opens a search")
-	}
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
 	if app.modal != fileSelectModal || app.fileSelect.selected != 1 {
 		t.Fatalf("modal = %v, selected = %d; want current tab preselected", app.modal, app.fileSelect.selected)

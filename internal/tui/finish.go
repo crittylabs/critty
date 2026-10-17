@@ -312,11 +312,6 @@ func (m AppModel) finishTextareaHeight() int {
 	return max(1, min(5, m.height-22))
 }
 
-func (m *AppModel) finishStatus(width int) string {
-	text, _ := m.layoutProgressCounts(width, 0, -1)
-	return text
-}
-
 func (m AppModel) optionalFormsNotice(width int) string {
 	hasOptional := false
 	for _, pending := range m.pendingForms() {

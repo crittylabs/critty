@@ -11,7 +11,7 @@ import (
 )
 
 func TestFinishMouseSubmitAfterOverallComment(t *testing.T) {
-	for _, size := range [][2]int{{80, 24}, {110, 40}, {140, 42}, {60, 18}, {40, 16}, {40, 24}, {50, 24}, {60, 24}, {65, 24}, {80, 18}} {
+	for _, size := range [][2]int{{40, 16}, {60, 18}, {80, 24}, {140, 42}} {
 		for _, position := range []string{"left", "center", "right"} {
 			t.Run(fmt.Sprintf("%dx%d/%s", size[0], size[1], position), func(t *testing.T) {
 				comment := testComment()

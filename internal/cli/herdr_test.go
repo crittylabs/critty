@@ -39,27 +39,6 @@ func TestHerdrDetectorUsesEnvironment(t *testing.T) {
 	}
 }
 
-func TestFocusCurrentHerdrTab(t *testing.T) {
-	var calls [][]string
-	origRun, origLook := runCommand, lookPath
-	runCommand = func(cmd *exec.Cmd) error {
-		calls = append(calls, cmd.Args)
-		return nil
-	}
-	lookPath = func(string) (string, error) { return "/usr/local/bin/herdr", nil }
-	t.Setenv("HERDR_TAB_ID", "w1:t2")
-	t.Cleanup(func() {
-		runCommand, lookPath = origRun, origLook
-	})
-
-	focusCurrentHerdrTab()
-
-	want := []string{"/usr/local/bin/herdr", "tab", "focus", "w1:t2"}
-	if len(calls) != 1 || !slices.Equal(calls[0], want) {
-		t.Fatalf("focus call = %v, want %v", calls, want)
-	}
-}
-
 func TestHerdrProcessIDs(t *testing.T) {
 	data := []byte(`{
   "result": {
@@ -125,7 +104,7 @@ func TestResolveHerdrContextFromAncestorProcess(t *testing.T) {
 	}
 }
 
-func TestNearestMultiplexerContextChoosesClosestHerdr(t *testing.T) {
+func TestNearestMultiplexerContextChoosesClosest(t *testing.T) {
 	origParent, origInspect := parentProcessID, inspectProcess
 	parentProcessID = func() int { return 500 }
 	inspectProcess = func(pid int) (int, error) {
@@ -142,38 +121,24 @@ func TestNearestMultiplexerContextChoosesClosestHerdr(t *testing.T) {
 		parentProcessID, inspectProcess = origParent, origInspect
 	})
 
-	got := walkAncestorContexts([]multiplexerDetector{
-		staticMultiplexerDetector{contexts: map[int]reviewMultiplexerContext{300: tmuxContext{session: "outer-tmux", pane: "%1"}}},
-		staticMultiplexerDetector{contexts: map[int]reviewMultiplexerContext{400: herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"}}},
-	})
-	if _, ok := got.(herdrContext); !ok {
-		t.Errorf("walkAncestorContexts() = %T, want herdrContext", got)
-	}
-}
-
-func TestNearestMultiplexerContextChoosesClosestTMUX(t *testing.T) {
-	origParent, origInspect := parentProcessID, inspectProcess
-	parentProcessID = func() int { return 500 }
-	inspectProcess = func(pid int) (int, error) {
-		switch pid {
-		case 500:
-			return 400, nil
-		case 400:
-			return 300, nil
-		default:
-			return 1, nil
-		}
-	}
-	t.Cleanup(func() {
-		parentProcessID, inspectProcess = origParent, origInspect
-	})
-
-	got := walkAncestorContexts([]multiplexerDetector{
-		staticMultiplexerDetector{contexts: map[int]reviewMultiplexerContext{400: tmuxContext{session: "inner-tmux", pane: "%1"}}},
-		staticMultiplexerDetector{contexts: map[int]reviewMultiplexerContext{300: herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"}}},
-	})
-	if _, ok := got.(tmuxContext); !ok {
-		t.Errorf("walkAncestorContexts() = %T, want tmuxContext", got)
+	tmux := tmuxContext{session: "tmux", pane: "%1"}
+	herdr := herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"}
+	for _, tt := range []struct {
+		name         string
+		inner, outer reviewMultiplexerContext
+	}{
+		{"Herdr inside tmux", herdr, tmux},
+		{"tmux inside Herdr", tmux, herdr},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := walkAncestorContexts([]multiplexerDetector{
+				staticMultiplexerDetector{contexts: map[int]reviewMultiplexerContext{300: tt.outer}},
+				staticMultiplexerDetector{contexts: map[int]reviewMultiplexerContext{400: tt.inner}},
+			})
+			if got != tt.inner {
+				t.Errorf("walkAncestorContexts() = %+v, want %+v", got, tt.inner)
+			}
+		})
 	}
 }
 
@@ -249,114 +214,52 @@ func TestSpawnTUIHerdrTab(t *testing.T) {
 	launch.close()
 }
 
-func TestSpawnTUIHerdrTabClosesTabWhenPaneRunFails(t *testing.T) {
-	var calls [][]string
+func TestSpawnTUIHerdrTabCleansUpAfterFailure(t *testing.T) {
+	const (
+		created = `{"result":{"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}`
+		herdr   = "/usr/local/bin/herdr"
+	)
+	run := []string{herdr, "pane", "run", "w1:p9", "exec env CRITTY_HOST='Herdr' '/usr/local/bin/critty' _tui --session '0123456789ab'"}
+	focus := []string{herdr, "tab", "focus", "w1:t9"}
+	closeTab := []string{herdr, "tab", "close", "w1:t9"}
+	restore := []string{herdr, "tab", "focus", "w1:t1"}
 	origOutput, origRun, origLook, origResolve := commandOutput, runCommand, lookPath, resolveExec
-	commandOutput = func(*exec.Cmd) ([]byte, error) {
-		return []byte(`{"result":{"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}`), nil
-	}
-	runCommand = func(cmd *exec.Cmd) error {
-		calls = append(calls, cmd.Args)
-		if len(calls) == 1 {
-			return fmt.Errorf("pane busy")
-		}
-		return nil
-	}
-	lookPath = func(string) (string, error) { return "/usr/local/bin/herdr", nil }
-	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
 	t.Cleanup(func() {
 		commandOutput, runCommand, lookPath, resolveExec = origOutput, origRun, origLook, origResolve
 	})
-
-	_, err := spawnTUIHerdrTab(
-		&reviewMode{ref: "HEAD", sessionKey: "0123456789ab"},
-		herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"},
-	)
-	if err == nil {
-		t.Fatal("expected pane run failure")
-	}
-	if len(calls) != 2 || !slices.Equal(calls[1][1:], []string{"tab", "close", "w1:t9"}) {
-		t.Errorf("cleanup calls = %v", calls)
-	}
-}
-
-func TestSpawnTUIHerdrTabClosesIncompleteTab(t *testing.T) {
-	var calls [][]string
-	origOutput, origRun, origLook, origResolve := commandOutput, runCommand, lookPath, resolveExec
-	commandOutput = func(*exec.Cmd) ([]byte, error) {
-		return []byte(`{"result":{"tab":{"tab_id":"w1:t9"},"root_pane":{}}}`), nil
-	}
-	runCommand = func(cmd *exec.Cmd) error {
-		calls = append(calls, cmd.Args)
-		return nil
-	}
-	lookPath = func(string) (string, error) { return "/usr/local/bin/herdr", nil }
-	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
-	t.Cleanup(func() {
-		commandOutput, runCommand, lookPath, resolveExec = origOutput, origRun, origLook, origResolve
-	})
-
-	_, err := spawnTUIHerdrTab(
-		&reviewMode{ref: "HEAD", sessionKey: "0123456789ab"},
-		herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"},
-	)
-	if err == nil {
-		t.Fatal("expected incomplete response error")
-	}
-	want := [][]string{
-		{"/usr/local/bin/herdr", "tab", "close", "w1:t9"},
-		{"/usr/local/bin/herdr", "tab", "focus", "w1:t1"},
-	}
-	if len(calls) != len(want) {
-		t.Fatalf("cleanup calls = %v", calls)
-	}
-	for i := range want {
-		if !slices.Equal(calls[i], want[i]) {
-			t.Errorf("cleanup call %d = %v, want %v", i, calls[i], want[i])
-		}
-	}
-}
-
-func TestSpawnTUIHerdrTabCleansUpWhenFocusFails(t *testing.T) {
-	var calls [][]string
-	origOutput, origRun, origLook, origResolve := commandOutput, runCommand, lookPath, resolveExec
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("XDG_STATE_HOME", "")
-	commandOutput = func(*exec.Cmd) ([]byte, error) {
-		return []byte(`{"result":{"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}`), nil
-	}
-	runCommand = func(cmd *exec.Cmd) error {
-		calls = append(calls, cmd.Args)
-		if len(calls) == 2 {
-			return fmt.Errorf("no foreground client")
-		}
-		return nil
-	}
-	lookPath = func(string) (string, error) { return "/usr/local/bin/herdr", nil }
+	lookPath = func(string) (string, error) { return herdr, nil }
 	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
-	t.Cleanup(func() {
-		commandOutput, runCommand, lookPath, resolveExec = origOutput, origRun, origLook, origResolve
-	})
-
-	_, err := spawnTUIHerdrTab(
-		&reviewMode{ref: "HEAD", sessionKey: "0123456789ab"},
-		herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"},
-	)
-	if err == nil {
-		t.Fatal("expected focus failure")
-	}
-	want := [][]string{
-		{"/usr/local/bin/herdr", "pane", "run", "w1:p9", "exec env CRITTY_HOST='Herdr' '/usr/local/bin/critty' _tui --session '0123456789ab'"},
-		{"/usr/local/bin/herdr", "tab", "focus", "w1:t9"},
-		{"/usr/local/bin/herdr", "tab", "close", "w1:t9"},
-		{"/usr/local/bin/herdr", "tab", "focus", "w1:t1"},
-	}
-	if len(calls) != len(want) {
-		t.Fatalf("cleanup calls = %v", calls)
-	}
-	for i := range want {
-		if !slices.Equal(calls[i], want[i]) {
-			t.Errorf("cleanup call %d = %v, want %v", i, calls[i], want[i])
-		}
+	for _, tt := range []struct {
+		name, response string
+		failingCall    int
+		want           [][]string
+	}{
+		{"pane run fails", created, 1, [][]string{run, closeTab}},
+		{"incomplete tab", `{"result":{"tab":{"tab_id":"w1:t9"},"root_pane":{}}}`, 0, [][]string{closeTab, restore}},
+		{"focus fails", created, 2, [][]string{run, focus, closeTab, restore}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var calls [][]string
+			commandOutput = func(*exec.Cmd) ([]byte, error) { return []byte(tt.response), nil }
+			runCommand = func(cmd *exec.Cmd) error {
+				calls = append(calls, cmd.Args)
+				if len(calls) == tt.failingCall {
+					return fmt.Errorf("call failed")
+				}
+				return nil
+			}
+			_, err := spawnTUIHerdrTab(
+				&reviewMode{ref: "HEAD", sessionKey: "0123456789ab"},
+				herdrContext{workspace: "w1", tab: "w1:t1", pane: "w1:p1"},
+			)
+			if err == nil {
+				t.Fatal("failure lost")
+			}
+			if !slices.EqualFunc(calls, tt.want, slices.Equal) {
+				t.Errorf("calls = %q, want %q", calls, tt.want)
+			}
+		})
 	}
 }

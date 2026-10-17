@@ -11,40 +11,37 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
-func TestRenderedContentLayoutTracksWrappedChromaLines(t *testing.T) {
-	longLine := strings.Repeat("x", 500)
-	lines := []string{"short", longLine, "short"}
-	app := newScrollTestApp("test.go", lines, false, 80, 24)
-	app.tabs[0].chromaLines[1] = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(longLine)
-	app.tabs[0].changedLines = map[int]bool{2: true}
-
-	app.rebuildContent()
-	if r := app.contentLayout.lineRanges[2]; r.end-r.start <= 1 {
-		t.Error("expected multiple rendered rows for wrapped Chroma-highlighted line")
-	}
-	for _, line := range []int{1, 3} {
-		if r := app.contentLayout.lineRanges[line]; r.end-r.start != 1 {
-			t.Errorf("line %d occupies %d rows, want 1", line, r.end-r.start)
-		}
-	}
-	if got := strings.Count(app.contentViewport.View(), "x"); got != len(longLine) {
-		t.Errorf("rendered %d of %d highlighted characters", got, len(longLine))
-	}
-}
-
-func TestRenderedContentLayoutTracksWrappedMarkdown(t *testing.T) {
-	longLine := strings.Repeat("word ", 100) // 500 chars, wraps in markdown
-	lines := []string{"short", longLine, "short"}
-	app := newScrollTestApp("test.md", lines, true, 80, 24)
-
-	app.rebuildContent()
-	if r := app.contentLayout.lineRanges[2]; r.end-r.start <= 1 {
-		t.Error("expected multiple rendered rows for wrapped Markdown line")
-	}
-	for _, line := range []int{1, 3} {
-		if r := app.contentLayout.lineRanges[line]; r.end-r.start != 1 {
-			t.Errorf("line %d occupies %d rows, want 1", line, r.end-r.start)
-		}
+func TestRenderedContentLayoutTracksWrappedLines(t *testing.T) {
+	for _, tt := range []struct {
+		path     string
+		long     string
+		markdown bool
+	}{
+		{"test.go", strings.Repeat("x", 500), false},
+		{"test.md", strings.Repeat("word ", 100), true},
+	} {
+		t.Run(tt.path, func(t *testing.T) {
+			app := newScrollTestApp(tt.path, []string{"short", tt.long, "short"}, tt.markdown, 80, 24)
+			if !tt.markdown {
+				app.tabs[0].chromaLines[1] = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(tt.long)
+				app.tabs[0].changedLines = map[int]bool{2: true}
+			}
+			app.rebuildContent()
+			if r := app.contentLayout.lineRanges[2]; r.end-r.start <= 1 {
+				t.Error("expected multiple rendered rows for the wrapped line")
+			}
+			for _, line := range []int{1, 3} {
+				if r := app.contentLayout.lineRanges[line]; r.end-r.start != 1 {
+					t.Errorf("line %d occupies %d rows, want 1", line, r.end-r.start)
+				}
+			}
+			if tt.markdown {
+				return
+			}
+			if got := strings.Count(app.contentViewport.View(), "x"); got != len(tt.long) {
+				t.Errorf("rendered %d of %d highlighted characters", got, len(tt.long))
+			}
+		})
 	}
 }
 

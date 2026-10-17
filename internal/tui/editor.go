@@ -48,7 +48,10 @@ func externalEditorCommand(path string) (*exec.Cmd, error) {
 	return sourceEditorCommand(path, 0)
 }
 
-var editorGotoCache sync.Map
+var (
+	editorGotoCache    sync.Map
+	editorProbeTimeout = 2 * time.Second
+)
 
 func sourceEditorCommand(path string, line int) (*exec.Cmd, error) {
 	editor := strings.TrimSpace(os.Getenv("EDITOR"))
@@ -78,7 +81,7 @@ func editorSupportsGoto(editor string, args []string) bool {
 	if cached, ok := editorGotoCache.Load(editor); ok {
 		return cached.(bool)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), editorProbeTimeout)
 	defer cancel()
 	helpArgs := append(append([]string(nil), args[1:]...), "--help")
 	cmd := exec.CommandContext(ctx, args[0], helpArgs...)

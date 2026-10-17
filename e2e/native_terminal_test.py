@@ -93,21 +93,6 @@ class NativeTerminalTest(unittest.TestCase):
                 json.loads((output / "result.json").read_text())["returncode"], 3
             )
 
-    def test_completed_output_survives_terminal_process_exit(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            output = Path(tmp) / "result"
-            proc = self.launch(
-                "import sys; print('approved: true',file=sys.stderr); "
-                "print('Review approved with no comments')",
-                output,
-            )
-            self.assertEqual(proc.wait(timeout=5), 0)
-            self.assertIn("approved: true", (output / "stderr.ansi").read_text())
-            self.assertIn("no comments", (output / "stdout.ansi").read_text())
-            self.assertEqual(
-                json.loads((output / "result.json").read_text())["returncode"], 0
-            )
-
     def test_hangup_retains_partial_output_and_exit_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "result"

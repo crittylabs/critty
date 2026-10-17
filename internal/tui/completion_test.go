@@ -196,8 +196,7 @@ func TestRenderCompletionMenu(t *testing.T) {
 		t.Errorf("second row is bold: %q", lines[2])
 	}
 	focused := strings.Split(renderCompletionMenu(items, 1, 0, 80), "\n")
-	label := strings.TrimSuffix(strings.TrimPrefix(focused[2], ansi.Strip(focused[2][:0])), "")
-	if strings.Count(label, "\x1b[2m") != 2 || !strings.Contains(ansi.Strip(label), "second/") {
+	if strings.Count(focused[2], "\x1b[2m") != 2 || !strings.Contains(ansi.Strip(focused[2]), "second/") {
 		t.Errorf("focused row should only fade its borders: %q", focused[2])
 	}
 	if !strings.Contains(focused[1], "\x1b[1;2m") && !strings.Contains(focused[1], "\x1b[2;1m") {

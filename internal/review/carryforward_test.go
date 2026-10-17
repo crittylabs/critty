@@ -41,27 +41,28 @@ func TestCarryForwardPreservesCommentIdentity(t *testing.T) {
 	}
 }
 
-func TestCarryForwardShiftsWithInsertedLines(t *testing.T) {
-	prev := "alpha\nbeta\ngamma\n"
-	next := "intro\nmore\nalpha\nbeta\ngamma\n"
-	c := Comment{ID: "c_1", StartLine: 2, EndLine: 3, Anchor: "beta\ngamma"}
-
-	got := carryOne(t, c, prev, next)
-
-	if got.StartLine != 4 || got.EndLine != 5 || got.Drifted {
-		t.Errorf("expected shift to 4-5, got %d-%d drifted=%v", got.StartLine, got.EndLine, got.Drifted)
-	}
-}
-
-func TestCarryForwardFindsMovedAnchor(t *testing.T) {
-	prev := "target line here\nfiller\nother\n"
-	next := "other\nfiller\ntarget line here\n"
-	c := Comment{ID: "c_1", StartLine: 1, EndLine: 1, Anchor: "target line here"}
-
-	got := carryOne(t, c, prev, next)
-
-	if got.StartLine != 3 || got.Drifted {
-		t.Errorf("expected anchor found at 3, got %d drifted=%v", got.StartLine, got.Drifted)
+func TestCarryForwardRemapsAnchor(t *testing.T) {
+	const fox = "the quick brown fox jumps"
+	for _, tt := range []struct {
+		name, prev, next, anchor string
+		start, end               int
+		drifted                  bool
+	}{
+		{"shifts with inserted lines", "alpha\nbeta\ngamma\n", "intro\nmore\nalpha\nbeta\ngamma\n", "beta\ngamma", 4, 5, false},
+		{"finds moved anchor", "target line here\nfiller\nother\n", "other\nfiller\ntarget line here\n", "target line here", 3, 3, false},
+		{"tolerates in-place edit", "first\n" + fox + "\nlast\n", "first\n" + fox + " again\nlast\n", fox, 2, 2, false},
+		{"prefers exact moved anchor over similar text", "first\n" + fox + "\nsecond\nthird\n", "first\n" + fox + " again\nsecond\nthird\n" + fox + "\n", fox, 5, 5, false},
+		{"drifts when anchor is removed", "keep\nremove me entirely\nkeep too\n", "keep\nkeep too\n", "remove me entirely", 2, 2, true},
+		{"clamps beyond EOF", "a\nb\nc\nd\n", "a\n", "d", 2, 2, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			start := 1 + strings.Count(tt.prev[:strings.Index(tt.prev, tt.anchor)], "\n")
+			c := Comment{ID: "c_1", StartLine: start, EndLine: start + strings.Count(tt.anchor, "\n"), Anchor: tt.anchor}
+			got := carryOne(t, c, tt.prev, tt.next)
+			if got.StartLine != tt.start || got.EndLine != tt.end || got.Drifted != tt.drifted {
+				t.Errorf("range = %d-%d, drifted=%v; want %d-%d, drifted=%v", got.StartLine, got.EndLine, got.Drifted, tt.start, tt.end, tt.drifted)
+			}
+		})
 	}
 }
 
@@ -92,18 +93,6 @@ func TestCarryForwardResizesRange(t *testing.T) {
 	}
 }
 
-func TestCarryForwardMarksDriftedWhenAnchorRemoved(t *testing.T) {
-	prev := "keep\nremove me entirely\nkeep too\n"
-	next := "keep\nkeep too\n"
-	c := Comment{ID: "c_1", StartLine: 2, EndLine: 2, Anchor: "remove me entirely"}
-
-	got := carryOne(t, c, prev, next)
-
-	if !got.Drifted {
-		t.Errorf("expected drifted, got %+v", got)
-	}
-}
-
 func TestCarryForwardRangeBoundaries(t *testing.T) {
 	for _, tt := range []struct {
 		name, next string
@@ -127,18 +116,6 @@ func TestCarryForwardRangeBoundaries(t *testing.T) {
 	}
 }
 
-func TestCarryForwardToleratesInPlaceEdit(t *testing.T) {
-	prev := "first\nthe quick brown fox jumps\nlast\n"
-	next := "first\nthe quick brown fox jumps again\nlast\n"
-	c := Comment{ID: "c_1", StartLine: 2, EndLine: 2, Anchor: "the quick brown fox jumps"}
-
-	got := carryOne(t, c, prev, next)
-
-	if got.Drifted || got.StartLine != 2 {
-		t.Errorf("in-place edit should stay anchored: %+v", got)
-	}
-}
-
 func TestCarryForwardToleratesMiddleCut(t *testing.T) {
 	for _, tt := range []struct{ name, before, after string }{
 		{"removed clause", `continue. If this organization has no locations yet,{" "}`, `continue.{" "}`},
@@ -155,17 +132,6 @@ func TestCarryForwardToleratesMiddleCut(t *testing.T) {
 	}
 }
 
-func TestCarryForwardPrefersExactMovedAnchor(t *testing.T) {
-	const anchor = "the quick brown fox jumps"
-	prev := anchor + "\nfirst\nsecond\nthird\n"
-	next := anchor + " again\nfirst\nsecond\nthird\n" + anchor + "\n"
-	c := Comment{ID: "c_1", StartLine: 1, EndLine: 1, Anchor: anchor}
-	got := carryOne(t, c, prev, next)
-	if got.Drifted || got.StartLine != 5 || got.EndLine != 5 {
-		t.Errorf("exact moved anchor should beat similar text: %+v", got)
-	}
-}
-
 func TestCarryForwardSkipsFileScopeAndOldSide(t *testing.T) {
 	prev := "a\nb\n"
 	next := "x\ny\nz\n"
@@ -179,22 +145,6 @@ func TestCarryForwardSkipsFileScopeAndOldSide(t *testing.T) {
 	}
 	if out[1].StartLine != 2 || out[1].Drifted {
 		t.Errorf("old-side comment should keep its base-ref position: %+v", out[1])
-	}
-}
-
-func TestCarryForwardClampsBeyondEOF(t *testing.T) {
-	prev := "a\nb\nc\nd\n"
-	next := "a\n"
-	c := Comment{ID: "c_1", StartLine: 4, EndLine: 4, Anchor: "d"}
-
-	got := carryOne(t, c, prev, next)
-
-	// SplitLines keeps the trailing empty line, so the new file has 2 lines.
-	if got.StartLine < 1 || got.StartLine > 2 {
-		t.Errorf("expected clamp into the new file, got %+v", got)
-	}
-	if !got.Drifted {
-		t.Error("expected drifted when the anchored line disappeared")
 	}
 }
 

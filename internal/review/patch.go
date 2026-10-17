@@ -9,21 +9,6 @@ import (
 	"github.com/crittylabs/critty/internal/git"
 )
 
-// OpenDiffSession keeps piped reviews separate from Git and document reviews.
-func OpenDiffSession(dataRoot string) (*Session, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	args := []string{"--diff"}
-	s, err := OpenSession(dataRoot, SessionKey(cwd, "", args))
-	if err != nil {
-		return nil, err
-	}
-	s.Meta = SessionEntry{Key: s.Key, CWD: cwd, Args: args}
-	return s, nil
-}
-
 func (s *Session) DiffPath() string {
 	return filepath.Join(s.Dir, "diff.json")
 }

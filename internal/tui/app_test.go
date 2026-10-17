@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image/color"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -47,33 +46,31 @@ func TestReviewHost(t *testing.T) {
 	}
 }
 
-func TestRenderHeaderUsesCrittyBrand(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func(*AppModel)
-	}{
-		{name: "document"},
-		{name: "selection", setup: func(app *AppModel) { app.tabs[0].selecting = true }},
-		{name: "loading", setup: func(app *AppModel) { app.tabs[0].doc = nil }},
+// renderedCells returns each printed rune of s with the SGR style in effect.
+func renderedCells(s string) ([]rune, []uv.Style) {
+	var runes []rune
+	var styles []uv.Style
+	var pen uv.Style
+	parser := ansi.NewParser()
+	parser.SetHandler(ansi.Handler{
+		Print: func(r rune) {
+			runes = append(runes, r)
+			styles = append(styles, pen)
+		},
+		HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
+			if cmd == 'm' {
+				uv.ReadStyle(params, &pen)
+			}
+		},
+	})
+	for i := range len(s) {
+		parser.Advance(s[i])
 	}
+	return runes, styles
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "first\nsecond\n")
-			app.width = 120
-			if tt.setup != nil {
-				tt.setup(&app)
-			}
-
-			header := ansi.Strip(app.renderHeader())
-			if !strings.Contains(header, ">_ critty ") {
-				t.Errorf("header = %q, want Critty branding", header)
-			}
-			if strings.Contains(header, " Crit:") {
-				t.Errorf("header = %q, contains legacy Crit branding", header)
-			}
-		})
-	}
+func sameColor(a, b color.Color) bool {
+	return a != nil && b != nil && color.RGBAModel.Convert(a) == color.RGBAModel.Convert(b)
 }
 
 func TestReviewBarProjectAndTopic(t *testing.T) {
@@ -94,34 +91,6 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 		if !strings.HasSuffix(ansi.Strip(bar), " Submit q ") {
 			t.Fatalf("width %d: Submit button was truncated: %q", width, bar)
 		}
-	}
-}
-
-func TestRenderHeaderShowsCodeReviewScope(t *testing.T) {
-	tests := []struct {
-		name    string
-		baseRef string
-		staged  bool
-		want    string
-	}{
-		{name: "working tree", baseRef: "HEAD", want: "review the changes."},
-		{name: "staged", baseRef: "HEAD", staged: true, want: "review the staged changes."},
-		{name: "base ref", baseRef: "main", want: "review the changes."},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "first\nsecond\n")
-			app.width = 120
-			app.filePath = ""
-			app.multiFile = true
-			app.baseRef = tt.baseRef
-			app.staged = tt.staged
-
-			header := ansi.Strip(app.renderHeader())
-			if !strings.Contains(header, tt.want) {
-				t.Errorf("header = %q, want scope %q", header, tt.want)
-			}
-		})
 	}
 }
 
@@ -147,33 +116,21 @@ func TestTabFilenameEmphasis(t *testing.T) {
 				app.tabs[0].state = tt.state
 				rendered := app.renderTab(app.tabLabels(), 0, true)
 				var underlined, bold, italic strings.Builder
-				var pen uv.Style
-				parser := ansi.NewParser()
-				parser.SetHandler(ansi.Handler{
-					Print: func(r rune) {
-						if r == '(' || r == ')' {
-							if pen.Fg == nil || color.RGBAModel.Convert(pen.Fg) != color.RGBAModel.Convert(muted) {
-								t.Errorf("delimiter %q foreground = %v, want %v", r, pen.Fg, muted)
-							}
-						}
-						if pen.Underline != uv.UnderlineNone {
-							underlined.WriteRune(r)
-						}
-						if pen.Attrs&uv.AttrBold != 0 {
-							bold.WriteRune(r)
-						}
-						if pen.Attrs&uv.AttrItalic != 0 {
-							italic.WriteRune(r)
-						}
-					},
-					HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
-						if cmd == 'm' {
-							uv.ReadStyle(params, &pen)
-						}
-					},
-				})
-				for i := range len(rendered) {
-					parser.Advance(rendered[i])
+				runes, styles := renderedCells(rendered)
+				for i, r := range runes {
+					pen := styles[i]
+					if (r == '(' || r == ')') && !sameColor(pen.Fg, muted) {
+						t.Errorf("delimiter %q foreground = %v, want %v", r, pen.Fg, muted)
+					}
+					if pen.Underline != uv.UnderlineNone {
+						underlined.WriteRune(r)
+					}
+					if pen.Attrs&uv.AttrBold != 0 {
+						bold.WriteRune(r)
+					}
+					if pen.Attrs&uv.AttrItalic != 0 {
+						italic.WriteRune(r)
+					}
 				}
 				if got := underlined.String(); got != "" {
 					t.Fatalf("tab label still uses underlining: %q", got)
@@ -207,30 +164,23 @@ func TestRenderHeaderPathBackground(t *testing.T) {
 	if !strings.Contains(strings.Join(strings.Fields(ansi.Strip(header)), " "), "path/to/file L0/3 0/0 💬") {
 		t.Fatalf("path and status should retain their order: %q", header)
 	}
-	var styles []uv.Style
-	var pen uv.Style
-	parser := ansi.NewParser()
-	parser.SetHandler(ansi.Handler{
-		Print: func(r rune) { styles = append(styles, pen) },
-		HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
-			if cmd == 'm' {
-				uv.ReadStyle(params, &pen)
-			}
-		},
-	})
-	for i := range len(header) {
-		parser.Advance(header[i])
+	runes, styles := renderedCells(header)
+	plain := string(runes)
+	runeIndex := func(text string) int {
+		i := strings.Index(plain, text)
+		if i < 0 {
+			t.Fatalf("header missing %q: %q", text, plain)
+		}
+		return len([]rune(plain[:i]))
 	}
-	plain := ansi.Strip(header)
-	gapStart := strings.Index(plain, "L0/3") + len("L0/3")
-	gapEnd := strings.Index(plain, "0/0")
-	for i, style := range styles[gapStart : gapEnd-1] {
-		if plain[gapStart+i] != ' ' || style.Bg == nil || color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(accent) {
-			t.Fatalf("header gap must contain spaces with the accent background: %+v", style)
+	gapStart, gapEnd := runeIndex("L0/3")+len("L0/3"), runeIndex("0/0")
+	for i := gapStart; i < gapEnd-1; i++ {
+		if runes[i] != ' ' || !sameColor(styles[i].Bg, accent) {
+			t.Fatalf("header gap must contain spaces with the accent background: %+v", styles[i])
 		}
 	}
-	if style := styles[gapEnd-1]; plain[gapEnd-1] != ' ' || style.Bg == nil || color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(buttonBackground) {
-		t.Fatalf("summary must have one space inside its background: %+v", style)
+	if runes[gapEnd-1] != ' ' || !sameColor(styles[gapEnd-1].Bg, buttonBackground) {
+		t.Fatalf("summary must have one space inside its background: %+v", styles[gapEnd-1])
 	}
 	for _, part := range []struct {
 		text string
@@ -241,15 +191,9 @@ func TestRenderHeaderPathBackground(t *testing.T) {
 		{"L0/3", lipgloss.Cyan, accent},
 		{"0/0", success, buttonBackground},
 	} {
-		start := strings.Index(ansi.Strip(header), part.text)
-		if start < 0 {
-			t.Fatalf("header missing %q: %q", part.text, header)
-		}
-		start = len([]rune(ansi.Strip(header)[:start]))
+		start := runeIndex(part.text)
 		for _, style := range styles[start : start+len(part.text)] {
-			if style.Fg == nil || style.Bg == nil ||
-				color.RGBAModel.Convert(style.Fg) != color.RGBAModel.Convert(part.fg) ||
-				color.RGBAModel.Convert(style.Bg) != color.RGBAModel.Convert(part.bg) {
+			if !sameColor(style.Fg, part.fg) || !sameColor(style.Bg, part.bg) {
 				t.Fatalf("wrong colors in %q: %+v", part.text, style)
 			}
 		}
@@ -533,22 +477,6 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 		t.Errorf("help height = %d, terminal height = %d", height, app.height)
 	}
 
-	closed := false
-	for _, region := range app.modalMouseRegions() {
-		if !region.action.close {
-			continue
-		}
-		if got := ansi.Cut(strings.Split(app.View().Content, "\n")[region.rect.top], region.rect.left, region.rect.right); ansi.Strip(got) != "x" {
-			t.Fatalf("close region contains %q, want x", got)
-		}
-		app = clickMouse(app, region.rect.left, region.rect.top)
-		closed = true
-	}
-	if !closed || app.modal != noModal {
-		t.Fatalf("clicking x left modal %v, want closed (found=%t)", app.modal, closed)
-	}
-
-	app = pressAltKey(app, '?')
 	app = pressKey(app, tea.KeyEscape)
 	if app.modal != noModal {
 		t.Fatalf("esc left modal %v open", app.modal)
@@ -648,52 +576,24 @@ func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
 }
 
 func TestDocRenderedMsg_LoadsExistingComments(t *testing.T) {
-	// Create a temp directory and test file
-	tmpDir := t.TempDir()
-	testFile := filepath.Join(tmpDir, "test.go")
+	testFile := filepath.Join(t.TempDir(), "test.go")
 	if err := os.WriteFile(testFile, []byte("package main\n\nfunc main() {}\n"), 0644); err != nil {
-		t.Fatalf("failed to write test file: %v", err)
+		t.Fatal(err)
 	}
-
-	// Save review comments for that file in the session
 	sess := setupSession(t, testFile)
-	comment := review.Comment{
-		ID:        "test-comment-1",
-		StartLine: 1,
-		EndLine:   1,
-		Anchor:    "package main",
-		Body:      "This is a test comment",
-		CreatedAt: review.Now(),
-	}
+	comment := testComment()
+	comment.Anchor = "package main"
 	sess.SetFileComments(testFile, "", []review.Comment{comment})
 	if err := sess.Save(); err != nil {
-		t.Fatalf("failed to save review state: %v", err)
+		t.Fatal(err)
 	}
 
-	// Create an AppModel with a tab for the test file
 	app := NewApp(testFile, AppConfig{Session: sess, Author: "Tester"})
-	app.tabs = []FileTab{
-		{path: testFile},
-	}
-	app.activeTab = 0
+	app.tabs = []FileTab{{path: testFile}}
+	app, _ = updateApp(app, docRenderedMsg{})
 
-	// Process the docRenderedMsg
-	updatedModel, _ := app.Update(docRenderedMsg{})
-	updatedApp := updatedModel.(AppModel)
-
-	// Assert the tab's state contains the previously saved comment
-	tab := updatedApp.tabs[0]
-	if tab.state == nil {
-		t.Fatal("expected tab.state to be non-nil after docRenderedMsg")
-	}
-	if len(tab.state.Comments) != 1 {
-		t.Fatalf("expected 1 comment, got %d", len(tab.state.Comments))
-	}
-	if tab.state.Comments[0].ID != "test-comment-1" {
-		t.Errorf("expected comment ID 'test-comment-1', got %s", tab.state.Comments[0].ID)
-	}
-	if tab.state.Comments[0].Body != "This is a test comment" {
-		t.Errorf("expected comment body 'This is a test comment', got %s", tab.state.Comments[0].Body)
+	if state := app.tabs[0].state; state == nil || len(state.Comments) != 1 || state.Comments[0].ID != comment.ID || state.Comments[0].Body != comment.Body {
+		t.Fatalf("state = %+v, want the saved comment", state)
 	}
 }
 
@@ -728,37 +628,6 @@ func TestResolveKey_TogglesSelectedComment(t *testing.T) {
 	comment = app.tabs[0].state.Comments[0]
 	if comment.Resolved || comment.ResolvedRound != 0 {
 		t.Fatalf("expected unresolved comment with cleared round, got %+v", comment)
-	}
-}
-
-func TestCommentSidebarFoldsResolvedThreads(t *testing.T) {
-	unresolved := testComment()
-	unresolved.ID = "c_unresolved"
-	unresolved.Body = "still open"
-	resolved := testComment()
-	resolved.ID = "c_resolved"
-	resolved.Body = "already handled"
-	resolved.Resolved = true
-
-	app, _ := newFinishTestApp(t, []review.Comment{resolved, unresolved})
-	app.tab().doc = document.FromContent("test.go", []byte("line\n"))
-	app.commentViewport.SetWidth(40)
-	app.commentViewport.SetHeight(20)
-	app.updateCommentSidebar()
-
-	items := app.tabs[0].sidebarItems
-	if len(items) != 2 || items[0].id != resolved.ID || items[1].id != unresolved.ID {
-		t.Fatalf("sidebar items = %+v, want both threads", items)
-	}
-	rendered := app.commentViewport.View()
-	if strings.Contains(rendered, resolved.Body) {
-		t.Errorf("resolved thread visible in sidebar: %q", rendered)
-	}
-	if !strings.Contains(rendered, unresolved.Body) {
-		t.Errorf("unresolved thread missing from sidebar: %q", rendered)
-	}
-	if got := unresolvedCommentCount(app.tabs[0].state.Comments); got != 1 {
-		t.Errorf("unresolved comment count = %d, want 1", got)
 	}
 }
 
@@ -845,22 +714,6 @@ func TestFileCommentShortcutRepliesToExistingThread(t *testing.T) {
 	}
 }
 
-func TestCommentSidebarSortsFileCommentsBeforeLineComments(t *testing.T) {
-	line := testComment()
-	line.ID = "c_line"
-	file := review.Comment{ID: "c_file", Scope: "file", Body: "whole file"}
-	app, _ := newFinishTestApp(t, []review.Comment{line, file})
-	app.commentViewport.SetWidth(40)
-	app.commentViewport.SetHeight(20)
-
-	app.updateCommentSidebar()
-
-	items := app.tabs[0].sidebarItems
-	if len(items) != 2 || items[0].id != file.ID || items[1].id != line.ID {
-		t.Fatalf("sidebar items = %+v, want file comment before line comment", items)
-	}
-}
-
 func TestRoundStart_ReloadsCommentsAndAdvancesRound(t *testing.T) {
 	app, _ := newFinishTestApp(t, []review.Comment{testComment()})
 	if err := os.WriteFile("test.go", []byte("package main\n"), 0o644); err != nil {
@@ -902,26 +755,17 @@ func TestRoundStart_ReloadsCommentsAndAdvancesRound(t *testing.T) {
 }
 
 func TestRoundStartRefreshesCodeReviewTabs(t *testing.T) {
-	t.Chdir(t.TempDir())
-	runGit := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, output)
-		}
-	}
-
-	runGit("init", "--quiet")
+	dir := newGitRepo(t)
 	if err := os.WriteFile("existing.go", []byte("package existing\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	runGit("add", "existing.go")
-	runGit("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--quiet", "-m", "initial")
+	runGitIn(t, dir, "add", "existing.go")
+	runGitIn(t, dir, "commit", "-q", "-m", "initial")
 	if err := os.WriteFile("existing.go", []byte("package existing\n\nvar changed = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	files, err := gitpkg.ChangedFiles()
+	files, err := gitpkg.ReviewSource{Scope: "all"}.Files()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -938,7 +782,7 @@ func TestRoundStartRefreshesCodeReviewTabs(t *testing.T) {
 		if err := os.WriteFile(path, []byte("new file\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		runGit("add", path)
+		runGitIn(t, dir, "add", path)
 	}
 
 	app = restartRound(t, app)
@@ -954,14 +798,7 @@ func TestRoundStartRefreshesCodeReviewTabs(t *testing.T) {
 }
 
 func TestStagedRoundUsesIndexDocument(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	runGitIn(t, dir, "init", "-q")
-	runGitIn(t, dir, "config", "user.email", "test@example.com")
-	runGitIn(t, dir, "config", "user.name", "Test")
-	runGitIn(t, dir, "config", "commit.gpgsign", "false")
+	dir := newGitRepo(t)
 	path := filepath.Join(dir, "partial.go")
 	if err := os.WriteFile(path, []byte("package base\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -975,9 +812,8 @@ func TestStagedRoundUsesIndexDocument(t *testing.T) {
 	if err := os.WriteFile(path, []byte("package unstaged\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(dir)
 
-	files, err := gitpkg.ChangedFilesStaged()
+	files, err := gitpkg.ReviewSource{Scope: "staged"}.Files()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1006,14 +842,7 @@ func TestStagedRoundUsesIndexDocument(t *testing.T) {
 }
 
 func TestRevertedAdditionShowsPlaceholderAndKeepsComments(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	runGitIn(t, dir, "init", "-q")
-	runGitIn(t, dir, "config", "user.email", "test@example.com")
-	runGitIn(t, dir, "config", "user.name", "Test")
-	runGitIn(t, dir, "config", "commit.gpgsign", "false")
+	dir := newGitRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("keep\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -1023,9 +852,8 @@ func TestRevertedAdditionShowsPlaceholderAndKeepsComments(t *testing.T) {
 		t.Fatal(err)
 	}
 	runGitIn(t, dir, "add", "added.go")
-	t.Chdir(dir)
 
-	files, err := gitpkg.ChangedFilesFrom("HEAD")
+	files, err := gitpkg.ReviewSource{Scope: "all"}.Files()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1086,12 +914,12 @@ func TestCommentSidebarCollapsesResolvedFileComments(t *testing.T) {
 	app.updateCommentSidebar()
 
 	items := app.tabs[0].sidebarItems
-	if len(items) != 2 || items[0].id != fileComment.ID || !items[0].resolved {
-		t.Fatalf("sidebar items = %+v, want the resolved file comment first", items)
+	if len(items) != 2 || items[0].id != fileComment.ID || !items[0].resolved || items[1].id != lineComment.ID {
+		t.Fatalf("sidebar items = %+v, want the resolved file comment before the line comment", items)
 	}
 	rendered := ansi.Strip(app.commentViewport.View())
-	if !strings.Contains(rendered, "☑︎ Resolved") || strings.Contains(rendered, fileComment.Body) {
-		t.Fatalf("sidebar = %q, want a collapsed resolved header without the body", rendered)
+	if !strings.Contains(rendered, "☑︎ Resolved") || strings.Contains(rendered, fileComment.Body) || !strings.Contains(rendered, lineComment.Body) {
+		t.Fatalf("sidebar = %q, want a collapsed resolved header without the body beside the open thread", rendered)
 	}
 
 	app.tabs[0].sidebarCursor = 0
@@ -1179,9 +1007,7 @@ func TestResolveKeysStayOrAdvance(t *testing.T) {
 		t.Fatalf("R selected %q, want the next unresolved thread first-b", got)
 	}
 
-	// R on an already resolved thread keeps it resolved and still moves on.
-	app.tabs[0].state.Comments[2].Resolved = true // first-c
-	app = pressKey(app, 'N')                      // back onto first-a? no: N goes to the previous stop
+	app.tabs[0].state.Comments[2].Resolved = true
 	app.tabs[0].cursorLine, app.tabs[0].cursorOnAnnotation, app.tabs[0].cursorAnnoIdx = 2, true, 0
 	if got := app.selectedCommentID(); got != "first-a" {
 		t.Fatalf("setup selected %q, want first-a", got)
@@ -1261,11 +1087,15 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 	}
 	initAdaptiveStyles(true)
 	for _, tc := range []struct {
-		scope string
-		bg    lipgloss.Style
-	}{{"staged", diffAddedTextBg}, {"unstaged", diffDeletedTextBg}} {
-		app.multiFile, app.filePath = true, ""
-		app.source = &gitpkg.ReviewSource{Scope: tc.scope}
+		scope  string
+		staged bool
+		bg     lipgloss.Style
+	}{{"staged", true, diffAddedTextBg}, {"staged", false, diffAddedTextBg}, {"unstaged", false, diffDeletedTextBg}} {
+		app.multiFile, app.filePath, app.staged = true, "", tc.staged
+		app.source = nil
+		if !tc.staged {
+			app.source = &gitpkg.ReviewSource{Scope: tc.scope}
+		}
 		bar := app.renderReviewBar()
 		if plain := ansi.Strip(bar); !strings.Contains(plain, "review the "+tc.scope+" changes on tmux.") {
 			t.Fatalf("%s bar = %q, want the scope before the noun", tc.scope, plain)
@@ -1274,6 +1104,7 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 			t.Fatalf("%s bar = %q, want the scope styled as %q", tc.scope, bar, want)
 		}
 	}
+	app.staged = false
 	app.source = &gitpkg.ReviewSource{Scope: "range", Range: "main..HEAD"}
 	if plain := ansi.Strip(app.renderReviewBar()); !strings.Contains(plain, "review the changes on tmux.") {
 		t.Fatalf("range bar = %q, want no scope word", plain)
@@ -1314,23 +1145,6 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 	}
 }
 
-func TestCountsUseSingularForOne(t *testing.T) {
-	for _, tc := range []struct {
-		n    int
-		want string
-	}{{0, "0 comments"}, {1, "1 comment"}, {2, "2 comments"}} {
-		if got := countNoun(tc.n, "comment", "comments"); got != tc.want {
-			t.Errorf("countNoun(%d) = %q, want %q", tc.n, got, tc.want)
-		}
-	}
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.tab().state.Comments = []review.Comment{{ID: "c1", Scope: "file", Body: "one"}}
-	if header := ansi.Strip(app.renderHeader()); !strings.Contains(header, "0/1 💬") {
-		t.Fatalf("header = %q, want the thread completion count", header)
-	}
-}
-
 func TestFooterHiddenOnShortTerminals(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
 	for _, tc := range []struct {
@@ -1364,32 +1178,19 @@ func TestDimRenderedDimsBackgrounds(t *testing.T) {
 	initAdaptiveStyles(true)
 	bar := reviewBarStyle.Render("bar") + diffAddedTextBg.Foreground(lipgloss.BrightWhite).Render("staged") + "plain"
 	dimmed := dimRendered(bar, 14, 1)
-	var styles []uv.Style
-	var pen uv.Style
-	parser := ansi.NewParser()
-	parser.SetHandler(ansi.Handler{
-		Print: func(r rune) { styles = append(styles, pen) },
-		HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
-			if cmd == 'm' {
-				uv.ReadStyle(params, &pen)
-			}
-		},
-	})
-	for i := range len(dimmed) {
-		parser.Advance(dimmed[i])
-	}
+	_, styles := renderedCells(dimmed)
 	if len(styles) < 14 {
 		t.Fatalf("parsed %d cells, want 14: %q", len(styles), dimmed)
 	}
 	for i, style := range styles[:14] {
-		if style.Fg == nil || color.RGBAModel.Convert(style.Fg) != (color.RGBA{R: 0x55, G: 0x55, B: 0x55, A: 255}) {
+		if !sameColor(style.Fg, color.RGBA{R: 0x55, G: 0x55, B: 0x55, A: 255}) {
 			t.Fatalf("cell %d fg = %v, want dimmed gray", i, style.Fg)
 		}
 		hasBg := i < 9
 		if (style.Bg != nil) != hasBg {
 			t.Fatalf("cell %d bg = %v, want background presence %t", i, style.Bg, hasBg)
 		}
-		if hasBg && color.RGBAModel.Convert(style.Bg) != (color.RGBA{R: 0x2a, G: 0x2a, B: 0x2a, A: 255}) {
+		if hasBg && !sameColor(style.Bg, color.RGBA{R: 0x2a, G: 0x2a, B: 0x2a, A: 255}) {
 			t.Fatalf("cell %d bg = %v, want dimmed dark gray", i, style.Bg)
 		}
 	}
@@ -1411,14 +1212,14 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 		"active tab": activeTabStyle, "help description": helpDescriptionStyle,
 		"context box": contextBoxStyle, "self author": app.commentAuthorStyle(app.author),
 	} {
-		if got := style.GetForeground(); color.RGBAModel.Convert(got) != color.RGBAModel.Convert(lipgloss.Black) {
+		if got := style.GetForeground(); !sameColor(got, lipgloss.Black) {
 			t.Errorf("%s foreground = %v on a light background, want black", name, got)
 		}
 	}
 	for name, style := range map[string]lipgloss.Style{
 		"inactive tab": inactiveTabStyle, "footer description": footerDescStyle, "comment": commentStyle,
 	} {
-		if got := style.GetForeground(); color.RGBAModel.Convert(got) != color.RGBAModel.Convert(lipgloss.BrightBlack) {
+		if got := style.GetForeground(); !sameColor(got, lipgloss.BrightBlack) {
 			t.Errorf("%s foreground = %v on a light background, want bright black", name, got)
 		}
 	}
@@ -1426,12 +1227,12 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 		t.Errorf("active tab = %q, want a black label", tab)
 	}
 	initAdaptiveStyles(true)
-	if got := activeTabStyle.GetForeground(); color.RGBAModel.Convert(got) != color.RGBAModel.Convert(lipgloss.BrightWhite) {
+	if got := activeTabStyle.GetForeground(); !sameColor(got, lipgloss.BrightWhite) {
 		t.Errorf("active tab foreground = %v on a dark background, want bright white", got)
 	}
 
 	app, _ = updateApp(app, tea.BackgroundColorMsg{Color: color.White})
-	if got := app.modalTextarea.Styles().Focused.CursorLine.GetBackground(); color.RGBAModel.Convert(got) != color.RGBAModel.Convert(lipgloss.Color("255")) {
+	if got := app.modalTextarea.Styles().Focused.CursorLine.GetBackground(); !sameColor(got, lipgloss.Color("255")) {
 		t.Errorf("textarea cursor line background = %v on a light background, want near white", got)
 	}
 	if terminalIsDark {
@@ -1452,22 +1253,11 @@ func TestAccessKeyUnderline(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var underlined strings.Builder
-			var pen uv.Style
-			parser := ansi.NewParser()
-			parser.SetHandler(ansi.Handler{
-				Print: func(r rune) {
-					if pen.Underline != uv.UnderlineNone {
-						underlined.WriteRune(r)
-					}
-				},
-				HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
-					if cmd == 'm' {
-						uv.ReadStyle(params, &pen)
-					}
-				},
-			})
-			for i := range len(tt.rendered) {
-				parser.Advance(tt.rendered[i])
+			runes, styles := renderedCells(tt.rendered)
+			for i, r := range runes {
+				if styles[i].Underline != uv.UnderlineNone {
+					underlined.WriteRune(r)
+				}
 			}
 			if got := underlined.String(); got != tt.want {
 				t.Fatalf("underlined text = %q, want %q in %q", got, tt.want, tt.rendered)

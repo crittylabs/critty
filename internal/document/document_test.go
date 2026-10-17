@@ -7,64 +7,30 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "test.md")
-	content := "# Title\n\nLine 2\nLine 3\n"
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	path := filepath.Join(t.TempDir(), "test.md")
+	content := "line one\nline two\nline three\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	doc, err := Load(path)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if doc.Path != path {
-		t.Errorf("expected path %s, got %s", path, doc.Path)
-	}
-	if doc.Content != content {
-		t.Errorf("content mismatch")
-	}
-	if doc.Hash == "" {
-		t.Error("hash should not be empty")
-	}
-	if doc.LineCount() != 5 { // trailing newline creates empty last line
-		t.Errorf("expected 5 lines, got %d", doc.LineCount())
-	}
-}
-
-func TestLineAt(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "test.md")
-	if err := os.WriteFile(path, []byte("line one\nline two\nline three"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
-	doc, _ := Load(path)
-
-	tests := []struct {
-		line int
-		want string
-	}{
-		{1, "line one"},
-		{2, "line two"},
-		{3, "line three"},
-		{0, ""},  // out of range
-		{4, ""},  // out of range
-		{-1, ""}, // out of range
+	if doc.Path != path || doc.Content != content {
+		t.Errorf("Load = %+v", doc)
 	}
-
-	for _, tt := range tests {
-		got := doc.LineAt(tt.line)
-		if got != tt.want {
-			t.Errorf("LineAt(%d) = %q, want %q", tt.line, got, tt.want)
+	// The trailing newline yields an empty last line.
+	if doc.LineCount() != 4 {
+		t.Errorf("LineCount = %d, want 4", doc.LineCount())
+	}
+	for line, want := range map[int]string{-1: "", 0: "", 1: "line one", 3: "line three", 4: "", 5: ""} {
+		if got := doc.LineAt(line); got != want {
+			t.Errorf("LineAt(%d) = %q, want %q", line, got, want)
 		}
 	}
-}
 
-func TestLoadNonexistent(t *testing.T) {
-	_, err := Load("/nonexistent/file.md")
-	if err == nil {
-		t.Error("expected error for nonexistent file")
+	if _, err := Load(filepath.Join(t.TempDir(), "missing.md")); err == nil {
+		t.Error("loaded a missing file")
 	}
 }

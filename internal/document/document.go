@@ -52,7 +52,3 @@ func (d *Document) LineAt(n int) string {
 func (d *Document) LineCount() int {
 	return len(d.Lines)
 }
-
-func HashContent(content []byte) string {
-	return fmt.Sprintf("%x", sha256.Sum256(content))
-}

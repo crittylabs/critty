@@ -33,11 +33,11 @@ func TestResolveSlugFromHeading(t *testing.T) {
 func TestSavePlanVersion(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 
-	v1, err := SavePlanVersion("my-plan", []byte("first\n"))
+	v1, err := SavePlanVersionAt(PlanStorageDir("my-plan"), []byte("first\n"))
 	if err != nil || v1 != 1 {
 		t.Fatalf("v1 = %d, err = %v", v1, err)
 	}
-	v2, err := SavePlanVersion("my-plan", []byte("second\n"))
+	v2, err := SavePlanVersionAt(PlanStorageDir("my-plan"), []byte("second\n"))
 	if err != nil || v2 != 2 {
 		t.Fatalf("v2 = %d, err = %v", v2, err)
 	}

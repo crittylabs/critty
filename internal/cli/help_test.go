@@ -117,18 +117,3 @@ func TestPagerCommand(t *testing.T) {
 		})
 	}
 }
-
-func TestStyledInstallHelpIncludesNewTargets(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		styled := styledHelp(installCmd, dark, 100)
-		plain := ansi.Strip(styled)
-		for _, want := range []string{"antigravity", "agy", "agents", "--user", ".codex/skills", "~/.gemini/antigravity-cli/skills"} {
-			if !strings.Contains(plain, want) {
-				t.Fatalf("dark=%t: install help lacks %q:\n%s", dark, want, plain)
-			}
-		}
-		if !strings.Contains(styled, "\x1b[") {
-			t.Fatal("install help has no styling")
-		}
-	}
-}

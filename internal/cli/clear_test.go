@@ -10,6 +10,9 @@ import (
 func TestRunClearAll(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Chdir(t.TempDir())
+	if err := runClearAll(); err != nil {
+		t.Fatalf("runClearAll without saved state: %v", err)
+	}
 	if err := os.WriteFile("plan.md", []byte("# Test\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +48,5 @@ func TestRunClearAll(t *testing.T) {
 	}
 	if _, err := os.Stat(other.Dir); err != nil {
 		t.Errorf("expected other directory's session preserved: %v", err)
-	}
-}
-
-func TestRunClearAllWithoutState(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	t.Chdir(t.TempDir())
-	if err := runClearAll(); err != nil {
-		t.Fatalf("runClearAll on empty dir: %v", err)
 	}
 }

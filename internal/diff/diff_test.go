@@ -2,205 +2,63 @@ package diff
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
 
-func TestComputeLineDiff_BasicChanges(t *testing.T) {
-	oldContent := "a\nb\nc"
-	newContent := "a\nx\nc\nd"
-	diff := ComputeLineDiff(oldContent, newContent)
-
-	expected := []DiffEntry{
-		{Type: "unchanged", OldLine: 1, NewLine: 1, Text: "a"},
-		{Type: "removed", OldLine: 2, NewLine: 0, Text: "b"},
-		{Type: "added", OldLine: 0, NewLine: 2, Text: "x"},
-		{Type: "unchanged", OldLine: 3, NewLine: 3, Text: "c"},
-		{Type: "added", OldLine: 0, NewLine: 4, Text: "d"},
-	}
-
-	if len(diff) != len(expected) {
-		t.Fatalf("diff len = %d, want %d\ndiff: %+v", len(diff), len(expected), diff)
-	}
-	for i, e := range expected {
-		if diff[i].Type != e.Type || diff[i].Text != e.Text {
-			t.Errorf("diff[%d] type/text = %+v, want %+v", i, diff[i], e)
-		}
-		if diff[i].OldLine != e.OldLine {
-			t.Errorf("diff[%d].OldLine = %d, want %d", i, diff[i].OldLine, e.OldLine)
-		}
-		if diff[i].NewLine != e.NewLine {
-			t.Errorf("diff[%d].NewLine = %d, want %d", i, diff[i].NewLine, e.NewLine)
-		}
-	}
-}
-
-func TestComputeLineDiff_EmptyOld(t *testing.T) {
-	diff := ComputeLineDiff("", "a\nb")
-	if len(diff) != 2 {
-		t.Fatalf("diff len = %d, want 2", len(diff))
-	}
-	if diff[0].Type != "added" || diff[1].Type != "added" {
-		t.Errorf("expected all added, got %+v", diff)
+func TestComputeLineDiff(t *testing.T) {
+	for _, tt := range []struct {
+		name, old, new string
+		want           []DiffEntry
+	}{
+		{"mixed changes", "a\nb\nc", "a\nx\nc\nd", []DiffEntry{
+			{Type: "unchanged", OldLine: 1, NewLine: 1, Text: "a"},
+			{Type: "removed", OldLine: 2, Text: "b"},
+			{Type: "added", NewLine: 2, Text: "x"},
+			{Type: "unchanged", OldLine: 3, NewLine: 3, Text: "c"},
+			{Type: "added", NewLine: 4, Text: "d"},
+		}},
+		{"both empty", "", "", nil},
+		{"all added", "", "a\nb", []DiffEntry{
+			{Type: "added", NewLine: 1, Text: "a"},
+			{Type: "added", NewLine: 2, Text: "b"},
+		}},
+		{"all removed", "a\nb", "", []DiffEntry{
+			{Type: "removed", OldLine: 1, Text: "a"},
+			{Type: "removed", OldLine: 2, Text: "b"},
+		}},
+		{"whitespace is significant", "x\n  y", "x\n    y", []DiffEntry{
+			{Type: "unchanged", OldLine: 1, NewLine: 1, Text: "x"},
+			{Type: "removed", OldLine: 2, Text: "  y"},
+			{Type: "added", NewLine: 2, Text: "    y"},
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ComputeLineDiff(tt.old, tt.new); len(got)+len(tt.want) > 0 && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ComputeLineDiff = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestComputeLineDiff_EmptyNew(t *testing.T) {
-	diff := ComputeLineDiff("a\nb", "")
-	if len(diff) != 2 {
-		t.Fatalf("diff len = %d, want 2", len(diff))
-	}
-	if diff[0].Type != "removed" || diff[1].Type != "removed" {
-		t.Errorf("expected all removed, got %+v", diff)
-	}
-}
-
-func TestComputeLineDiff_Identical(t *testing.T) {
-	diff := ComputeLineDiff("a\nb\nc", "a\nb\nc")
-	for _, e := range diff {
-		if e.Type != "unchanged" {
-			t.Errorf("expected all unchanged, got %+v", diff)
-			break
-		}
-	}
-}
-
-func TestComputeLineDiff_WhitespaceOnlyChanges(t *testing.T) {
-	oldContent := "line1\n  indented\nline3"
-	newContent := "line1\n    indented\nline3"
-	diff := ComputeLineDiff(oldContent, newContent)
-
-	removedCount, addedCount := 0, 0
-	for _, e := range diff {
-		switch e.Type {
-		case "removed":
-			removedCount++
-		case "added":
-			addedCount++
-		}
-	}
-	if removedCount != 1 || addedCount != 1 {
-		t.Errorf("whitespace change: removed=%d added=%d, want 1 and 1", removedCount, addedCount)
-	}
-}
-
-func TestComputeLineDiff_BothEmpty(t *testing.T) {
-	diff := ComputeLineDiff("", "")
-	if len(diff) != 0 {
-		t.Errorf("expected empty diff, got %+v", diff)
-	}
-}
-
-func TestComputeLineDiff_CompleteReplacement(t *testing.T) {
-	diff := ComputeLineDiff("a\nb\nc", "x\ny\nz")
-	// Should have 6 entries: 3 removed + 3 added
-	removedCount := 0
-	addedCount := 0
-	for _, e := range diff {
-		switch e.Type {
-		case "removed":
-			removedCount++
-		case "added":
-			addedCount++
-		}
-	}
-	if removedCount != 3 {
-		t.Errorf("removedCount = %d, want 3", removedCount)
-	}
-	if addedCount != 3 {
-		t.Errorf("addedCount = %d, want 3", addedCount)
-	}
-}
-
-func TestMapOldLineToNew_UnchangedLines(t *testing.T) {
-	entries := ComputeLineDiff("a\nb\nc", "a\nb\nc")
-	m := MapOldLineToNew(entries)
-	for i := 1; i <= 3; i++ {
-		if m[i] != i {
-			t.Errorf("m[%d] = %d, want %d", i, m[i], i)
-		}
-	}
-}
-
-func TestMapOldLineToNew_WithInsertions(t *testing.T) {
-	// Old: a, b, c  →  New: a, x, b, c
-	entries := ComputeLineDiff("a\nb\nc", "a\nx\nb\nc")
-	m := MapOldLineToNew(entries)
-	if m[1] != 1 {
-		t.Errorf("m[1] = %d, want 1", m[1])
-	}
-	if m[2] != 3 {
-		t.Errorf("m[2] = %d, want 3", m[2])
-	}
-	if m[3] != 4 {
-		t.Errorf("m[3] = %d, want 4", m[3])
-	}
-}
-
-func TestMapOldLineToNew_WithRemovals(t *testing.T) {
-	// Old: a, b, c  →  New: a, c
-	entries := ComputeLineDiff("a\nb\nc", "a\nc")
-	m := MapOldLineToNew(entries)
-	if m[1] != 1 {
-		t.Errorf("m[1] = %d, want 1", m[1])
-	}
-	// Line 2 was removed; should map to next surviving new line (2, which is "c")
-	if m[2] != 2 {
-		t.Errorf("m[2] = %d, want 2 (next new line after removed content)", m[2])
-	}
-	if m[3] != 2 {
-		t.Errorf("m[3] = %d, want 2", m[3])
-	}
-}
-
-func TestDiffEntriesToHunks_BasicChange(t *testing.T) {
-	entries := ComputeLineDiff("a\nb\nc", "a\nx\nc")
-	hunks := DiffEntriesToHunks(entries)
-	if len(hunks) != 1 {
-		t.Fatalf("hunks = %d, want 1", len(hunks))
-	}
-	h := hunks[0]
-	// Should have context + del + add + context lines
-	var dels, adds, ctx int
-	for _, l := range h.Lines {
-		switch l.Type {
-		case "del":
-			dels++
-		case "add":
-			adds++
-		case "context":
-			ctx++
-		}
-	}
-	if dels != 1 {
-		t.Errorf("dels = %d, want 1", dels)
-	}
-	if adds != 1 {
-		t.Errorf("adds = %d, want 1", adds)
-	}
-	if ctx != 2 {
-		t.Errorf("context = %d, want 2", ctx)
-	}
-}
-
-func TestDiffEntriesToHunks_NoChanges(t *testing.T) {
-	entries := ComputeLineDiff("a\nb\nc", "a\nb\nc")
-	hunks := DiffEntriesToHunks(entries)
-	if len(hunks) != 0 {
-		t.Errorf("hunks = %d, want 0 for identical content", len(hunks))
-	}
-}
-
-func TestDiffEntriesToHunks_AllNew(t *testing.T) {
-	entries := ComputeLineDiff("", "a\nb\nc")
-	hunks := DiffEntriesToHunks(entries)
-	if len(hunks) != 1 {
-		t.Fatalf("hunks = %d, want 1", len(hunks))
-	}
-	for _, l := range hunks[0].Lines {
-		if l.Type != "add" {
-			t.Errorf("expected all add lines, got %s", l.Type)
-		}
+func TestMapOldLineToNew(t *testing.T) {
+	for _, tt := range []struct {
+		name, old, new string
+		want           map[int]int
+	}{
+		{"unchanged", "a\nb\nc", "a\nb\nc", map[int]int{1: 1, 2: 2, 3: 3}},
+		{"insertion shifts later lines", "a\nb\nc", "a\nx\nb\nc", map[int]int{1: 1, 2: 3, 3: 4}},
+		{"removed line maps to the next surviving line", "a\nb\nc", "a\nc", map[int]int{1: 1, 2: 2, 3: 2}},
+		{"replacements map to their successors", "a\nb\nc\nd\ne", "a\nx\nc\ny\ne", map[int]int{1: 1, 2: 2, 3: 3, 4: 4, 5: 5}},
+		{"everything removed", "a\nb\nc", "", map[int]int{1: 0, 2: 0, 3: 0}},
+		{"everything added", "", "a\nb\nc", map[int]int{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MapOldLineToNew(ComputeLineDiff(tt.old, tt.new)); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MapOldLineToNew = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -246,91 +104,16 @@ func mutateLines(lines []string) []string {
 }
 
 func BenchmarkComputeLineDiff(b *testing.B) {
-	sizes := []struct {
-		name string
-		n    int
-	}{
-		{"100_lines", 100},
-		{"1000_lines", 1000},
-		{"5000_lines", 5000},
-	}
-
-	for _, sz := range sizes {
-		oldLines := generateCodeLines(sz.n, "old")
-		newLines := mutateLines(oldLines)
+	for _, n := range []int{100, 1000, 5000} {
+		oldLines := generateCodeLines(n, "old")
 		oldContent := strings.Join(oldLines, "\n")
-		newContent := strings.Join(newLines, "\n")
+		newContent := strings.Join(mutateLines(oldLines), "\n")
 
-		b.Run(sz.name, func(b *testing.B) {
+		b.Run(fmt.Sprintf("%d_lines", n), func(b *testing.B) {
 			b.ReportAllocs()
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				ComputeLineDiff(oldContent, newContent)
 			}
 		})
-	}
-}
-
-func TestDiffEntriesToHunks_SeparateHunks(t *testing.T) {
-	// Changes far apart should produce separate hunks (gap > 2*context lines)
-	var oldLines, newLines []string
-	for i := 1; i <= 30; i++ {
-		line := fmt.Sprintf("line%d", i)
-		oldLines = append(oldLines, line)
-		switch i {
-		case 5:
-			newLines = append(newLines, "changed5")
-		case 25:
-			newLines = append(newLines, "changed25")
-		default:
-			newLines = append(newLines, line)
-		}
-	}
-	old := strings.Join(oldLines, "\n")
-	new := strings.Join(newLines, "\n")
-	entries := ComputeLineDiff(old, new)
-	hunks := DiffEntriesToHunks(entries)
-	if len(hunks) != 2 {
-		t.Errorf("expected 2 separate hunks for distant changes, got %d", len(hunks))
-	}
-}
-
-func TestMapOldLineToNew_AllRemoved(t *testing.T) {
-	// Old: a, b, c  →  New: (empty)
-	entries := ComputeLineDiff("a\nb\nc", "")
-	m := MapOldLineToNew(entries)
-	// All old lines were removed, so each should map to 0 (no corresponding new line).
-	for i := 1; i <= 3; i++ {
-		if got, exists := m[i]; !exists {
-			t.Errorf("m[%d] missing, expected an entry for removed line", i)
-		} else if got != 0 {
-			t.Errorf("m[%d] = %d, want 0 for removed line", i, got)
-		}
-	}
-}
-
-func TestMapOldLineToNew_AllAdded(t *testing.T) {
-	// Old: (empty)  →  New: a, b, c
-	entries := ComputeLineDiff("", "a\nb\nc")
-	m := MapOldLineToNew(entries)
-	// No old lines to map, map should be empty or contain no old-line entries.
-	if len(m) != 0 {
-		t.Errorf("expected empty map for all-added, got %d entries", len(m))
-	}
-}
-
-func TestMapOldLineToNew_MixedOperations(t *testing.T) {
-	// Old: a, b, c, d, e  →  New: a, x, c, y, e
-	entries := ComputeLineDiff("a\nb\nc\nd\ne", "a\nx\nc\ny\ne")
-	m := MapOldLineToNew(entries)
-	// a:1→1, b:2→removed (maps to next: 3 or x:2), c:3→3, d:4→removed (maps to next: 5 or y:4), e:5→5
-	if m[1] != 1 {
-		t.Errorf("m[1] = %d, want 1", m[1])
-	}
-	if m[3] != 3 {
-		t.Errorf("m[3] = %d, want 3", m[3])
-	}
-	if m[5] != 5 {
-		t.Errorf("m[5] = %d, want 5", m[5])
 	}
 }

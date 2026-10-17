@@ -1,9 +1,6 @@
 package diff
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // DiffEntry represents a single line in the diff output.
 type DiffEntry struct {
@@ -11,24 +8,6 @@ type DiffEntry struct {
 	OldLine int    `json:"old_line,omitempty"` // 1-based line number in old content (0 if added)
 	NewLine int    `json:"new_line,omitempty"` // 1-based line number in new content (0 if removed)
 	Text    string `json:"text"`
-}
-
-// DiffHunk represents a single hunk in a unified diff.
-type DiffHunk struct {
-	OldStart int
-	OldCount int
-	NewStart int
-	NewCount int
-	Header   string // the @@ line text
-	Lines    []DiffLine
-}
-
-// DiffLine represents a single line within a diff hunk.
-type DiffLine struct {
-	Type    string // "context", "add", "del"
-	Content string
-	OldNum  int // 0 if add
-	NewNum  int // 0 if del
 }
 
 // ComputeLineDiff computes a line-level diff between oldContent and newContent
@@ -211,121 +190,7 @@ func MapOldLineToNew(entries []DiffEntry) map[int]int {
 			}
 		}
 	}
-	// If nextNewLine is still 0 for some removed lines (all content was removed
-	// with no new lines at all), find the last new line as fallback.
-	if nextNewLine == 0 {
-		lastNewLine := 0
-		for _, e := range entries {
-			if e.NewLine > 0 {
-				lastNewLine = e.NewLine
-			}
-		}
-		if lastNewLine > 0 {
-			for _, e := range entries {
-				if e.Type == "removed" && m[e.OldLine] == 0 {
-					m[e.OldLine] = lastNewLine
-				}
-			}
-		}
-	}
 	return m
-}
-
-// groupChangedIndices groups changed entry indices into ranges separated by gaps
-// larger than 2*contextLines of unchanged lines.
-func groupChangedIndices(changedIndices []int, contextLines int) [][2]int {
-	var groups [][2]int
-	groupStart := changedIndices[0]
-	groupEnd := changedIndices[0]
-	for _, ci := range changedIndices[1:] {
-		if ci-groupEnd > 2*contextLines {
-			groups = append(groups, [2]int{groupStart, groupEnd})
-			groupStart = ci
-		}
-		groupEnd = ci
-	}
-	groups = append(groups, [2]int{groupStart, groupEnd})
-	return groups
-}
-
-func entryToDiffLine(e DiffEntry) (DiffLine, int, int) {
-	switch e.Type {
-	case "unchanged":
-		return DiffLine{Type: "context", Content: e.Text, OldNum: e.OldLine, NewNum: e.NewLine}, 1, 1
-	case "removed":
-		return DiffLine{Type: "del", Content: e.Text, OldNum: e.OldLine}, 1, 0
-	case "added":
-		return DiffLine{Type: "add", Content: e.Text, NewNum: e.NewLine}, 0, 1
-	default:
-		return DiffLine{}, 0, 0
-	}
-}
-
-func buildHunkFromGroup(entries []DiffEntry, gStart, gEnd, contextLines int) DiffHunk {
-	start := gStart - contextLines
-	if start < 0 {
-		start = 0
-	}
-	end := gEnd + contextLines
-	if end >= len(entries) {
-		end = len(entries) - 1
-	}
-
-	var lines []DiffLine
-	var oldStart, newStart, oldCount, newCount int
-	for i := start; i <= end; i++ {
-		dl, oldInc, newInc := entryToDiffLine(entries[i])
-		oldCount += oldInc
-		newCount += newInc
-		if oldStart == 0 && dl.OldNum > 0 {
-			oldStart = dl.OldNum
-		}
-		if newStart == 0 && dl.NewNum > 0 {
-			newStart = dl.NewNum
-		}
-		lines = append(lines, dl)
-	}
-	if oldStart == 0 {
-		oldStart = 1
-	}
-	if newStart == 0 {
-		newStart = 1
-	}
-
-	return DiffHunk{
-		OldStart: oldStart, OldCount: oldCount,
-		NewStart: newStart, NewCount: newCount,
-		Header: fmt.Sprintf("@@ -%d,%d +%d,%d @@", oldStart, oldCount, newStart, newCount),
-		Lines:  lines,
-	}
-}
-
-// DiffEntriesToHunks converts LCS diff entries into DiffHunk format (same as git diff),
-// so the frontend can use one unified renderer. Groups changes with 3 lines of context.
-func DiffEntriesToHunks(entries []DiffEntry) []DiffHunk {
-	if len(entries) == 0 {
-		return nil
-	}
-
-	const contextLines = 3
-
-	var changedIndices []int
-	for i, e := range entries {
-		if e.Type != "unchanged" {
-			changedIndices = append(changedIndices, i)
-		}
-	}
-	if len(changedIndices) == 0 {
-		return nil
-	}
-
-	groups := groupChangedIndices(changedIndices, contextLines)
-
-	hunks := make([]DiffHunk, 0, len(groups))
-	for _, g := range groups {
-		hunks = append(hunks, buildHunkFromGroup(entries, g[0], g[1], contextLines))
-	}
-	return hunks
 }
 
 // SplitLines splits content into lines, returning an empty slice for empty input.

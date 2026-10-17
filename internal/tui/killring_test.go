@@ -20,13 +20,7 @@ func newKillRingApp(value string) AppModel {
 }
 
 func editorMessage(m *AppModel, msg tea.Msg) {
-	updated, _ := m.Update(msg)
-	switch updated := updated.(type) {
-	case AppModel:
-		*m = updated
-	case *AppModel:
-		*m = *updated
-	}
+	*m, _ = updateApp(*m, msg)
 }
 
 func editorControl(m *AppModel, code rune) {

@@ -16,24 +16,13 @@ import (
 func TestMouseClickSelectsFileTab(t *testing.T) {
 	app := newCommentNavigationTestApp()
 	app.width = 120
-
+	if app = clickMouse(app, 20, app.headerHeight()+app.tabBarHeight()); app.activeTab != 0 {
+		t.Fatalf("click below the tab bar selected tab %d", app.activeTab)
+	}
 	labels := app.tabLabels()
 	firstWidth := lipgloss.Width(app.renderTab(labels, 0, true))
-	app = clickMouse(app, firstWidth+1, app.headerHeight())
-
-	if app.activeTab != 1 {
+	if app = clickMouse(app, firstWidth+1, app.headerHeight()); app.activeTab != 1 {
 		t.Fatalf("active tab = %d, want 1", app.activeTab)
-	}
-}
-
-func TestMouseClickOutsideTabBarDoesNotSelectFileTab(t *testing.T) {
-	app := newCommentNavigationTestApp()
-	app.width = 120
-
-	app = clickMouse(app, 20, app.headerHeight()+app.tabBarHeight())
-
-	if app.activeTab != 0 {
-		t.Fatalf("active tab = %d, want 0", app.activeTab)
 	}
 }
 
@@ -131,26 +120,15 @@ func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
 func TestMouseWheelScrollsCodePane(t *testing.T) {
 	app := setupAppWithDoc(t, strings.Repeat("line\n", 20))
 	app.width = 100
-	app.contentViewport.SetWidth(80)
-
+	app.contentViewport.SetWidth(75)
+	_, top, right, _ := app.contentBounds()
+	if app = wheelMouse(app, right+1, top+1, tea.MouseWheelDown); app.contentViewport.YOffset() != 0 {
+		t.Fatal("wheel outside the code pane scrolled it")
+	}
 	x, y := contentScreenPoint(app, 10, 1)
 	app = wheelMouse(app, x, y, tea.MouseWheelDown)
-
 	if got := app.contentViewport.YOffset(); got != app.contentViewport.MouseWheelDelta {
 		t.Fatalf("viewport offset = %d, want %d", got, app.contentViewport.MouseWheelDelta)
-	}
-}
-
-func TestMouseWheelOutsideCodePaneDoesNotScroll(t *testing.T) {
-	app := setupAppWithDoc(t, strings.Repeat("line\n", 20))
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-
-	_, top, right, _ := app.contentBounds()
-	app = wheelMouse(app, right+1, top+1, tea.MouseWheelDown)
-
-	if got := app.contentViewport.YOffset(); got != 0 {
-		t.Fatalf("viewport offset = %d, want 0", got)
 	}
 }
 
@@ -170,16 +148,20 @@ func TestMouseClickFocusesCodeLine(t *testing.T) {
 }
 
 func TestMouseClickCodeGutterOpensLineComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-
-	x, y := contentScreenPoint(app, 0, 1)
-	app = clickMouse(app, x, y)
-
-	if app.modal != commentModal || app.tab().cursorLine != 2 || app.tab().selecting {
-		t.Fatalf("modal = %v, line = %d, selecting = %t; want comment for line 2",
-			app.modal, app.tab().cursorLine, app.tab().selecting)
+	for _, gutter := range []bool{true, false} {
+		app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+		app.width = 100
+		app.contentViewport.SetWidth(75)
+		x := gutterWidth
+		if gutter {
+			x = 0
+		}
+		x, y := contentScreenPoint(app, x, 1)
+		app = clickMouse(app, x, y)
+		if (app.modal == commentModal) != gutter || app.tab().cursorLine != 2 || app.tab().selecting {
+			t.Fatalf("gutter %t: modal = %v, line = %d, selecting = %t",
+				gutter, app.modal, app.tab().cursorLine, app.tab().selecting)
+		}
 	}
 }
 
@@ -255,116 +237,46 @@ func TestMouseClickRenderedCodeLineUsesItsDisplayedPosition(t *testing.T) {
 	}
 }
 
-func TestMouseClickWrappedContinuationUsesOriginalLine(t *testing.T) {
-	longLine := "wrapped-start " + strings.Repeat("word ", 20) + "continuation-tail"
-	app := setupAppWithDoc(t, longLine+"\nnext unique\n")
-	app.multiFile = true
-	app.width = 60
-	app.height = 24
-	app.recalculateLayout()
-	app.rebuildContent()
-	left, _, _, _ := app.contentBounds()
-	y := renderedLineY(t, app, "continuation-tail")
-
-	app = clickMouse(app, left, y)
-
-	if app.tab().cursorLine != 1 {
-		t.Fatalf("line = %d, want wrapped source line 1 at screen row %d", app.tab().cursorLine, y)
-	}
-}
-
-func TestMouseClickTabIndentedWrappedRowsUsesOriginalLine(t *testing.T) {
-	tests := []struct {
-		name    string
-		content string
-		minRows int
+func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
+	words := func(n int) string { return strings.Repeat("word ", n) }
+	for _, tt := range []struct {
+		name, content, first, next string
+		deleted                    bool
+		minRows                    int
 	}{
-		{
-			name:    "two physical rows",
-			content: "\t\ttab-start " + strings.Repeat("word ", 10) + "two-row-tail",
-			minRows: 2,
-		},
-		{
-			name:    "three physical rows",
-			content: "\t\ttab-start " + strings.Repeat("word ", 20) + "three-row-tail",
-			minRows: 3,
-		},
-	}
-
-	for _, tt := range tests {
+		{name: "plain", content: "wrapped-start " + words(20) + "continuation-tail\nnext unique\n", first: "wrapped-start", next: "next unique", minRows: 2},
+		{name: "tab indented two rows", content: "\t\ttab-start " + words(10) + "two-row-tail\nnext unique\n", first: "tab-start", next: "next unique", minRows: 2},
+		{name: "tab indented three rows", content: "\t\ttab-start " + words(20) + "three-row-tail\nnext unique\n", first: "tab-start", next: "next unique", minRows: 3},
+		{name: "markdown table", content: "| very-long-header-cell " + words(12) + "| value |\n| --- | --- |\n| body | value |\n", first: "very-long-header-cell", next: "2 │", minRows: 2},
+		{name: "deleted before line", content: "current unique\nnext unique\n", first: "deleted-start", next: "current unique", deleted: true, minRows: 2},
+	} {
 		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, tt.content+"\nnext unique\n")
+			app := setupAppWithDoc(t, tt.content)
 			app.multiFile = true
-			app.width = 60
-			app.height = 24
+			app.width, app.height = 60, 24
+			if tt.deleted {
+				app.tabs[0].isMarkdown = false
+				app.tabs[0].chromaLines = []string{"current unique", "next unique"}
+				app.tabs[0].deletedAfter = map[int][]gitpkg.DeletedLine{
+					0: {{OldLineNum: 1, Content: "deleted-start " + words(20)}},
+				}
+			}
 			app.recalculateLayout()
 			app.rebuildContent()
 			left, _, _, _ := app.contentBounds()
-			firstY := renderedLineY(t, app, "tab-start")
-			nextY := renderedLineY(t, app, "next unique")
+			firstY := renderedLineY(t, app, tt.first)
+			nextY := renderedLineY(t, app, tt.next)
 			if rows := nextY - firstY; rows < tt.minRows {
 				t.Fatalf("rendered rows = %d, want at least %d", rows, tt.minRows)
 			}
-
 			for y := firstY; y < nextY; y++ {
-				clicked := clickMouse(app, left+gutterWidth, y)
-				if clicked.tab().cursorLine != 1 {
-					t.Fatalf("screen row %d selected line %d, want wrapped source line 1", y, clicked.tab().cursorLine)
+				for _, x := range []int{left, left + gutterWidth} {
+					if clicked := clickMouse(app, x, y); clicked.tab().cursorLine != 1 {
+						t.Fatalf("screen %d,%d selected line %d, want source line 1", x, y, clicked.tab().cursorLine)
+					}
 				}
 			}
 		})
-	}
-}
-
-func TestMouseClickWrappedDeletedRowsUsesFollowingLine(t *testing.T) {
-	app := setupAppWithDoc(t, "current unique\nnext unique\n")
-	app.multiFile = true
-	app.width = 60
-	app.height = 24
-	app.tabs[0].isMarkdown = false
-	app.tabs[0].chromaLines = []string{"current unique", "next unique"}
-	app.tabs[0].deletedAfter = map[int][]gitpkg.DeletedLine{
-		0: {{OldLineNum: 1, Content: "deleted-start " + strings.Repeat("word ", 20)}},
-	}
-	app.recalculateLayout()
-	app.rebuildContent()
-	left, _, _, _ := app.contentBounds()
-	firstY := renderedLineY(t, app, "deleted-start")
-	currentY := renderedLineY(t, app, "current unique")
-	if currentY-firstY < 2 {
-		t.Fatalf("deleted line occupies %d rows, want wrapped rows", currentY-firstY)
-	}
-
-	for y := firstY; y < currentY; y++ {
-		clicked := clickMouse(app, left+gutterWidth, y)
-		if clicked.tab().cursorLine != 1 {
-			t.Fatalf("deleted screen row %d selected line %d, want following source line 1",
-				y, clicked.tab().cursorLine)
-		}
-	}
-}
-
-func TestMouseClickWrappedMarkdownTableRowsUsesOriginalLine(t *testing.T) {
-	header := "| very-long-header-cell " + strings.Repeat("word ", 12) + "| value |"
-	app := setupAppWithDoc(t, header+"\n| --- | --- |\n| body | value |\n")
-	app.multiFile = true
-	app.width = 60
-	app.height = 24
-	app.recalculateLayout()
-	app.rebuildContent()
-	left, _, _, _ := app.contentBounds()
-	firstY := renderedLineY(t, app, "very-long-header-cell")
-	separatorY := renderedLineY(t, app, "2 │")
-	if separatorY-firstY < 2 {
-		t.Fatalf("table header occupies %d rows, want wrapped rows", separatorY-firstY)
-	}
-
-	for y := firstY; y < separatorY; y++ {
-		clicked := clickMouse(app, left+gutterWidth, y)
-		if clicked.tab().cursorLine != 1 {
-			t.Fatalf("table screen row %d selected line %d, want source line 1",
-				y, clicked.tab().cursorLine)
-		}
 	}
 }
 
@@ -386,19 +298,6 @@ func TestMouseDragRenderedCodeLinesUsesDisplayedPositions(t *testing.T) {
 	start, end := app.selectionRange()
 	if start != 2 || end != 3 {
 		t.Fatalf("selection = %d-%d, want displayed lines 2-3", start, end)
-	}
-}
-
-func TestMouseClickCodeTextDoesNotOpenLineComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-
-	x, y := contentScreenPoint(app, gutterWidth, 1)
-	app = clickMouse(app, x, y)
-
-	if app.modal != noModal {
-		t.Fatalf("modal = %v, want no modal", app.modal)
 	}
 }
 
@@ -503,25 +402,6 @@ func TestMouseDragSelectsDeletedLineRange(t *testing.T) {
 	}
 }
 
-func TestMouseClickFocusesInlineComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-	app.tabs[0].state.Comments = []review.Comment{{
-		ID: "c_inline", StartLine: 1, EndLine: 1, Body: "comment",
-	}}
-	app.updateCommentSidebar()
-	app.rebuildContent()
-
-	x, y := contentScreenPoint(app, 10, 1)
-	app = clickMouse(app, x, y)
-
-	if app.focused != contentPane || !app.tab().cursorOnAnnotation || app.tab().cursorAnnoIdx != 0 {
-		t.Fatalf("focus = %v, annotation = %t/%d; want first inline comment",
-			app.focused, app.tab().cursorOnAnnotation, app.tab().cursorAnnoIdx)
-	}
-}
-
 func TestMouseClickOpensFocusedInlineComment(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
@@ -535,8 +415,9 @@ func TestMouseClickOpensFocusedInlineComment(t *testing.T) {
 	target := app.contentLayout.lineRanges[1]
 	x, y := contentScreenPoint(app, 10, target.start+1)
 	app = clickMouse(app, x, y)
-	if app.modal != noModal {
-		t.Fatalf("first click opened modal %v, want focus only", app.modal)
+	if app.modal != noModal || app.focused != contentPane || !app.tab().cursorOnAnnotation || app.tab().cursorAnnoIdx != 0 {
+		t.Fatalf("first click: modal = %v, focus = %v, annotation = %t; want focus only",
+			app.modal, app.focused, app.tab().cursorOnAnnotation)
 	}
 	app = clickMouse(app, x, y)
 
@@ -870,49 +751,6 @@ func TestHeaderDeleteHonorsExistingRestrictions(t *testing.T) {
 	}
 }
 
-func TestMouseClickFocusesSidebar(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-
-	left, top, _, _ := app.commentBounds()
-	app = clickMouse(app, left+1, top)
-
-	if app.focused != commentPane {
-		t.Fatalf("focus = %v, want comment pane", app.focused)
-	}
-}
-
-func TestMouseClickSelectsSidebarComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-	app.contentViewport.SetHeight(20)
-	app.commentViewport.SetWidth(25)
-	app.commentViewport.SetHeight(20)
-	app.tabs[0].state.Comments = []review.Comment{
-		{ID: "c_first", StartLine: 1, EndLine: 1, Body: "first comment"},
-		{ID: "c_second", StartLine: 3, EndLine: 3, Body: "second comment"},
-	}
-	app.updateCommentSidebar()
-	app.rebuildContent()
-
-	left, top, _, _ := app.commentBounds()
-	row := 0
-	for i, target := range app.sidebarTargets {
-		if target == 1 {
-			row = i
-			break
-		}
-	}
-	app = clickMouse(app, left+1, top+1+row)
-
-	if app.focused != commentPane || app.tab().sidebarCursor != 1 || app.tab().cursorLine != 3 {
-		t.Fatalf("focus = %v, sidebar = %d, line = %d; want second comment at line 3",
-			app.focused, app.tab().sidebarCursor, app.tab().cursorLine)
-	}
-}
-
 func TestMouseClickOpensFocusedSidebarComment(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
@@ -960,9 +798,9 @@ func TestMouseClickSelectsWrappedSidebarCommentFromRenderedRows(t *testing.T) {
 
 	app = clickMouse(app, left+1, top+1+firstSecondRow)
 
-	if app.tab().sidebarCursor != 1 || app.tab().cursorLine != 3 {
-		t.Fatalf("sidebar = %d, line = %d; want wrapped-row map to select second comment",
-			app.tab().sidebarCursor, app.tab().cursorLine)
+	if app.focused != commentPane || app.tab().sidebarCursor != 1 || app.tab().cursorLine != 3 {
+		t.Fatalf("focus = %v, sidebar = %d, line = %d; want wrapped-row map to select second comment",
+			app.focused, app.tab().sidebarCursor, app.tab().cursorLine)
 	}
 }
 

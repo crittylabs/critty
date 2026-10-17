@@ -3,7 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
-	"strconv"
+	"slices"
 	"strings"
 	"testing"
 
@@ -108,15 +108,7 @@ func TestTextareaLineEndsMatchTextarea(t *testing.T) {
 		ta.CursorEnd()
 		ta.CursorDown()
 	}
-	if got := textareaLineEnds(ta); len(got) != len(want) || strings.Join(strings.Fields(fmtInts(got)), " ") != strings.Join(strings.Fields(fmtInts(want)), " ") {
+	if got := textareaLineEnds(ta); !slices.Equal(got, want) {
 		t.Fatalf("line ends: got %v want %v", got, want)
 	}
-}
-
-func fmtInts(values []int) string {
-	parts := make([]string, len(values))
-	for i, v := range values {
-		parts[i] = strconv.Itoa(v)
-	}
-	return strings.Join(parts, " ")
 }

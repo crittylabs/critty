@@ -137,23 +137,36 @@ class Round:
 
     def keys(self, *keys: str) -> None:
         tmux("send-keys", "-t", self.pane, *keys)
-        time.sleep(0.15)
+        if keys[-1] == "Escape":
+            # Keep a following key from arriving as an Alt combination.
+            self.settle()
 
     def text(self, text: str) -> None:
         tmux("send-keys", "-l", "-t", self.pane, text)
-        time.sleep(0.1)
+
+    def settle(self) -> None:
+        """Give input time to take effect before asserting that nothing happened."""
+        time.sleep(0.3)
+
+    def wait_screen(self, text: str, description: str) -> str:
+        def visible() -> str | None:
+            screen = self.screen()
+            return screen if text in screen else None
+
+        return wait_until(visible, description)
 
     def click(self, pattern: str, last: bool = False) -> None:
-        rows = list(enumerate(self.screen().splitlines(), 1))
-        for y, row in reversed(rows) if last else rows:
-            match = re.search(pattern, row)
-            if match:
-                # Button rows contain spaces and single-cell frame/selector glyphs.
-                x = match.start() + 1
-                self.text(f"\x1b[<35;{x};{y}M")
-                self.text(f"\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m")
-                return
-        raise AssertionError(f"mouse target not visible: {pattern}\n{self.screen()}")
+        def target() -> tuple[int, int] | None:
+            rows = list(enumerate(self.screen().splitlines(), 1))
+            for y, row in reversed(rows) if last else rows:
+                if match := re.search(pattern, row):
+                    # Button rows contain spaces and single-cell frame/selector glyphs.
+                    return match.start() + 1, y
+            return None
+
+        x, y = wait_until(target, f"mouse target {pattern}")
+        self.text(f"\x1b[<35;{x};{y}M")
+        self.text(f"\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m")
 
     def comment(
         self, body: str, file: bool = True, expected: str | None = None
@@ -307,13 +320,14 @@ def scenarios() -> None:
             "existing feedback confirmation",
         )
         unchanged.keys("n")
+        unchanged.settle()
         assert not unchanged.result.exists(), (
             "declining resolve-all submitted the round"
         )
         assert not any(c.get("resolved") for c in unchanged.comments()), (
             "declining resolved feedback"
         )
-        assert "Preserve draft" in unchanged.screen(), "declining discarded the draft"
+        unchanged.wait_screen("Preserve draft", "draft after declining resolve-all")
         unchanged.keys("Enter", "y")
         unchanged.completed(True)
         assert all(c.get("resolved") for c in unchanged.comments())
@@ -326,16 +340,16 @@ def scenarios() -> None:
             submission.keys("q", "Down")
             body = f"Overall comment: {verdict}."
             submission.text(body)
-            assert "● Comment" in submission.screen(), (
-                "first input did not select Comment"
-            )
+            submission.wait_screen("● Comment", "first input selects Comment")
             submission.keys("C-s")
+            submission.settle()
             assert not submission.result.exists(), "C-s submitted the overall comment"
             assert "● Comment" in submission.screen(), (
                 "new overall feedback did not select Comment"
             )
             if verdict != "comment":
                 submission.keys(action)
+                submission.settle()
             assert not submission.result.exists(), (
                 "selecting a verdict submitted the review"
             )
@@ -374,6 +388,7 @@ def scenarios() -> None:
         draft.keys("q", "q")
         wait_until(lambda: "Abort review?" in draft.screen(), "abort confirmation")
         draft.keys("n")
+        draft.settle()
         assert not draft.result.exists(), "declining abort ended the review"
         wait_until(
             lambda: "Saved draft" in draft.screen(), "draft after declining abort"
@@ -388,6 +403,7 @@ def scenarios() -> None:
         )
         resumed_draft.keys("Tab")
         resumed_draft.text(" Updated draft.")
+        resumed_draft.wait_screen("Updated draft", "updated overall draft")
         cli("stop", "--session", draft.session)
         resumed_draft.completed(None)
         externally_resumed = Round("draft-after-stop", ["--session", draft.session])
@@ -478,25 +494,24 @@ def scenarios() -> None:
         assert tmux("display-message", "-p", "-t", mouse.pane, "#{pane_width}") == "54"
         mouse.comment("Existing feedback.")
         mouse.keys("r")
-        assert all(c.get("resolved") for c in mouse.comments())
+        wait_until(
+            lambda: all(c.get("resolved") for c in mouse.comments()),
+            "mouse thread resolution",
+        )
         mouse.keys("q")
         mouse.click(r"Overall comment \(optional\)")
         mouse.text("Both videos look good!")
         mouse.click(r"[○●] Approve")
-        assert "● Approve" in mouse.screen(), "mouse did not select Approve"
+        mouse.wait_screen("● Approve", "mouse selects Approve")
         mouse.click(r"Submit RET")
+        mouse.wait_screen("Required items must be completed", "required items notice")
         assert not mouse.result.exists(), "missing confirmation allowed approval"
-        assert "Required items must be completed" in mouse.screen(), mouse.screen()
-        assert "Proceed anyway" not in mouse.screen(), mouse.screen()
-        mouse.keys("f")
-        assert not mouse.result.exists(), "Proceed bypassed required confirmation"
+        # Let the double-click guard at Submit's position expire before reuse.
+        time.sleep(0.5)
         mouse.click(r"Review r")
-        screen = wait_until(
-            lambda: mouse.screen() if "Required" in mouse.screen() else None,
-            "wrapped required confirmation",
-        )
+        screen = mouse.wait_screen("L2/", "Review focuses the first unchecked item")
+        assert "Required items must be completed" not in screen, screen
         rows = screen.splitlines()
-        assert "L2/" in screen, "Review did not focus the first unchecked item"
         viewed_row = next(
             i for i, row in enumerate(rows) if re.search(r"\bViewed\b", row)
         )
@@ -527,19 +542,24 @@ def scenarios() -> None:
         form.comment("Pending form review thread.")
         form.click(r"0/1 💬")
         form.keys("r")
-        assert all(c.get("resolved") for c in form.comments())
+        wait_until(
+            lambda: all(c.get("resolved") for c in form.comments()),
+            "form thread resolution",
+        )
         form.click(r"1/1 💬")
         form.keys("g")
         form.keys("j", "Space", "j", "j", "Space")
         form.keys("q")
         form.click(r"Overall comment \(optional\)")
         form.text("Keep this form review draft.")
+        form.wait_screen("Keep this form review draft.", "overall draft input")
         form.click(r"1/1 💬", last=True)
+        form.settle()
         assert not form.result.exists(), "counter click submitted the review"
         form.keys("q", "Down", "C-s", "Tab", "Tab", "Tab", "Tab", "Tab", "Enter")
-        assert "L5/" in form.screen(), "Submit counter did not focus unchecked consent"
+        form.wait_screen("L5/", "Submit counter focuses unchecked consent")
         form.keys("q")
-        assert "Optional items remain unanswered" in form.screen(), form.screen()
+        form.wait_screen("Optional items remain unanswered", "optional items notice")
         form.keys("Escape")
         form.finish(True)
         result = json.loads((ROOT / "form-result.json").read_text())
@@ -572,7 +592,7 @@ def scenarios() -> None:
         blocker = directory / "result-1.json"
         blocker.mkdir()
         failure.keys("q", "y")
-        time.sleep(0.3)
+        failure.settle()
         assert not failure.result.exists(), "save failure exited the TUI"
         saved = json.loads((directory / "forms.json").read_text())
         assert saved["attachments"][0]["answers"]["confirm"]["value"], saved

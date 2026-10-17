@@ -157,24 +157,6 @@ func (cj *CritJSON) TotalComments() int {
 	return n
 }
 
-// UnresolvedComments counts comments with Resolved == false across all scopes.
-func (cj *CritJSON) UnresolvedComments() int {
-	n := 0
-	for _, c := range cj.ReviewComments {
-		if !c.Resolved {
-			n++
-		}
-	}
-	for _, f := range cj.Files {
-		for _, c := range f.Comments {
-			if !c.Resolved {
-				n++
-			}
-		}
-	}
-	return n
-}
-
 // Touch stamps UpdatedAt with the current UTC time.
 func (cj *CritJSON) Touch() {
 	cj.UpdatedAt = Now()

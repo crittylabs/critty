@@ -331,7 +331,7 @@ func TestMissingFormFinishesAsFeedbackWithoutResolving(t *testing.T) {
 	}
 }
 
-func TestFormApprovalAndResultFailure(t *testing.T) {
+func TestFormApprovalGrantsHumanConsent(t *testing.T) {
 	app, ch := formTestApp(t)
 	app.toggleForm(2)
 	app.toggleForm(3)
@@ -346,35 +346,6 @@ func TestFormApprovalAndResultFailure(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(app.session.Dir, "result-1.json")); err != nil {
 		t.Fatal(err)
-	}
-	app, ch = formTestApp(t)
-	app.toggleForm(2)
-	app.toggleForm(3)
-	app.toggleForm(5)
-	if err := os.Mkdir(filepath.Join(app.session.Dir, "result-1.json"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	_, cmd = app.doFinish()
-	if isQuit(cmd) || app.err == nil {
-		t.Fatal("save failure submitted review")
-	}
-	select {
-	case <-ch:
-		t.Fatal("save failure emitted approval")
-	default:
-	}
-	if app.forms.Documents[0].Answers["confirm"].Value != true {
-		t.Fatal("save failure lost confirmation")
-	}
-	if app.session.CJ.RoundState.Finished {
-		t.Fatal("save failure finished the round")
-	}
-	if err := os.Remove(filepath.Join(app.session.Dir, "result-1.json")); err != nil {
-		t.Fatal(err)
-	}
-	_, cmd = app.doFinish()
-	if !isQuit(cmd) || !takeEvent(t, ch).Approved {
-		t.Fatalf("retry failed: %v", app.err)
 	}
 }
 
@@ -444,6 +415,14 @@ func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
 			_, cmd := app.submitReview(verdict)
 			if isQuit(cmd) || !app.finishSaveFailed || app.session.CJ.RoundState.Finished {
 				t.Fatal("save failure submitted review")
+			}
+			select {
+			case <-ch:
+				t.Fatal("save failure emitted a result")
+			default:
+			}
+			if app.forms.Documents[0].Answers["confirm"].Value != true {
+				t.Fatal("save failure lost confirmation")
 			}
 			id := app.session.CJ.RoundState.ReviewCommentID
 			if err := os.Remove(blocker); err != nil {

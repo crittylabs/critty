@@ -18,7 +18,7 @@ func patchApp(t *testing.T, raw string) AppModel {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sess, err := review.OpenDiffSession("")
+	sess, err := review.OpenSession("", "diff")
 	if err != nil {
 		t.Fatal(err)
 	}

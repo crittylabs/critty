@@ -37,6 +37,7 @@ func resolve(t *testing.T, s *Store, id string, read func(context.Context, Targe
 }
 
 func TestNotificationSkipsScreensAndConsumesRequest(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	r := prepare(t, s)
 	target := testTarget("%1")
@@ -58,6 +59,7 @@ func TestNotificationSkipsScreensAndConsumesRequest(t *testing.T) {
 }
 
 func TestConflictingNotificationsFail(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	r := prepare(t, s)
 	for _, pane := range []string{"%1", "%2"} {
@@ -72,6 +74,7 @@ func TestConflictingNotificationsFail(t *testing.T) {
 }
 
 func TestOnlyLiveRegisteredCandidatesAreScanned(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	target := testTarget("%1")
 	if err := s.Register(target); err != nil {
@@ -98,8 +101,10 @@ func TestOnlyLiveRegisteredCandidatesAreScanned(t *testing.T) {
 }
 
 func TestVisibleSearchFailures(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"missing", "multiple", "unreadable", "partial"} {
 		t.Run(scenario, func(t *testing.T) {
+			t.Parallel()
 			s := testStore(t)
 			r := prepare(t, s)
 			if err := s.Register(testTarget("%1")); err != nil {
@@ -127,6 +132,7 @@ func TestVisibleSearchFailures(t *testing.T) {
 }
 
 func TestNotificationDuringScanTakesPrecedence(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	r := prepare(t, s)
 	scanTarget := testTarget("%1")
@@ -146,6 +152,7 @@ func TestNotificationDuringScanTakesPrecedence(t *testing.T) {
 }
 
 func TestRequestExpiryValidationAndPermissions(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	r := prepare(t, s)
 	info, err := os.Stat(filepath.Join(s.dir, "request-"+r.ID+".json"))
@@ -168,6 +175,7 @@ func TestRequestExpiryValidationAndPermissions(t *testing.T) {
 }
 
 func TestConcurrentNotificationsPreserveConflicts(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	r := prepare(t, s)
 	var wg sync.WaitGroup
@@ -191,6 +199,7 @@ func TestConcurrentNotificationsPreserveConflicts(t *testing.T) {
 }
 
 func TestResolveNotificationRequiresCallback(t *testing.T) {
+	t.Parallel()
 	s := testStore(t)
 	r := prepare(t, s)
 	target := testTarget("%1")

@@ -29,12 +29,31 @@ func setupSession(t *testing.T, docPath string) *review.Session {
 
 func setupAppWithDoc(t *testing.T, content string) AppModel {
 	t.Helper()
+	return newDocApp(t, content, func(path string) *review.Session { return setupSession(t, path) })
+}
+
+// setupParallelAppWithDoc marks the test parallel and keeps its session under
+// a private data root instead of setting XDG_STATE_HOME.
+func setupParallelAppWithDoc(t *testing.T, content string) AppModel {
+	t.Helper()
+	t.Parallel()
+	return newDocApp(t, content, func(path string) *review.Session {
+		sess, err := review.OpenDocSession(t.TempDir(), path)
+		if err != nil {
+			t.Fatalf("opening session: %v", err)
+		}
+		return sess
+	})
+}
+
+func newDocApp(t *testing.T, content string, session func(string) *review.Session) AppModel {
+	t.Helper()
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.md")
 	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
-	app := NewApp(testFile, AppConfig{Session: setupSession(t, testFile), Author: "Tester"})
+	app := NewApp(testFile, AppConfig{Session: session(testFile), Author: "Tester"})
 	app.tabs = []FileTab{{path: testFile}}
 	app.activeTab = 0
 	updated, _ := app.Update(docRenderedMsg{})
@@ -290,6 +309,22 @@ func takeEvent(t *testing.T, ch chan FinishEvent) FinishEvent {
 		t.Fatal("expected a finish event")
 		return FinishEvent{}
 	}
+}
+
+// newGitRepo creates an isolated repository, changes into it, and points the
+// review state at a temporary directory.
+func newGitRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	runGitIn(t, dir, "init", "-q")
+	runGitIn(t, dir, "config", "user.email", "test@example.com")
+	runGitIn(t, dir, "config", "user.name", "Test")
+	runGitIn(t, dir, "config", "commit.gpgsign", "false")
+	t.Chdir(dir)
+	return dir
 }
 
 func runGitIn(t *testing.T, dir string, args ...string) {

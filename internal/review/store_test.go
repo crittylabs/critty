@@ -225,25 +225,6 @@ func isHex(s string) bool {
 	}) < 0
 }
 
-func TestUnresolvedComments(t *testing.T) {
-	cj := NewCritJSON()
-	cj.ReviewComments = []Comment{
-		{ID: "r_1", Scope: "review"},
-		{ID: "r_2", Scope: "review", Resolved: true},
-	}
-	cj.Files["a.go"] = CritJSONFile{Comments: []Comment{
-		{ID: "c_1"},
-		{ID: "c_2", Resolved: true},
-		{ID: "c_3"},
-	}}
-	if got := cj.TotalComments(); got != 5 {
-		t.Errorf("TotalComments = %d, want 5", got)
-	}
-	if got := cj.UnresolvedComments(); got != 3 {
-		t.Errorf("UnresolvedComments = %d, want 3", got)
-	}
-}
-
 func TestSessionClearRemovesFolderAndRegistryEntry(t *testing.T) {
 	setupStateDir(t)
 	if err := os.WriteFile("plan.md", []byte("# Test\n"), 0o644); err != nil {

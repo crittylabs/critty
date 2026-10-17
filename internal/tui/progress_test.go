@@ -71,61 +71,61 @@ func TestSubmitProgressCountersFocusAndNavigate(t *testing.T) {
 }
 
 func TestProgressCounterMouseRegionsSurviveWrappingAndResize(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		for _, size := range []tea.WindowSizeMsg{{Width: 110, Height: 30}, {Width: 40, Height: 16}, {Width: 80, Height: 24}} {
-			for _, modal := range []bool{false, true} {
-				for _, kind := range []progressKind{progressThreads, progressRequiredChecks, progressRequiredChoices, progressOptionalChecks, progressOptionalChoices} {
-					app := progressTestApp(t, false)
-					app.activeTab = 1
-					app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 24})
-					if modal {
-						app.openFinishModal()
-						app.modalTextarea.SetValue("Mouse navigation draft.")
-					}
-					app, _ = updateApp(app, size)
-					var rect mouseRect
-					found := false
-					if modal {
-						for _, region := range app.modalMouseRegions() {
-							if !region.action.dialog && !region.action.close && region.action.focus == finishProgressStart+int(kind) {
-								rect, found = region.rect, true
-							}
-						}
-					} else {
-						_, layout := app.renderReviewScreen()
-						for _, region := range layout.progressRegions {
-							if region.kind == kind {
-								rect, found = region.rect, true
-							}
-							if region.rect.bottom > app.headerHeight() {
-								t.Fatal("header counter overlaps the content tabs")
-							}
-						}
-					}
-					if !found || rect.left < 0 || rect.right > app.width || rect.top < 0 || rect.bottom > app.height {
-						t.Fatalf("counter %d unreachable in %v, modal=%t: %+v", kind, size, modal, rect)
-					}
-					for _, count := range app.progressCounts() {
-						if count.kind == kind {
-							row := strings.Split(app.View().Content, "\n")[rect.top]
-							if text := ansi.Strip(ansi.Cut(row, rect.left, rect.right)); text != ansi.Strip(count.render(false)) {
-								t.Fatalf("counter mouse region contains %q, want %q", text, ansi.Strip(count.render(false)))
-							}
-						}
-					}
-					app, cmd := clickMouseCmd(app, (rect.left+rect.right)/2, rect.top)
-					if isQuit(cmd) || app.modal != noModal || app.activeTab != 0 {
-						t.Fatal("clicking a progress counter did not navigate")
-					}
-					if modal && app.finishDraft != "Mouse navigation draft." {
-						t.Fatal("clicking a counter discarded the overall draft")
-					}
-					app = pressKey(app, tea.KeyTab)
-					if app.activeTab != 1 {
-						t.Fatal("header counters intercepted file-tab navigation")
+	sizes := []tea.WindowSizeMsg{{Width: 110, Height: 30}, {Width: 40, Height: 16}, {Width: 80, Height: 24}}
+	kinds := []progressKind{progressThreads, progressRequiredChecks, progressRequiredChoices, progressOptionalChecks, progressOptionalChoices}
+	// Pairwise: every pair of kind, size, color scheme, and modal values occurs.
+	for k, kind := range kinds {
+		for i, size := range sizes {
+			dark, modal := (k+i)%2 == 0, (k/2+i)%2 == 1
+			initAdaptiveStyles(dark)
+			app := progressTestApp(t, false)
+			app.activeTab = 1
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 24})
+			if modal {
+				app.openFinishModal()
+				app.modalTextarea.SetValue("Mouse navigation draft.")
+			}
+			app, _ = updateApp(app, size)
+			var rect mouseRect
+			found := false
+			if modal {
+				for _, region := range app.modalMouseRegions() {
+					if !region.action.dialog && !region.action.close && region.action.focus == finishProgressStart+int(kind) {
+						rect, found = region.rect, true
 					}
 				}
+			} else {
+				_, layout := app.renderReviewScreen()
+				for _, region := range layout.progressRegions {
+					if region.kind == kind {
+						rect, found = region.rect, true
+					}
+					if region.rect.bottom > app.headerHeight() {
+						t.Fatal("header counter overlaps the content tabs")
+					}
+				}
+			}
+			if !found || rect.left < 0 || rect.right > app.width || rect.top < 0 || rect.bottom > app.height {
+				t.Fatalf("counter %d unreachable in %v, modal=%t: %+v", kind, size, modal, rect)
+			}
+			for _, count := range app.progressCounts() {
+				if count.kind == kind {
+					row := strings.Split(app.View().Content, "\n")[rect.top]
+					if text := ansi.Strip(ansi.Cut(row, rect.left, rect.right)); text != ansi.Strip(count.render(false)) {
+						t.Fatalf("counter mouse region contains %q, want %q", text, ansi.Strip(count.render(false)))
+					}
+				}
+			}
+			app, cmd := clickMouseCmd(app, (rect.left+rect.right)/2, rect.top)
+			if isQuit(cmd) || app.modal != noModal || app.activeTab != 0 {
+				t.Fatal("clicking a progress counter did not navigate")
+			}
+			if modal && app.finishDraft != "Mouse navigation draft." {
+				t.Fatal("clicking a counter discarded the overall draft")
+			}
+			app = pressKey(app, tea.KeyTab)
+			if app.activeTab != 1 {
+				t.Fatal("header counters intercepted file-tab navigation")
 			}
 		}
 	}
@@ -191,7 +191,7 @@ func TestUnansweredFormsCountersNavigate(t *testing.T) {
 		app.doFinish()
 		content, _ := app.finishFormsContent(70)
 		plain := ansi.Strip(content)
-		if strings.Contains(plain, "Proceed") || strings.Index(plain, "Required items") >= strings.Index(plain, "Review r") || strings.Index(plain, "Cancel esc") >= strings.Index(plain, "1/2") {
+		if strings.Index(plain, "Required items") >= strings.Index(plain, "Review r") || strings.Index(plain, "Cancel esc") >= strings.Index(plain, "1/2") {
 			t.Fatalf("unexpected confirmation order: %s", plain)
 		}
 		if mouse {

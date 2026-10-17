@@ -76,13 +76,8 @@ func ResolveSlug(content []byte) string {
 	return "plan-" + time.Now().Format("2006-01-02-150405")
 }
 
-// SavePlanVersion saves content as the next numbered version and updates
-// current.md, returning the 1-based version number.
-func SavePlanVersion(slug string, content []byte) (int, error) {
-	return SavePlanVersionAt(PlanStorageDir(slug), content)
-}
-
-// SavePlanVersionAt versions a plan inside its session's storage directory.
+// SavePlanVersionAt saves content in a plan's storage directory as the next
+// numbered version and updates current.md, returning the 1-based version.
 func SavePlanVersionAt(dir string, content []byte) (int, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, fmt.Errorf("creating plan storage dir: %w", err)

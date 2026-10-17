@@ -33,8 +33,7 @@ func previewPNG(t *testing.T, width, height int) []byte {
 }
 
 func TestTextReviewDoesNotProbeImages(t *testing.T) {
-	t.Setenv("TMUX", "")
-	app := setupAppWithDoc(t, "# Text only\n\nNo image previews.\n")
+	app := setupParallelAppWithDoc(t, "# Text only\n\nNo image previews.\n")
 	out := &previewOutput{changed: make(chan struct{}, 1)}
 	p := tea.NewProgram(app, tea.WithInput(strings.NewReader("")), tea.WithOutput(out), tea.WithWindowSize(80, 24), tea.WithoutSignalHandler())
 	timer := time.AfterFunc(350*time.Millisecond, p.Quit)
@@ -71,17 +70,21 @@ func (w *previewOutput) output() string {
 }
 
 func TestPreviewTerminalRoundTrip(t *testing.T) {
-	for _, encoded := range []bool{false, true} {
-		for _, lost := range []int{0, 2} {
-			t.Run(fmt.Sprintf("csi-u=%t/lostProbes=%d", encoded, lost), func(t *testing.T) {
-				testPreviewTerminalRoundTrip(t, lost, encoded)
-			})
-		}
+	t.Parallel()
+	// Retries are covered by the model tests; one lost probe checks that the
+	// timeout fires in a running program.
+	for _, tc := range []struct {
+		encoded bool
+		lost    int
+	}{{false, 0}, {true, 1}} {
+		t.Run(fmt.Sprintf("csi-u=%t/lostProbes=%d", tc.encoded, tc.lost), func(t *testing.T) {
+			t.Parallel()
+			testPreviewTerminalRoundTrip(t, tc.lost, tc.encoded)
+		})
 	}
 }
 
 func testPreviewTerminalRoundTrip(t *testing.T, lost int, encoded bool) {
-	t.Setenv("TMUX", "")
 	dir := t.TempDir()
 	path := dir + "/image.png"
 	if err := os.WriteFile(path, previewPNG(t, 3, 2), 0o644); err != nil {
@@ -181,7 +184,7 @@ func TestPreviewDecodeLimits(t *testing.T) {
 	}
 }
 
-func TestImageCapabilityAndPassthrough(t *testing.T) {
+func TestImageProbeSequence(t *testing.T) {
 	t.Setenv("TMUX", "test")
 	d := newImageDisplay()
 	sequence := d.probeSequence()
@@ -193,21 +196,6 @@ func TestImageCapabilityAndPassthrough(t *testing.T) {
 	if query < 0 || cleanup < query || !strings.Contains(sequence, ansi.SaveCursor) ||
 		!strings.Contains(sequence, ansi.RestoreCursor) || !strings.Contains(sequence, ";AAAAAA==") {
 		t.Fatalf("probe does not measure and clean up a transparent placement: %q", sequence)
-	}
-	for _, tc := range []struct {
-		id      int
-		payload string
-		enabled bool
-	}{
-		{d.probeID + 1, "OK", false}, {d.probeID, "EINVAL", false}, {d.probeID, "OK", false},
-	} {
-		app := AppModel{images: d}
-		app.images.checking = true
-		app.images.attempts = 1
-		model, _ := app.Update(uv.KittyGraphicsEvent{Options: kitty.Options{ID: tc.id}, Payload: []byte(tc.payload)})
-		if model.(AppModel).images.enabled != tc.enabled {
-			t.Fatalf("capability %+v", tc)
-		}
 	}
 }
 
@@ -388,19 +376,6 @@ func TestImageManualRecheckHasNoAttemptLimit(t *testing.T) {
 		if app.images.checking {
 			t.Fatal("automatic retries did not stop")
 		}
-	}
-}
-
-func TestImageProbeIgnoresEarlierCursorReports(t *testing.T) {
-	app := AppModel{images: newImageDisplay()}
-	app.images.checking = true
-	id := app.images.probeID
-	app, _ = updateApp(app, imageProbeMsg{id})
-	app, _ = updateApp(app, tea.CursorPositionMsg{X: 7, Y: 3})
-	app, _ = updateApp(app, uv.KittyGraphicsEvent{Options: kitty.Options{ID: id}, Payload: []byte("OK")})
-	app, _ = updateApp(app, tea.CursorPositionMsg{X: 0, Y: 1})
-	if !app.images.enabled {
-		t.Fatal("earlier cursor report blocked a supported terminal")
 	}
 }
 

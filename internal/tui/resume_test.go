@@ -173,9 +173,9 @@ func restartRound(t *testing.T, old AppModel) AppModel {
 			}
 			files, err = cfg.Source.Files()
 		case old.staged:
-			files, err = gitpkg.ChangedFilesStaged()
+			files, err = gitpkg.ReviewSource{Scope: "staged"}.Files()
 		default:
-			files, err = gitpkg.ChangedFilesFrom(ref)
+			files, err = gitpkg.ReviewSource{Scope: "all", Base: ref}.Files()
 		}
 		if err != nil {
 			t.Fatal(err)

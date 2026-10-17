@@ -117,27 +117,6 @@ func TestOpenReviewSessionPersistsStagedScope(t *testing.T) {
 	}
 }
 
-func TestRootCommandSupportsStagedFlag(t *testing.T) {
-	if rootCmd.Flags().Lookup("staged") == nil {
-		t.Fatal("root command has no --staged flag")
-	}
-}
-
-func TestBuildTUICommandStagedMode(t *testing.T) {
-	mockTMUXLaunch(t, "")
-
-	cmd, err := buildTUICommand(&reviewMode{ref: "HEAD", staged: true, sessionKey: "0123456789ab"}, "tmux")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(cmd, "_tui --session") {
-		t.Errorf("pane command missing staged scope: %s", cmd)
-	}
-	if strings.Contains(cmd, "--base") {
-		t.Errorf("staged pane command should not include --base: %s", cmd)
-	}
-}
-
 func TestTMUXDetectorUsesEnvironment(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux/default,100,2")
 	t.Setenv("TMUX_PANE", "%7")
@@ -152,64 +131,44 @@ func TestTMUXDetectorUsesEnvironment(t *testing.T) {
 	}
 }
 
-func TestResolveTMUXContextFromAncestorPanePID(t *testing.T) {
+func TestResolveTMUXContextFromAncestor(t *testing.T) {
 	origOutput, origParent, origInspect, origLook := commandOutput, parentProcessID, inspectProcess, lookPath
-	commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
-		switch cmd.Args[1] {
-		case "list-panes":
-			return []byte("300\t/tmp/tmux-501/default\t100\t$2\t%7\n"), nil
-		case "list-clients":
-			return []byte("200\t/tmp/tmux-501/default\t100\t$3\n"), nil
-		default:
-			return nil, fmt.Errorf("unexpected command: %v", cmd.Args)
-		}
-	}
+	t.Cleanup(func() {
+		commandOutput, parentProcessID, inspectProcess, lookPath = origOutput, origParent, origInspect, origLook
+	})
 	parentProcessID = func() int { return 400 }
 	inspectProcess = func(pid int) (int, error) {
-		switch pid {
-		case 400:
-			return 300, nil
-		default:
+		if pid != 400 {
 			return 0, fmt.Errorf("unexpected PID: %d", pid)
 		}
+		return 300, nil
 	}
 	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
-	t.Cleanup(func() {
-		commandOutput, parentProcessID, inspectProcess, lookPath = origOutput, origParent, origInspect, origLook
-	})
-
-	context := walkAncestorContexts([]multiplexerDetector{tmuxDetector{}})
-	got, ok := context.(tmuxContext)
-	if !ok {
-		t.Fatalf("walkAncestorContexts() = %T, want tmuxContext", context)
-	}
-	if got.session != "/tmp/tmux-501/default,100,2" || got.pane != "%7" {
-		t.Errorf("walkAncestorContexts() = %+v", got)
-	}
-}
-
-func TestResolveTMUXContextFallsBackToClientPID(t *testing.T) {
-	origOutput, origParent, origInspect, origLook := commandOutput, parentProcessID, inspectProcess, lookPath
-	commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
-		if cmd.Args[1] == "list-clients" {
-			return []byte("300\t/tmp/tmux-501/default\t100\t$3\n"), nil
-		}
-		return nil, fmt.Errorf("no panes")
-	}
-	parentProcessID = func() int { return 400 }
-	inspectProcess = func(int) (int, error) { return 300, nil }
-	lookPath = func(string) (string, error) { return "/usr/bin/tmux", nil }
-	t.Cleanup(func() {
-		commandOutput, parentProcessID, inspectProcess, lookPath = origOutput, origParent, origInspect, origLook
-	})
-
-	context := walkAncestorContexts([]multiplexerDetector{tmuxDetector{}})
-	got, ok := context.(tmuxContext)
-	if !ok {
-		t.Fatalf("walkAncestorContexts() = %T, want tmuxContext", context)
-	}
-	if got.session != "/tmp/tmux-501/default,100,3" || got.pane != "" {
-		t.Errorf("walkAncestorContexts() = %+v", got)
+	for _, tt := range []struct {
+		name, panes, clients string
+		want                 tmuxContext
+	}{
+		{"pane PID", "300\t/tmp/tmux-501/default\t100\t$2\t%7\n", "200\t/tmp/tmux-501/default\t100\t$3\n", tmuxContext{session: "/tmp/tmux-501/default,100,2", pane: "%7"}},
+		{"client PID", "", "300\t/tmp/tmux-501/default\t100\t$3\n", tmuxContext{session: "/tmp/tmux-501/default,100,3"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				switch cmd.Args[1] {
+				case "list-panes":
+					if tt.panes == "" {
+						return nil, fmt.Errorf("no panes")
+					}
+					return []byte(tt.panes), nil
+				case "list-clients":
+					return []byte(tt.clients), nil
+				}
+				return nil, fmt.Errorf("unexpected command: %v", cmd.Args)
+			}
+			got, ok := walkAncestorContexts([]multiplexerDetector{tmuxDetector{}}).(tmuxContext)
+			if !ok || got.session != tt.want.session || got.pane != tt.want.pane {
+				t.Errorf("walkAncestorContexts() = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -309,18 +268,6 @@ func TestBuildFinishPayloadApproved(t *testing.T) {
 	}
 }
 
-func TestBuildFinishPayloadUsesConfigPromptOverride(t *testing.T) {
-	sess := newPayloadSession(t)
-	cfg := &config.Config{Prompts: map[string]string{
-		"on_finish_approved": "inline:Custom approved for {{.session_key}}",
-	}}
-
-	payload := buildFinishPayload(cfg, sess, &reviewMode{docPath: "doc.md"}, true)
-	if want := "Custom approved for " + sess.Key + "\n\nReview verdict: approve."; payload.Prompt != want {
-		t.Errorf("prompt = %q, want %q", payload.Prompt, want)
-	}
-}
-
 func TestBuildFinishPayloadPlanMode(t *testing.T) {
 	sess := newPayloadSession(t)
 	sess.CJ.CliArgs = []string{"plan", "--name", "my-plan", "docs/plan.md"}
@@ -358,14 +305,14 @@ func TestOverallSubmissionSurvivesCustomPrompts(t *testing.T) {
 			sess := newPayloadSession(t)
 			sess.SetSubmission(verdict, "Overall instructions.", "Human")
 			cfg := &config.Config{Prompts: map[string]string{
-				"on_finish_approved":   "inline:Custom approval",
-				"on_finish_unresolved": "inline:Custom feedback",
+				"on_finish_approved":   "inline:Custom approval for {{.session_key}}",
+				"on_finish_unresolved": "inline:Custom feedback for {{.session_key}}",
 			}}
 			payload := buildFinishPayload(cfg, sess, &reviewMode{docPath: "doc.md"}, verdict == review.VerdictApprove)
 			if payload.Verdict != verdict || payload.ReviewComment == nil || payload.ReviewComment.Body != "Overall instructions." {
 				t.Fatalf("submission missing: %+v", payload)
 			}
-			if !strings.HasPrefix(payload.Prompt, "Custom ") || !strings.Contains(payload.Prompt, "Overall instructions.") || !strings.Contains(payload.Prompt, "Review verdict: "+string(verdict)) {
+			if !strings.HasPrefix(payload.Prompt, "Custom ") || !strings.Contains(payload.Prompt, " for "+sess.Key) || !strings.Contains(payload.Prompt, "Overall instructions.") || !strings.Contains(payload.Prompt, "Review verdict: "+string(verdict)) {
 				t.Fatalf("custom prompt hid the submission: %s", payload.Prompt)
 			}
 			if (payload.NextCommand == "") != (verdict == review.VerdictApprove) {

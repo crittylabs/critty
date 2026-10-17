@@ -66,18 +66,6 @@ func (l herdrLaunch) restoreFocus() {
 	_ = runCommand(l.context.command(l.bin, "tab", "focus", l.sourceTab))
 }
 
-func focusCurrentHerdrTab() {
-	tab := os.Getenv("HERDR_TAB_ID")
-	if tab == "" {
-		return
-	}
-	herdrBin, err := lookPath("herdr")
-	if err != nil {
-		return
-	}
-	_ = runCommand(exec.Command(herdrBin, "tab", "focus", tab))
-}
-
 func herdrProcessContexts() map[int]herdrContext {
 	herdrBin, err := lookPath("herdr")
 	if err != nil {

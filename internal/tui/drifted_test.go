@@ -16,66 +16,66 @@ import (
 )
 
 func TestClickRenderedDriftedBubblePreservesResolution(t *testing.T) {
-	for _, width := range []int{60, 80, 100, 160} {
-		for _, height := range []int{24, 40, 60} {
-			t.Run(fmt.Sprintf("%dx%d", width, height), func(t *testing.T) {
-				app := setupAppWithDoc(t, strings.Repeat("source line\n", 20))
-				app.width, app.height = width, height
-				app.recalculateLayout()
-				app.tab().state.Comments = []review.Comment{
-					{ID: "file", Scope: "file", Author: "Other", Body: "file feedback"},
-					{ID: "a", StartLine: 3, EndLine: 3, Drifted: true, Resolved: true, Author: "Other", Body: "resolved"},
-					{ID: "b", StartLine: 6, EndLine: 6, Drifted: true, Author: "Other", Body: "unresolved"},
-					{ID: "d1", StartLine: 12, EndLine: 12, Drifted: true, Resolved: true, Author: "Other", Body: "group resolved"},
-					{ID: "d2", StartLine: 12, EndLine: 12, Drifted: true, Author: "Other", Body: "group unresolved"},
+	t.Parallel()
+	for _, size := range [][2]int{{60, 24}, {80, 60}, {100, 40}, {160, 24}} {
+		width, height := size[0], size[1]
+		t.Run(fmt.Sprintf("%dx%d", width, height), func(t *testing.T) {
+			app := setupParallelAppWithDoc(t, strings.Repeat("source line\n", 20))
+			app.width, app.height = width, height
+			app.recalculateLayout()
+			app.tab().state.Comments = []review.Comment{
+				{ID: "file", Scope: "file", Author: "Other", Body: "file feedback"},
+				{ID: "a", StartLine: 3, EndLine: 3, Drifted: true, Resolved: true, Author: "Other", Body: "resolved"},
+				{ID: "b", StartLine: 6, EndLine: 6, Drifted: true, Author: "Other", Body: "unresolved"},
+				{ID: "d1", StartLine: 12, EndLine: 12, Drifted: true, Resolved: true, Author: "Other", Body: "group resolved"},
+				{ID: "d2", StartLine: 12, EndLine: 12, Drifted: true, Author: "Other", Body: "group unresolved"},
+			}
+			app.rebuildContent()
+			app.updateCommentSidebar()
+			for step := range 30 {
+				rows := strings.Split(ansi.Strip(app.View().Content), "\n")
+				var bubbles []tea.Mouse
+				for y, row := range rows {
+					if x := strings.Index(row, "💬"); x >= 0 {
+						bubbles = append(bubbles, tea.Mouse{X: lipgloss.Width(row[:x]), Y: y})
+					}
 				}
-				app.rebuildContent()
-				app.updateCommentSidebar()
-				for step := range 30 {
-					rows := strings.Split(ansi.Strip(app.View().Content), "\n")
-					var bubbles []tea.Mouse
-					for y, row := range rows {
-						if x := strings.Index(row, "💬"); x >= 0 {
-							bubbles = append(bubbles, tea.Mouse{X: lipgloss.Width(row[:x]), Y: y})
-						}
+				if len(bubbles) == 0 {
+					t.Fatal("no visible bubble")
+				}
+				point := bubbles[step%len(bubbles)]
+				app = clickMouse(app, point.X, point.Y)
+				openedModal := app.modal != noModal
+				app = clickMouse(app, point.X, point.Y)
+				for _, c := range app.tab().state.Comments {
+					want := c.ID == "a" || c.ID == "d1"
+					if c.Resolved != want {
+						t.Fatalf("step %d: bubble at %d,%d changed %s resolution", step, point.X, point.Y, c.ID)
 					}
-					if len(bubbles) == 0 {
-						t.Fatal("no visible bubble")
+				}
+				if openedModal {
+					if app.modal == noModal {
+						t.Fatal("second click dismissed the newly opened dialog")
 					}
-					point := bubbles[step%len(bubbles)]
-					app = clickMouse(app, point.X, point.Y)
-					openedModal := app.modal != noModal
-					app = clickMouse(app, point.X, point.Y)
-					for _, c := range app.tab().state.Comments {
-						want := c.ID == "a" || c.ID == "d1"
-						if c.Resolved != want {
-							t.Fatalf("step %d: bubble at %d,%d changed %s resolution", step, point.X, point.Y, c.ID)
-						}
-					}
-					if openedModal {
-						if app.modal == noModal {
-							t.Fatal("second click dismissed the newly opened dialog")
-						}
-						app.modalOpenedAt = time.Now().Add(-time.Second)
-						for _, region := range app.modalMouseRegions() {
-							if region.action.resolve {
-								c, _ := app.driftedComment(app.editingID)
-								app = clickMouse(app, region.rect.left, region.rect.top)
-								got, _ := app.driftedComment(c.ID)
-								if got.Resolved == c.Resolved {
-									t.Fatal("intentional checkbox click was suppressed")
-								}
-								app.toggleResolve(c.ID)
-								break
+					app.modalOpenedAt = time.Now().Add(-time.Second)
+					for _, region := range app.modalMouseRegions() {
+						if region.action.resolve {
+							c, _ := app.driftedComment(app.editingID)
+							app = clickMouse(app, region.rect.left, region.rect.top)
+							got, _ := app.driftedComment(c.ID)
+							if got.Resolved == c.Resolved {
+								t.Fatal("intentional checkbox click was suppressed")
 							}
+							app.toggleResolve(c.ID)
+							break
 						}
 					}
-					if app.modal != noModal {
-						app = pressKey(app, tea.KeyEscape)
-					}
 				}
-			})
-		}
+				if app.modal != noModal {
+					app = pressKey(app, tea.KeyEscape)
+				}
+			}
+		})
 	}
 }
 

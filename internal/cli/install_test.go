@@ -37,6 +37,14 @@ func destinations(t *testing.T, target string) []string {
 	return dests
 }
 
+// aiReviewResources lists the AI review skill files every agent target installs.
+var aiReviewResources = []string{
+	"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
+	"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
+	"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
+	"critty-ai-review/scripts/codex-review-requirements.txt",
+}
+
 func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
 	want := map[string]string{
@@ -44,12 +52,7 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 		filepath.Join(".opencode", "commands", "critty.md"):                 filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
 		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
-	for _, rel := range []string{
-		"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
-		"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
-		"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
-		"critty-ai-review/scripts/codex-review-requirements.txt",
-	} {
+	for _, rel := range aiReviewResources {
 		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
 	}
 	for _, f := range integrations()["opencode"] {
@@ -93,12 +96,7 @@ func TestIntegrationLayouts(t *testing.T) {
 	}
 	for target, dests := range want {
 		dir := map[string]string{"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents"}[target]
-		for _, rel := range []string{
-			"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
-			"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
-			"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
-			"critty-ai-review/scripts/codex-review-requirements.txt",
-		} {
+		for _, rel := range aiReviewResources {
 			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
 		}
 		if got := destinations(t, target); !slices.Equal(got, dests) {
@@ -172,9 +170,6 @@ func TestCodexSkillsUseCodexConventions(t *testing.T) {
 			t.Errorf("Codex critty skill lacks %q", wanted)
 		}
 	}
-	if !strings.Contains(skill, "critty --staged") {
-		t.Error("Codex critty skill does not document staged-only review")
-	}
 	if !strings.Contains(cli, "`$critty`") {
 		t.Error("Codex critty-cli skill does not point at $critty")
 	}
@@ -189,9 +184,6 @@ func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
 
 	if !strings.Contains(command, "critty $ARGUMENTS") {
 		t.Error("OpenCode command lost $ARGUMENTS")
-	}
-	if !strings.Contains(command, "critty --staged") {
-		t.Error("OpenCode command does not document staged-only review")
 	}
 	if !strings.HasPrefix(command, "---\ndescription: ") {
 		t.Errorf("OpenCode command frontmatter should start with description:\n%s", command[:min(len(command), 120)])

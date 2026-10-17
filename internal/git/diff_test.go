@@ -115,18 +115,23 @@ func writeFile(t *testing.T, dir, name string, data []byte) {
 	}
 }
 
-func TestChangedFilesWithSpecialPaths(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-
+// newRepo creates a repository with isolated Git configuration and makes it
+// the working directory.
+func newRepo(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	t.Chdir(dir)
 	runGit(t, dir, "init", "-q")
 	runGit(t, dir, "config", "user.email", "test@example.com")
 	runGit(t, dir, "config", "user.name", "Test")
 	runGit(t, dir, "config", "commit.gpgsign", "false")
+	return dir
+}
+
+func TestFilesWithSpecialPaths(t *testing.T) {
+	dir := newRepo(t)
 
 	writeFile(t, dir, "docs/user guide.md", []byte("# Guide\n"))
 	writeFile(t, dir, "old name.txt", []byte("hello\nworld\n"))
@@ -141,10 +146,9 @@ func TestChangedFilesWithSpecialPaths(t *testing.T) {
 	runGit(t, dir, "mv", "old name.txt", "new name.txt")
 	writeFile(t, dir, "untracked file.txt", []byte("new\n"))
 
-	t.Chdir(dir)
-	files, err := ChangedFiles()
+	files, err := (ReviewSource{Scope: "all"}).Files()
 	if err != nil {
-		t.Fatalf("ChangedFiles: %v", err)
+		t.Fatalf("Files: %v", err)
 	}
 
 	byPath := make(map[string]FileChange, len(files))
@@ -181,57 +185,12 @@ func TestChangedFilesWithSpecialPaths(t *testing.T) {
 	}
 }
 
-func TestStagedReviewUsesIndexContent(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.email", "test@example.com")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "commit.gpgsign", "false")
-
-	writeFile(t, dir, "partial.txt", []byte("base\n"))
-	runGit(t, dir, "add", "partial.txt")
-	runGit(t, dir, "commit", "-q", "-m", "initial")
-	writeFile(t, dir, "partial.txt", []byte("staged\n"))
-	runGit(t, dir, "add", "partial.txt")
-	writeFile(t, dir, "partial.txt", []byte("unstaged\n"))
-	writeFile(t, dir, "untracked.txt", []byte("untracked\n"))
-
-	t.Chdir(dir)
-	files, err := ChangedFilesStaged()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(files) != 1 || files[0].Path != "partial.txt" {
-		t.Fatalf("staged files = %+v, want only partial.txt", files)
-	}
-	content, err := FileContentFromIndex("partial.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != "staged\n" {
-		t.Errorf("indexed content = %q, want %q", content, "staged\\n")
-	}
-	diff, err := DiffFileStaged("partial.txt", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if diff == nil || !diff.ChangedLines[1] {
-		t.Fatalf("staged diff = %+v, want changed line 1", diff)
-	}
-}
-
-func TestChangedFilesStagedBeforeInitialCommit(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	runGit(t, dir, "init", "-q")
+func TestStagedFilesBeforeInitialCommit(t *testing.T) {
+	dir := newRepo(t)
 	writeFile(t, dir, "first.txt", []byte("first\n"))
 	runGit(t, dir, "add", "first.txt")
-	t.Chdir(dir)
 
-	files, err := ChangedFilesStaged()
+	files, err := (ReviewSource{Scope: "staged"}).Files()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,20 +251,13 @@ func TestInlineDiff(t *testing.T) {
 }
 
 func TestDiffFileAnnotatesReplacementLines(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.email", "test@example.com")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "commit.gpgsign", "false")
+	dir := newRepo(t)
 
 	writeFile(t, dir, "README.md", []byte("prefix old suffix\n"))
 	runGit(t, dir, "add", "README.md")
 	runGit(t, dir, "commit", "-q", "-m", "initial")
 	writeFile(t, dir, "README.md", []byte("prefix new suffix\n"))
 
-	t.Chdir(dir)
 	info, err := DiffFile("README.md", "", "HEAD")
 	if err != nil {
 		t.Fatalf("DiffFile: %v", err)
@@ -320,20 +272,13 @@ func TestDiffFileAnnotatesReplacementLines(t *testing.T) {
 }
 
 func TestDiffFileDeletedFileAnchorsBeforeFirstLine(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.email", "test@example.com")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "commit.gpgsign", "false")
+	dir := newRepo(t)
 
 	writeFile(t, dir, "gone.txt", []byte("one\ntwo\nthree\n"))
 	runGit(t, dir, "add", "gone.txt")
 	runGit(t, dir, "commit", "-q", "-m", "initial")
 	runGit(t, dir, "rm", "-q", "gone.txt")
 
-	t.Chdir(dir)
 	info, err := DiffFile("gone.txt", "", "HEAD")
 	if err != nil {
 		t.Fatalf("DiffFile: %v", err)

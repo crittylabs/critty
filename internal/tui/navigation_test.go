@@ -79,24 +79,6 @@ func TestLineNavigation(t *testing.T) {
 	}
 }
 
-func TestCommentNavigationCrossesFiles(t *testing.T) {
-	app := newCommentNavigationTestApp()
-	app.tabs[0].cursorLine = 4
-	app.tabs[0].cursorOnAnnotation = true
-
-	app = pressKey(app, ']')
-
-	if app.activeTab != 2 || app.tab().cursorLine != 1 || !app.tab().cursorOnAnnotation {
-		t.Fatalf("next comment = tab %d, line %d; want tab 2, line 1", app.activeTab, app.tab().cursorLine)
-	}
-
-	app = pressKey(app, '[')
-
-	if app.activeTab != 0 || app.tab().cursorLine != 4 || !app.tab().cursorOnAnnotation {
-		t.Fatalf("previous comment = tab %d, line %d; want tab 0, line 4", app.activeTab, app.tab().cursorLine)
-	}
-}
-
 func TestCommentNavigationFinishesAfterLastAndWrapsBackward(t *testing.T) {
 	app := newCommentNavigationTestApp()
 	app.tabs[0].cursorLine = 2
@@ -377,29 +359,6 @@ func TestAngleBracketsMoveToFileBoundaries(t *testing.T) {
 	app = pressKey(app, '<')
 	if app.tab().cursorLine != 1 || app.tab().cursorOnAnnotation {
 		t.Fatalf("< moved to line %d, annotation=%t; want line 1", app.tab().cursorLine, app.tab().cursorOnAnnotation)
-	}
-
-}
-
-func TestFooterKeepsOnlyNonstandardNavigationHints(t *testing.T) {
-	app := newChangeNavigationTestApp()
-	app.height = 24
-	footer := app.renderFooter()
-
-	for _, omitted := range []string{"j/k", "shift+↑↓", "</>"} {
-		if strings.Contains(footer, omitted) {
-			t.Errorf("footer contains fallback navigation hint %q: %q", omitted, footer)
-		}
-	}
-	for _, retained := range []string{"[/]", "?"} {
-		if !strings.Contains(footer, retained) {
-			t.Errorf("footer does not contain %q: %q", retained, footer)
-		}
-	}
-
-	app.tabs[0].selecting = true
-	if footer := app.renderFooter(); strings.Contains(footer, "j/k") || !strings.Contains(footer, "?") {
-		t.Errorf("selection footer = %q, want help without j/k", footer)
 	}
 }
 

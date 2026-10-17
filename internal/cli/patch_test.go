@@ -95,34 +95,43 @@ func TestAttachmentOnlyReview(t *testing.T) {
 	}
 }
 
-func TestNullRejectsOtherInputs(t *testing.T) {
+func TestExclusiveInputsRejectConflicts(t *testing.T) {
 	oldNull, oldDiff, oldScope, oldCode, oldStaged, oldUnstaged := reviewNull, reviewDiff, reviewScope, reviewCode, reviewStaged, reviewUnstaged
 	t.Cleanup(func() {
 		reviewNull, reviewDiff, reviewScope, reviewCode, reviewStaged, reviewUnstaged = oldNull, oldDiff, oldScope, oldCode, oldStaged, oldUnstaged
 	})
-	reviewNull = true
-	for _, input := range []string{"diff", "scope", "code", "staged", "unstaged", "file"} {
-		t.Run(input, func(t *testing.T) {
-			reviewDiff, reviewScope, reviewCode, reviewStaged, reviewUnstaged = "", "", false, false, false
-			var args []string
-			switch input {
-			case "diff":
-				reviewDiff = os.DevNull
-			case "scope":
-				reviewScope = "all"
-			case "code":
-				reviewCode = true
-			case "staged":
-				reviewStaged = true
-			case "unstaged":
-				reviewUnstaged = true
-			case "file":
-				args = []string{"notice.md"}
+	// TestDiffInputArguments covers file arguments with --diff.
+	for _, primary := range []string{"null", "diff"} {
+		for _, input := range []string{"diff", "scope", "code", "staged", "unstaged", "file"} {
+			if primary == "diff" && (input == "diff" || input == "file") {
+				continue
 			}
-			if _, err := resolveReviewMode(args); err == nil {
-				t.Fatal("accepted conflicting input")
-			}
-		})
+			t.Run(primary+"/"+input, func(t *testing.T) {
+				reviewNull, reviewDiff = primary == "null", ""
+				if primary == "diff" {
+					reviewDiff = "-"
+				}
+				reviewScope, reviewCode, reviewStaged, reviewUnstaged = "", false, false, false
+				var args []string
+				switch input {
+				case "diff":
+					reviewDiff = os.DevNull
+				case "scope":
+					reviewScope = "all"
+				case "code":
+					reviewCode = true
+				case "staged":
+					reviewStaged = true
+				case "unstaged":
+					reviewUnstaged = true
+				case "file":
+					args = []string{"notice.md"}
+				}
+				if _, err := resolveReviewMode(args); err == nil {
+					t.Fatal("accepted conflicting input")
+				}
+			})
+		}
 	}
 }
 
@@ -223,46 +232,5 @@ func TestDiffInputArguments(t *testing.T) {
 				t.Fatalf("error = %v, want failure %v", err, tt.fail)
 			}
 		})
-	}
-}
-
-func TestResolveDiffFromStdin(t *testing.T) {
-	t.Chdir(t.TempDir())
-	path := filepath.Join(t.TempDir(), "input.diff")
-	if err := os.WriteFile(path, []byte(addedPatch), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := f.Close(); err != nil {
-			t.Error(err)
-		}
-	}()
-	stdin, diff, code, staged, scope := os.Stdin, reviewDiff, reviewCode, reviewStaged, reviewScope
-	os.Stdin, reviewDiff, reviewCode, reviewStaged, reviewScope = f, "-", false, false, ""
-	t.Cleanup(func() { os.Stdin, reviewDiff, reviewCode, reviewStaged, reviewScope = stdin, diff, code, staged, scope })
-	mode, err := resolveReviewMode(nil)
-	if err != nil || mode.patch == nil || len(mode.files) != 1 {
-		t.Fatalf("mode = %+v, %v", mode, err)
-	}
-	if _, err := resolveReviewMode([]string{"file"}); err == nil {
-		t.Fatal("accepted document with --diff")
-	}
-	reviewStaged = true
-	if _, err := resolveReviewMode(nil); err == nil {
-		t.Fatal("accepted staged with --diff")
-	}
-	reviewStaged, reviewScope = false, "all"
-	if _, err := resolveReviewMode(nil); err == nil {
-		t.Fatal("accepted scope with --diff")
-	}
-	unstaged := reviewUnstaged
-	t.Cleanup(func() { reviewUnstaged = unstaged })
-	reviewScope, reviewUnstaged = "", true
-	if _, err := resolveReviewMode(nil); err == nil {
-		t.Fatal("accepted unstaged with --diff")
 	}
 }

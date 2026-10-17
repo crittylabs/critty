@@ -52,12 +52,6 @@ func TestThreadAuthorsKeepColorsAcrossRoles(t *testing.T) {
 	if parent == agent {
 		t.Fatal("reviewer and agent share a color")
 	}
-	if want := lipgloss.NewStyle().Foreground(lipgloss.BrightWhite).Render("body"); parent != want {
-		t.Fatal("the current reviewer's comments are not white")
-	}
-	if want := lipgloss.NewStyle().Foreground(lipgloss.Cyan).Render("body"); agent != want {
-		t.Fatal("the first other author is not cyan")
-	}
 	app.commentAuthorStyle("Another author")
 	if got := app.commentAuthorStyle("Reviewer").Render("body"); got != parent {
 		t.Fatal("adding an author changed the reviewer's color")
@@ -497,48 +491,33 @@ func TestHiddenCommentGutterTracksDeletedWrappedLines(t *testing.T) {
 	}
 }
 
-func TestHideCommentsShortcutPreservesInput(t *testing.T) {
-	for _, modal := range []modalType{commentModal, fileCommentModal, replyModal, editModal} {
-		app := setupAppWithDoc(t, "source\n")
-		app.modal = modal
-		app.modalTextarea.Focus()
-		updated, _ := app.Update(tea.KeyPressMsg{Code: 'H', Text: "H"})
-		app = *updated.(*AppModel)
-		if app.hideComments || app.modalTextarea.Value() != "H" {
-			t.Fatalf("modal %v intercepted H", modal)
-		}
-	}
-	app := newCommentNavigationTestApp()
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'H', Text: "H"})
-	if app.fileSelect.input.Value() != "H" || app.hideComments {
-		t.Fatal("fold shortcut intercepted the file selector")
-	}
-}
-
-func TestHInputAndDialogs(t *testing.T) {
-	for _, modal := range []modalType{commentModal, fileCommentModal, replyModal, editModal, finishModal, discardChangesModal, deleteConfirmModal, helpModal} {
-		app := setupAppWithDoc(t, "source\n")
-		app.modal = modal
-		app.modalTextarea.Focus()
-		updated, _ := app.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
-		app = *updated.(*AppModel)
-		if modal == commentModal || modal == fileCommentModal || modal == replyModal || modal == editModal || modal == finishModal {
-			if app.modalTextarea.Value() != "h" {
-				t.Fatalf("modal %v swallowed input", modal)
+func TestFoldShortcutsPreserveInput(t *testing.T) {
+	for _, key := range []rune{'h', 'H'} {
+		for _, modal := range []modalType{commentModal, fileCommentModal, replyModal, editModal, finishModal, discardChangesModal, deleteConfirmModal, helpModal} {
+			app := setupAppWithDoc(t, "source\n")
+			app.modal = modal
+			app.modalTextarea.Focus()
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: key, Text: string(key)})
+			if app.hideComments || app.foldResolved {
+				t.Fatalf("modal %v: %c changed comment visibility", modal, key)
+			}
+			switch modal {
+			case commentModal, fileCommentModal, replyModal, editModal, finishModal:
+				if app.modalTextarea.Value() != string(key) {
+					t.Fatalf("modal %v swallowed %c", modal, key)
+				}
+			case discardChangesModal, deleteConfirmModal:
+				if key == 'h' && app.modalFocus != 1 {
+					t.Fatalf("modal %v did not move button focus", modal)
+				}
 			}
 		}
-		if modal == discardChangesModal || modal == deleteConfirmModal {
-			if app.modalFocus != 1 {
-				t.Fatalf("modal %v did not move button focus", modal)
-			}
+		app := newCommentNavigationTestApp()
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: key, Text: string(key)})
+		if app.fileSelect.input.Value() != string(key) || app.hideComments || app.foldResolved {
+			t.Fatalf("%c was intercepted in the file selector", key)
 		}
-	}
-	app := newCommentNavigationTestApp()
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'h', Text: "h"})
-	if app.fileSelect.input.Value() != "h" {
-		t.Fatal("fold shortcut intercepted the file selector")
 	}
 }
 

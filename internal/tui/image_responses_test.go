@@ -11,6 +11,7 @@ import (
 )
 
 func TestImageResponseReplayPreservesTextInput(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		input string
 		want  string
@@ -21,7 +22,7 @@ func TestImageResponseReplayPreservesTextInput(t *testing.T) {
 		{"\x1b[91;3u日本語", "日本語"},
 	} {
 		t.Run(tc.want, func(t *testing.T) {
-			app := setupAppWithDoc(t, "source\n")
+			app := setupParallelAppWithDoc(t, "source\n")
 			app.images.tmux = true
 			app.modal = commentModal
 			app.modalTextarea.Focus()
@@ -49,6 +50,7 @@ func TestImageResponseReplayPreservesTextInput(t *testing.T) {
 }
 
 func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		chunks []string
@@ -61,7 +63,7 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 		{"delayed graphics", []string{"\x1b[95;3uGi=123;", "OK\x1b[92;3u\x1b[91;3u2;1R"}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "source\n")
+			app := setupParallelAppWithDoc(t, "source\n")
 			app.images.tmux = tc.tmux
 			app.modal = commentModal
 			app.modalTextarea.Focus()
