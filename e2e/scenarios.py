@@ -761,6 +761,90 @@ def scenarios() -> None:
             "failed approval save keeps TUI and answers; retry exports explicit human consent"
         )
 
+        source = ROOT / "unmanaged"
+        source.mkdir()
+        (source / "whole.md").write_text("one\ntwo\n")
+        (source / ".gitattributes").write_text("* text ident\n")
+        prepared = json.loads(
+            cli(
+                "tmp",
+                "prepare",
+                "--root",
+                str(source),
+                "--",
+                "whole.md",
+                "one.md",
+                "two.md",
+                ".gitattributes",
+                "raw.txt",
+                "raw.bin",
+            ).stdout
+        )
+        tree = Path(prepared["tree"])
+        (tree / "whole.md").unlink()
+        (tree / "one.md").write_text("one\n")
+        (tree / "two.md").write_text("two\n")
+        (tree / "raw.txt").write_bytes(b"line\r\n$Id: keep $\r\n")
+        (tree / "raw.bin").write_bytes(b"\x00\xff\r\n")
+        frozen = json.loads(cli("tmp", "snapshot", prepared["id"]).stdout)
+        attachment = Path(frozen["attachment"])
+        consent_line = len(attachment.read_text().splitlines())
+        temporary = Round(
+            "temporary-tree",
+            [
+                "--diff",
+                frozen["diff"],
+                "--attachment",
+                str(attachment),
+                "--result",
+                frozen["result"],
+                "--focus",
+                f"{attachment}:{consent_line}",
+            ],
+        )
+        temporary.keys("Space")
+        temporary.comment("Keep this proposal; confirm in the next round.")
+        temporary.finish(False)
+        temporary = Round(
+            "temporary-tree-approved",
+            ["--session", temporary.session, "--result", frozen["result"]],
+        )
+        temporary.finish(True)
+        wrong_root = cli(
+            "tmp",
+            "apply",
+            prepared["id"],
+            frozen["snapshot"],
+            "--root",
+            str(WORK),
+            "--result",
+            frozen["result"],
+            check=False,
+        )
+        assert wrong_root.returncode != 0 and "root differs" in wrong_root.stderr
+        assert (source / "whole.md").exists()
+        applied = json.loads(
+            cli(
+                "tmp",
+                "apply",
+                prepared["id"],
+                frozen["snapshot"],
+                "--root",
+                str(source),
+                "--result",
+                frozen["result"],
+            ).stdout
+        )
+        assert applied["complete"], applied
+        assert not (source / "whole.md").exists()
+        assert (source / "one.md").read_text() == "one\n"
+        assert (source / "two.md").read_text() == "two\n"
+        assert (source / "raw.txt").read_bytes() == b"line\r\n$Id: keep $\r\n"
+        assert (source / "raw.bin").read_bytes() == b"\x00\xff\r\n"
+        report(
+            "temporary tree: split a file through a frozen diff, human consent, and bounded application"
+        )
+
         export = ROOT / "failed-export.json"
         failed_export = Round(
             "export-failure",

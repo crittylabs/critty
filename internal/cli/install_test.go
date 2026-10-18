@@ -46,6 +46,7 @@ var additionalSkillResources = []string{
 	"critty-ai-review/scripts/codex-review-requirements.txt",
 	"critty-cli/references/configuration.md",
 	"critty-approval/references/requests.md", "critty-approval/references/feedback-authorization.md",
+	"critty/references/temporary-tree.md",
 }
 
 func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
@@ -281,7 +282,7 @@ func TestBundledSkillResources(t *testing.T) {
 				}
 			}
 			for _, f := range integrations()[agent] {
-				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") && !strings.Contains(filepath.ToSlash(f.dest), "/critty-cli/references/") && !strings.Contains(filepath.ToSlash(f.dest), "/critty-approval/references/") {
+				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") && !strings.Contains(filepath.ToSlash(f.dest), "/references/") {
 					continue
 				}
 				data, err := f.content()
