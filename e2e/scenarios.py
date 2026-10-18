@@ -267,7 +267,7 @@ def scenarios() -> None:
     if not (ROOT / "bin" / "tmux").exists():
         (ROOT / "bin" / "tmux").symlink_to(TMUX)
     (CONFIG / "tcrit" / "config.json").write_text(
-        json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": False})
+        json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": True})
     )
     migrated = cli("status")
     assert json.loads(migrated.stdout) == []
@@ -302,7 +302,14 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
-        default_approval = Round("default-approval", ["plan.md"])
+        history_task = json.loads(
+            cli(
+                "history", "start", "Review lifecycle", "--project", "Scenario Project"
+            ).stdout
+        )["task"]["id"]
+        default_approval = Round(
+            "default-approval", ["plan.md", "--task", history_task]
+        )
         version = cli("--version").stdout.strip().removeprefix("critty version ")
         # Keep long development versions visible instead of testing truncation.
         tmux("resize-pane", "-t", default_approval.pane, "-x", "100")
@@ -318,7 +325,7 @@ def scenarios() -> None:
             "Submit defaults to Approve when no comments are unresolved; Enter sends it"
         )
 
-        unchanged = Round("unchanged-feedback", ["plan.md"])
+        unchanged = Round("unchanged-feedback", ["plan.md", "--task", history_task])
         cli(
             "comment",
             "--session",
@@ -349,6 +356,38 @@ def scenarios() -> None:
         assert all(c.get("resolved") for c in unchanged.comments())
         report(
             "existing feedback defaults to Approve; declining resolve-all keeps the draft; confirming approves"
+        )
+
+        task_sessions = {default_approval.session, unchanged.session}
+        assert task_sessions <= {
+            session["key"] for session in json.loads(cli("status").stdout)
+        }, "task reviews were removed by approval cleanup"
+        quiet = json.loads(cli("history", "finish", history_task).stdout)
+        assert not quiet["decision_required"] and not quiet["task"]["pruned"]
+        assert not quiet.get("maintenance") and quiet["storage"]["bytes"] > 0
+        assert not json.loads(cli("history", "usage").stdout)["exceeded"]
+        decision = json.loads(
+            cli("history", "finish", history_task, "--action", "ask").stdout
+        )
+        assert decision["decision_required"] and not decision["task"]["pruned"]
+        organized = json.loads(
+            cli("history", "finish", history_task, "--action", "archive").stdout
+        )
+        archive = Path(organized["archive"])
+        saved = json.loads((archive / "manifest.json").read_text())
+        assert saved["task"]["project"] == "Scenario Project"
+        assert "Scenario Project - Review lifecycle" in archive.name
+        assert {session["key"] for session in saved["sessions"]} == task_sessions
+        assert "Existing feedback" in (archive / "review.md").read_text()
+        assert organized["task"]["pruned"]
+        assert task_sessions.isdisjoint(
+            session["key"] for session in json.loads(cli("status").stdout)
+        )
+        (CONFIG / "critty" / "config.toml").write_text(
+            'author = "Scenario Reviewer"\ncleanup_on_approve = false\n'
+        )
+        report(
+            "task reviews defer approval cleanup; one boundary decision archives both sessions before removing originals"
         )
 
         for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:

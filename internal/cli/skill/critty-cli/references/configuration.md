@@ -18,4 +18,21 @@ cleanup_on_approve = false
 
 Quote prompt keys containing `:` or `.`.  These characters are part of the key, not TOML table separators.
 
+## History policy
+
+Retention settings apply only in the global TOML file.  Omitted or empty `start` and `end` mean `auto`: retain originals quietly, offer old completed tasks at task start, and rotate completed backups when capacity is exceeded.  Project settings cannot authorize history actions.
+
+```toml
+[history]
+start = "auto"
+end = "auto"
+keep_days = 30
+max_bytes = 1073741824
+# archive_dir = "/absolute/path/to/archives"
+```
+
+`keep_days` is the desired retention period, not a minimum guarantee: capacity rotation can remove more recent completed backups.  `max_bytes` budgets known original-review bytes, excluding explicit archives.  Rotation stops at 80% of the limit and protects ongoing, busy, ungrouped, and out-of-scope records.  Report a target that cannot be reached; do not widen deletion scope.
+
+Use `keep`, `archive`, or `delete` for fixed boundary behavior.  `ask` is available for an explicit decision request, usually through `--action ask`.  A one-time maintenance answer does not authorize editing global preferences.  Change settings only when the user requests persistent behavior.
+
 For supported keys and full merge rules, see [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).

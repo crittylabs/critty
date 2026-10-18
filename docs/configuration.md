@@ -1,6 +1,6 @@
 # Configuration
 
-Critty uses TOML for user-edited settings.  Comments, tables, and literal strings make launcher lists, prompt overrides, and future grouped policies easier to maintain.  Review records remain CritJSON; session metadata, manifests, and JSON command output retain their existing formats.
+Critty uses TOML for user-edited settings.  Comments, tables, and literal strings make launcher lists, prompt overrides, and task retention policies easier to maintain.  Review records remain CritJSON; session metadata, manifests, and JSON command output retain their existing formats.
 
 The loader is [internal/config](../internal/config).  The [agent configuration reference](../internal/cli/skill/critty-cli/references/configuration.md) covers editing settings.
 
@@ -38,6 +38,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `cleanup_on_approve` | Boolean enabling removal of eligible approved reviews. |
 | `disable_stats` | Boolean disabling review statistics. |
 | `prompts` | Table mapping prompt keys to overrides. |
+| `history` | Global-only table controlling task retention. |
 
 Global settings are applied first, followed by project settings.  Settings merge as follows:
 
@@ -48,3 +49,20 @@ Global settings are applied first, followed by project settings.  Settings merge
 - Prompt tables merge by key.  A project value replaces the corresponding global value and leaves other keys intact.
 
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.
+
+## History settings
+
+Only the global `config.toml` supplies history policy.  Project history settings do not override it or authorize removing records.  See the [review history design](review-history.md) for task boundaries, archive layout, and retention decisions.
+
+```toml
+[history]
+start = "auto"
+end = "auto"
+keep_days = 30
+max_bytes = 1073741824
+# archive_dir = "/absolute/path/to/archives"
+```
+
+Omitted or empty actions mean `auto`.  Routine completion retains originals quietly.  At task start, completed tasks beyond `keep_days` are offered for maintenance.  When backup usage exceeds `max_bytes`, auto removes the oldest eligible completed tasks in this working directory until usage reaches 80% of the limit, even within `keep_days`.  Ongoing and busy reviews, ungrouped sessions, and explicit archives are protected.  Usage is an estimate of known original-review locations, not a disk quota; insufficient eligible records produce a report instead of expanding deletion scope.
+
+Set `start` or `end` to `keep`, `archive`, or `delete` only for fixed behavior.  `keep` retains originals at that boundary regardless of capacity.  Fixed start actions use `keep_days`; fixed end actions apply to the named task.  `ask` is also accepted for callers that explicitly request a decision.  `keep_days` and `max_bytes` are positive integers; zero or omission uses 30 days and 1 GiB.  `archive_dir`, when set, must be absolute.  Invocation-level flags affect only that command, and one-time maintenance answers do not update settings.

@@ -99,4 +99,44 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.CleanupOnApprove {
 		t.Error("cleanup_on_approve should default to false")
 	}
+	if cfg.History.Start != "auto" || cfg.History.End != "auto" || cfg.History.KeepDays != 30 || cfg.History.MaxBytes != 1<<30 {
+		t.Fatalf("unexpected default history policy: %+v", cfg.History)
+	}
+}
+
+func TestHistoryPolicyIsGlobalOnly(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	project := t.TempDir()
+	writeConfig(t, ProjectPath(project), `[history]
+start = "delete"
+end = "delete"
+keep_days = 1
+max_bytes = 1
+`)
+	cfg, err := Load(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.History.Start != "auto" || cfg.History.End != "auto" {
+		t.Fatalf("project enabled automatic deletion: %+v", cfg.History)
+	}
+	writeConfig(t, GlobalPath(), `[history]
+start = "archive"
+end = "ask"
+keep_days = 7
+max_bytes = 12345
+`)
+	cfg, err = Load(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.History.Start != "archive" || cfg.History.End != "ask" || cfg.History.KeepDays != 7 || cfg.History.MaxBytes != 12345 {
+		t.Fatalf("global policy not respected: %+v", cfg.History)
+	}
+	writeConfig(t, GlobalPath(), `[history]
+end = "typo"
+`)
+	if _, err := Load(project); err == nil {
+		t.Fatal("invalid history policy accepted")
+	}
 }

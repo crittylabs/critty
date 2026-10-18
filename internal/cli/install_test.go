@@ -37,8 +37,9 @@ func destinations(t *testing.T, target string) []string {
 	return dests
 }
 
-// sharedSkillResources lists supporting skill files every agent target installs.
-var sharedSkillResources = []string{
+// additionalSkillResources lists the extra skill files every agent target installs.
+var additionalSkillResources = []string{
+	"critty-history/SKILL.md",
 	"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
 	"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
 	"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
@@ -53,7 +54,7 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 		filepath.Join(".opencode", "commands", "critty.md"):                 filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
 		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
-	for _, rel := range sharedSkillResources {
+	for _, rel := range additionalSkillResources {
 		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
 	}
 	for _, f := range integrations()["opencode"] {
@@ -97,7 +98,7 @@ func TestIntegrationLayouts(t *testing.T) {
 	}
 	for target, dests := range want {
 		dir := map[string]string{"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents"}[target]
-		for _, rel := range sharedSkillResources {
+		for _, rel := range additionalSkillResources {
 			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
 		}
 		if got := destinations(t, target); !slices.Equal(got, dests) {

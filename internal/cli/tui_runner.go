@@ -25,6 +25,10 @@ import (
 // payloads and can start new rounds; otherwise it returns the last finish
 // payload for the caller to print (inline mode).
 func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, serving bool) (*ipc.FinishPayload, error) {
+	cfg, err := taskReviewConfig(cfg, sess)
+	if err != nil {
+		return nil, err
+	}
 	documents, err := sess.LoadDocuments()
 	if err != nil {
 		return nil, err

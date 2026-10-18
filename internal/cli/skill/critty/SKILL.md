@@ -11,6 +11,8 @@ Run the interactive review loop when the user selects Critty or `/critty-approva
 
 The `critty` binary must be on PATH.  If missing and mise is available, use `mise use github:crittylabs/critty` for the project, or `mise use -g github:crittylabs/critty` for a requested user-wide installation.  Follow the caller's tool-management scope.  Otherwise, use `go install github.com/crittylabs/critty/cmd/critty@latest` and ensure Go's binary directory is on PATH.
 
+Before the first review of a work task, use [critty-history](../critty-history/SKILL.md) to start or continue its history task and handle old records once at that boundary.  Reuse any supplied task ID, pass `--task <id>` for each new review, and retain it across rounds and agent handoffs.  Return to that skill when the whole task is complete to apply its retention policy; individual approval does not trigger another cleanup question.
+
 ## Step 1: Select the input
 
 Pass explicit arguments through.  Otherwise use the current request's subject: a versioned plan, a document, or Git changes.  Default to Git changes when no target is named; clarify only when competing current targets make the choice ambiguous.  An older plan elsewhere in the conversation does not select plan mode.
@@ -64,7 +66,7 @@ Match approval to the invocation, session, and reviewed content.  Report missing
 
 Use `path`, `anchor`, and any `quote` to locate feedback; `drifted: true` means line numbers are approximate.  To recover saved threads, run `critty comments --session <id> --json --all`.  For attached documents, use the finish output's mapping from comment paths to original files.
 
-Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Keep saved reviews after approval for retrospectives, archiving, and later continuation.  Approval and task completion alone do not request deletion.  Follow a printed cleanup command only when the user explicitly enabled `cleanup_on_approve` or requested deletion, after reading all feedback and images and preserving evidence needed by the caller; `/critty-approval` handles form results and execution records.  If reading or preservation fails, keep the session and report the failure.
+Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Follow [critty-history](../critty-history/SKILL.md) for record lifetime and archiving; `/critty-approval` handles form results and execution evidence.  Read all feedback and images and preserve required evidence before any explicitly requested cleanup.  If reading or preservation fails, keep the session and report the failure.
 
 ## Step 4: Address new feedback
 
