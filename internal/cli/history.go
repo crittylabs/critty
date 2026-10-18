@@ -69,6 +69,7 @@ func newHistoryCommand() *cobra.Command {
 			"Actions are auto, keep, ask, archive (save then remove originals), and delete.  Auto is the default.  " +
 			"Ask returns JSON with decision_required=true and makes no destructive change; choose an action once for the task and rerun finish or clean.\n\n" +
 			"Auto retains backups quietly, asks about completed tasks beyond keep_days, and rotates the oldest completed backups at capacity to 80% of max_bytes.  Archives and ongoing or busy reviews are protected.\n\n" +
+			"Usage counts allocated disk blocks for review files and directories, counting hard links once.\n\n" +
 			"Global history settings: start, end, keep_days (default 30), max_bytes (default 1 GiB), and archive_dir.  " +
 			"Project files cannot change retention policy.  Start/clean consider only completed tasks in this directory, based on their most recent saved review update.  " +
 			"Fixed finish actions apply to the named task; auto also checks completed backups in this directory.  Active or busy reviews cannot be exported or removed.\n\n" +
@@ -217,7 +218,7 @@ func newHistoryCommand() *cobra.Command {
 			return printJSON(cmd.OutOrStdout(), task)
 		},
 	}
-	usage := &cobra.Command{Use: "usage", Short: "Estimate original review storage without changing records", Args: cobra.NoArgs,
+	usage := &cobra.Command{Use: "usage", Short: "Estimate allocated review disk usage without changing records", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			store, policy, err := historyContext()
 			if err != nil {

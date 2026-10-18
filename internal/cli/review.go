@@ -222,6 +222,8 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 		return err
 	}
 
+	warnHistory(os.Stderr, sess.Meta.CWD, cfg.History)
+
 	multiplexer, err := reviewTerminalContext()
 	if err != nil {
 		return err

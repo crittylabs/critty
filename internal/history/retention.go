@@ -112,7 +112,11 @@ func (s *Store) maintain(policy Policy, askAge bool) (result Maintenance, err er
 }
 
 func lastUpdated(task Task) (time.Time, error) {
-	updated, err := time.Parse(time.RFC3339Nano, task.CompletedAt)
+	base := task.CompletedAt
+	if base == "" {
+		base = task.StartedAt
+	}
+	updated, err := time.Parse(time.RFC3339Nano, base)
 	if err != nil {
 		return time.Time{}, err
 	}

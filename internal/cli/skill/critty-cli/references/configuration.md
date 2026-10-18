@@ -20,7 +20,7 @@ Quote prompt keys containing `:` or `.`.  These characters are part of the key, 
 
 ## History policy
 
-Retention settings apply only in the global TOML file.  Omitted or empty `start` and `end` mean `auto`: retain originals quietly, offer old completed tasks at task start, and rotate completed backups when capacity is exceeded.  Project settings cannot authorize history actions.
+Retention settings apply only in the global TOML file.  Omitted or empty `start` and `end` mean `auto`: the CLI retains originals quietly, reports any maintenance decision at task start, and rotates completed backups when capacity is exceeded.  This describes command behavior; it does not instruct agents to inspect old records or usage independently.  Project settings cannot authorize history actions.
 
 ```toml
 [history]
@@ -31,7 +31,7 @@ max_bytes = 1073741824
 # archive_dir = "/absolute/path/to/archives"
 ```
 
-`keep_days` is the desired retention period, not a minimum guarantee: capacity rotation can remove more recent completed backups.  `max_bytes` budgets known original-review bytes, excluding explicit archives.  Rotation stops at 80% of the limit and protects ongoing, busy, ungrouped, and out-of-scope records.  Report a target that cannot be reached; do not widen deletion scope.
+`keep_days` is the desired retention period, not a minimum guarantee: capacity rotation can remove more recent completed backups.  `max_bytes` budgets allocated disk space in known original-review locations, including directory blocks and counting hard links once, excluding explicit archives.  Rotation stops at 80% of the limit and protects ongoing, busy, ungrouped, and out-of-scope records.  Report a target that cannot be reached; do not widen deletion scope.
 
 Use `keep`, `archive`, or `delete` for fixed boundary behavior.  `ask` is available for an explicit decision request, usually through `--action ask`.  A one-time maintenance answer does not authorize editing global preferences.  Change settings only when the user requests persistent behavior.
 

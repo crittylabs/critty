@@ -11,7 +11,9 @@ Run the interactive review loop when the user selects Critty or `/critty-approva
 
 The `critty` binary must be on PATH.  If missing and mise is available, use `mise use github:crittylabs/critty` for the project, or `mise use -g github:crittylabs/critty` for a requested user-wide installation.  Follow the caller's tool-management scope.  Otherwise, use `go install github.com/crittylabs/critty/cmd/critty@latest` and ensure Go's binary directory is on PATH.
 
-Before the first review of a work task, use [critty-history](../critty-history/SKILL.md) to start or continue its history task and handle old records once at that boundary.  Reuse any supplied task ID, pass `--task <id>` for each new review, and retain it across rounds and agent handoffs.  Return to that skill when the whole task is complete to apply its retention policy; individual approval does not trigger another cleanup question.
+Before the first review of a work task, use [critty-history](../critty-history/SKILL.md) for task registration or continuation.  Reuse any supplied task ID, pass `--task <id>` for each new review, and retain it across rounds and agent handoffs.  Return to that skill when the whole task is complete to apply its retention policy; individual approval does not trigger another cleanup question.
+
+When review startup or resume prints `critty: warning: history:`, follow [critty-history](../critty-history/SKILL.md#handle-review-flow-warnings) after collecting the current round's result.  A command-reported warning or maintenance result, or an explicit user maintenance request, triggers inspection.  Task boundaries alone do not trigger independent capacity/age checks.  Use Critty commands through that skill for cleanup and exports; do not explore storage or write maintenance scripts.
 
 ## Step 1: Select the input
 

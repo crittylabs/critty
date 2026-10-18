@@ -82,7 +82,9 @@ Feedback answers are drafts; overall approval and initial checkmarks supply no i
 
 ## Task history
 
-Use [critty-history](../critty-history/SKILL.md) before the first review and after the whole work task, for grouping, automatic backup rotation, maintenance decisions, and archives.  `critty history --help` lists commands; `--task <id>` on `critty`, `review`, and `plan` associates a review without prompting at each round.
+Normal review start/resume reports history warnings on stderr while preserving stdout and verdicts.  `critty doctor` includes fresh history checks and suggested remedies, independent of the passive warning throttle.  On `critty: warning: history:`, follow [critty-history](../critty-history/SKILL.md#handle-review-flow-warnings) for targeted inspection, policy-driven cleanup, or a batched user decision.
+
+Use [critty-history](../critty-history/SKILL.md) before the first review and after the whole work task, for task bookkeeping; Critty applies the configured policy.  Inspect capacity or old records only after a command warning/result or explicit maintenance request.  Cleanup and exports use Critty commands, without storage-tree traversal or custom maintenance scripts.  `critty history --help` lists commands; `--task <id>` on `critty`, `review`, and `plan` associates a review without prompting at each round.
 
 ## Review command output
 

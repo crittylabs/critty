@@ -13,7 +13,7 @@ import (
 
 const DefaultMaxBytes int64 = 1 << 30
 
-// StorageUsage counts logical bytes in known original review directories.
+// StorageUsage counts allocated bytes in known original review directories.
 // Explicit archives and task receipts are outside the rolling backup budget.
 type StorageUsage struct {
 	Bytes    int64    `json:"bytes"`
@@ -21,6 +21,17 @@ type StorageUsage struct {
 	Exceeded bool     `json:"exceeded"`
 	Roots    []string `json:"roots"`
 	Warnings []string `json:"warnings,omitempty"`
+}
+
+type diskAllocation struct {
+	bytes  int64
+	device uint64
+	inode  uint64
+}
+
+type fileIdentity struct {
+	device uint64
+	inode  uint64
 }
 
 func (s *Store) Usage(maxBytes int64) StorageUsage {
@@ -32,6 +43,7 @@ func (s *Store) Usage(maxBytes int64) StorageUsage {
 		u.Warnings = append(u.Warnings, fmt.Sprintf("%s: %v", path, err))
 	}
 	seen := map[string]bool{}
+	counted := map[fileIdentity]bool{}
 	include := func(root string) {
 		original := root
 		info, err := os.Lstat(root)
@@ -84,14 +96,23 @@ func (s *Store) Usage(maxBytes int64) StorageUsage {
 				warn(path, fmt.Errorf("symbolic link excluded"))
 				return nil
 			}
-			if !entry.Type().IsRegular() {
+			if !entry.Type().IsRegular() && !entry.IsDir() {
 				return nil
 			}
 			info, err := entry.Info()
 			if err != nil {
 				warn(path, err)
-			} else {
-				u.Bytes += info.Size()
+				return nil
+			}
+			allocation, err := allocatedDiskSpace(info)
+			if err != nil {
+				warn(path, err)
+				return nil
+			}
+			id := fileIdentity{allocation.device, allocation.inode}
+			if !counted[id] {
+				counted[id] = true
+				u.Bytes += allocation.bytes
 			}
 			return nil
 		}); err != nil {

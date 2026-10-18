@@ -390,8 +390,39 @@ def scenarios() -> None:
             "task reviews defer approval cleanup; one boundary decision archives both sessions before removing originals"
         )
 
+        warning_task = json.loads(
+            cli("history", "start", "Old retained work", "--action", "keep").stdout
+        )["task"]["id"]
+        cli("history", "finish", warning_task, "--action", "keep")
+        receipt = STATE / "critty" / "history" / f"{warning_task}.json"
+        record = json.loads(receipt.read_text())
+        record["started_at"] = "1999-12-31T00:00:00Z"
+        record["completed_at"] = "2000-01-01T00:00:00Z"
+        receipt.write_text(json.dumps(record))
+        (CONFIG / "critty" / "config.toml").write_text(
+            'author = "Scenario Reviewer"\ncleanup_on_approve = false\n'
+            "[history]\nmax_bytes = 1\n"
+        )
+        diagnosis = json.loads(cli("doctor", "--json", check=False).stdout)
+        history_checks = {item["check"]: item for item in diagnosis["checks"]}
+        assert history_checks["history/age"]["status"] == "warn"
+        assert "critty history list" in history_checks["history/age"]["advice"]
+        assert not json.loads(receipt.read_text())["pruned"]
         for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:
             submission = Round(f"submit-{verdict}", ["plan.md"])
+            if verdict == "approve":
+                wait_until(
+                    lambda current=submission: (
+                        "critty: warning: history:" in current.err.read_text()
+                    ),
+                    "history warning during ordinary review startup",
+                )
+                warning = submission.err.read_text()
+                assert "above max_bytes=1" in warning and "keep_days=30" in warning
+                assert "critty-history" in warning
+                assert not json.loads(receipt.read_text())["pruned"]
+            else:
+                assert "critty: warning: history:" not in submission.err.read_text()
             submission.keys("q", "Down")
             body = f"Overall comment: {verdict}."
             submission.text(body)

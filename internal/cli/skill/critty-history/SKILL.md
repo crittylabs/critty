@@ -1,87 +1,70 @@
 ---
 name: critty-history
-description: Group Critty reviews by task, apply retention at task boundaries, and save portable Markdown archives for retrospectives or later publication. Use at the start and end of work using Critty, including tasks with several reviews, or when managing saved records.
+description: Group Critty reviews by task, handle history warnings through Critty commands, and export requested or valuable discussions. Use for task bookkeeping, command-reported history warnings or maintenance results, and explicit history or archive requests.
 ---
 
 # Review history
 
-Organize review records at work boundaries so they remain useful without accumulating unnoticed.  One task may span several reviews, conversations, and agent tools.  Individual approval completes a review, not the task.  Keep the task ID and any pending retention decision in the caller's existing handoff or progress record.
+One work task can span several reviews and conversations.  Retain its task ID across rounds and handoffs.  Individual approval completes a review, not the task.
+
+## Maintenance trigger and command boundary
+
+Inspect capacity or old records only after a Critty warning, a returned maintenance decision/error, or an explicit user maintenance request.  Ordinary review startup/resume performs passive checks.  Routine task bookkeeping lets Critty apply its policy; it is not a reason for a separate storage scan, `history usage`, `doctor`, or old-record discussion.
+
+Use Critty commands and their JSON results for inspection, saving, cleanup, and recovery.  Keep task/session IDs and returned archive paths as locators.  Do not traverse storage trees, inspect internal task/session/manifest files for maintenance, calculate usage yourself, or write scripts to reconstruct, archive, move, repair, or delete Critty records.  If the CLI cannot perform an operation or provide required information, retain the records and report that limitation.  Reading exported Markdown for a requested retrospective is separate from maintaining stored records.
 
 ## Start or continue a task
 
-Use `critty history list` from the task's working directory to find an existing task for this work.  Retain its ID across conversations.  Use `critty history reopen <task-id>` to continue a completed task whose original sessions were kept.  Reopen only when continuing that work; a separate task gets its own ID.
+Reuse a supplied or recorded task ID.  Only if continuing work without its ID, use `critty history list` to identify that task; unrelated entries are not maintenance candidates merely because they appear.  Reopen a completed task with `critty history reopen <task-id>` when continuing work whose original reviews were retained.
 
-For new work, run `critty history start '<task name>'` once.  The project name defaults to the repository or directory name; pass `--project '<project name>'` to override it.  Record `task.id` from its JSON output.  Start applies the configured policy in this directory; it leaves ongoing work alone.  Under `auto`, recent backups remain quiet, old completed tasks can request a decision, and capacity pressure rotates completed backups automatically.  Report automatic deletions and their task identities after the operation.  Process any `maintenance` results with `decision_required: true` together, once at this boundary.  Honor a pending age-maintenance deferral in the host record; it suppresses repeated questions, not capacity rotation.  Present old-task candidates together before the first review, without waiting for a maintenance choice to begin independent work.  Report `skip` and `error` results, their reasons, and any `maintenance_error`; old-task failures do not prevent starting the new task.  Repair failed tasks separately.  Resuming a task or opening another review does not repeat start-time maintenance.
+For new work, run `critty history start '<task name>'` once and record `task.id`.  The project name defaults to the repository or directory name; `--project '<name>'` overrides it.  Critty applies the configured start policy itself.  Report returned automatic deletions, `skip`/`error` outcomes, and `maintenance_error`.  If the result actually contains `decision_required: true`, follow the decision procedure below and honor an existing deferral.  Otherwise continue the work quietly.  Do not gather additional old candidates or repeat maintenance when resuming a conversation or opening another review.
 
-Pass `--task <task-id>` when opening each review through `/critty`.  This associates the saved review before the TUI opens and defers approval cleanup to the task, including after resume.  To include an existing stopped review, use `critty history add <task-id> --session <session-id>`.  Membership is explicit so concurrent agents do not share an implicit current task.  Each review belongs to at most one task.
+Pass `--task <task-id>` to each new review through `/critty`.  Use `critty history add <task-id> --session <session-id>` to include an existing stopped review.  Membership is explicit so concurrent agents do not share an implicit current task; a review belongs to at most one task.
 
 ## Finish the work
 
-Finish after all operations authorized by the task's reviews are verified or explicitly abandoned.  Keep a task open through waits, interruptions, and unfinished publication; a commit or a closed terminal alone does not finish a larger task.  Then run `critty history finish <task-id>` once.  Default `auto` retains originals quietly and checks capacity.  Report any automatic rotation and failures; ordinary completion needs no archive question.
+Keep the task open through interruptions, waits, commits, and unfinished publication.  After every authorized operation is verified or explicitly abandoned, run `critty history finish <task-id>` once.  Critty applies the end policy itself; default `auto` keeps originals quietly and checks capacity.  Report returned rotation or failures.  Completion alone does not trigger another inspection, archive offer, or cleanup question.
 
-## Present one retention decision
+## Handle review-flow warnings
 
-Commands return JSON.  When `decision_required` is true, use the host's question or approval UI once for the current task or batch of old candidates.  Show names and IDs, session counts, age, known archive paths, and sizes when available.  Distinguish the storage reclaimed from an additional saved copy; label unavailable size estimates rather than inventing them.  Allow per-task exceptions to a batch choice.
+When review startup/resume prints `critty: warning: history:`, preserve the output and collect the current round's result first.  Then handle its category through the relevant commands:
 
-| Choice | CLI action and meaning |
+| Warning | Response |
 | --- | --- |
-| Save and clean up | `archive`: save and verify the standard archive, show its path, then remove originals.  Suggest this when continued TUI editing is unnecessary. |
-| Keep for continuation | `keep`: complete the work and retain resumable originals; reopen before further reviews.  The capacity policy still applies at future boundaries; reopening marks continued work as ongoing. |
-| Delete | `delete`: remove selected originals without saving.  State whether an existing archive remains. |
-| Decide later | Retain records and record a pending decision for 7 days later in the caller's progress record.  Do not silently select archive or delete. |
+| `capacity` | Use `critty history usage` for the reported scope, then apply `critty history clean` under the configured policy when permitted.  Default `auto` rotates eligible completed backups without a confirmation; report actual deletions and any unreachable target.  Fixed `keep` remains keep.  Ask about specific protected records only if a further decision is needed. |
+| `age` | Use `critty history list` and `critty status` to identify the reported records.  Honor fixed policy and an existing deferral.  Present one decision for completed tasks that need it.  Ask whether to continue, group, save, or explicitly complete/remove open or ungrouped work; age does not establish completion. |
+| `recovery` | Use `critty history list` to identify the exact task and recorded action.  Retry with `critty history finish <task-id> --action <recorded-action>`.  Let the CLI verify the archive and remaining originals; report failures. |
+| `incomplete` or `check unavailable` | Use `critty doctor --json` and the relevant history/status command to obtain diagnostics.  Use a documented CLI recovery command if available; otherwise retain records and report the blocker.  Do not repair metadata by hand. |
 
-Apply an answer with `critty history finish <task-id> --action <action>`.  For old candidates, use the exact IDs shown by the original result, never a fresh destructive age sweep.  Recheck the selected tasks and their saved updates before acting; changed, reopened, or busy tasks need reconsideration.  For automatic actions, respect their configured scope.
+`critty doctor` provides a fresh diagnosis with suggested commands when handling a warning or explicit diagnosis request.  It bypasses passive warning suppression.  Batch related warnings into one discussion for the work task; a warning does not authorize stopping another agent's review, deleting archives, changing preferences, or publishing records.  Keep the current task open throughout maintenance.  Critty throttles its own checks and repeated warning categories; agents do not schedule or poll for reminders.
 
-`ask` returns a decision request; it does not open another review or read interactive stdin.  If the user defers, dismisses the question, or cannot answer, complete finished work with `--action keep` and record that this is deferred retention, not an explicit keep choice.  Preserve the candidate IDs, boundary, last presentation, next reminder, and any known archive paths.  Reuse that record across agent handoffs.  Offer the deferred IDs at the first work boundary after the reminder is due, rechecking eligibility first.  A pending question is not another reason to interrupt each review.  If the host has no durable progress record, retain the records and report that a persistent reminder could not be saved.
+## Present one reported decision
 
-Respect global policy, including `auto` capacity rotation.  Individual approval does not authorize an extra cleanup action.  Running or busy reviews are protected; stop them through `/critty` before retrying.  An export failure leaves original sessions intact.  Interrupted removal records its remaining sessions; rerun `finish` with the recorded action and task ID.  On failure, a nonzero exit accompanies JSON with `error` and the partial `result`; report the failure and retained archive path rather than declaring cleanup complete.
+When a command returns `decision_required: true`, show its task names/IDs, session counts, and any reported ages, sizes, or archive paths together.  Use only information returned by commands; label unavailable estimates instead of calculating them or exploring the storage tree.  Allow per-task exceptions.
 
-A review removed outside history does not prevent `keep`, `ask`, or `delete`; their JSON reports `missing_sessions`.  A strict archive requires all members.  To remove a missing or unwanted member explicitly without deleting its data, use `critty history detach <task-id> --session <session-id>`, then retry.  Short concurrent history writes wait briefly; after a longer busy error, retry the same operation.  If review association fails after creating a session, the error identifies that saved session; add it with `history add` before resuming instead of creating a replacement.
+| Choice | Command and meaning |
+| --- | --- |
+| Save and clean up | `critty history finish <task-id> --action archive`: save, verify, report the archive path, and remove originals. |
+| Keep | `critty history finish <task-id> --action keep`: retain resumable originals.  Future configured capacity rotation still applies. |
+| Delete | `critty history finish <task-id> --action delete`: remove selected originals without a new archive; existing archives remain. |
+| Decide later | Retain originals with `--action keep` and record the pending IDs and last presentation in the caller's progress record.  Revisit only after another command notification or user request, honoring any user-specified deferral. |
 
-Unrelated corrupt task records produce warnings; capacity rotation stops when membership coverage is incomplete.  Explicit operations on valid tasks remain available.  When membership cannot be determined, reviews retain data even if approval cleanup is enabled.  Repair the reported task record before relying on automatic organization; a review directly associated with a corrupt task stays blocked to protect its records.
+For old candidates, act only on returned IDs and refresh their state with `history list` if needed before acting.  The CLI owns membership, busy checks, verification, and removal.  A dismissal supplies no destructive authorization.  Elapsed time or a work boundary alone does not trigger a deferred question or recheck.  Keep one pending decision across handoffs.  A one-time answer does not change global settings.
 
-## Policy
+## Save valuable discussions or requested records
 
-Read the [configuration reference](../critty-cli/references/configuration.md) when resolving or editing global settings.  Run boundary commands without an action override unless the user selected one.  Omitted or empty `start` and `end` mean `auto`; fixed `keep`, `archive`, or `delete` actions override it.  `ask` remains available for a deliberate decision request.  A one-time answer does not authorize changing global preferences.  Report configuration errors and retain data rather than guessing an action.
+A concrete insight, useful human correction, or substantial AI cowork/review discussion resolving a difficult tradeoff may merit one archive suggestion at a suitable work boundary.  Explain the value and respect a declined suggestion.  Routine approval, length, and completion alone are not reasons to ask.  This is a suggestion about known content, not a reason to inspect old records or capacity.
 
-`keep_days` defaults to 30 and expresses the desired backup retention period.  Age alone makes completed tasks candidates for a maintenance conversation at task start; it does not delete them.  Recent saved review updates reset age.  `max_bytes` defaults to 1 GiB and budgets known original-review storage, excluding explicit archives.  When exceeded under `auto`, Critty deletes eligible completed tasks in this working directory, oldest saved update first, until usage reaches 80% of the limit.  Capacity can override `keep_days`.  Ongoing, busy, ungrouped, interrupted, and out-of-scope records remain protected.  Report an unreachable target without expanding the deletion scope or asking about each automatic rotation.
+Use `critty history export <task-id>` for a selected save or handoff, optionally with `--output <parent-directory>`.  It keeps originals and returns the actual `archive` path.  Refer to an already recorded archive location before suggesting another copy.  Critty generates the dated project/task folder, readable `review.md`, attachments, assets, original session files, and manifest; agents do not assemble or verify this layout themselves.
 
-`critty history usage` returns measured bytes, roots, and warnings without changing records.  This estimate covers default review storage and registered external review directories for this working directory; it is not a full disk inventory or quota.  `history clean` applies start policy explicitly; `--days 0` includes all completed tasks.  With `auto`, clean returns `outcomes` and `storage`; fixed actions return an outcome array.  Start uses `maintenance`; finish can also return `maintenance` and `storage`.  A failed operation returns partial results under `result` with `error`.  Use the actual measured scope and report incomplete scans.
+For reported missing sessions or external images, `export --allow-incomplete` explicitly saves the remaining material and reports warnings while keeping originals.  It cannot bypass corruption or missing managed images.  The `archive` action stays strict.  Use `critty history detach <task-id> --session <session-id>` only for a selected missing/unwanted member, then retry the original command.  Exported state is not every historical round or independent evidence of the original host's approval; retain required completion evidence separately.  Local saving does not authorize PR, git-notes, or other publication, and session import is not implemented.
 
-## Suggest valuable records selectively
+## Policy and limits
 
-A substantial design discussion, a useful human correction, an unexpected insight, or an AI cowork/review exchange that resolves a difficult tradeoff may deserve a durable archive.  At an appropriate work boundary, explain the concrete value and offer an export once.  Routine approval, conversation length, and task completion alone are not reasons to ask.  Respect a declined suggestion.  Use `export` to preserve originals unless cleanup was also selected, and check the known archive before creating another copy.
+Read the [configuration reference](../critty-cli/references/configuration.md) when resolving or editing settings for an actual decision.  Run task boundaries without action overrides unless the user selected one.  Omitted or empty `start`/`end` mean `auto`; fixed global actions take precedence.  Invalid configuration is an error to report, not a reason to guess a destructive action.
 
-## Save without removing originals
+Critty applies `keep_days` and the allocated-byte `max_bytes` budget.  Age alone does not delete records; capacity rotation can remove newer completed backups.  Ongoing, busy, ungrouped, inconsistent, and out-of-scope records are protected, as are explicit archives.  An unreachable budget does not authorize broader cleanup.
 
-Use `critty history export <task-id>` for an explicit copy or handoff, optionally with `--output <parent-directory>`.  Export does not reclaim space.  Do not export on every approval or conversation; keep a known archive location with the task record and inspect it before proposing another copy.  After a successful save, retain its path in the host record.  Explicit archives are protected from automatic rotation and have no default age reminder.  Export creates a unique folder named with the local date/time, project name, task name, and ID.  Its default parent is `$XDG_STATE_HOME/critty/archives` (usually `~/.local/state/critty/archives`).  The JSON result gives the actual `archive` path.  If external images or review sessions have already disappeared, `export --allow-incomplete` explicitly saves the remaining material, leaves missing references unchanged, and records warnings in `review.md` and `manifest.json`.  It always keeps originals and cannot bypass corruption or missing managed session images.  Automatic archival remains strict.
+On failure, nonzero exit accompanies JSON with `error` and partial `result`.  Report partial removal and any archive path.  Interrupted pruning requires the recorded task/action.  If association failed after creating a session, use the returned session ID with `history add` before resuming.  Selected ungrouped reviews can be removed with `critty clear --session <id>` after an explicit deletion decision and required evidence preservation; never substitute `clear --all` for selected maintenance.
 
-```text
-2026-10-18 134000 - Critty - Review history - <id>-<unique suffix>/
-  review.md
-  attachments/
-    <session-id>/
-      <attachment-id>/
-        document.md
-        assets/
-      source-<path-hash>/
-        source.md
-        assets/
-  assets/
-  sessions/
-  manifest.json
-```
-
-`review.md` contains the project and task identities, sessions, verdicts, comments, resolved threads, replies, and links to saved documents and source snapshots.  `attachments/` contains readable document snapshots, each with its own `assets/` for images referenced within that document.  Top-level `assets/` contains images referenced by the main review record.  Image references are relative to their document.  Remote resources remain URLs and are not fetched.  Original session files stay byte-for-byte under `sessions/`, including forms, plan versions, and review JSON.  `manifest.json` records session metadata, file hashes, and image provenance.  External local image bytes are captured at export time and may differ from the reviewed revision; managed session images come from saved attachments.  Exported data describes saved state; it is not a complete edit log, every past round, or independent evidence of the original host completion.  Keep required approval evidence under the caller's policy.
-
-Use the Markdown archive as input for a retrospective or a requested PR/git-notes summary.  Saving locally does not authorize publication.  Preserve the original JSON for future Crit interchange; a compatible JSON shape alone does not establish bidirectional session-resume support.
-
-## Archive maintenance and current limits
-
-Saving records also consumes storage outside the rolling backup budget.  When the user requests archive maintenance, offer keep, move, or delete with exact paths and available sizes, especially when the archive is the only remaining copy.  Verify a destination copy before removing a moved source and update its locator.  Age or capacity alone does not authorize archive deletion.  Task `delete` removes originals, not saved archives.
-
-The CLI does not implement persistent snoozes, a complete archive inventory, archive move/delete commands, or background scheduling.  The latest archive locator and host progress records are not a complete inventory.  Report these limits when relevant and use exact paths under the caller's file-operation permissions for requested archive maintenance.
-
-During explicit maintenance, surface old open tasks, ungrouped sessions, and interrupted cleanup separately.  Ask whether to continue, group, save, or delete them; age and process absence do not prove that work is complete.  Preserve busy sessions and uncertain staging/recovery data.  Handle corrupt membership as a repair case.
-
-For retention rationale, default policy, the task data model, and archive integrity boundaries, see the [review history design](https://github.com/crittylabs/critty/blob/main/docs/review-history.md).
+The CLI does not provide a complete archive inventory, archive move/delete commands, persistent snoozes, or a background scheduler.  Existing archives survive task cleanup.  Report unsupported requests instead of offering actions that would require direct filesystem work.  For the maintained format and retention contract, see the [review history design](https://github.com/crittylabs/critty/blob/main/docs/review-history.md).
