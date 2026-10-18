@@ -22,6 +22,7 @@ type Config struct {
 	History          history.Policy    `json:"history"`
 	Output           string            `json:"output,omitempty"`
 	Author           string            `json:"author,omitempty"`
+	Split            bool              `json:"split,omitempty"`
 	IgnorePatterns   []string          `json:"ignore_patterns,omitempty"`
 	Launchers        []string          `json:"launchers,omitempty"`
 	Quiet            bool              `json:"quiet,omitempty"`
@@ -40,6 +41,7 @@ type fileConfig struct {
 	History          *history.Policy   `toml:"history"`
 	Output           string            `toml:"output"`
 	Author           string            `toml:"author"`
+	Split            *bool             `toml:"split"`
 	IgnorePatterns   []string          `toml:"ignore_patterns"`
 	Launchers        []string          `toml:"launchers"`
 	Quiet            *bool             `toml:"quiet"`
@@ -88,6 +90,7 @@ func Load(projectRoot string) (*Config, error) {
 	if cfg.Author == "" {
 		cfg.Author = gitUserName()
 	}
+
 	return cfg, nil
 }
 
@@ -132,6 +135,9 @@ func apply(cfg *Config, fc *fileConfig) {
 	}
 	if fc.Author != "" {
 		cfg.Author = fc.Author
+	}
+	if fc.Split != nil {
+		cfg.Split = *fc.Split
 	}
 	// Pattern lists are unioned across levels, like crit.
 	cfg.IgnorePatterns = appendUnique(cfg.IgnorePatterns, fc.IgnorePatterns)

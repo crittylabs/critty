@@ -55,6 +55,9 @@ func (m AppModel) searchButton() string {
 		return ""
 	}
 	button := renderBarButton("Search", "/")
+	if m.multiFile && m.width > 0 && lipgloss.Width(m.splitButton()+" "+m.whitespaceButton()+" "+button+" "+m.submitButton()+" ") > m.width {
+		return modalBtnFocusedKey.Render("/")
+	}
 	if m.width > 0 && lipgloss.Width(button+" "+m.submitButton()+" ") > m.width {
 		button = renderBarButton("Search", "")
 	}

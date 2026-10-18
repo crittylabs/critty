@@ -64,6 +64,7 @@ func (f FileChange) ReviewStatus() string {
 
 // DiffInfo contains parsed diff information for a single file.
 type DiffInfo struct {
+	CommonLines   map[int]int             `json:",omitempty"` // new-to-old coordinates supplied by the patch
 	ChangedLines  map[int]bool            // added/modified line numbers (1-based) in new file
 	InlineChanges map[int][]InlineSegment // inline changes keyed by new-file line number
 	DeletedAfter  map[int][]DeletedLine   // deleted lines keyed by the new-file line they appear after (0 = before line 1)
@@ -131,6 +132,7 @@ func diffPathspec(path, oldPath string) []string {
 
 func diffInfo(files []*gitdiff.File) *DiffInfo {
 	info := &DiffInfo{
+		CommonLines:   make(map[int]int),
 		ChangedLines:  make(map[int]bool),
 		InlineChanges: make(map[int][]InlineSegment),
 		DeletedAfter:  make(map[int][]DeletedLine),
@@ -155,6 +157,7 @@ func diffInfo(files []*gitdiff.File) *DiffInfo {
 					lastNewLine = int(newLine)
 					newLine++
 				case gitdiff.OpContext:
+					info.CommonLines[int(newLine)] = int(oldLine)
 					lastNewLine = int(newLine)
 					newLine++
 					oldLine++

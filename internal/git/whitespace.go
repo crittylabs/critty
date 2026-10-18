@@ -1,6 +1,7 @@
 package git
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/aymanbagabas/go-udiff/lcs"
@@ -15,8 +16,12 @@ func (info *DiffInfo) IgnoreWhitespace(newLines []string) *DiffInfo {
 		return nil
 	}
 	filtered := &DiffInfo{
+		CommonLines:  maps.Clone(info.CommonLines),
 		ChangedLines: make(map[int]bool), InlineChanges: make(map[int][]InlineSegment),
 		DeletedAfter: make(map[int][]DeletedLine),
+	}
+	if filtered.CommonLines == nil {
+		filtered.CommonLines = make(map[int]int)
 	}
 	for line, changed := range info.ChangedLines {
 		filtered.ChangedLines[line] = changed
@@ -39,7 +44,8 @@ func (info *DiffInfo) IgnoreWhitespace(newLines []string) *DiffInfo {
 			delete(filtered.ChangedLines, anchor+i+1)
 			delete(filtered.InlineChanges, anchor+i+1)
 		}
-		for _, change := range lcs.DiffLines(oldKeys, newKeys) {
+		changes := lcs.DiffLines(oldKeys, newKeys)
+		for _, change := range changes {
 			after := anchor + change.ReplStart
 			for i := change.Start; i < change.End; i++ {
 				line := deleted[i]
@@ -56,6 +62,21 @@ func (info *DiffInfo) IgnoreWhitespace(newLines []string) *DiffInfo {
 					filtered.InlineChanges[after+i+1] = newSegments
 				}
 			}
+		}
+		// Equal lines still need their original coordinates after filtering.
+		old, next := 0, 0
+		for _, change := range changes {
+			for next < change.ReplStart {
+				filtered.CommonLines[anchor+next+1] = deleted[old].OldLineNum
+				old++
+				next++
+			}
+			old, next = change.End, change.ReplEnd
+		}
+		for next < len(added) && old < len(deleted) {
+			filtered.CommonLines[anchor+next+1] = deleted[old].OldLineNum
+			old++
+			next++
 		}
 	}
 	return filtered

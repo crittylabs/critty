@@ -37,6 +37,9 @@ func (m *AppModel) visualLines(t *FileTab) []lineRef {
 	if t.doc == nil {
 		return nil
 	}
+	if m.alternateDiff(t) {
+		return m.diffVisualLines(t)
+	}
 	lines := make([]lineRef, 0, t.doc.LineCount()+len(t.deletedAfter))
 	for line := 1; line <= t.doc.LineCount(); line++ {
 		for _, del := range t.deletedAfter[line-1] {
@@ -53,6 +56,9 @@ func (m *AppModel) visualLines(t *FileTab) []lineRef {
 }
 
 func (m *AppModel) adjacentLine(t *FileTab, step int) (lineRef, bool) {
+	if m.alternateDiff(t) {
+		return adjacentDiffLine(t, step)
+	}
 	lines := m.visualLines(t)
 	if t.cursorLine == 0 && step > 0 && len(lines) > 0 {
 		return lines[0], true

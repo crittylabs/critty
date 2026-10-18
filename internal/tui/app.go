@@ -69,6 +69,7 @@ type AppConfig struct {
 	Version   string
 	Session   *review.Session
 	Author    string
+	Split     bool
 	// Staged reads code-review files and diffs from the Git index.
 	Staged    bool
 	Patch     *gitpkg.Patch
@@ -117,6 +118,8 @@ type AppModel struct {
 	hideComments     bool
 	foldResolved     bool
 	ignoreWhitespace bool
+	split            bool
+	viewAttention    *diffAttention
 	previousReplyIDs []string // submission baseline pending initial window dimensions
 	initialFocus     *sourceLocation
 
@@ -187,6 +190,7 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
+	columns      []diffMouseRow
 	formControls []formControl
 	rows         []contentMouseTarget
 	lineRanges   map[int]renderedRange
@@ -213,16 +217,20 @@ func (r *commentHeaderRegion) translate(x, y int) {
 }
 
 type renderedScreenLayout struct {
-	finishButton    mouseRect
-	hasFinishButton bool
-	footerHelp      mouseRect
-	hasFooterHelp   bool
-	imagesButton    mouseRect
-	hasImagesButton bool
-	modalRegions    []modalMouseRegion
-	isearchCursor   *tea.Cursor
-	isearchRegions  []isearchMouseRegion
-	progressRegions []progressRegion
+	whitespaceButton    mouseRect
+	hasWhitespaceButton bool
+	splitButton         mouseRect
+	hasSplitButton      bool
+	finishButton        mouseRect
+	hasFinishButton     bool
+	footerHelp          mouseRect
+	hasFooterHelp       bool
+	imagesButton        mouseRect
+	hasImagesButton     bool
+	modalRegions        []modalMouseRegion
+	isearchCursor       *tea.Cursor
+	isearchRegions      []isearchMouseRegion
+	progressRegions     []progressRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -240,7 +248,7 @@ func (l *renderedContentLayout) appendBlock(b *strings.Builder, block string, ta
 		b.WriteByte('\n')
 		l.rows = append(l.rows, target)
 	}
-	if target.line <= 0 && !target.annotation {
+	if target.passive || target.line <= 0 && !target.annotation {
 		return
 	}
 	ranges := l.lineRanges
@@ -356,6 +364,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		tabs:            tabs,
 		activeTab:       0,
 		multiFile:       true,
+		split:           cfg.Split,
 		session:         cfg.Session,
 		author:          cfg.Author,
 		authorColors:    make(map[string]int),
@@ -606,6 +615,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
+		attention := m.captureDiffAttention()
 		m.width = msg.Width
 		m.height = msg.Height
 		m.images.cell = cellPixelSize()
@@ -613,6 +623,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.tabs) > 0 && m.tab().state != nil {
 			m.rebuildContent()
 			m.updateCommentSidebar()
+			m.restoreDiffAttention(attention)
 			m.focusStartupLocation()
 			m.focusNewReply()
 		}
@@ -644,7 +655,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			doc, _ := m.loadDocument(t.path)
 			t.doc = doc
 			t.ensureHighlightCache()
-			if m.patch != nil {
+			if m.patch != nil || m.alternateDiff(t) {
 				if lines := m.visualLines(t); len(lines) > 0 {
 					t.cursorLine, t.cursorSide = lines[0].line, lines[0].side
 				}
@@ -901,6 +912,12 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.multiFile {
 			m.toggleWhitespace()
 		}
+		return m, nil
+	case key.Matches(msg, keys.Split):
+		m.toggleSplit()
+		return m, nil
+	case (msg.String() == "left" || msg.String() == "right") && m.focused == contentPane && m.alternateDiff(t):
+		m.moveDiffSide(msg.String() == "left")
 		return m, nil
 	case key.Matches(msg, keys.Images):
 		cmd := m.toggleImages()
@@ -2669,8 +2686,11 @@ func (m AppModel) renderReviewBar() string {
 	if search := m.searchButton(); search != "" {
 		right = search + reviewBarStyle.Render(" ") + right
 	}
-	if m.ignoreWhitespace {
-		right = reviewBarStyle.Render("[WS: ignored] ") + right
+	if button := m.whitespaceButton(); button != "" {
+		right = button + reviewBarStyle.Render(" ") + right
+	}
+	if button := m.splitButton(); button != "" {
+		right = button + reviewBarStyle.Render(" ") + right
 	}
 	if m.width <= 0 {
 		return text + reviewBarStyle.Render(" ") + right
@@ -2837,6 +2857,12 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		sections = append(sections, footer)
 	}
 	layout := renderedScreenLayout{progressRegions: progressRegions}
+	if button := m.whitespaceButton(); button != "" {
+		layout.whitespaceButton, layout.hasWhitespaceButton = buttonRect(header, 0, button)
+	}
+	if button := m.splitButton(); button != "" {
+		layout.splitButton, layout.hasSplitButton = buttonRect(header, 0, button)
+	}
 	if rect, ok := buttonRect(header, 0, m.searchButton()); ok && m.searchButton() != "" {
 		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
 	}
@@ -3128,6 +3154,14 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	_, imageLayout := m.renderReviewScreen()
+	if imageLayout.hasWhitespaceButton && imageLayout.whitespaceButton.contains(mouse) {
+		m.toggleWhitespace()
+		return m, nil
+	}
+	if imageLayout.hasSplitButton && imageLayout.splitButton.contains(mouse) {
+		m.toggleSplit()
+		return m, nil
+	}
 	for _, region := range imageLayout.progressRegions {
 		if region.rect.contains(mouse) {
 			m.jumpToProgress(region.kind)
@@ -3203,9 +3237,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		}
 		wasFocused := m.focused == contentPane
 		m.focused = contentPane
-		if target, ok := m.contentMouseTarget(mouse.Y - top + m.contentViewport.YOffset()); ok {
+		if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok {
 			t := m.tab()
-			if mouse.X == left && !target.annotation && t.selecting {
+			if m.isContentGutter(mouse.X-left) && !target.annotation && t.selecting {
 				start, end := m.selectionRange()
 				if start < end && target.side == t.selectSide && target.line == end {
 					m.openLineComment()
@@ -3234,7 +3268,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 					return m, nil
 				}
 			}
-			if mouse.X == left && !target.annotation {
+			if m.isContentGutter(mouse.X-left) && !target.annotation {
 				t.selecting = true
 				t.selectAnchor = target.line
 				t.selectSide = target.side
@@ -3460,8 +3494,8 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 	side := ""
 	if m.modal == noModal && len(m.tabs) > 0 && m.tab().state != nil {
 		left, top, _, bottom := m.contentBounds()
-		if mouse.X == left && mouse.Y >= top && mouse.Y < bottom {
-			if target, ok := m.contentMouseTarget(mouse.Y - top + m.contentViewport.YOffset()); ok && !target.annotation {
+		if m.isContentGutter(mouse.X-left) && mouse.Y >= top && mouse.Y < bottom {
+			if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && !target.annotation {
 				line = target.line
 				side = target.side
 			}
@@ -3492,7 +3526,7 @@ func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.C
 }
 
 func (m *AppModel) updateMouseSelection(mouse tea.Mouse, autoScroll bool) {
-	_, top, _, bottom := m.contentBounds()
+	left, top, _, bottom := m.contentBounds()
 	viewportY := mouse.Y - top + m.contentViewport.YOffset()
 	if autoScroll && mouse.Y <= top {
 		m.contentViewport.ScrollUp(1)
@@ -3504,7 +3538,7 @@ func (m *AppModel) updateMouseSelection(mouse tea.Mouse, autoScroll bool) {
 		return
 	}
 
-	if target, ok := m.contentMouseTarget(viewportY); ok {
+	if target, ok := m.contentMouseTargetAt(mouse.X-left, viewportY); ok && !target.annotation {
 		t := m.tab()
 		if t.selecting && target.side != t.selectSide {
 			return
@@ -3519,6 +3553,7 @@ func (m *AppModel) updateMouseSelection(mouse tea.Mouse, autoScroll bool) {
 }
 
 type contentMouseTarget struct {
+	passive         bool // repeated context maps to a source line without extending its scroll range
 	line            int
 	side            string
 	annotation      bool
@@ -3854,7 +3889,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	if mouse.X < left || (!m.hideComments && mouse.X >= right) || mouse.Y < top || mouse.Y >= bottom {
 		return m, nil
 	}
-	if target, ok := m.contentMouseTarget(mouse.Y - top + m.contentViewport.YOffset()); ok && target.annotation && mouse.X >= left+gutterWidth {
+	if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && target.annotation && mouse.X >= left+gutterWidth {
 		annotations := m.annotationsAfterLine(target.line, target.side)
 		if target.annotationIndex < len(annotations) {
 			m.focused = contentPane
@@ -4079,7 +4114,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
 		{keys: "h/H", desc: "fold/hide"},
-		{keys: "w / I", desc: "WS / images"},
+		{keys: "w/W · I", desc: "WS changes · images"},
 		{keys: "alt+o", desc: "open image/link"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
@@ -4103,6 +4138,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "alt+}/alt+{", desc: "next/prev file"},
 		{keys: "1-9", desc: "file tab"},
 		{keys: "n/N", desc: "diff/open/form"},
+		{keys: "S · ←/→", desc: "split diff · diff side"},
 		{keys: "↑/↓", desc: "choose file"},
 		{keys: "enter/esc", desc: "open/cancel"},
 	}, columnWidth)

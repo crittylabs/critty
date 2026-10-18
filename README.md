@@ -186,11 +186,15 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Recorded with the v1.2.0 candidate.
+Videos recorded with the v1.2.0 candidate.
 
 ### Code review with inline comments
 
 <video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
+
+### Side-by-side code review
+
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/e5d6b0c3-47c4-431d-a020-058f6cf9b414)
 
 ### Review round trips with Claude Code
 

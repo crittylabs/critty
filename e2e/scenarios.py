@@ -302,6 +302,41 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
+        patch = WORK / "standalone.diff"
+        patch.write_text(
+            "diff --git a/standalone.go b/standalone.go\n"
+            "--- a/standalone.go\n+++ b/standalone.go\n"
+            "@@ -10,3 +20,3 @@\n context\n-old call\n+new call\n tail\n"
+        )
+        formats = Round("diff-formats", [f"--diff={patch}"])
+        tmux("resize-pane", "-t", formats.pane, "-x", "100")
+        pane_width = int(
+            tmux("display-message", "-p", "-t", formats.pane, "#{pane_width}")
+        )
+        wait_until(
+            lambda: (
+                len(formats.screen().splitlines()[0].expandtabs(8)) == pane_width - 1
+            ),
+            "review redrawn at the server's pane width before mouse input",
+        )
+        formats.click(r"Ignore: none")
+        formats.wait_screen("Ignore: WS", "mouse disables whitespace-only changes")
+        formats.keys("W")
+        formats.wait_screen("Ignore: none", "uppercase W restores whitespace changes")
+        formats.keys("S")
+        formats.wait_screen("Split: on", "side-by-side diff without source files")
+        formats.keys("g", "j", "Left", "Enter")
+        formats.text("Deleted line remains on its original side.")
+        formats.keys("C-s")
+        saved = wait_until(formats.comments, "old-side comment saved")
+        assert saved[0]["side"] == "old" and saved[0]["start_line"] == 11
+        formats.click(r"Split: on")
+        formats.wait_screen("Split: off", "mouse disables split diff")
+        assert formats.comments() == saved
+        assert not (WORK / "standalone.go").exists()
+        formats.finish(False)
+        report("standalone patch format switching preserves old-side comments")
+
         history_task = json.loads(
             cli(
                 "history", "start", "Review lifecycle", "--project", "Scenario Project"

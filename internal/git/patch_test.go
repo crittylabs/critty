@@ -1,11 +1,39 @@
 package git
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
 )
+
+func TestLoadPatchRecoversDisplayCoordinates(t *testing.T) {
+	t.Chdir(t.TempDir())
+	p, err := ParsePatch(strings.NewReader("diff --git a/missing b/missing\n--- a/missing\n+++ b/missing\n@@ -10,2 +20,2 @@\n context\n-old\n+new\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Files[0].Diff.CommonLines = nil
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("patch.json", data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadPatch("patch.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.Files[0].Diff.CommonLines[20]; got != 10 {
+		t.Fatalf("old coordinate = %d, want 10", got)
+	}
+	if loaded.Files[0].Content != p.Files[0].Content {
+		t.Fatal("recovered coordinates changed saved source")
+	}
+}
 
 func TestParsePatch(t *testing.T) {
 	t.Chdir(t.TempDir())

@@ -170,5 +170,26 @@ func LoadPatch(path string) (*Patch, error) {
 	if len(p.Files) == 0 && p.Raw != "" {
 		return nil, fmt.Errorf("empty diff snapshot")
 	}
+	// Recover display coordinates in older snapshots from the saved patch,
+	// without reading files or applying the patch again.
+	missing := false
+	for _, file := range p.Files {
+		missing = missing || file.Diff != nil && file.Diff.CommonLines == nil
+	}
+	if missing && p.Raw != "" {
+		files, _, err := gitdiff.Parse(strings.NewReader(p.Raw))
+		if err != nil {
+			return nil, fmt.Errorf("parsing saved diff: %w", err)
+		}
+		for _, file := range files {
+			path := file.NewName
+			if file.IsDelete {
+				path = file.OldName
+			}
+			if saved := p.File(filepath.ToSlash(filepath.Clean(path))); saved != nil && saved.Diff != nil && saved.Diff.CommonLines == nil {
+				saved.Diff.CommonLines = diffInfo([]*gitdiff.File{file}).CommonLines
+			}
+		}
+	}
 	return &p, nil
 }

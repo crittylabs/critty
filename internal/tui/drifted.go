@@ -91,6 +91,11 @@ func (m *AppModel) decorateDrifted(content string, layout *renderedContentLayout
 			last[lineRef{side: target.side, line: target.line}] = i
 		}
 	}
+	for i, row := range layout.columns {
+		if row.left.line > 0 && !row.left.passive {
+			last[lineRef{side: row.left.side, line: row.left.line}] = i
+		}
+	}
 	for ref, ids := range groups {
 		y, ok := last[ref]
 		if !ok {
