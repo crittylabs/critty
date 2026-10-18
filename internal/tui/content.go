@@ -61,6 +61,11 @@ func (m *AppModel) rebuildContent() {
 		return
 	}
 	t := m.tab()
+	if m.alternateDiff(t) {
+
+		m.rebuildDiffContent()
+		return
+	}
 	m.contentLayout = newRenderedContentLayout()
 
 	// Collect annotations keyed by the line they appear AFTER

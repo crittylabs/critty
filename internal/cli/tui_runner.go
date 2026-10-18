@@ -41,6 +41,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		Version:   versionString(),
 		Session:   sess,
 		Author:    cfg.Author,
+		Split:     cfg.Split,
 		Staged:    mode.staged,
 		Source:    mode.source,
 		FinishCh:  finishCh,

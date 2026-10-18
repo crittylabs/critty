@@ -32,6 +32,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | --- | --- |
 | `output` | String selecting review storage. |
 | `author` | String used for comment attribution. |
+| `split` | Boolean enabling side-by-side diffs initially; defaults to `false` (unified). |
 | `ignore_patterns` | Array of glob strings excluded from review input. |
 | `launchers` | Ordered array of launcher names or custom launcher specifications. |
 | `quiet` | Boolean controlling finish-output verbosity. |
@@ -49,6 +50,8 @@ Global settings are applied first, followed by project settings.  Settings merge
 - Prompt tables merge by key.  A project value replaces the corresponding global value and leaves other keys intact.
 
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.
+
+The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
 
 ## History settings
 

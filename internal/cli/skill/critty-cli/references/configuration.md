@@ -11,12 +11,15 @@ Use a TOML parser and generator.  Preserve unrelated settings and distinguish an
 ```toml
 launchers = ["mux", "desktop-terminal"]
 cleanup_on_approve = false
+split = false # true starts diff reviews in side-by-side view
 
 [prompts]
 "on_finish_approved:diff" = "file:.critty/prompts/approved.md"
 ```
 
 Quote prompt keys containing `:` or `.`.  These characters are part of the key, not TOML table separators.
+
+`split` chooses the initial diff view and follows boolean precedence.  Runtime view changes are display-only: source text, comment sides and coordinates, and saved review data remain independent of the view.  Supplied unified patches support both views without original files; unavailable context is never filled from unrelated worktree content.
 
 ## History policy
 

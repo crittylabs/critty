@@ -99,8 +99,36 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.CleanupOnApprove {
 		t.Error("cleanup_on_approve should default to false")
 	}
+	if cfg.Split {
+		t.Fatal("split should default to false")
+	}
 	if cfg.History.Start != "auto" || cfg.History.End != "auto" || cfg.History.KeepDays != 30 || cfg.History.MaxBytes != 1<<30 {
 		t.Fatalf("unexpected default history policy: %+v", cfg.History)
+	}
+}
+
+func TestSplitConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name, global, project string
+		want                  bool
+	}{
+		{"global", "split = true", "", true},
+		{"project disables", "split = true", "split = false", false},
+		{"project enables", "split = false", "split = true", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			project := t.TempDir()
+			writeConfig(t, GlobalPath(), tc.global)
+			writeConfig(t, ProjectPath(project), tc.project)
+			cfg, err := Load(project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Split != tc.want {
+				t.Fatalf("split = %v, want %v", cfg.Split, tc.want)
+			}
+		})
 	}
 }
 

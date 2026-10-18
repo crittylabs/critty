@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -14,11 +15,14 @@ const whitespacePatch = "diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1
 
 func TestWhitespaceToggleAcrossFiles(t *testing.T) {
 	m := patchApp(t, whitespacePatch)
+	if !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: none") {
+		t.Fatal("whitespace control should always be present")
+	}
 	before := m.tabs[0].doc.Content
 	m.tab().cursorLine, m.tab().cursorSide = 1, "old"
 	m.tab().selecting, m.tab().selectSide = true, "old"
 	m = pressKey(m, 'w')
-	if !m.ignoreWhitespace || !strings.Contains(m.renderHeader(), "[WS: ignored]") {
+	if !m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: WS") {
 		t.Fatal("missing whitespace mode")
 	}
 	if m.tabs[0].changedLines[1] || !m.tabs[0].changedLines[2] || len(m.tabs[1].changeChunks) != 0 {
@@ -40,8 +44,28 @@ func TestWhitespaceToggleAcrossFiles(t *testing.T) {
 			t.Fatal("original diff not restored")
 		}
 	}
-	if m.ignoreWhitespace || strings.Contains(m.renderHeader(), "[WS: ignored]") {
+	if m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: none") {
 		t.Fatal("mode not cleared")
+	}
+}
+
+func TestWhitespaceControlKeepsHeaderPositions(t *testing.T) {
+	m := patchApp(t, whitespacePatch)
+	_, before := m.renderReviewScreen()
+	if !before.hasWhitespaceButton {
+		t.Fatal("missing whitespace button")
+	}
+	m = clickMouse(m, before.whitespaceButton.left, before.whitespaceButton.top)
+	_, after := m.renderReviewScreen()
+	if !m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: WS") {
+		t.Fatal("click did not toggle whitespace")
+	}
+	if before.whitespaceButton != after.whitespaceButton || before.splitButton != after.splitButton || !reflect.DeepEqual(before.isearchRegions, after.isearchRegions) {
+		t.Fatal("toggling whitespace moved header controls")
+	}
+	m = pressKey(m, 'W')
+	if m.ignoreWhitespace {
+		t.Fatal("uppercase W did not toggle whitespace")
 	}
 }
 
