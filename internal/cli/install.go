@@ -19,7 +19,7 @@ import (
 //go:embed skill/critty-ai-review/references/codex-cli.md skill/critty-ai-review/scripts/codex_review_server.py skill/critty-ai-review/scripts/codex-review-requirements.txt
 //go:embed skill/critty-cli/references/configuration.md
 //go:embed skill/critty-history/SKILL.md
-//go:embed skill/critty-approval/references/*.md
+//go:embed skill/critty-approval/references/*.md skill/critty/references/*.md
 var skillContent embed.FS
 
 var installForce bool
@@ -239,6 +239,7 @@ func integrations() map[string][]integrationFile {
 			skillResource("critty-cli", "references/configuration.md", dir),
 			skillResource("critty-approval", "references/requests.md", dir),
 			skillResource("critty-approval", "references/feedback-authorization.md", dir),
+			skillResource("critty", "references/temporary-tree.md", dir),
 		}
 		if agent == "opencode" {
 			for i := range files {

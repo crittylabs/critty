@@ -23,6 +23,8 @@ For editing settings or locating custom prompts, read [configuration](references
 | `review`, `plan`, `--session` | Read the selected input, save local review state, and open the human TUI, using tmux or Herdr when applicable.  Terminal-marker resolution can read visible text in registered panes. |
 | `comment` | Add or update comments in local review state; it does not post a GitHub or GitLab comment. |
 | `stop`, `clear` | `stop` closes the review TUI and preserves saved state.  `clear` deletes the selected saved review and attachments. |
+| `tmp prepare`, `tmp snapshot` | Preparation reads explicit regular-file targets beneath `--root` into `.critty/tmp/`; snapshot reads those copies.  Both initialize isolated Git baselines with hooks and content conversions disabled.  Snapshot writes the frozen diff and application-consent attachment.  Originals stay unchanged. |
+| `tmp apply` | Verify the saved review and consent, then write or delete registered destinations beneath the prepared root, also required as `--root`.  This can write outside the working directory.  Detect concurrent changes, preserve backups, and journal partial application for retry.  Runs no Git subprocess.  Requires the caller's permission to modify those targets; see the [temporary-tree workflow](../critty/references/temporary-tree.md). |
 | `install` | Write integration files to the selected project or user configuration directories. |
 | `env`, `env tty` | Inspect local terminal/process information and print the requested environment or device. |
 | `env run`, `env --` | Execute the supplied command with the detected terminal environment.  Assess that command's own effects; the wrapper does not make it read-only or local-only. |

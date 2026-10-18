@@ -1,7 +1,7 @@
 ---
 name: critty
 description: Review code changes or a document with Critty's terminal UI and address the reviewer's inline comments round by round. Use when the user or an approval workflow selects Critty; a generic review request does not count.
-allowed-tools: Bash(critty *), Read, Edit, Grep, Glob
+allowed-tools: Bash(critty review *), Bash(critty plan *), Bash(critty --session *), Bash(critty comment *), Bash(critty comments *), Bash(critty status *), Bash(critty terminal prepare), Read, Grep, Glob
 argument-hint: "[file]"
 ---
 
@@ -14,6 +14,8 @@ The `critty` binary must be on PATH.  If missing and mise is available, use `mis
 Before the first review of a work task, use [critty-history](../critty-history/SKILL.md) for task registration or continuation.  Reuse any supplied task ID, pass `--task <id>` for each new review, and retain it across rounds and agent handoffs.  Return to that skill when the whole task is complete to apply its retention policy; individual approval does not trigger another cleanup question.
 
 When review startup or resume prints `critty: warning: history:`, follow [critty-history](../critty-history/SKILL.md#handle-review-flow-warnings) after collecting the current round's result.  A command-reported warning or maintenance result, or an explicit user maintenance request, triggers inspection.  Task boundaries alone do not trigger independent capacity/age checks.  Use Critty commands through that skill for cleanup and exports; do not explore storage or write maintenance scripts.
+
+When existing files outside source control need review before application, read [temporary-tree review](references/temporary-tree.md) **before editing the originals**.  It reviews independent copies as a Git diff, then checks for concurrent changes before applying approved contents.
 
 ## Step 1: Select the input
 
