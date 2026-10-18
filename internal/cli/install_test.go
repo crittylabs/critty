@@ -37,12 +37,13 @@ func destinations(t *testing.T, target string) []string {
 	return dests
 }
 
-// aiReviewResources lists the AI review skill files every agent target installs.
-var aiReviewResources = []string{
+// sharedSkillResources lists supporting skill files every agent target installs.
+var sharedSkillResources = []string{
 	"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
 	"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
 	"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
 	"critty-ai-review/scripts/codex-review-requirements.txt",
+	"critty-cli/references/configuration.md",
 }
 
 func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
@@ -52,7 +53,7 @@ func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
 		filepath.Join(".opencode", "commands", "critty.md"):                 filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
 		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
 	}
-	for _, rel := range aiReviewResources {
+	for _, rel := range sharedSkillResources {
 		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
 	}
 	for _, f := range integrations()["opencode"] {
@@ -96,7 +97,7 @@ func TestIntegrationLayouts(t *testing.T) {
 	}
 	for target, dests := range want {
 		dir := map[string]string{"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents"}[target]
-		for _, rel := range aiReviewResources {
+		for _, rel := range sharedSkillResources {
 			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
 		}
 		if got := destinations(t, target); !slices.Equal(got, dests) {
@@ -265,7 +266,7 @@ func TestApprovalSkillReferencesUseAgentConventions(t *testing.T) {
 	}
 }
 
-func TestAIReviewSkillResources(t *testing.T) {
+func TestBundledSkillResources(t *testing.T) {
 	for agent, variant := range skillVariants {
 		t.Run(agent, func(t *testing.T) {
 			for _, name := range []string{"critty-ai-review", "critty-ai-cowork"} {
@@ -278,7 +279,7 @@ func TestAIReviewSkillResources(t *testing.T) {
 				}
 			}
 			for _, f := range integrations()[agent] {
-				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") {
+				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") && !strings.Contains(filepath.ToSlash(f.dest), "/critty-cli/references/") {
 					continue
 				}
 				data, err := f.content()
@@ -298,13 +299,13 @@ func TestAIReviewSkillResources(t *testing.T) {
 					t.Errorf("installed asset %s differs", dest)
 				}
 				if filepath.Base(dest) != "SKILL.md" {
-					_, resource, _ := strings.Cut(filepath.ToSlash(dest), "/critty-ai-review/")
-					embedded, err := skillContent.ReadFile("skill/critty-ai-review/" + resource)
+					_, resource, _ := strings.Cut(filepath.ToSlash(dest), "/skills/")
+					embedded, err := skillContent.ReadFile("skill/" + resource)
 					if err != nil {
 						t.Fatal(err)
 					}
 					if !bytes.Equal(got, embedded) {
-						t.Error("review resource changed during rendering")
+						t.Error("skill resource changed during rendering")
 					}
 				}
 			}

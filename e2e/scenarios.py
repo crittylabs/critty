@@ -272,16 +272,18 @@ def scenarios() -> None:
     migrated = cli("status")
     assert json.loads(migrated.stdout) == []
     assert "critty: migrated " in migrated.stderr
-    assert (CONFIG / "critty" / "config.json").is_file()
+    assert (CONFIG / "critty" / "config.toml").is_file()
+    assert not (CONFIG / "critty" / "config.json").exists()
     assert not (CONFIG / "tcrit").exists()
     # Once the current path exists, even unusable old data stays unread and quiet.
     (CONFIG / "tcrit").mkdir()
     (CONFIG / "tcrit" / "config.json").write_text("invalid JSON")
+    (CONFIG / "critty" / "config.json").write_text("invalid JSON")
     current = cli("status")
     assert json.loads(current.stdout) == []
     assert current.stderr == ""
     report(
-        "startup renames old configuration once; current configuration ignores old data silently"
+        "startup converts old configuration to TOML once; current configuration ignores old data silently"
     )
     (WORK / "plan.md").write_text(
         "# Release plan\n\nDeploy the application.\nConfirm deployment.\n"
@@ -706,8 +708,12 @@ elif operation == "close":
         assert (
             custom.pane not in tmux("list-panes", "-a", "-F", "#{pane_id}").splitlines()
         )
-        project_config = WORK / ".critty.config.json"
-        project_config.write_text(json.dumps({"launchers": [f"custom:{launcher}"]}))
+        project_config = WORK / ".critty.toml"
+        project_config.write_text(
+            "launchers = "
+            + json.dumps([f"custom:{launcher}"], ensure_ascii=False)
+            + "\n"
+        )
         try:
             (WORK / "launcher-check.json").unlink()
             cli_first = Round("launcher-cli-priority", ["plan.md", "--launcher", "mux"])

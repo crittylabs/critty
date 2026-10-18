@@ -12,14 +12,14 @@ func TestLauncherConfigPrecedence(t *testing.T) {
 		name, project string
 		want          []string
 	}{
-		{"inherit", `{}`, []string{"mux", "custom:global"}},
-		{"override", `{"launchers":["custom:project","mux"]}`, []string{"custom:project", "mux"}},
-		{"clear", `{"launchers":[]}`, []string{}},
+		{"inherit", "", []string{"mux", "custom:global"}},
+		{"override", `launchers = ["custom:project", "mux"]`, []string{"custom:project", "mux"}},
+		{"clear", `launchers = []`, []string{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			home, project := t.TempDir(), t.TempDir()
 			t.Setenv("XDG_CONFIG_HOME", home)
-			writeConfig(t, filepath.Join(home, "critty", "config.json"), `{"launchers":["mux","custom:global"]}`)
+			writeConfig(t, GlobalPath(), `launchers = ["mux", "custom:global"]`)
 			writeConfig(t, ProjectPath(project), tc.project)
 			cfg, err := Load(project)
 			if err != nil {
@@ -47,19 +47,22 @@ func TestLoadMergesGlobalAndProject(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	project := t.TempDir()
 
-	writeConfig(t, filepath.Join(configHome, "critty", "config.json"), `{
-		"author": "Global Author",
-		"quiet": true,
-		"cleanup_on_approve": false,
-		"ignore_patterns": ["*.lock"],
-		"prompts": {"on_finish_approved": "inline:global", "on_finish_unresolved": "inline:global"}
-	}`)
-	writeConfig(t, ProjectPath(project), `{
-		"author": "Project Author",
-		"quiet": false,
-		"ignore_patterns": ["*.min.js", "*.lock"],
-		"prompts": {"on_finish_unresolved": "inline:project"}
-	}`)
+	writeConfig(t, GlobalPath(), `
+		author = "Global Author"
+		quiet = true
+		cleanup_on_approve = false
+		ignore_patterns = ["*.lock"]
+		[prompts]
+		on_finish_approved = "inline:global"
+		on_finish_unresolved = "inline:global"
+	`)
+	writeConfig(t, ProjectPath(project), `
+		author = "Project Author"
+		quiet = false
+		ignore_patterns = ["*.min.js", "*.lock"]
+		[prompts]
+		on_finish_unresolved = "inline:project"
+	`)
 
 	cfg, err := Load(project)
 	if err != nil {

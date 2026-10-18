@@ -4,7 +4,9 @@
 
 ### Changed
 
-- Use only Critty names for state, configuration, custom prompts, and launcher environment variables.  On startup, migrate old paths only when the corresponding Critty destination is absent, update saved review metadata, and report completed renames on stderr.  Existing Critty paths are used directly without checking or reporting old paths.  No aliases or directory merges are created; active reviews must stop before state migration.
+- Edit settings in `$XDG_CONFIG_HOME/critty/config.toml` or project `.critty.toml`, with TOML comments and tables.  Review records and JSON command output keep their formats.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
+
+- Use only Critty names for state, configuration, custom prompts, and launcher environment variables, without compatibility aliases or directory merges.
 
 ### Fixed
 

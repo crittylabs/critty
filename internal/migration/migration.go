@@ -1,4 +1,4 @@
-// Package migration retires old local names before normal Critty reads begin.
+// Package migration retires old local names and configuration formats before reads begin.
 package migration
 
 import (
@@ -19,11 +19,13 @@ import (
 )
 
 type move struct {
-	from, to string
-	state    bool
+	from, to  string
+	preferred string
+	state     bool
+	toml      bool
 }
 
-// Run renames absent destinations only.  Existing Critty paths short-circuit
+// Run migrates absent destinations only.  Existing Critty paths short-circuit
 // before the corresponding old path is inspected.  Reports go to stderr.
 func Run(project string, report io.Writer) error {
 	state := xdg.StateHome()
@@ -34,24 +36,19 @@ func Run(project string, report io.Writer) error {
 	}
 	if project != "" {
 		moves = append(moves,
-			move{from: filepath.Join(project, ".tcrit.config.json"), to: filepath.Join(project, ".critty.config.json")},
+			move{from: filepath.Join(project, ".tcrit.config.json"), to: filepath.Join(project, ".critty.config.json"), preferred: filepath.Join(project, ".critty.toml")},
 			move{from: filepath.Join(project, ".tcrit"), to: filepath.Join(project, ".critty")},
 		)
 	}
-	var pending []move
-	for _, item := range moves {
-		needed, err := item.needed()
-		if err != nil {
-			return err
-		}
-		if needed {
-			pending = append(pending, item)
-		}
+	if err := migrate(moves, filepath.Dir(state), report); err != nil {
+		return err
 	}
-	if len(pending) > 0 {
-		if err := renameAll(pending, filepath.Dir(state), report); err != nil {
-			return err
-		}
+	formats := []move{{from: filepath.Join(config, "config.json"), to: filepath.Join(config, "config.toml"), toml: true}}
+	if project != "" {
+		formats = append(formats, move{from: filepath.Join(project, ".critty.config.json"), to: filepath.Join(project, ".critty.toml"), toml: true})
+	}
+	if err := migrate(formats, filepath.Dir(state), report); err != nil {
+		return err
 	}
 	if _, current := os.LookupEnv("CRITTY_HOST"); !current {
 		if value, old := os.LookupEnv("TCRIT_HOST"); old {
@@ -68,7 +65,31 @@ func Run(project string, report io.Writer) error {
 	return nil
 }
 
+func migrate(moves []move, base string, report io.Writer) error {
+	var pending []move
+	for _, item := range moves {
+		needed, err := item.needed()
+		if err != nil {
+			return err
+		}
+		if needed {
+			pending = append(pending, item)
+		}
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+	return renameAll(pending, base, report)
+}
+
 func (m move) needed() (bool, error) {
+	if m.preferred != "" {
+		if _, err := os.Lstat(m.preferred); err == nil {
+			return false, nil
+		} else if !os.IsNotExist(err) {
+			return false, err
+		}
+	}
 	if _, err := os.Lstat(m.to); err == nil {
 		return false, nil
 	} else if !os.IsNotExist(err) {
@@ -83,6 +104,9 @@ func (m move) needed() (bool, error) {
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
 		return false, fmt.Errorf("cannot migrate symbolic link %s; rename its data directory first", m.from)
+	}
+	if m.toml && !info.Mode().IsRegular() {
+		return false, fmt.Errorf("config path is not a regular file: %s", m.from)
 	}
 	if m.state && !info.IsDir() {
 		return false, fmt.Errorf("state path is not a directory: %s", m.from)
@@ -113,9 +137,12 @@ func renameAll(moves []move, base string, report io.Writer) (err error) {
 		if !needed {
 			continue
 		}
-		if item.state {
+		switch {
+		case item.state:
 			err = renameState(item)
-		} else {
+		case item.toml:
+			err = convertConfig(item)
+		default:
 			err = renameAbsent(item.from, item.to)
 		}
 		if os.IsExist(err) {

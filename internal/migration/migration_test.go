@@ -63,10 +63,10 @@ func TestRenamedDataIsReadUnderCurrentNames(t *testing.T) {
 	if err := Run(project, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "critty: migrated ") != 4 {
+	if strings.Count(output.String(), "critty: migrated ") != 6 {
 		t.Fatal(output.String())
 	}
-	for _, path := range []string{old, filepath.Join(configRoot, "tcrit"), filepath.Join(project, ".tcrit.config.json"), filepath.Join(project, ".tcrit")} {
+	for _, path := range []string{old, filepath.Join(configRoot, "tcrit"), filepath.Join(project, ".tcrit.config.json"), filepath.Join(project, ".tcrit"), filepath.Join(configRoot, "critty", "config.json"), filepath.Join(project, ".critty.config.json")} {
 		if _, err := os.Lstat(path); !os.IsNotExist(err) {
 			t.Fatalf("old name remains: %s: %v", path, err)
 		}
@@ -102,10 +102,10 @@ func TestCurrentDestinationsIgnoreOldPaths(t *testing.T) {
 	// Invalid old data must never be examined when the destination exists.
 	write(t, filepath.Join(state, "critty", "marker"), "current")
 	write(t, filepath.Join(state, "tcrit", "reviews", "123456abcdef", "review.json"), "invalid metadata")
-	write(t, filepath.Join(configRoot, "critty", "config.json"), map[string]any{"author": "Current"})
-	write(t, filepath.Join(project, ".critty.config.json"), map[string]any{})
+	writeText(t, filepath.Join(configRoot, "critty", "config.toml"), `author = "Current"`)
+	writeText(t, filepath.Join(project, ".critty.toml"), "")
 	write(t, filepath.Join(project, ".critty", "marker"), "current")
-	for _, path := range []string{filepath.Join(configRoot, "tcrit"), filepath.Join(project, ".tcrit.config.json"), filepath.Join(project, ".tcrit")} {
+	for _, path := range []string{filepath.Join(configRoot, "tcrit"), filepath.Join(project, ".tcrit.config.json"), filepath.Join(project, ".tcrit"), filepath.Join(configRoot, "critty", "config.json"), filepath.Join(project, ".critty.config.json")} {
 		if err := os.Symlink("missing-target", path); err != nil {
 			t.Fatal(err)
 		}
@@ -272,7 +272,7 @@ func TestConcurrentStartupMigratesOnce(t *testing.T) {
 		}
 		reports += strings.Count(r.output.String(), "critty: migrated ")
 	}
-	if reports != 1 {
+	if reports != 2 {
 		t.Fatalf("reported %d migrations", reports)
 	}
 }

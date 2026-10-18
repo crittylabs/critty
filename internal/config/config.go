@@ -1,16 +1,17 @@
 // Package config loads Critty configuration from the XDG config directory
-// (global) and the project root (.critty.config.json), mirroring crit's
+// (global) and the project root (.critty.toml), mirroring crit's
 // two-level merge semantics for the subset of keys Critty supports.
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/crittylabs/critty/internal/xdg"
 )
@@ -34,24 +35,24 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
-	Output           string            `json:"output"`
-	Author           string            `json:"author"`
-	IgnorePatterns   []string          `json:"ignore_patterns"`
-	Launchers        []string          `json:"launchers"`
-	Quiet            *bool             `json:"quiet"`
-	CleanupOnApprove *bool             `json:"cleanup_on_approve"`
-	DisableStats     *bool             `json:"disable_stats"`
-	Prompts          map[string]string `json:"prompts"`
+	Output           string            `toml:"output"`
+	Author           string            `toml:"author"`
+	IgnorePatterns   []string          `toml:"ignore_patterns"`
+	Launchers        []string          `toml:"launchers"`
+	Quiet            *bool             `toml:"quiet"`
+	CleanupOnApprove *bool             `toml:"cleanup_on_approve"`
+	DisableStats     *bool             `toml:"disable_stats"`
+	Prompts          map[string]string `toml:"prompts"`
 }
 
 // GlobalPath returns the global config file path.
 func GlobalPath() string {
-	return filepath.Join(xdg.ConfigHome(), "config.json")
+	return filepath.Join(xdg.ConfigHome(), "config.toml")
 }
 
 // ProjectPath returns the project config file path under root.
 func ProjectPath(root string) string {
-	return filepath.Join(root, ".critty.config.json")
+	return filepath.Join(root, ".critty.toml")
 }
 
 // Load merges global and project configuration.  projectRoot may be empty
@@ -105,7 +106,7 @@ func readFile(path string) (*fileConfig, error) {
 		return nil, fmt.Errorf("reading config %s: %w", path, err)
 	}
 	var fc fileConfig
-	if err := json.Unmarshal(data, &fc); err != nil {
+	if err := toml.Unmarshal(data, &fc); err != nil {
 		return nil, fmt.Errorf("parsing config %s: %w", path, err)
 	}
 	return &fc, nil
