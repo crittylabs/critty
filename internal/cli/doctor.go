@@ -64,6 +64,7 @@ var doctorSections = map[string]string{
 	"images":       "Images",
 	"terminal":     "Terminal binding",
 	"launchers":    "Review launchers",
+	"history":      "Review history",
 }
 
 var doctorMarks = map[string]string{"ok": "✓", "error": "✗", "warn": "!", "info": "·"}
@@ -190,10 +191,12 @@ func newDoctorCommand() *cobra.Command {
 	var notifyOnly bool
 	cmd := &cobra.Command{
 		Use: "doctor", Aliases: []string{"check"},
-		Short: "Diagnose integrations, review launchers and image settings",
+		Short: "Diagnose integrations, review history, launchers and image settings",
 		Long: `Check project and global integrations against this build, Python and MCP
 requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
-image settings. Desktop checks inspect installed applications and commands without
+image settings. History checks report backup capacity, idle records, and interrupted
+cleanup with suggested commands. They inspect saved records without deleting data.
+Desktop checks inspect installed applications and commands without
 opening windows or testing automation permission.
 Use --terminal-request with a prepared, displayed marker to test terminal binding.
 Add --terminal-notify-only to require a filter notification and skip registered
@@ -214,6 +217,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkIntegrations(integrations())
 			r.checkAI(python)
 			r.checkImages()
+			r.checkHistory()
 			r.checkTerminalBinding(request, notifyOnly)
 			origin := terminalbinding.CaptureOrigin(os.Getpid())
 			r.checkDesktopLaunchers(runtime.GOOS, origin, func(name string) error {

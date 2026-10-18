@@ -18,6 +18,7 @@ import (
 //go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md skill/critty-ai-review/SKILL.md skill/critty-ai-review/references/restricted-cli.md skill/critty-ai-review/scripts/claude_review_gate.py skill/critty-ai-cowork/SKILL.md
 //go:embed skill/critty-ai-review/references/codex-cli.md skill/critty-ai-review/scripts/codex_review_server.py skill/critty-ai-review/scripts/codex-review-requirements.txt
 //go:embed skill/critty-cli/references/configuration.md
+//go:embed skill/critty-history/SKILL.md
 var skillContent embed.FS
 
 var installForce bool
@@ -84,7 +85,7 @@ var skillVariants = map[string]skillVariant{
 	},
 }
 
-var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork"}
+var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork", "critty-history"}
 
 // renderSkill returns the embedded skill rewritten for the named agent.
 func renderSkill(name, agent string) ([]byte, error) {
@@ -226,6 +227,7 @@ func integrations() map[string][]integrationFile {
 		"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents", "antigravity": ".agents",
 	} {
 		files := []integrationFile{
+			skillFile("critty-history", agent, dir),
 			skillFile("critty-ai-review", agent, dir),
 			skillFile("critty-ai-cowork", agent, dir),
 			skillResource("critty-ai-review", "references/restricted-cli.md", dir),
@@ -312,8 +314,8 @@ Targets:
   prompts      Stock finish prompt templates (customize after copying)
   all          claude-code + codex + opencode + antigravity
 
-Agent targets include critty-cli, critty-approval, critty-ai-review, and
-critty-ai-cowork, with their reference files and review gate. The interactive
+Agent targets include critty-cli, critty-approval, critty-history, critty-ai-review,
+and critty-ai-cowork, with their reference files and review gate. The interactive
 critty workflow is a skill except in OpenCode, where it is a command.
 
 Codex uses .codex/skills in either scope. OpenCode uses .opencode in

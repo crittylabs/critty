@@ -13,11 +13,13 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/crittylabs/critty/internal/history"
 	"github.com/crittylabs/critty/internal/xdg"
 )
 
 // Config is the resolved (merged) configuration.
 type Config struct {
+	History          history.Policy    `json:"history"`
 	Output           string            `json:"output,omitempty"`
 	Author           string            `json:"author,omitempty"`
 	IgnorePatterns   []string          `json:"ignore_patterns,omitempty"`
@@ -35,6 +37,7 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
+	History          *history.Policy   `toml:"history"`
 	Output           string            `toml:"output"`
 	Author           string            `toml:"author"`
 	IgnorePatterns   []string          `toml:"ignore_patterns"`
@@ -58,13 +61,17 @@ func ProjectPath(root string) string {
 // Load merges global and project configuration.  projectRoot may be empty
 // to skip the project level.  Missing files are not errors.
 func Load(projectRoot string) (*Config, error) {
-	cfg := &Config{CleanupOnApprove: true}
+	cfg := &Config{}
 
 	global, err := readFile(GlobalPath())
 	if err != nil {
 		return nil, err
 	}
 	apply(cfg, global)
+	// Retention can delete saved data, so repositories cannot enable it.
+	if global != nil && global.History != nil {
+		cfg.History = *global.History
+	}
 
 	if projectRoot != "" {
 		project, err := readFile(ProjectPath(projectRoot))
@@ -74,6 +81,10 @@ func Load(projectRoot string) (*Config, error) {
 		apply(cfg, project)
 	}
 
+	cfg.History, err = cfg.History.Normalize()
+	if err != nil {
+		return nil, err
+	}
 	if cfg.Author == "" {
 		cfg.Author = gitUserName()
 	}

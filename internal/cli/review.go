@@ -18,6 +18,7 @@ import (
 	"github.com/crittylabs/critty/internal/config"
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/history"
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/review"
 )
@@ -206,6 +207,22 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 	if err := saveReviewMode(sess, mode); err != nil {
 		return err
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	store := history.New(cwd)
+	if reviewTask != "" {
+		if err := store.Add(reviewTask, sess.Key); err != nil {
+			return fmt.Errorf("review %s was saved but could not join task %s: %w; retry with history add before resuming this review", sess.Key, reviewTask, err)
+		}
+	}
+	cfg, err = taskReviewConfig(cfg, sess)
+	if err != nil {
+		return err
+	}
+
+	warnHistory(os.Stderr, sess.Meta.CWD, cfg.History)
 
 	multiplexer, err := reviewTerminalContext()
 	if err != nil {

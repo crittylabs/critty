@@ -267,7 +267,7 @@ def scenarios() -> None:
     if not (ROOT / "bin" / "tmux").exists():
         (ROOT / "bin" / "tmux").symlink_to(TMUX)
     (CONFIG / "tcrit" / "config.json").write_text(
-        json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": False})
+        json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": True})
     )
     migrated = cli("status")
     assert json.loads(migrated.stdout) == []
@@ -302,7 +302,14 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
-        default_approval = Round("default-approval", ["plan.md"])
+        history_task = json.loads(
+            cli(
+                "history", "start", "Review lifecycle", "--project", "Scenario Project"
+            ).stdout
+        )["task"]["id"]
+        default_approval = Round(
+            "default-approval", ["plan.md", "--task", history_task]
+        )
         version = cli("--version").stdout.strip().removeprefix("critty version ")
         # Keep long development versions visible instead of testing truncation.
         tmux("resize-pane", "-t", default_approval.pane, "-x", "100")
@@ -318,7 +325,7 @@ def scenarios() -> None:
             "Submit defaults to Approve when no comments are unresolved; Enter sends it"
         )
 
-        unchanged = Round("unchanged-feedback", ["plan.md"])
+        unchanged = Round("unchanged-feedback", ["plan.md", "--task", history_task])
         cli(
             "comment",
             "--session",
@@ -351,8 +358,104 @@ def scenarios() -> None:
             "existing feedback defaults to Approve; declining resolve-all keeps the draft; confirming approves"
         )
 
+        task_sessions = {default_approval.session, unchanged.session}
+        assert task_sessions <= {
+            session["key"] for session in json.loads(cli("status").stdout)
+        }, "task reviews were removed by approval cleanup"
+        quiet = json.loads(cli("history", "finish", history_task).stdout)
+        assert not quiet["decision_required"] and not quiet["task"]["pruned"]
+        assert not quiet.get("maintenance") and quiet["storage"]["bytes"] > 0
+        assert not json.loads(cli("history", "usage").stdout)["exceeded"]
+        retained = Round("retained-inspection", ["--session", default_approval.session])
+        retained.keys("q", "Enter")
+        retained.completed(True)
+        details = next(
+            task
+            for task in json.loads(cli("history", "list").stdout)
+            if task["id"] == history_task
+        )
+        assert (
+            details["completed_at"] and details["updated_at"] and details["bytes"] > 0
+        )
+        assert all(
+            session["task"] == history_task and not session["ungrouped"]
+            for session in json.loads(cli("status").stdout)
+            if session["key"] in task_sessions
+        )
+        assert cli(
+            "clear", "--session", default_approval.session, check=False
+        ).returncode
+        deferred = json.loads(cli("history", "defer", history_task).stdout)
+        assert deferred["deferred_until"] and deferred["deferred_update"]
+        copied = json.loads(cli("history", "export", history_task).stdout)["archive"]
+        inventory = json.loads(cli("history", "archives", "list").stdout)["archives"]
+        assert any(item["path"] == copied and item["bytes"] > 0 for item in inventory)
+        cli("history", "archives", "verify", copied)
+        cli("history", "archives", "delete", copied)
+        assert not Path(copied).exists()
+        assert task_sessions <= {
+            session["key"] for session in json.loads(cli("status").stdout)
+        }, "archive deletion removed live reviews"
+        report(
+            "completed reviews resume without reopening; member-safe clear, persistent deferral, and archive commands round-trip"
+        )
+        decision = json.loads(
+            cli("history", "finish", history_task, "--action", "ask").stdout
+        )
+        assert decision["decision_required"] and not decision["task"]["pruned"]
+        organized = json.loads(
+            cli("history", "finish", history_task, "--action", "archive").stdout
+        )
+        archive = Path(organized["archive"])
+        saved = json.loads((archive / "manifest.json").read_text())
+        assert saved["task"]["project"] == "Scenario Project"
+        assert "Scenario Project - Review lifecycle" in archive.name
+        assert {session["key"] for session in saved["sessions"]} == task_sessions
+        assert "Existing feedback" in (archive / "review.md").read_text()
+        assert organized["task"]["pruned"]
+        assert task_sessions.isdisjoint(
+            session["key"] for session in json.loads(cli("status").stdout)
+        )
+        (CONFIG / "critty" / "config.toml").write_text(
+            'author = "Scenario Reviewer"\ncleanup_on_approve = false\n'
+        )
+        report(
+            "task reviews defer approval cleanup; one boundary decision archives both sessions before removing originals"
+        )
+
+        warning_task = json.loads(
+            cli("history", "start", "Old retained work", "--action", "keep").stdout
+        )["task"]["id"]
+        cli("history", "finish", warning_task, "--action", "keep")
+        receipt = STATE / "critty" / "history" / f"{warning_task}.json"
+        record = json.loads(receipt.read_text())
+        record["started_at"] = "1999-12-31T00:00:00Z"
+        record["completed_at"] = "2000-01-01T00:00:00Z"
+        receipt.write_text(json.dumps(record))
+        (CONFIG / "critty" / "config.toml").write_text(
+            'author = "Scenario Reviewer"\ncleanup_on_approve = false\n'
+            "[history]\nmax_bytes = 1\n"
+        )
+        diagnosis = json.loads(cli("doctor", "--json", check=False).stdout)
+        history_checks = {item["check"]: item for item in diagnosis["checks"]}
+        assert history_checks["history/age"]["status"] == "warn"
+        assert "critty history list" in history_checks["history/age"]["advice"]
+        assert not json.loads(receipt.read_text())["pruned"]
         for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:
             submission = Round(f"submit-{verdict}", ["plan.md"])
+            if verdict == "approve":
+                wait_until(
+                    lambda current=submission: (
+                        "critty: warning: history:" in current.err.read_text()
+                    ),
+                    "history warning during ordinary review startup",
+                )
+                warning = submission.err.read_text()
+                assert "above max_bytes=1" in warning and "keep_days=30" in warning
+                assert "critty-history" in warning
+                assert not json.loads(receipt.read_text())["pruned"]
+            else:
+                assert "critty: warning: history:" not in submission.err.read_text()
             submission.keys("q", "Down")
             body = f"Overall comment: {verdict}."
             submission.text(body)

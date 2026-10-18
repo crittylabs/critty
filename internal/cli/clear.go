@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/history"
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/review"
 )
@@ -97,7 +98,7 @@ func runClearAll() error {
 		return err
 	}
 
-	removed := 0
+	sessions := []*review.Session{}
 	for _, e := range entries {
 		if e.CWD == cwd && ipc.Alive(review.SocketPathFor(e.Key)) {
 			return fmt.Errorf("review %s is active; stop it before clearing", e.Key)
@@ -111,14 +112,15 @@ func runClearAll() error {
 		if e.ReviewPath != "" {
 			dir = filepath.Dir(e.ReviewPath)
 		}
-		sess := &review.Session{Key: e.Key, Dir: dir}
-		if err := sess.Clear(); err != nil {
+		sessions = append(sessions, &review.Session{Key: e.Key, Dir: dir})
+	}
+	if len(sessions) > 0 {
+		if err := history.New(cwd).ClearSessions(sessions); err != nil {
 			return err
 		}
-		removed++
 	}
 
-	fmt.Printf("Removed %d review session(s)\n", removed)
+	fmt.Printf("Removed %d review session(s)\n", len(sessions))
 	return nil
 }
 
@@ -133,5 +135,5 @@ func clearSavedReview(sess *review.Session) error {
 	if ipc.Alive(review.SocketPathFor(sess.Key)) {
 		return fmt.Errorf("review %s is active; stop it before clearing", sess.Key)
 	}
-	return sess.Clear()
+	return history.ClearSession(sess)
 }

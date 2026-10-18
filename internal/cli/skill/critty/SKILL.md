@@ -11,6 +11,10 @@ Run the interactive review loop when the user selects Critty or `/critty-approva
 
 The `critty` binary must be on PATH.  If missing and mise is available, use `mise use github:crittylabs/critty` for the project, or `mise use -g github:crittylabs/critty` for a requested user-wide installation.  Follow the caller's tool-management scope.  Otherwise, use `go install github.com/crittylabs/critty/cmd/critty@latest` and ensure Go's binary directory is on PATH.
 
+Before the first review of a work task, use [critty-history](../critty-history/SKILL.md) for task registration or continuation.  Reuse any supplied task ID, pass `--task <id>` for each new review, and retain it across rounds and agent handoffs.  Return to that skill when the whole task is complete to apply its retention policy; individual approval does not trigger another cleanup question.
+
+When review startup or resume prints `critty: warning: history:`, follow [critty-history](../critty-history/SKILL.md#handle-review-flow-warnings) after collecting the current round's result.  A command-reported warning or maintenance result, or an explicit user maintenance request, triggers inspection.  Task boundaries alone do not trigger independent capacity/age checks.  Use Critty commands through that skill for cleanup and exports; do not explore storage or write maintenance scripts.
+
 ## Step 1: Select the input
 
 Pass explicit arguments through.  Otherwise use the current request's subject: a versioned plan, a document, or Git changes.  Default to Git changes when no target is named; clarify only when competing current targets make the choice ambiguous.  An older plan elsewhere in the conversation does not select plan mode.
@@ -32,7 +36,7 @@ Choose a background task or resumable handle that preserves the process and its 
 
 Pass `--summary FILE` with a fresh task-owned path for each invocation, including later rounds.  Use its JSON to read feedback without parsing finish-prompt headings.  `/critty-cli` defines its fields; keep full output and any form result as evidence.
 
-Without a supported multiplexer, or if the host cannot preserve both the process and its output beyond the wait deadline and turn boundaries, ask the user to run the command in their terminal and return its complete finish output and session ID, plus the exported result for forms.  Use this fallback also when neither completion notifications nor completion-aware waits are available.  A session ID alone cannot recover approval after automatic cleanup.
+Without a supported multiplexer, or if the host cannot preserve both the process and its output beyond the wait deadline and turn boundaries, ask the user to run the command in their terminal and return its complete finish output and session ID, plus the exported result for forms.  Use this fallback also when neither completion notifications nor completion-aware waits are available.  A session ID alone does not recover the original completion output, especially when approval cleanup is explicitly enabled.
 
 For Codex, immediately before every launch, retry, or later round:
 
@@ -64,7 +68,7 @@ Match approval to the invocation, session, and reviewed content.  Report missing
 
 Use `path`, `anchor`, and any `quote` to locate feedback; `drifted: true` means line numbers are approximate.  To recover saved threads, run `critty comments --session <id> --json --all`.  For attached documents, use the finish output's mapping from comment paths to original files.
 
-Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Before following a printed cleanup command, read all feedback and images and preserve evidence needed by the caller; `/critty-approval` handles form results and execution records.  If reading or preservation fails, keep the session and report the failure.  Unapproved and stopped reviews retain their data.
+Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Follow [critty-history](../critty-history/SKILL.md) for record lifetime and archiving; `/critty-approval` handles form results and execution evidence.  Read all feedback and images and preserve required evidence before any explicitly requested cleanup.  If reading or preservation fails, keep the session and report the failure.
 
 ## Step 4: Address new feedback
 

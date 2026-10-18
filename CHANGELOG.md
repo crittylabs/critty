@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Manage review history by task with `critty history` and the bundled [critty-history skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-history/SKILL.md).  Group multiple reviews with `--task` and save portable Markdown archives with attachments, images, and original session data.  Default `auto` retains backups quietly, offers maintenance beyond `keep_days`, and rotates the oldest completed backups within a per-directory allocated-disk budget.  Explicit archives, ongoing or busy reviews, and the task being finished are protected.  Inspect task sizes and updates, defer age questions across conversations, and list, verify, or explicitly delete archives through commands.  Ordinary reviews warn about capacity, old records, and interrupted cleanup; the skill responds to command reports or explicit maintenance requests.  `critty doctor` provides fresh history checks and suggested remedies.  Global start/end policies support fixed behavior; `cleanup_on_approve = true` remains an opt-in for reviews outside a task.  `clear` protects task members; retained completed reviews can be opened without reopening their task.
+
 ### Changed
 
 - Edit settings in `$XDG_CONFIG_HOME/critty/config.toml` or project `.critty.toml`, with TOML comments and tables.  Review records and JSON command output keep their formats.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
