@@ -61,19 +61,21 @@ func ValidPolicyAction(action string) bool {
 }
 
 type Task struct {
-	ID          string                `json:"id"`
-	Project     string                `json:"project"`
-	Name        string                `json:"name"`
-	CWD         string                `json:"cwd"`
-	StartedAt   string                `json:"started_at"`
-	CompletedAt string                `json:"completed_at,omitempty"`
-	Sessions    []string              `json:"sessions"`
-	Archive     string                `json:"archive,omitempty"`
-	Pruned      bool                  `json:"pruned"`
-	Pruning     bool                  `json:"pruning,omitempty"`
-	Action      string                `json:"action,omitempty"`
-	Pending     []review.SessionEntry `json:"pending,omitempty"`
-	Missing     []string              `json:"missing_sessions,omitempty"`
+	ID             string                `json:"id"`
+	Project        string                `json:"project"`
+	Name           string                `json:"name"`
+	CWD            string                `json:"cwd"`
+	StartedAt      string                `json:"started_at"`
+	CompletedAt    string                `json:"completed_at,omitempty"`
+	Sessions       []string              `json:"sessions"`
+	Archive        string                `json:"archive,omitempty"`
+	Pruned         bool                  `json:"pruned"`
+	Pruning        bool                  `json:"pruning,omitempty"`
+	Action         string                `json:"action,omitempty"`
+	Pending        []review.SessionEntry `json:"pending,omitempty"`
+	Missing        []string              `json:"missing_sessions,omitempty"`
+	DeferredUntil  string                `json:"deferred_until,omitempty"`
+	DeferredUpdate string                `json:"deferred_update,omitempty"`
 }
 
 type Outcome struct {
@@ -85,6 +87,11 @@ type Outcome struct {
 	Missing          []string      `json:"missing_sessions,omitempty"`
 	Maintenance      []Outcome     `json:"maintenance,omitempty"`
 	Storage          *StorageUsage `json:"storage,omitempty"`
+	Limited          bool          `json:"limited,omitempty"`
+	MaintenanceError string        `json:"maintenance_error,omitempty"`
+	UpdatedAt        string        `json:"updated_at,omitempty"`
+	Bytes            *int64        `json:"bytes,omitempty"`
+	Warnings         []string      `json:"warnings,omitempty"`
 }
 
 type StartResult struct {
@@ -92,6 +99,8 @@ type StartResult struct {
 	Maintenance      []Outcome     `json:"maintenance"`
 	MaintenanceError string        `json:"maintenance_error,omitempty"`
 	Storage          *StorageUsage `json:"storage,omitempty"`
+	Limited          bool          `json:"limited,omitempty"`
+	Reason           string        `json:"reason,omitempty"`
 }
 
 type Store struct {
@@ -221,8 +230,9 @@ func (s *Store) Start(name string, policy Policy) (result StartResult, err error
 		return result, fmt.Errorf("invalid start retention policy")
 	}
 	err = s.withLock(func() error {
-		maintenance, err := s.maintain(policy, true)
+		maintenance, err := s.maintain(policy, true, "")
 		result.Maintenance, result.Storage = maintenance.Outcomes, maintenance.Storage
+		result.Limited, result.Reason = maintenance.Limited, maintenance.Reason
 		if err != nil {
 			result.MaintenanceError = err.Error()
 		}
@@ -464,6 +474,9 @@ func (s *Store) clean(action string, days int, archiveDir string) ([]Outcome, er
 		if days > 0 && updated.After(s.now().AddDate(0, 0, -days)) {
 			continue
 		}
+		if action == "ask" && s.deferred(task, updated) {
+			continue
+		}
 		result, err := s.apply(&task, action, archiveDir)
 		if errors.Is(err, ErrBusy) {
 			results = append(results, Outcome{Task: task, Action: "skip", Reason: err.Error()})
@@ -506,6 +519,10 @@ func (s *Store) applyChecked(task *Task, action, archiveDir string, expectedUpda
 			return fmt.Errorf("resume interrupted organization with --action %s", task.Action)
 		}
 		if action == "keep" || action == "ask" {
+			if action == "ask" {
+				info := s.describeTask(*task)
+				result.UpdatedAt, result.Bytes, result.Warnings = info.UpdatedAt, &info.Bytes, info.Warnings
+			}
 			return s.save(task)
 		}
 		if action == "archive" && !task.Pruning {
@@ -514,6 +531,9 @@ func (s *Store) applyChecked(task *Task, action, archiveDir string, expectedUpda
 				return err
 			}
 			task.Archive, result.Archive = path, path
+			if err := s.recordArchive(path); err != nil {
+				return err
+			}
 			// Record the verified archive before removing any original data.
 			if err := s.save(task); err != nil {
 				return err
@@ -565,6 +585,9 @@ func (s *Store) Export(id, archiveDir string, allowIncomplete bool) (path string
 				return err
 			}
 			task.Archive = path
+			if err := s.recordArchive(path); err != nil {
+				return fmt.Errorf("archive saved at %s, but inventory update failed: %w", path, err)
+			}
 			if err := s.save(task); err != nil {
 				return fmt.Errorf("archive saved at %s, but task update failed: %w", path, err)
 			}

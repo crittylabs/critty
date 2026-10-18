@@ -40,9 +40,6 @@ func taskReviewConfig(cfg *config.Config, sess *review.Session) (*config.Config,
 	if task.Pruning {
 		return nil, fmt.Errorf("task %s has interrupted organization; run critty history finish %s --action %s", task.ID, task.ID, task.Action)
 	}
-	if task.CompletedAt != "" {
-		return nil, fmt.Errorf("task %s is complete; run critty history reopen %s before continuing", task.ID, task.ID)
-	}
 	copy := *cfg
 	copy.CleanupOnApprove = false
 	return &copy, nil
@@ -68,13 +65,13 @@ func newHistoryCommand() *cobra.Command {
 		Long: "Group several review sessions into one task.  Retention runs only at explicit task boundaries.\n\n" +
 			"Actions are auto, keep, ask, archive (save then remove originals), and delete.  Auto is the default.  " +
 			"Ask returns JSON with decision_required=true and makes no destructive change; choose an action once for the task and rerun finish or clean.\n\n" +
-			"Auto retains backups quietly, asks about completed tasks beyond keep_days, and rotates the oldest completed backups at capacity to 80% of max_bytes.  Archives and ongoing or busy reviews are protected.\n\n" +
-			"Usage counts allocated disk blocks for review files and directories, counting hard links once.\n\n" +
+			"Auto retains backups quietly, asks about completed tasks beyond keep_days, and rotates the oldest completed backups at capacity to 80% of max_bytes.  Archives and ongoing, busy, or just-finished reviews are protected.\n\n" +
+			"Usage counts allocated disk blocks for registered reviews in this working directory, including directory blocks and counting hard links once.\n\n" +
 			"Global history settings: start, end, keep_days (default 30), max_bytes (default 1 GiB), and archive_dir.  " +
 			"Project files cannot change retention policy.  Start/clean consider only completed tasks in this directory, based on their most recent saved review update.  " +
 			"Fixed finish actions apply to the named task; auto also checks completed backups in this directory.  Active or busy reviews cannot be exported or removed.\n\n" +
 			"Archives default to the Critty state directory's archives folder, with a dated project-and-task folder containing review.md, attachments/, assets/, sessions/, and manifest.json.  Each document has its own assets/ for referenced images.  " +
-			"Export keeps originals; the archive action verifies saved files before removing them.  Archives preserve saved state, not every historical round or original host completion evidence.",
+			"Export keeps originals; the archive action verifies saved files before removing them.  Archives preserve saved state, not every historical round or original host completion evidence.  Use archives list/verify/delete for explicit archive maintenance and defer for persistent age deferrals.  A limited capacity pass is reported separately from successful task completion.",
 	}
 	var startAction string
 	var project string
@@ -198,7 +195,7 @@ func newHistoryCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			tasks, err := store.List()
+			tasks, err := store.Details()
 			if err != nil {
 				return err
 			}
@@ -227,7 +224,19 @@ func newHistoryCommand() *cobra.Command {
 			return printJSON(cmd.OutOrStdout(), store.Usage(policy.MaxBytes))
 		},
 	}
-	command.AddCommand(start, add, detach, finish, clean, export, list, reopen, usage)
+	var deferDays int
+	deferTask := &cobra.Command{Use: "defer <task-id>", Short: "Defer age questions across conversations without disabling capacity rotation", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			store, _, err := historyContext()
+			if err != nil {
+				return err
+			}
+			task, err := store.Defer(args[0], deferDays)
+			return historyOutput(cmd, task, err)
+		},
+	}
+	deferTask.Flags().IntVar(&deferDays, "days", 7, "days to defer; 0 suppresses age questions until saved content changes")
+	command.AddCommand(start, add, detach, finish, clean, export, list, reopen, usage, deferTask, newArchivesCommand())
 	return command
 }
 

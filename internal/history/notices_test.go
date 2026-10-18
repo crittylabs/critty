@@ -78,7 +78,7 @@ func TestNoticeCacheAndConditionChanges(t *testing.T) {
 		t.Fatalf("empty state warned: %v %v", messages, err)
 	}
 	task := startTask(t, s, "Recent backup")
-	session := addReview(t, s, task)
+	addReview(t, s, task)
 	policy.MaxBytes = 1
 	if messages, err := s.Notices(policy); err != nil || len(messages) != 1 {
 		t.Fatalf("policy change did not invalidate cache: %v %v", messages, err)
@@ -112,12 +112,8 @@ func TestNoticeCacheAndConditionChanges(t *testing.T) {
 		t.Fatalf("resolved capacity warning survived: %v %v", messages, err)
 	}
 	// A new capacity episode is visible before the previous 7-day cooldown.
-	if err := os.MkdirAll(session.Dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(session.Dir, "orphan"), []byte("payload"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	next := startTask(t, s, "New capacity episode")
+	addReview(t, s, next)
 	now = now.Add(2 * time.Hour)
 	if messages, err := s.Notices(policy); err != nil || len(messages) != 1 {
 		t.Fatalf("new capacity episode suppressed: %v %v", messages, err)

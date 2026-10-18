@@ -366,6 +366,39 @@ def scenarios() -> None:
         assert not quiet["decision_required"] and not quiet["task"]["pruned"]
         assert not quiet.get("maintenance") and quiet["storage"]["bytes"] > 0
         assert not json.loads(cli("history", "usage").stdout)["exceeded"]
+        retained = Round("retained-inspection", ["--session", default_approval.session])
+        retained.keys("q", "Enter")
+        retained.completed(True)
+        details = next(
+            task
+            for task in json.loads(cli("history", "list").stdout)
+            if task["id"] == history_task
+        )
+        assert (
+            details["completed_at"] and details["updated_at"] and details["bytes"] > 0
+        )
+        assert all(
+            session["task"] == history_task and not session["ungrouped"]
+            for session in json.loads(cli("status").stdout)
+            if session["key"] in task_sessions
+        )
+        assert cli(
+            "clear", "--session", default_approval.session, check=False
+        ).returncode
+        deferred = json.loads(cli("history", "defer", history_task).stdout)
+        assert deferred["deferred_until"] and deferred["deferred_update"]
+        copied = json.loads(cli("history", "export", history_task).stdout)["archive"]
+        inventory = json.loads(cli("history", "archives", "list").stdout)["archives"]
+        assert any(item["path"] == copied and item["bytes"] > 0 for item in inventory)
+        cli("history", "archives", "verify", copied)
+        cli("history", "archives", "delete", copied)
+        assert not Path(copied).exists()
+        assert task_sessions <= {
+            session["key"] for session in json.loads(cli("status").stdout)
+        }, "archive deletion removed live reviews"
+        report(
+            "completed reviews resume without reopening; member-safe clear, persistent deferral, and archive commands round-trip"
+        )
         decision = json.loads(
             cli("history", "finish", history_task, "--action", "ask").stdout
         )

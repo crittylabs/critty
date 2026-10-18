@@ -127,8 +127,8 @@ func TestCapacityDoesNotExpandScopeOrOverrideKeep(t *testing.T) {
 	}
 	policy.Start = "auto"
 	result, err := s.Maintain(policy)
-	if err == nil || !result.Limited {
-		t.Fatalf("unreachable target was not reported: %+v %v", result, err)
+	if err != nil || result.Storage.Bytes != 0 || result.Limited {
+		t.Fatalf("other directory contributed to this budget: %+v %v", result, err)
 	}
 	if _, err := os.Stat(otherSession.Path()); err != nil {
 		t.Fatal("rotation crossed directories:", err)
@@ -169,11 +169,11 @@ func TestAutoFinishChecksCapacityAndProtectsChangedReviews(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err := s.FinishPolicy(task.ID, policy)
-	if err != nil || !result.Task.Pruned || len(result.Maintenance) != 1 || result.DecisionRequired {
-		t.Fatalf("end did not rotate quietly: %+v %v", result, err)
+	if err != nil || result.Task.Pruned || len(result.Maintenance) != 0 || result.DecisionRequired || !result.Limited || result.Reason == "" {
+		t.Fatalf("end did not preserve the just-finished backup: %+v %v", result, err)
 	}
-	if _, err := os.Stat(session.Path()); !os.IsNotExist(err) {
-		t.Fatalf("backup was not removed: %v", err)
+	if _, err := os.Stat(session.Path()); err != nil {
+		t.Fatalf("just-finished backup was removed: %v", err)
 	}
 
 	next := startTask(t, s, "Changed after selection")
@@ -200,7 +200,7 @@ func TestAutoFinishChecksCapacityAndProtectsChangedReviews(t *testing.T) {
 		t.Fatal(err)
 	}
 	limited, err := s.Maintain(policy)
-	if err == nil || !limited.Limited {
+	if err != nil || !limited.Limited {
 		t.Fatalf("corrupt review not protected: %+v %v", limited, err)
 	}
 	if _, err := os.Stat(saved.Path()); err != nil {

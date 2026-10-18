@@ -16,13 +16,14 @@ type Maintenance struct {
 	Outcomes []Outcome     `json:"outcomes"`
 	Storage  *StorageUsage `json:"storage,omitempty"`
 	Limited  bool          `json:"limited,omitempty"`
+	Reason   string        `json:"reason,omitempty"`
 }
 
 // Maintain applies the start policy within this working directory.  Auto asks
 // about age, but rotates completed backups without a question under pressure.
 func (s *Store) Maintain(policy Policy) (result Maintenance, err error) {
 	err = s.withLock(func() error {
-		result, err = s.maintain(policy, true)
+		result, err = s.maintain(policy, true, "")
 		return err
 	})
 	return result, err
@@ -35,18 +36,22 @@ func (s *Store) FinishPolicy(id string, policy Policy) (result Outcome, err erro
 		if err != nil || policy.End != "auto" {
 			return err
 		}
-		maintenance, err := s.maintain(policy, false)
+		maintenance, err := s.maintain(policy, false, id)
 		result.Maintenance, result.Storage = maintenance.Outcomes, maintenance.Storage
+		result.Limited, result.Reason = maintenance.Limited, maintenance.Reason
+		if err != nil {
+			result.MaintenanceError = err.Error()
+		}
 		task, readErr := s.read(id)
 		if readErr == nil {
 			result.Task = *task
 		}
-		return errors.Join(err, readErr)
+		return readErr
 	})
 	return result, err
 }
 
-func (s *Store) maintain(policy Policy, askAge bool) (result Maintenance, err error) {
+func (s *Store) maintain(policy Policy, askAge bool, protected string) (result Maintenance, err error) {
 	if !ValidPolicyAction(policy.Start) || policy.KeepDays < 0 || policy.MaxBytes < 0 {
 		return result, fmt.Errorf("invalid history retention policy")
 	}
@@ -63,6 +68,9 @@ func (s *Store) maintain(policy Policy, askAge bool) (result Maintenance, err er
 		}
 		return result, err
 	}
+	if len(usage.Warnings) != 0 {
+		return result, ErrHistoryUnavailable
+	}
 	// Dividing first avoids overflow and leaves headroom after a cleanup pass.
 	target := usage.MaxBytes/5*4 + usage.MaxBytes%5*4/5
 	tasks, incomplete, err := s.scan()
@@ -75,7 +83,7 @@ func (s *Store) maintain(policy Policy, askAge bool) (result Maintenance, err er
 	}
 	candidates := []candidate{}
 	for _, task := range tasks {
-		if task.CompletedAt == "" || task.Pruned || task.Pruning {
+		if task.ID == protected || task.CompletedAt == "" || task.Pruned || task.Pruning {
 			continue
 		}
 		updated, err := lastUpdated(task)
@@ -106,7 +114,7 @@ func (s *Store) maintain(policy Policy, askAge bool) (result Maintenance, err er
 	result.Storage = &usage
 	result.Limited = usage.Bytes > target
 	if result.Limited {
-		return result, fmt.Errorf("backup cleanup could not reach %d bytes; protected, busy, or out-of-scope records remain", target)
+		result.Reason = fmt.Sprintf("backup cleanup could not reach %d bytes; ongoing, busy, ungrouped, inconsistent, or just-finished records remain", target)
 	}
 	return result, nil
 }

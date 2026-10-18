@@ -8,7 +8,6 @@ import (
 	"slices"
 
 	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/xdg"
 )
 
 const DefaultMaxBytes int64 = 1 << 30
@@ -16,6 +15,7 @@ const DefaultMaxBytes int64 = 1 << 30
 // StorageUsage counts allocated bytes in known original review directories.
 // Explicit archives and task receipts are outside the rolling backup budget.
 type StorageUsage struct {
+	CWD      string   `json:"cwd"`
 	Bytes    int64    `json:"bytes"`
 	MaxBytes int64    `json:"max_bytes"`
 	Exceeded bool     `json:"exceeded"`
@@ -35,10 +35,41 @@ type fileIdentity struct {
 }
 
 func (s *Store) Usage(maxBytes int64) StorageUsage {
+	return s.usage(maxBytes, nil)
+}
+
+func (s *Store) usage(maxBytes int64, selected map[string]bool) StorageUsage {
 	if maxBytes <= 0 {
 		maxBytes = DefaultMaxBytes
 	}
-	u := StorageUsage{MaxBytes: maxBytes, Roots: []string{}}
+	var roots, warnings []string
+	entries, err := review.ListSessionEntries()
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("%s: %v", review.SessionsDir(), err))
+	}
+	for _, entry := range entries {
+		if entry.CWD != s.CWD || (selected != nil && !selected[entry.Key]) {
+			continue
+		}
+		path := entry.ReviewPath
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(entry.CWD, path)
+		}
+		dir := filepath.Dir(path)
+		rel, err := filepath.Rel(dir, entry.CWD)
+		if filepath.Base(path) != "review.json" || err != nil || rel == "." || filepath.IsLocal(rel) {
+			warnings = append(warnings, fmt.Sprintf("%s: review directory cannot contain its working directory", path))
+			continue
+		}
+		roots = append(roots, dir)
+	}
+	u := measureDirectories(s.CWD, maxBytes, roots)
+	u.Warnings = append(u.Warnings, warnings...)
+	return u
+}
+
+func measureDirectories(cwd string, maxBytes int64, roots []string) StorageUsage {
+	u := StorageUsage{CWD: cwd, MaxBytes: maxBytes, Roots: []string{}}
 	warn := func(path string, err error) {
 		u.Warnings = append(u.Warnings, fmt.Sprintf("%s: %v", path, err))
 	}
@@ -119,35 +150,8 @@ func (s *Store) Usage(maxBytes int64) StorageUsage {
 			warn(root, err)
 		}
 	}
-	reviewRoot := filepath.Join(xdg.StateHome(), "reviews")
-	defaults, err := os.ReadDir(reviewRoot)
-	if err != nil && !os.IsNotExist(err) {
-		warn(reviewRoot, err)
-	}
-	for _, entry := range defaults {
-		if review.ValidSessionKey(entry.Name()) && entry.IsDir() {
-			include(filepath.Join(reviewRoot, entry.Name()))
-		}
-	}
-	entries, err := review.ListSessionEntries()
-	if err != nil {
-		warn(review.SessionsDir(), err)
-	}
-	for _, entry := range entries {
-		if entry.CWD != s.CWD {
-			continue
-		}
-		path := entry.ReviewPath
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(entry.CWD, path)
-		}
-		dir := filepath.Dir(path)
-		rel, err := filepath.Rel(dir, entry.CWD)
-		if filepath.Base(path) != "review.json" || err != nil || rel == "." || filepath.IsLocal(rel) {
-			warn(path, fmt.Errorf("review directory cannot contain its working directory"))
-			continue
-		}
-		include(dir)
+	for _, root := range roots {
+		include(root)
 	}
 	slices.Sort(u.Roots)
 	u.Exceeded = u.Bytes > u.MaxBytes

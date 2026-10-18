@@ -15,6 +15,12 @@ import (
 
 func TestAttachmentApprovalCleanup(t *testing.T) {
 	sess := newPayloadSession(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.Meta = review.SessionEntry{Key: sess.Key, CWD: cwd, Mode: "files"}
 	var data bytes.Buffer
 	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 1, 1))); err != nil {
 		t.Fatal(err)

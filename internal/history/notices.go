@@ -72,7 +72,7 @@ func (s *Store) Notices(policy Policy) (messages []string, err error) {
 		}
 		last := state.WarnedAt[kind]
 		if last.IsZero() || last.After(now) || now.Sub(last) >= noticeRepeatInterval {
-			messages = append(messages, kind+": "+message+". Follow the critty-history skill for handling; this warning has not changed saved records")
+			messages = append(messages, kind+": "+message+". No saved records were changed; agents can follow the critty-history skill")
 			state.WarnedAt[kind] = now
 		}
 	}
@@ -111,7 +111,10 @@ func (s *Store) Inspect(policy Policy) Inspection {
 		}
 		updated, err := lastUpdated(task)
 		if err != nil {
-			result.Issues["incomplete"] = "some saved tasks could not be inspected; use `critty history list` and `critty status` for diagnostics and retain unavailable records"
+			result.Issues["incomplete"] += fmt.Sprintf(" task %s: %v; use `critty history list` and `critty status`; use `critty history detach %s --session <id>` only for a confirmed missing member; retain uncertain records.", task.ID, err, task.ID)
+			continue
+		}
+		if task.CompletedAt != "" && s.deferred(task, updated) {
 			continue
 		}
 		if !updated.Before(cutoff) {

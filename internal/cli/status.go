@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/internal/history"
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/review"
 )
@@ -87,12 +88,24 @@ func listReviewSessions() error {
 	}
 	type savedSession struct {
 		review.SessionEntry
-		Running bool `json:"running"`
+		Running      bool   `json:"running"`
+		Task         string `json:"task,omitempty"`
+		Ungrouped    bool   `json:"ungrouped"`
+		HistoryError string `json:"history_error,omitempty"`
 	}
 	result := []savedSession{}
 	for _, entry := range entries {
 		if entry.CWD == cwd {
-			result = append(result, savedSession{entry, ipc.Alive(review.SocketPathFor(entry.Key))})
+			item := savedSession{SessionEntry: entry, Running: ipc.Alive(review.SocketPathFor(entry.Key))}
+			task, err := history.New(cwd).ForSession(entry.Key)
+			if err != nil {
+				item.HistoryError = err.Error()
+			} else if task != nil {
+				item.Task = task.ID
+			} else {
+				item.Ungrouped = true
+			}
+			result = append(result, item)
 		}
 	}
 	return printJSON(os.Stdout, result)
