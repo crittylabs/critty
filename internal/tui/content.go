@@ -148,6 +148,13 @@ func (m *AppModel) rebuildContent() {
 	var b strings.Builder
 	b.Grow(len(sourceLines) * 200) // pre-allocate to reduce allocations
 	layout := newRenderedContentLayout()
+	if t.attachment != nil && t.attachment.Removed {
+		notice := "History (read-only): this attachment is not part of this review.\n" +
+			"Checkboxes are inactive because this attachment was removed or replaced.\n" +
+			"Answer forms in the current attachments section.  This snapshot is kept for comment history."
+		layout.appendBlock(&b, ansi.Wrap(notice, max(1, contentWidth), ""), contentMouseTarget{})
+		layout.appendBlock(&b, "", contentMouseTarget{})
+	}
 	appendAnnotation := func(ann annotation, focused bool, target contentMouseTarget) {
 		if ann.drifted && !m.driftedExpanded(ann.id, ann.resolved) && (!focused || !ann.resolved) {
 			return

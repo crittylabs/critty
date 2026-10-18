@@ -2567,7 +2567,7 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 	if t.attachment != nil {
 		displayPath = t.attachment.Source
 		if t.attachment.Removed {
-			displayPath += " (removed attachment)"
+			displayPath += " (history, read-only)"
 		}
 	} else if m.filePath != "" && t.path != overallCommentsPath {
 		displayPath = m.filePath

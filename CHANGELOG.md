@@ -22,6 +22,8 @@
 
 ### Fixed
 
+- Distinguish replaced attachments from current forms.  Commented snapshots appear last in collapsed, read-only attachment history, with an explanation that their checkboxes are inactive and answers belong in current attachments.
+
 - Click Markdown links and plain web URLs to open them.  In attachment choices, links take priority over selection; click the checkbox, gaps, or trailing space to change the answer.
 
 - Markdown code spans, emphasis, and links retain their formatting and click targets across wrapped rows, including deleted lines.

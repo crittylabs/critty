@@ -29,6 +29,8 @@ type treeIcons struct {
 
 var defaultTreeIcons = treeIcons{dirOpen: "▾ ", dirClosed: "▸ ", file: "  "}
 
+const attachmentHistoryPath = "\x00attachment-history"
+
 // treeIndent is the number of columns each nesting level adds.
 const treeIndent = 1
 
@@ -54,7 +56,7 @@ type fileTree struct {
 }
 
 func newFileTree() fileTree {
-	return fileTree{collapsed: map[string]bool{}, syncedTab: -1, viewport: viewport.New()}
+	return fileTree{collapsed: map[string]bool{attachmentHistoryPath: true}, syncedTab: -1, viewport: viewport.New()}
 }
 
 type treeNode struct {
@@ -140,13 +142,15 @@ func (m *AppModel) reviewFileTree() *treeNode {
 	var indices []int
 	var overall *treeNode
 	attachments := &treeNode{name: "attachments", path: "\x00attachments", isDir: true}
+	history := &treeNode{name: "attachment history (read-only)", path: attachmentHistoryPath, isDir: true}
 	for i, t := range m.tabs {
 		if t.path == overallCommentsPath {
 			overall = &treeNode{name: t.displayPath(), path: t.path, tabIndex: i}
 		} else if t.attachment != nil {
 			name := t.attachment.Name
 			if t.attachment.Removed {
-				name += " (removed)"
+				history.children = append(history.children, &treeNode{name: name, path: t.path, tabIndex: i})
+				continue
 			}
 			attachments.children = append(attachments.children, &treeNode{name: name, path: t.path, tabIndex: i})
 		} else {
@@ -179,6 +183,9 @@ func (m *AppModel) reviewFileTree() *treeNode {
 	if len(paths) > 0 {
 		forest.children = append(forest.children, root)
 	}
+	if len(history.children) > 0 {
+		forest.children = append(forest.children, history)
+	}
 	return forest
 }
 
@@ -206,7 +213,11 @@ func (m *AppModel) syncFileTree() {
 	if tree.syncedTab != m.activeTab {
 		delete(tree.collapsed, "")
 		if m.tabs[m.activeTab].attachment != nil {
-			delete(tree.collapsed, "\x00attachments")
+			if m.tabs[m.activeTab].attachment.Removed {
+				delete(tree.collapsed, attachmentHistoryPath)
+			} else {
+				delete(tree.collapsed, "\x00attachments")
+			}
 		}
 		parts := strings.Split(strings.Trim(filepath.ToSlash(m.tabs[m.activeTab].path), "/"), "/")
 		for j := 1; j < len(parts); j++ {

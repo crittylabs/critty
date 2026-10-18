@@ -27,9 +27,9 @@ func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
 	sess.SetFileComments("c/outside.go", "", []review.Comment{{ID: "outside-comment", Body: "keep"}})
 	app := NewCodeReviewApp(files, "HEAD", AppConfig{Patch: &gitpkg.Patch{}, Session: sess, Documents: docs})
 	want := []string{
-		docs[0].Path(), docs[1].Path(), docs[2].Path(),
+		docs[0].Path(), docs[1].Path(),
 		"a/sub/z.go", "a/z/sub.go", "a/a.go", "a/y.go",
-		"attachments/local.md", "b/x.go", "c/outside.go", ".config", "a.go", "root.go",
+		"attachments/local.md", "b/x.go", "c/outside.go", ".config", "a.go", "root.go", docs[2].Path(),
 	}
 	if len(app.tabs) != len(want) {
 		t.Fatalf("tab count = %d, want %d", len(app.tabs), len(want))
@@ -41,7 +41,7 @@ func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
 	}
 	app.syncFileTree()
 	index := 0
-	for _, row := range app.fileTree.rows {
+	for _, row := range visibleTreeRows(app.fileTree.root, nil) {
 		if row.isDir {
 			continue
 		}
@@ -50,7 +50,7 @@ func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
 		}
 		index++
 	}
-	if !app.tabs[9].outsideChanges || app.tabs[2].attachment == nil || !app.tabs[2].attachment.Removed {
+	if !app.tabs[8].outsideChanges || app.tabs[12].attachment == nil || !app.tabs[12].attachment.Removed {
 		t.Fatal("sorting lost restored tab metadata")
 	}
 	app.toggleTreeDir(0)
@@ -311,8 +311,13 @@ func TestFileTreeRootAndCascade(t *testing.T) {
 		}
 	}
 	app.toggleTreeDir(0)
-	if len(app.fileTree.rows) != 5 || len(app.fileTree.collapsed) != 0 {
+	if len(app.fileTree.rows) != 5 {
 		t.Fatalf("cascade did not reopen the chain: %+v", app.fileTree)
+	}
+	for _, path := range []string{"", "a", "a/sub", "a/sub/deep"} {
+		if app.fileTree.collapsed[path] {
+			t.Fatalf("%q was not reopened", path)
+		}
 	}
 	app.toggleTreeDir(0)
 	app.fileTree.syncedTab = -1

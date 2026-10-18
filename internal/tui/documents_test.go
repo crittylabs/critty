@@ -6,10 +6,79 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestReplacedAttachmentHistory(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	sess, err := review.OpenSession(t.TempDir(), "history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := review.AttachedDocument{ID: "old", Name: "NEXT_ACTIONS.md", Source: "/docs/NEXT_ACTIONS.md", Content: "- [ ] Old action <!-- form: id=old consent -->\n", Removed: true}
+	current := review.AttachedDocument{ID: "current", Name: "APPROVAL.md", Source: "/docs/APPROVAL.md", Content: "- [ ] Current action <!-- form: id=current consent -->\n"}
+	sess.SetFileComments(old.Path(), "", []review.Comment{{ID: "history-comment", Body: "Keep this discussion"}})
+	app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "main.go"}}, "HEAD", AppConfig{Session: sess, Documents: []review.AttachedDocument{old, current}})
+	for i := range app.tabs {
+		tab := &app.tabs[i]
+		tab.state = &fileReview{Comments: sess.FileComments(tab.path)}
+		if tab.attachment != nil {
+			tab.doc = document.FromContent(tab.path, []byte(tab.attachment.Content))
+		}
+	}
+	if err := app.beginForms(nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	app.width, app.height = 90, 24
+	app.recalculateLayout()
+	app.syncFileTree()
+	if app.tabs[0].path != current.Path() || app.tabs[len(app.tabs)-1].path != old.Path() {
+		t.Fatal("current attachments and changes must precede history")
+	}
+	for _, row := range app.fileTree.rows {
+		if row.path == old.Path() {
+			t.Fatal("history must start collapsed")
+		}
+	}
+	app.activeTab = len(app.tabs) - 1
+	app.syncFileTree()
+	if app.fileTree.rows[app.fileTree.cursor].path != old.Path() {
+		t.Fatal("navigation to an old comment must reveal its attachment")
+	}
+	app.rebuildContent()
+	content := strings.Join(strings.Fields(ansi.Strip(app.contentViewport.GetContent())), " ")
+	for _, want := range []string{"History", "read-only", "not part of this review", "Checkboxes are inactive"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("history notice missing %q: %s", want, content)
+		}
+	}
+	if app.forms.Document(old.Path()) != nil || len(app.contentLayout.formControls) != 0 || len(app.pendingForms()) != 1 {
+		t.Fatal("historical form must remain inactive and excluded from current answers")
+	}
+	if len(app.tab().state.Comments) != 1 || app.contentLayout.lineRanges[1].end == 0 {
+		t.Fatal("history lost its comments or source line mapping")
+	}
+	app.width = 40
+	app.recalculateLayout()
+	app.rebuildContent()
+	for _, row := range strings.Split(app.contentViewport.GetContent(), "\n") {
+		if row == "" {
+			break
+		}
+		if ansi.StringWidth(row) > app.contentViewport.Width() {
+			t.Fatalf("history notice overflows narrow content pane: %q", row)
+		}
+	}
+	app.activeTab = 0
+	app.rebuildContent()
+	if strings.Contains(app.contentViewport.GetContent(), "Checkboxes are inactive") || len(app.contentLayout.formControls) == 0 {
+		t.Fatal("current attachment must keep its active form without a history notice")
+	}
+}
 
 func TestAttachedDocumentMixedReview(t *testing.T) {
 	d := review.AttachedDocument{ID: "a_notice", Source: "/missing/notice.md", Name: "notice.md", Content: "# Notice\nPlease review\n"}
@@ -83,11 +152,12 @@ func TestAttachedDocumentCommentsAndResume(t *testing.T) {
 	}
 	docs[0].Removed = true
 	resumed := NewApp(path, AppConfig{Session: sess, Documents: docs})
-	if resumed.tabs[0].attachment == nil || resumed.tabs[1].path != path {
+	if resumed.tabs[1].attachment == nil || resumed.tabs[0].path != path {
 		t.Fatal("removed document did not retain separate comment tab")
 	}
 	resumed.syncFileTree()
-	if !strings.Contains(resumed.fileTree.rows[1].name, "removed") {
-		t.Fatal("removed attachment not identified")
+	last := resumed.fileTree.rows[len(resumed.fileTree.rows)-1]
+	if last.name != "attachment history (read-only)" || !last.collapsed {
+		t.Fatal("removed attachment history not identified or folded")
 	}
 }
