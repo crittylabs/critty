@@ -10,6 +10,8 @@
 
 ### Changed
 
+- Approval requests use a short description and ordinary approval for a single action.  Publication details and separate permissions or choices are covered by focused references in the [approval skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md).
+
 - AI review and cowork skills record task-scoped authorization for chat requests and Critty feedback, carrying it across covered revisions while keeping each review tied to its exact snapshot.  New services, broader access, and publication still require separate authorization.
 
 - Edit settings in `$XDG_CONFIG_HOME/critty/config.toml` or project `.critty.toml`, with TOML comments and tables.  Review records and JSON command output keep their formats.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
