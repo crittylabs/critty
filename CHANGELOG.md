@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Use only Critty names for state, configuration, custom prompts, and launcher environment variables.  On startup, migrate old paths only when the corresponding Critty destination is absent, update saved review metadata, and report completed renames on stderr.  Existing Critty paths are used directly without checking or reporting old paths.  No aliases or directory merges are created; active reviews must stop before state migration.
+
 ### Fixed
 
 - `critty review --help` explains that reviews outside a multiplexer open a desktop terminal window when available, instead of listing the removed `auto` launcher.

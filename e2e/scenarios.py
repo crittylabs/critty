@@ -35,7 +35,7 @@ def environment() -> dict[str, str]:
     env = {
         k: v
         for k, v in os.environ.items()
-        if not k.startswith(("HERDR_", "TMUX", "CRITTY_", "TCRIT_"))
+        if not k.startswith(("HERDR_", "TMUX", "CRITTY_"))
     }
     env.update(
         XDG_STATE_HOME=str(STATE),
@@ -262,12 +262,26 @@ def report(message: str) -> None:
 
 
 def scenarios() -> None:
-    for path in [WORK, STATE, CONFIG / "critty", ROOT / "bin"]:
+    for path in [WORK, STATE, CONFIG / "tcrit", ROOT / "bin"]:
         path.mkdir(parents=True, exist_ok=True)
     if not (ROOT / "bin" / "tmux").exists():
         (ROOT / "bin" / "tmux").symlink_to(TMUX)
-    (CONFIG / "critty" / "config.json").write_text(
+    (CONFIG / "tcrit" / "config.json").write_text(
         json.dumps({"author": "Scenario Reviewer", "cleanup_on_approve": False})
+    )
+    migrated = cli("status")
+    assert json.loads(migrated.stdout) == []
+    assert "critty: migrated " in migrated.stderr
+    assert (CONFIG / "critty" / "config.json").is_file()
+    assert not (CONFIG / "tcrit").exists()
+    # Once the current path exists, even unusable old data stays unread and quiet.
+    (CONFIG / "tcrit").mkdir()
+    (CONFIG / "tcrit" / "config.json").write_text("invalid JSON")
+    current = cli("status")
+    assert json.loads(current.stdout) == []
+    assert current.stderr == ""
+    report(
+        "startup renames old configuration once; current configuration ignores old data silently"
     )
     (WORK / "plan.md").write_text(
         "# Release plan\n\nDeploy the application.\nConfirm deployment.\n"

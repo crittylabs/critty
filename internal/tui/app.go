@@ -4762,8 +4762,5 @@ func countNoun(n int, singular, plural string) string {
 }
 
 func reviewHost() string {
-	if host, ok := os.LookupEnv("CRITTY_HOST"); ok {
-		return host
-	}
-	return os.Getenv("TCRIT_HOST")
+	return os.Getenv("CRITTY_HOST")
 }

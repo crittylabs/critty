@@ -2,11 +2,15 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/crittylabs/critty/internal/config"
 	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/internal/migration"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -60,6 +64,18 @@ func reconnectSession(key string) error {
 }
 
 func Execute() int {
+	project, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
+	if out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output(); err == nil {
+		project = strings.TrimSpace(string(out))
+	}
+	if err := migration.Run(project, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return 1
+	}
 	if err := rootCmd.Execute(); err != nil {
 		return 1
 	}

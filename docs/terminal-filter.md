@@ -12,7 +12,7 @@ The wrapper and Critty must run on the same host with the same state directory, 
 
 ## Terminal filter notification interface
 
-Filters such as tfil can avoid pane text searches by reporting a marker they observe in the agent's terminal output.  [tfil](https://github.com/knu/tfil) 0.4.1 and later support this with `--critty-notify`.  Add that option to your tfil launch or generated Codex wrapper and restart the wrapped session.  Wrappers generated with the older `--tcrit-notify` option also report Critty markers with tfil 0.4.1, while TCrit's `TCRIT-` markers still go to `tcrit`.  The filter is optional; without it, Critty searches the visible text in registered panes.
+Filters such as tfil can avoid pane text searches by reporting a marker they observe in the agent's terminal output.  [tfil](https://github.com/knu/tfil) 0.4.1 and later support this with `--critty-notify`.  Add that option to your tfil launch or generated Codex wrapper and restart the wrapped session.  The filter is optional; without it, Critty searches the visible text in registered panes.
 
 - Protocol v1 marker: `CRITTY-` followed by exactly 32 lowercase hexadecimal characters.  Extract the complete marker across output chunks and terminal escape sequences; the hexadecimal suffix is the request ID.  Inspect rendered output rather than assuming one PTY read equals one line.
 - On detection, execute `critty terminal notify <request-id>` as an argument vector, inheriting the filter's original terminal environment and the same `XDG_STATE_HOME` as Critty.  Use `TMUX` and `TMUX_PANE`, or `HERDR_SOCKET_PATH`, `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID`.  Run this from the filter, not from a daemon-backed agent shell.

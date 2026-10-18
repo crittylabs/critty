@@ -11,9 +11,7 @@ func TestFinishPromptDirectoryPrecedence(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	project := t.TempDir()
 	dirs := []string{
-		filepath.Join(configHome, "tcrit", "prompts"),
 		filepath.Join(configHome, "critty", "prompts"),
-		filepath.Join(project, ".tcrit", "prompts"),
 		filepath.Join(project, ".critty", "prompts"),
 	}
 	ctx := Context{Approved: true, Mode: "diff"}

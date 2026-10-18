@@ -9,49 +9,27 @@ import (
 	"testing"
 )
 
-func TestLegacyRoundStateMigration(t *testing.T) {
-	state := RoundState{
+func TestRoundStateJSONRoundTrip(t *testing.T) {
+	cj := NewCritJSON()
+	cj.ReviewRound = 3
+	cj.RoundState = RoundState{
 		Verdict: VerdictComment, ReviewCommentDraft: "draft", Finished: true,
-		Files:            map[string]SnapshotFile{"a.md": {Content: "original"}},
-		SubmittedReplies: []string{},
+		Files: map[string]SnapshotFile{"a.md": {Content: "original"}},
 	}
-	encoded, err := json.Marshal(state)
+	data, err := json.Marshal(cj)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"tcrit_state", "critty_state"} {
-		var cj CritJSON
-		input := `{"review_round":3,"files":{},"` + key + `":` + string(encoded) + `}`
-		if err := json.Unmarshal([]byte(input), &cj); err != nil {
-			t.Fatal(err)
-		}
-		if cj.ReviewRound != 3 || !reflect.DeepEqual(cj.RoundState, state) {
-			t.Fatalf("state lost: %+v", cj)
-		}
-		output, err := json.Marshal(cj)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(output), "critty_state") {
-			t.Fatalf("wrong saved key: %s", output)
-		}
-		var legacyReader struct {
-			State RoundState `json:"tcrit_state"`
-		}
-		if err := json.Unmarshal(output, &legacyReader); err != nil || !reflect.DeepEqual(legacyReader.State, state) {
-			t.Fatalf("old reader lost state: %+v, %v", legacyReader.State, err)
-		}
-		var reloaded CritJSON
-		if err := json.Unmarshal(output, &reloaded); err != nil || !reflect.DeepEqual(cj, reloaded) {
-			t.Fatalf("round trip lost data: %+v, %v", reloaded, err)
-		}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(data, &keys); err != nil {
+		t.Fatal(err)
 	}
-	for _, current := range []string{`{}`, `null`} {
-		var cj CritJSON
-		input := `{"critty_state":` + current + `,"tcrit_state":{"review_comment_draft":"old"}}`
-		if err := json.Unmarshal([]byte(input), &cj); err != nil || cj.RoundState.ReviewCommentDraft != "" {
-			t.Fatalf("legacy overrides current: %+v, %v", cj, err)
-		}
+	if _, ok := keys["critty_state"]; !ok {
+		t.Fatal("missing Critty round state")
+	}
+	var decoded CritJSON
+	if err := json.Unmarshal(data, &decoded); err != nil || !reflect.DeepEqual(cj, decoded) {
+		t.Fatalf("round trip lost state: %+v, %v", decoded, err)
 	}
 }
 

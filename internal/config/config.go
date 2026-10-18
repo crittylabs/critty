@@ -54,20 +54,19 @@ func ProjectPath(root string) string {
 	return filepath.Join(root, ".critty.config.json")
 }
 
-// Load merges global and project configuration.  Each level falls back to its
-// legacy path only when the current file is absent.  projectRoot may be empty
+// Load merges global and project configuration.  projectRoot may be empty
 // to skip the project level.  Missing files are not errors.
 func Load(projectRoot string) (*Config, error) {
 	cfg := &Config{CleanupOnApprove: true}
 
-	global, err := readPreferredFile(GlobalPath(), filepath.Join(xdg.LegacyConfigHome(), "config.json"))
+	global, err := readFile(GlobalPath())
 	if err != nil {
 		return nil, err
 	}
 	apply(cfg, global)
 
 	if projectRoot != "" {
-		project, err := readPreferredFile(ProjectPath(projectRoot), filepath.Join(projectRoot, ".tcrit.config.json"))
+		project, err := readFile(ProjectPath(projectRoot))
 		if err != nil {
 			return nil, err
 		}
@@ -78,14 +77,6 @@ func Load(projectRoot string) (*Config, error) {
 		cfg.Author = gitUserName()
 	}
 	return cfg, nil
-}
-
-func readPreferredFile(path, legacy string) (*fileConfig, error) {
-	file, err := readFile(path)
-	if file != nil || err != nil {
-		return file, err
-	}
-	return readFile(legacy)
 }
 
 // LoadCurrent loads configuration for the current directory, using the git

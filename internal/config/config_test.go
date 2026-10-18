@@ -1,8 +1,6 @@
 package config
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -86,77 +84,6 @@ func TestLoadMergesGlobalAndProject(t *testing.T) {
 	}
 	if cfg.Prompts["on_finish_approved"] != "inline:global" {
 		t.Errorf("global prompt should survive, got %q", cfg.Prompts["on_finish_approved"])
-	}
-}
-
-func TestLoadConfigPrecedence(t *testing.T) {
-	for _, count := range []int{1, 2, 3, 4} {
-		t.Run(fmt.Sprintf("%d layers", count), func(t *testing.T) {
-			configHome := t.TempDir()
-			t.Setenv("XDG_CONFIG_HOME", configHome)
-			project := t.TempDir()
-			paths := []string{
-				filepath.Join(configHome, "tcrit", "config.json"),
-				filepath.Join(configHome, "critty", "config.json"),
-				filepath.Join(project, ".tcrit.config.json"),
-				filepath.Join(project, ".critty.config.json"),
-			}
-			for i, path := range paths[:count] {
-				data, err := json.Marshal(map[string]any{
-					"author":          fmt.Sprintf("layer %d", i),
-					"quiet":           i%2 == 0,
-					"ignore_patterns": []string{fmt.Sprintf("pattern %d", i)},
-					"prompts": map[string]string{
-						fmt.Sprintf("hook %d", i): "inline:kept",
-						"shared":                  fmt.Sprintf("inline:layer %d", i),
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				writeConfig(t, path, string(data))
-			}
-			cfg, err := Load(project)
-			if err != nil {
-				t.Fatal(err)
-			}
-			last := count - 1
-			if cfg.Author != fmt.Sprintf("layer %d", last) || cfg.Quiet != (last%2 == 0) || cfg.Prompts["shared"] != fmt.Sprintf("inline:layer %d", last) {
-				t.Fatalf("last layer did not override earlier values: %+v", cfg)
-			}
-			active := []int{0}
-			if count >= 2 {
-				active = []int{1}
-			}
-			if count >= 3 {
-				active = append(active, last)
-			}
-			if len(cfg.IgnorePatterns) != len(active) || len(cfg.Prompts) != len(active)+1 {
-				t.Fatalf("unexpected merged values: %+v", cfg)
-			}
-			for index, layer := range active {
-				if cfg.IgnorePatterns[index] != fmt.Sprintf("pattern %d", layer) || cfg.Prompts[fmt.Sprintf("hook %d", layer)] != "inline:kept" {
-					t.Fatalf("layer %d values were lost: %+v", layer, cfg)
-				}
-			}
-		})
-	}
-}
-
-func TestCurrentConfigSkipsInvalidLegacyFiles(t *testing.T) {
-	configHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configHome)
-	project := t.TempDir()
-	writeConfig(t, filepath.Join(configHome, "tcrit", "config.json"), "invalid JSON")
-	writeConfig(t, filepath.Join(configHome, "critty", "config.json"), `{"author":"global"}`)
-	writeConfig(t, filepath.Join(project, ".tcrit.config.json"), "invalid JSON")
-	writeConfig(t, filepath.Join(project, ".critty.config.json"), `{}`)
-	cfg, err := Load(project)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.Author != "global" {
-		t.Fatalf("Author = %q, want global", cfg.Author)
 	}
 }
 
