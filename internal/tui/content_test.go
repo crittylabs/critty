@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/internal/git"
@@ -50,6 +51,73 @@ func TestHighlightMarkdownNestedBoldLinkPreservesText(t *testing.T) {
 	want := "- Crit-compatible agent workflow — review commands"
 	if got := ansi.Strip(highlightMarkdown(line)); got != want {
 		t.Fatalf("highlighted text = %q, want %q", got, want)
+	}
+}
+
+func TestMarkdownInlineFormattingAcrossWrap(t *testing.T) {
+	for _, source := range []string{
+		"before `code with several words across rows` after",
+		"before **bold with several words across rows** after",
+		"before [a label with several words across rows](https://example.org/a_(b)) after",
+	} {
+		t.Run(source, func(t *testing.T) {
+			app := newScrollTestApp("test.md", []string{source}, true, 32, 24)
+			app.rebuildContent()
+			want := strings.Join(strings.Fields(ansi.Strip(highlightMarkdown(source))), "")
+			var text strings.Builder
+			for _, row := range strings.Split(app.contentViewport.GetContent(), "\n") {
+				// Content rows have a seven-column source gutter.
+				text.WriteString(strings.Join(strings.Fields(ansi.Strip(ansi.Cut(row, 7, 1000))), ""))
+			}
+			if got := text.String(); got != want {
+				t.Fatalf("wrapped text = %q, want %q", got, want)
+			}
+			deleted := strings.Join(deletedDisplayLines(source, "", nil, true, 20, nil), "")
+			if got := strings.Join(strings.Fields(ansi.Strip(deleted)), ""); got != want {
+				t.Fatalf("deleted text = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestWrappedMarkdownCells(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		initAdaptiveStyles(dark)
+		for _, source := range []string{
+			"**日本語 é bold words across several wrapped rows**",
+			"`日本語 é code words across several wrapped rows`",
+			"[日本語 é linked words across several wrapped rows](https://example.org/a_(b))",
+		} {
+			app := newScrollTestApp("test.md", []string{source, "plain tail"}, true, 32, 24)
+			app.rebuildContent()
+			rows := uv.NewStyledString(app.contentViewport.GetContent()).Lines(ansi.GraphemeWidth)
+			for y, row := range rows {
+				x := 0
+				for _, cell := range row {
+					if x < 7 || y >= app.contentLayout.lineRanges[1].end {
+						if cell.Link.URL != "" {
+							t.Fatalf("link leaked to gutter or next line: (%d,%d) %+v", x, y, cell)
+						}
+					} else if strings.TrimSpace(cell.Content) != "" {
+						switch source[0] {
+						case '*':
+							if cell.Style.Attrs&uv.AttrBold == 0 {
+								t.Fatalf("bold lost after wrapping at (%d,%d)", x, y)
+							}
+						case '`':
+							if cell.Style.Fg == nil {
+								t.Fatalf("code style lost after wrapping at (%d,%d)", x, y)
+							}
+						case '[':
+							if cell.Link.URL != "https://example.org/a_(b)" {
+								t.Fatalf("link lost after wrapping at (%d,%d): %q", x, y, cell.Link.URL)
+							}
+						}
+					}
+					x += max(1, cell.Width)
+				}
+			}
+		}
 	}
 }
 

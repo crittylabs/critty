@@ -22,6 +22,10 @@
 
 ### Fixed
 
+- Click Markdown links and plain web URLs to open them.  In attachment choices, links take priority over selection; click the checkbox, gaps, or trailing space to change the answer.
+
+- Markdown code spans, emphasis, and links retain their formatting and click targets across wrapped rows, including deleted lines.
+
 - `critty review --help` explains that reviews outside a multiplexer open a desktop terminal window when available, instead of listing the removed `auto` launcher.
 
 ## 1.2.0

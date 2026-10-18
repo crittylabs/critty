@@ -248,6 +248,42 @@ func formTestAppWithContent(t *testing.T, content string) (AppModel, chan Finish
 	return app, ch
 }
 
+func TestFormLinksTakePriorityOverSelection(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] [Example](https://example.org) https://example.net <!-- form: id=link -->\n")
+	app.width = 70
+	app.recalculateLayout()
+	app.rebuildContent()
+	for _, uri := range []string{"https://example.org", "https://example.net"} {
+		cells, _ := linkCells(app.contentViewport.GetContent(), uri)
+		if len(cells) == 0 {
+			t.Fatalf("no clickable cells for %s", uri)
+		}
+		left, top, _, _ := app.contentBounds()
+		for _, point := range []tea.Mouse{cells[0], cells[len(cells)-1]} {
+			_, cmd := app.handleMouseClick(tea.MouseClickMsg(tea.Mouse{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft}))
+			if cmd == nil || app.forms.Documents[0].Answers["link"].Value == true {
+				t.Fatalf("link %q at %+v (viewport %dx%d) resolved %q; cmd=%v answer=%+v", uri, point, app.contentViewport.Width(), app.contentViewport.Height(), app.referenceAt(left+point.X, top+point.Y), cmd != nil, app.forms.Documents[0].Answers["link"])
+			}
+		}
+	}
+	control := app.contentLayout.formControls[0]
+	left, top, _, _ := app.contentBounds()
+	app = clickMouse(app, left+app.contentViewport.Width()-1, top+control.rect.top)
+	if app.forms.Documents[0].Answers["link"].Value != true {
+		t.Fatal("trailing space did not toggle selection")
+	}
+	app = clickMouse(app, left+control.rect.left, top+control.rect.top)
+	if app.forms.Documents[0].Answers["link"].Value == true {
+		t.Fatal("checkbox did not toggle selection")
+	}
+	cells, _ := linkCells(app.contentViewport.GetContent(), "https://example.org")
+	gap := cells[len(cells)-1]
+	app = clickMouse(app, left+gap.X+1, top+gap.Y)
+	if app.forms.Documents[0].Answers["link"].Value != true {
+		t.Fatal("space between links did not toggle selection")
+	}
+}
+
 func TestFormKeyboardMouseAndSourcePositions(t *testing.T) {
 	app, _ := formTestApp(t)
 	content := app.tab().doc.Content
@@ -290,10 +326,10 @@ func TestFormKeyboardMouseAndSourcePositions(t *testing.T) {
 	if app.toggleForm(8) {
 		t.Fatal("code example interactive")
 	}
-	// Labels toggle, but the whitespace after the rendered text does not.
+	// Labels and trailing space toggle; the gutter does not.
 	control := app.contentLayout.formControls[0]
 	left, top, _, _ := app.contentBounds()
-	app = clickMouse(app, left+control.rect.right+3, top+control.rect.top-app.contentViewport.YOffset())
+	app = clickMouse(app, left+control.rect.left-1, top+control.rect.top-app.contentViewport.YOffset())
 	if len(app.missingForms()) != 0 {
 		t.Fatal("trailing whitespace toggled confirmation")
 	}
