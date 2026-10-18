@@ -10,6 +10,8 @@
 
 ### Changed
 
+- AI review and cowork skills record task-scoped authorization for chat requests and Critty feedback, carrying it across covered revisions while keeping each review tied to its exact snapshot.  New services, broader access, and publication still require separate authorization.
+
 - Edit settings in `$XDG_CONFIG_HOME/critty/config.toml` or project `.critty.toml`, with TOML comments and tables.  Review records and JSON command output keep their formats.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
 
 - Use only Critty names for state, configuration, custom prompts, and launcher environment variables, without compatibility aliases or directory merges.
