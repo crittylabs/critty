@@ -3143,6 +3143,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		if cmd, ok := m.openImageLink(uri); ok {
 			return m, cmd
 		}
+		if cmd := m.openLink(uri, false); uri != "" && cmd != nil {
+			return m, cmd
+		}
 	}
 	if rect, ok := m.finishButtonRect(); ok && rect.contains(mouse) {
 		m.openFinishModal()

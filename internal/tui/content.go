@@ -352,7 +352,7 @@ func (m *AppModel) rebuildContent() {
 					if wi == 0 {
 						start = checkboxX
 					}
-					end := lipgloss.Width(strings.TrimRight(plain, " \t"))
+					end := contentWidth - gutterWidth
 					if start < end {
 						layout.formControls = append(layout.formControls, formControl{line: lineNum,
 							rect: mouseRect{left: gutterWidth + start, right: gutterWidth + end, top: len(layout.rows), bottom: len(layout.rows) + 1}})
@@ -369,35 +369,25 @@ func (m *AppModel) rebuildContent() {
 			// Get the display content: Chroma-highlighted or raw
 			displayLine := documentDisplayLine(t, i, line)
 
-			styleFunc := func(s string) string { return s }
 			if isMarkdown {
-				displayLine = linkedDisplayLine(line, m.imageSpans(lineNum, false), displaySourceText)
-				styleFunc = func(s string) string { return highlightMarkdown(s) }
+				displayLine = highlightMarkdown(linkedDisplayLine(line, m.imageSpans(lineNum, false), displaySourceText))
 			}
-			// Highlight search matches in the styled line before wrapping, so a
-			// matched Markdown line is styled whole instead of row by row.
-			if decorate != nil {
-				if decorated, ok := decorate(styleFunc(displayLine)); ok {
-					displayLine = decorated
-					styleFunc = func(s string) string { return s }
-				}
-			}
+			displayLine = highlight(displayLine)
 			if isSelected {
-				styleFunc = func(s string) string { return inlineBackground(selectedLineBg, s) }
+				displayLine = inlineBackground(selectedLineBg, displayLine)
 			} else if isSidebarHighlight {
-				styleFunc = func(s string) string { return inlineBackground(sidebarHighlightBg, s) }
+				displayLine = inlineBackground(sidebarHighlightBg, displayLine)
 			} else if isChanged {
-				base := styleFunc
-				styleFunc = func(s string) string { return inlineBackground(diffChangedLineBg, base(s)) }
+				displayLine = inlineBackground(diffChangedLineBg, displayLine)
 			}
 
 			wrapped := lipgloss.Wrap(displayLine, textWidth, "")
 			wrappedLines := strings.Split(wrapped, "\n")
 			for wi, wl := range wrappedLines {
 				if wi == 0 {
-					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, styleFunc(wl)), lineTarget)
+					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wl), lineTarget)
 				} else {
-					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, styleFunc(wl)), lineTarget)
+					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wl), lineTarget)
 				}
 			}
 		}
@@ -577,10 +567,6 @@ func renderCommentHeader(label string, resolved, deletable bool, width int) (str
 }
 
 var (
-	reBold       = regexp.MustCompile(`\*\*(.+?)\*\*`)
-	reItalic     = regexp.MustCompile(`(?:^|[^*])\*([^*]+?)\*(?:[^*]|$)`)
-	reCode       = regexp.MustCompile("`([^`]+)`")
-	reLink       = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`)
 	reListItem   = regexp.MustCompile(`^(\s*[-*+]\s)(.*)$`)
 	reCheckbox   = regexp.MustCompile(`^(\s*[-*+]\s)\[([ xX])\]\s(.*)$`)
 	reNumList    = regexp.MustCompile(`^(\s*\d+\.\s)(.*)$`)
@@ -599,16 +585,16 @@ func highlightMarkdown(line string) string {
 	}
 
 	if strings.HasPrefix(trimmed, "#### ") {
-		return mdH4Style.Render(line)
+		return mdH4Style.Render(highlightInline(line))
 	}
 	if strings.HasPrefix(trimmed, "### ") {
-		return mdH3Style.Render(line)
+		return mdH3Style.Render(highlightInline(line))
 	}
 	if strings.HasPrefix(trimmed, "## ") {
-		return mdH2Style.Render(line)
+		return mdH2Style.Render(highlightInline(line))
 	}
 	if strings.HasPrefix(trimmed, "# ") {
-		return mdH1Style.Render(line)
+		return mdH1Style.Render(highlightInline(line))
 	}
 
 	if reTableSep.MatchString(line) {
@@ -629,7 +615,7 @@ func highlightMarkdown(line string) string {
 
 	if loc := reBlockquote.FindStringSubmatchIndex(line); loc != nil {
 		rest := line[loc[4]:loc[5]]
-		return mdBlockquoteBar.Render("▎") + " " + mdBlockquoteStyle.Render(rest)
+		return mdBlockquoteBar.Render("▎") + " " + mdBlockquoteStyle.Render(highlightInline(rest))
 	}
 
 	if loc := reCheckbox.FindStringSubmatchIndex(line); loc != nil {
@@ -637,7 +623,7 @@ func highlightMarkdown(line string) string {
 		checked := line[loc[4]:loc[5]]
 		rest := line[loc[6]:loc[7]]
 		if checked == "x" || checked == "X" {
-			return indent + mdCheckboxDone.Render("✓") + " " + mdCheckboxDoneText.Render(rest)
+			return indent + mdCheckboxDone.Render("✓") + " " + mdCheckboxDoneText.Render(highlightInline(rest))
 		}
 		return indent + mdCheckboxOpen.Render("☐") + " " + highlightInline(rest)
 	}
@@ -718,7 +704,7 @@ func inlineColors(style lipgloss.Style, content string, foreground bool) string 
 func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, width int, base, changed lipgloss.Style, decorate func(string) (string, bool)) []string {
 	var b strings.Builder
 	for _, segment := range segments {
-		content := segment.Content
+		content := displaySourceText(segment.Content)
 		if isMarkdown {
 			content = highlightMarkdown(content)
 		}
@@ -728,7 +714,7 @@ func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, wi
 		}
 		b.WriteString(inlineBackground(style, content))
 	}
-	line := displaySourceText(b.String())
+	line := b.String()
 	if decorate != nil {
 		line, _ = decorate(line)
 	}
@@ -743,26 +729,13 @@ func deletedDisplayLines(content, cached string, inline []gitpkg.InlineSegment, 
 	if cached != "" {
 		display = displaySourceText(cached)
 	}
+	if isMarkdown {
+		display = highlightMarkdown(display)
+	}
 	if decorate != nil {
-		styled := display
-		if isMarkdown {
-			styled = highlightMarkdown(styled)
-		}
-		if decorated, ok := decorate(styled); ok {
-			lines := strings.Split(lipgloss.Wrap(decorated, width, ""), "\n")
-			for i := range lines {
-				lines[i] = inlineBackground(diffDeletedLineBg, lines[i])
-			}
-			return lines
-		}
+		display, _ = decorate(display)
 	}
-	lines := strings.Split(lipgloss.Wrap(display, width, ""), "\n")
-	for i := range lines {
-		if isMarkdown {
-			lines[i] = highlightMarkdown(lines[i])
-		}
-		lines[i] = inlineBackground(diffDeletedLineBg, lines[i])
-	}
+	lines := strings.Split(lipgloss.Wrap(inlineBackground(diffDeletedLineBg, display), width, ""), "\n")
 	return lines
 }
 
@@ -855,45 +828,4 @@ func formatTableSep(colWidths []int) string {
 
 func highlightInline(line string) string {
 	return highlightInlineWith(line, mdLinkStyle, mdCodeStyle)
-}
-
-func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) string {
-	// Render links before injecting any ANSI styles. CSI sequences also start
-	// with "[", so running the Markdown link regexp afterward can mistake an
-	// escape sequence followed by a link for part of the link label.
-	line = reLink.ReplaceAllStringFunc(line, func(match string) string {
-		idx := strings.Index(match, "](")
-		if idx < 0 {
-			return match
-		}
-		text := match[1:idx]
-		return linkStyle.Render(text)
-	})
-
-	line = reCode.ReplaceAllStringFunc(line, func(match string) string {
-		inner := match[1 : len(match)-1]
-		return codeStyle.Render(" " + inner + " ")
-	})
-
-	line = reBold.ReplaceAllStringFunc(line, func(match string) string {
-		inner := match[2 : len(match)-2]
-		return mdBoldStyle.Render(inner)
-	})
-
-	line = reItalic.ReplaceAllStringFunc(line, func(match string) string {
-		start := 0
-		end := len(match)
-		if match[0] != '*' {
-			start = 1
-		}
-		if match[end-1] != '*' {
-			end--
-		}
-		inner := match[start+1 : end-1]
-		prefix := match[:start]
-		suffix := match[end:]
-		return prefix + mdItalicStyle.Render(inner) + suffix
-	})
-
-	return line
 }
