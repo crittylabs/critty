@@ -8,6 +8,8 @@
 
 - Use only Critty names for state, configuration, custom prompts, and launcher environment variables, without compatibility aliases or directory merges.
 
+- Approved reviews now retain their comments, replies, snapshots, and images by default for later review and archiving.  Set `cleanup_on_approve` to `true` to opt into approval cleanup, or use `critty clear` to delete a saved review explicitly.
+
 ### Fixed
 
 - `critty review --help` explains that reviews outside a multiplexer open a desktop terminal window when available, instead of listing the removed `auto` launcher.

@@ -50,7 +50,7 @@ func TestLoadMergesGlobalAndProject(t *testing.T) {
 	writeConfig(t, GlobalPath(), `
 		author = "Global Author"
 		quiet = true
-		cleanup_on_approve = false
+		cleanup_on_approve = true
 		ignore_patterns = ["*.lock"]
 		[prompts]
 		on_finish_approved = "inline:global"
@@ -75,8 +75,8 @@ func TestLoadMergesGlobalAndProject(t *testing.T) {
 	if cfg.Quiet {
 		t.Error("project quiet=false should override global true")
 	}
-	if cfg.CleanupOnApprove {
-		t.Error("global cleanup_on_approve=false should override the default true")
+	if !cfg.CleanupOnApprove {
+		t.Error("global cleanup_on_approve=true should enable cleanup")
 	}
 	want := []string{"*.lock", "*.min.js"}
 	if len(cfg.IgnorePatterns) != len(want) {
@@ -96,7 +96,7 @@ func TestLoadDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading: %v", err)
 	}
-	if !cfg.CleanupOnApprove {
-		t.Error("cleanup_on_approve should default to true")
+	if cfg.CleanupOnApprove {
+		t.Error("cleanup_on_approve should default to false")
 	}
 }

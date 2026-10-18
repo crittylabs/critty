@@ -260,7 +260,21 @@ func TestBuildFinishPayloadApproved(t *testing.T) {
 	if len(payload.Comments) != 1 || !payload.Comments[0].Resolved || len(payload.Comments[0].Replies) != 1 {
 		t.Fatalf("missing resolved thread: %+v", payload.Comments)
 	}
+	if err := sess.Save(); err != nil {
+		t.Fatal(err)
+	}
+	cleanupOnApprove(cfg, sess)
+	retained, err := review.OpenSession("", sess.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if comments := retained.FileComments("a.go"); len(comments) != 1 || len(comments[0].Replies) != 1 {
+		t.Fatalf("default approval cleanup lost saved threads: %+v", comments)
+	}
 	cleanupOnApprove(&config.Config{CleanupOnApprove: true}, sess)
+	if _, err := os.Stat(sess.Dir); !os.IsNotExist(err) {
+		t.Fatalf("explicit approval cleanup retained the session: %v", err)
+	}
 	for _, want := range []string{"Final instruction", "Final reply", `"resolved": true`} {
 		if !strings.Contains(payload.Prompt, want) {
 			t.Errorf("approval output lost %q after cleanup: %s", want, payload.Prompt)

@@ -58,7 +58,7 @@ func ProjectPath(root string) string {
 // Load merges global and project configuration.  projectRoot may be empty
 // to skip the project level.  Missing files are not errors.
 func Load(projectRoot string) (*Config, error) {
-	cfg := &Config{CleanupOnApprove: true}
+	cfg := &Config{}
 
 	global, err := readFile(GlobalPath())
 	if err != nil {

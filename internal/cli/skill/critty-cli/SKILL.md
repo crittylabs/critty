@@ -88,7 +88,7 @@ On submission, stdout contains the finish prompt, threads, and attached document
 
 Use a fresh path for each invocation and verify exit 0, session, round, and the reviewed inputs before acting.  The parent directory must exist; the file must be outside the session directory and must not overwrite reviewed input or the `--result` file.  Summary export failure returns nonzero without printing approval or cleaning up the review.  Keep full finish output for additional instructions and evidence; a summary does not contain form answers or individual consents.  Use `--result` and `/critty-approval` for those decisions.
 
-Ordinary approved reviews may be cleaned up immediately.  Preserve the finish output; the session ID alone is insufficient to recover it later.  Form results and comment images defer cleanup as described in their finish output.  Use `/critty` for launch, wait, and recovery decisions.
+Saved reviews are retained after approval by default.  The Crit-compatible `cleanup_on_approve` setting defaults to `false` in Critty; explicitly setting it to `true` enables approval cleanup.  With cleanup enabled, ordinary reviews are deleted after successful finish output, while form results and comment images defer cleanup as described in their finish output.  Preserve the finish output even when retaining the session; saved state does not replace the original completion evidence.  Use `/critty` for launch, wait, and recovery decisions.
 
 ## Environment diagnostics
 
@@ -115,7 +115,7 @@ critty comments <review-path>    # an explicit review.json or its directory
 
 Review-level comments come first, then files in path order with file-level comments before line-level ones.  Each JSON entry adds `scope` and `path` to the stored comment fields.
 
-The finish prompt contains all comments and replies, including resolved threads on approval.  The current overall comment and verdict are appended even with a custom prompt.  Its body uses Crit-compatible `review_comments` with `scope: "review"`; the explicit verdict is a Critty extension stored in `critty_state.verdict`.  IPC and form results also expose `verdict` and optional `review_comment`.  Unsubmitted drafts stay in `critty_state.review_comment_draft` and are not submitted comments.  Read new reviewer instructions before continuing; approval cleanup may already have removed the saved review.  Use `critty comments --all` when inspecting a saved review headlessly.
+The finish prompt contains all comments and replies, including resolved threads on approval.  The current overall comment and verdict are appended even with a custom prompt.  Its body uses Crit-compatible `review_comments` with `scope: "review"`; the explicit verdict is a Critty extension stored in `critty_state.verdict`.  IPC and form results also expose `verdict` and optional `review_comment`.  Unsubmitted drafts stay in `critty_state.review_comment_draft` and are not submitted comments.  Read new reviewer instructions before continuing; explicitly enabled approval cleanup may already have removed the saved review.  Use `critty comments --all` when inspecting a saved review headlessly.
 
 ## Targeting a session or plan
 
@@ -284,7 +284,7 @@ critty clear --all               # delete every saved review for this directory
 
 Each round closes its TUI and dedicated pane or tab.  On cancellation or a task switch, stop the specific review and collect the blocking command's result; neither cancellation nor a connection error is approval.  A stopped review keeps comments, replies, resolution status, and round context, but unsaved editor text is not retained.  Stop is also safe when that session is already stopped.
 
-Use `clear` when deletion is requested, or when an approved finish result directs cleanup after its images have been read.  `stop` preserves data; `clear` deletes the session and its attachments and refuses active reviews.  Never clear earlier tasks automatically to start a new one.  Legacy `clear --code`, `clear <file>`, and `comment --clear` select saved reviews through their existing targeting rules; use an explicit session ID when several match.
+Use `clear` when deletion is requested, or when explicitly enabled approval cleanup directs it after its images have been read.  Preserve saved reviews for retrospectives, archiving, and later continuation by default; approval or task completion alone does not authorize clearing them.  `stop` preserves data; `clear` deletes the session and its attachments and refuses active reviews.  Never clear earlier tasks automatically to start a new one.  Legacy `clear --code`, `clear <file>`, and `comment --clear` select saved reviews through their existing targeting rules; use an explicit session ID when several match.
 
 ## Terminal marker requests
 

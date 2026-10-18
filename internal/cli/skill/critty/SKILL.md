@@ -32,7 +32,7 @@ Choose a background task or resumable handle that preserves the process and its 
 
 Pass `--summary FILE` with a fresh task-owned path for each invocation, including later rounds.  Use its JSON to read feedback without parsing finish-prompt headings.  `/critty-cli` defines its fields; keep full output and any form result as evidence.
 
-Without a supported multiplexer, or if the host cannot preserve both the process and its output beyond the wait deadline and turn boundaries, ask the user to run the command in their terminal and return its complete finish output and session ID, plus the exported result for forms.  Use this fallback also when neither completion notifications nor completion-aware waits are available.  A session ID alone cannot recover approval after automatic cleanup.
+Without a supported multiplexer, or if the host cannot preserve both the process and its output beyond the wait deadline and turn boundaries, ask the user to run the command in their terminal and return its complete finish output and session ID, plus the exported result for forms.  Use this fallback also when neither completion notifications nor completion-aware waits are available.  A session ID alone does not recover the original completion output, especially when approval cleanup is explicitly enabled.
 
 For Codex, immediately before every launch, retry, or later round:
 
@@ -64,7 +64,7 @@ Match approval to the invocation, session, and reviewed content.  Report missing
 
 Use `path`, `anchor`, and any `quote` to locate feedback; `drifted: true` means line numbers are approximate.  To recover saved threads, run `critty comments --session <id> --json --all`.  For attached documents, use the finish output's mapping from comment paths to original files.
 
-Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Before following a printed cleanup command, read all feedback and images and preserve evidence needed by the caller; `/critty-approval` handles form results and execution records.  If reading or preservation fails, keep the session and report the failure.  Unapproved and stopped reviews retain their data.
+Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Keep saved reviews after approval for retrospectives, archiving, and later continuation.  Approval and task completion alone do not request deletion.  Follow a printed cleanup command only when the user explicitly enabled `cleanup_on_approve` or requested deletion, after reading all feedback and images and preserving evidence needed by the caller; `/critty-approval` handles form results and execution records.  If reading or preservation fails, keep the session and report the failure.
 
 ## Step 4: Address new feedback
 
