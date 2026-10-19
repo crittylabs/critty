@@ -567,3 +567,43 @@ func TestFormTextAnswers(t *testing.T) {
 		t.Fatalf("closing the editor changed the choice: %v %+v", app.modal, d.Answers["q"])
 	}
 }
+
+func TestFormListModal(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "# Questions\n\n- [ ] All <!-- form: id=all select-all=r -->\n\n## Q1. Retry?\n\n- [ ] Bounded <!-- form: id=retry value=bounded tags=r -->\n- [ ] Manual <!-- form: id=retry value=manual -->\n\n## Q2. Why?\n\n- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Publish <!-- form: id=publish consent -->\n")
+	app.toggleForm(8)
+	view := func() string { return ansi.Strip(app.View().Content) }
+	if !strings.Contains(app.renderFooter(), "Answers") {
+		t.Fatal("no answer list button")
+	}
+	app = pressKey(app, 'F')
+	if app.modal != formListModal {
+		t.Fatal("F did not open the answer list")
+	}
+	for _, want := range []string{"Q1. Retry?", "✓ retry · Manual", "Q2. Why?", "! Reason", "○ Publish", "1 of 3 answered"} {
+		if !strings.Contains(view(), want) {
+			t.Fatalf("missing %q in %q", want, view())
+		}
+	}
+	if strings.Contains(view(), "All") {
+		t.Fatal("select-all item listed as an answer")
+	}
+	app = pressKey(app, 'u')
+	if strings.Contains(view(), "retry") || app.formList.selected != 0 {
+		t.Fatalf("filter kept answered items: %q", view())
+	}
+	app = pressKey(app, 'j')
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if app.modal != noModal || app.tab().cursorLine != 13 || !app.tab().cursorOnForm || app.focused != contentPane {
+		t.Fatalf("Enter did not go to Publish: modal %v line %d", app.modal, app.tab().cursorLine)
+	}
+	app = pressKey(app, 'F')
+	for _, region := range app.modalMouseRegions() {
+		if region.action.pick && region.action.pickIndex == 0 {
+			app = clickMouse(app, region.rect.left, region.rect.top)
+			break
+		}
+	}
+	if app.modal != noModal || app.tab().cursorLine != 12 {
+		t.Fatalf("click did not go to Reason: modal %v line %d", app.modal, app.tab().cursorLine)
+	}
+}

@@ -6,6 +6,7 @@
 
 - Attachment forms can select or clear groups of items at once.  Add `tags=` to items and a checkbox with `select-all=` to control every item with those tags, such as all checks in a section or every recommended answer.  It shows a mixed state when only some are selected, and individual changes update it.  Each target, including consents, records a human answer.  Documents using these attributes require this release.  See [critty-cli](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#forms-and-exported-results).
 - Attachment forms can ask for written answers.  A `text` item opens an editor for a free-form answer, and a choice with `text` accepts a note, such as the details of an "Other" option.  Answers are written and shown like comments, including pasted image previews, and are exported with the form result separately from review comments.  History archives list saved form answers in `review.md` and keep images pasted into them.
+- Press `F` or click **Answers** to list every form field grouped by its Markdown section, with its answer or what remains.  Choose a row to go to it, or show only unanswered items.
 
 ### Fixed
 

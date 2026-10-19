@@ -53,6 +53,7 @@ const (
 	fileSelectModal
 	lightboxModal
 	formTextModal
+	formListModal
 )
 
 // FinishEvent is emitted on the finish channel when the reviewer finishes a
@@ -98,6 +99,7 @@ type AppModel struct {
 	formViewed    map[string]map[int]bool
 	// formTargets maps select-all IDs to item indices by document path.
 	formTargets   map[string]map[string][]int
+	formList      formListState
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
@@ -231,6 +233,8 @@ type renderedScreenLayout struct {
 	hasFinishButton     bool
 	footerHelp          mouseRect
 	hasFooterHelp       bool
+	formListButton      mouseRect
+	hasFormListButton   bool
 	imagesButton        mouseRect
 	hasImagesButton     bool
 	modalRegions        []modalMouseRegion
@@ -794,6 +798,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.modal == fileSelectModal {
 		return m.handleFileSelectModal(msg)
 	}
+	if m.modal == formListModal {
+		return m.handleFormListKey(msg)
+	}
 	m.locationError = ""
 	if m.modal == lightboxModal {
 		return m.handleLightboxKey(msg)
@@ -1015,6 +1022,10 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.rebuildContent()
 			return m, nil
 		}
+
+	case key.Matches(msg, keys.FormList):
+		m.openFormList()
+		return m, nil
 
 	case key.Matches(msg, keys.FileComment):
 		if m.readOnly {
@@ -2918,6 +2929,9 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	}
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
+	if button := m.formListButton(); button != "" {
+		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
+	}
 
 	full := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
@@ -3134,6 +3148,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal == fileSelectModal {
 		return m.handleFileSelectMouse(mouse)
 	}
+	if m.modal == formListModal {
+		return m.handleFormListMouse(mouse)
+	}
 	if m.modal == helpModal {
 		for _, region := range m.modalMouseRegions() {
 			if region.action.scrollable && region.rect.contains(mouse) {
@@ -3211,6 +3228,10 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 			m.jumpToProgress(region.kind)
 			return m, nil
 		}
+	}
+	if imageLayout.hasFormListButton && imageLayout.formListButton.contains(mouse) {
+		m.openFormList()
+		return m, nil
 	}
 	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
 		cmd := m.toggleImages()
@@ -4103,9 +4124,20 @@ func (m AppModel) renderFooter() string {
 		}
 		items = append([]string{k("space", action)}, items...)
 	}
+	if button := m.formListButton(); button != "" {
+		items = append([]string{button}, items...)
+	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
 
 	return footerStyle.Width(m.width).Render(strings.Join(items, " · "))
+}
+
+// formListButton opens the answer list when any attachment has a form.
+func (m AppModel) formListButton() string {
+	if m.forms == nil || !m.forms.HasForms() {
+		return ""
+	}
+	return renderBarButton("Answers", "F")
 }
 
 func (m AppModel) footerHelpButton() string {
@@ -4180,6 +4212,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	general := renderHelpGroup("General", []helpItem{
 		{keys: "enter", desc: "comment/open"},
 		{keys: "f", desc: "file comment"},
+		{keys: "F", desc: "answer list"},
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
@@ -4529,6 +4562,11 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 	case gotoLineModal, openSourceModal:
 		content, locationRegions := m.locationModalContent(innerWidth)
 		regions = append(regions, locationRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(content)
+
+	case formListModal:
+		content, listRegions := m.formListModalContent(innerWidth, max(3, bgH-14))
+		regions = append(regions, listRegions...)
 		modalContent = frameStyle.Width(modalWidth).Render(content)
 
 	case fileSelectModal:

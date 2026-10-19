@@ -304,3 +304,29 @@ func Satisfied(item Item, answer Answer) bool {
 	}
 	return answer.Value == true
 }
+
+type Heading struct {
+	Line int
+	Text string
+}
+
+// Headings lists Markdown headings in source order so form items can be
+// grouped by the section that asks them.
+func Headings(source string) ([]Heading, error) {
+	data := []byte(source)
+	var headings []Heading
+	err := ast.Walk(parser.New().Parse(data), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		heading, ok := n.(*ast.Heading)
+		if !entering || !ok {
+			return ast.WalkContinue, nil
+		}
+		segments := heading.Source()
+		if len(segments) == 0 {
+			return ast.WalkSkipChildren, nil
+		}
+		title := strings.TrimSpace(string(text.NewLines(segments).Bytes(data)))
+		headings = append(headings, Heading{Line: strings.Count(source[:segments[0].Start], "\n") + 1, Text: title})
+		return ast.WalkSkipChildren, nil
+	})
+	return headings, err
+}
