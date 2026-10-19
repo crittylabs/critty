@@ -14,6 +14,8 @@ Each recording runs `setup.sh`, then `vhs`, then `clean-recording.sh`.  The setu
 
 Set `DEMO_VERSION` to label the recording build, for example `DEMO_VERSION=v1.2.0 make -C demo rebuild` from the repository root.  The tapes put the fixture's build first on `PATH`; if the recording host's login shell reorders `PATH`, make the same commit the default `critty` (for example with mise) before recording.
 
+Codex review-flow recordings use `assets/codex-config.toml`: GPT-6.1 Sol, medium reasoning, and Fast mode.  Preparation scripts copy this file into the recording's isolated `CODEX_HOME` before adding fixture trust settings, so they do not depend on personal Codex defaults.  Claude Code remains on Opus 5.5 with low effort and fast mode disabled.
+
 MP4s are local build outputs ignored by Git.  Published recordings are hosted as release assets.  After the first recording, MP4s only rebuild when a tape, script, or fixture is newer.
 
 For inline playback in the GitHub README, upload the MP4s as GitHub video attachments and use their `https://github.com/user-attachments/assets/...` URLs in `<video controls>` elements.  Keep the versioned release assets for downloads.
