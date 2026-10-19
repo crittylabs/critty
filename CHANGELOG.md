@@ -24,6 +24,8 @@
 
 ### Fixed
 
+- Paste text with `C-v` in comment and reply editors.  Prefer plain text on Linux and macOS; when unavailable, extract text from HTML, or from RTF on macOS.  Image paste remains available.
+
 - Distinguish replaced attachments from current forms.  Commented snapshots appear last in collapsed, read-only attachment history, with an explanation that their checkboxes are inactive and answers belong in current attachments.
 
 - Click Markdown links and plain web URLs to open them.  In attachment choices, links take priority over selection; click the checkbox, gaps, or trailing space to change the answer.

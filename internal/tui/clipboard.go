@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/crittylabs/critty/internal/clipboard"
@@ -14,19 +13,22 @@ type clipboardImageMsg struct {
 	id   uint64
 	data []byte
 	err  error
-	text tea.Msg
+	text string
 }
 
 func (m *AppModel) pasteClipboardImage() tea.Cmd {
 	m.clipboardID++
 	id := m.clipboardID
 	m.clipboardPending = true
-	m.clipboardStatus = "Reading clipboard image… (ESC to cancel)"
+	m.clipboardStatus = "Reading clipboard… (ESC to cancel)"
 	return func() tea.Msg {
 		data, err := clipboard.ReadImage()
 		msg := clipboardImageMsg{id: id, data: data, err: err}
 		if errors.Is(err, clipboard.ErrNoImage) {
-			msg.text = textarea.Paste()
+			msg.text, err = clipboard.ReadText()
+			if err != nil {
+				msg.err = err
+			}
 		}
 		return msg
 	}
@@ -42,12 +44,9 @@ func (m *AppModel) finishClipboardImage(msg clipboardImageMsg) tea.Cmd {
 		return nil
 	}
 	if errors.Is(msg.err, clipboard.ErrNoImage) {
-		if _, ok := msg.text.(tea.PasteMsg); !ok {
-			m.clipboardStatus = "Clipboard has no supported image or readable text"
-			return nil
-		}
+		m.killRing.interrupt()
 		var cmd tea.Cmd
-		m.modalTextarea, cmd = m.modalTextarea.Update(msg.text)
+		m.modalTextarea, cmd = m.modalTextarea.Update(tea.PasteMsg{Content: msg.text})
 		return cmd
 	}
 	if msg.err != nil {

@@ -7,11 +7,11 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/crittylabs/critty/internal/clipboard"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -58,9 +58,26 @@ func TestClipboardCancelAndFailures(t *testing.T) {
 	if m.err != nil || m.clipboardStatus != "clipboard failed" || m.modalTextarea.Value() != "original" {
 		t.Fatal("clipboard error was fatal or lost draft")
 	}
-	editorControl(&m, 'v')
-	editorMessage(&m, clipboardImageMsg{id: m.clipboardID, err: clipboard.ErrNoImage, text: tea.PasteMsg{Content: "text "}})
-	if m.modalTextarea.Value() != "text original" {
-		t.Fatalf("text fallback = %q", m.modalTextarea.Value())
-	}
+	t.Run("text command", func(t *testing.T) {
+		if runtime.GOOS != "darwin" {
+			t.Skip("command fixture uses the macOS clipboard backend")
+		}
+		dir := t.TempDir()
+		for _, name := range []string{"pbpaste", "osascript"} {
+			script := "#!/bin/sh\ncase \"$*\" in *JSON.stringify*) printf '{\"text\":\"text \"}\n' ;; *AppKit*) exit 0 ;; *) printf 'text ' ;; esac\n"
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Setenv("PATH", dir)
+		var cmd tea.Cmd
+		m, cmd = updateApp(m, tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
+		if cmd == nil {
+			t.Fatal("C-v returned no clipboard command")
+		}
+		editorMessage(&m, cmd())
+		if m.modalTextarea.Value() != "text original" {
+			t.Fatalf("text fallback = %q", m.modalTextarea.Value())
+		}
+	})
 }

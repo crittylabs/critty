@@ -1,4 +1,4 @@
-// Package clipboard reads images without requiring cgo in release binaries.
+// Package clipboard reads text and images without requiring cgo in release binaries.
 package clipboard
 
 import (
@@ -70,7 +70,7 @@ type limitedBuffer struct {
 func (b *limitedBuffer) Write(p []byte) (int, error) {
 	// Allow Base64 expansion for the macOS bridge.
 	if b.buffer.Len()+len(p) > (review.MaxAttachmentBytes+2)/3*4+1024 {
-		return 0, fmt.Errorf("clipboard image exceeds 5 MiB")
+		return 0, fmt.Errorf("clipboard content exceeds 5 MiB")
 	}
 	return b.buffer.Write(p)
 }
@@ -81,7 +81,7 @@ func run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	var out limitedBuffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("reading image with %s: %w", name, err)
+		return nil, fmt.Errorf("reading clipboard with %s: %w", name, err)
 	}
 	return out.buffer.Bytes(), nil
 }
@@ -105,6 +105,6 @@ function run() {
   if (!bitmap || bitmap.isNil()) throw Error('cannot decode clipboard image');
   const png = bitmap.representationUsingTypeProperties($.NSPNGFileType, $({}));
   if (!png || png.isNil()) throw Error('cannot encode clipboard image');
-  if (png.length > 5242880) throw Error('clipboard image exceeds 5 MiB');
+  if (png.length > 5242880) throw Error('clipboard content exceeds 5 MiB');
   return ObjC.unwrap(png.base64EncodedStringWithOptions(0));
 }`
