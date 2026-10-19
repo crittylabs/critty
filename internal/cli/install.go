@@ -17,7 +17,7 @@ import (
 
 //go:embed skill/critty/SKILL.md skill/critty-cli/SKILL.md skill/critty-approval/SKILL.md skill/critty-ai-review/SKILL.md skill/critty-ai-review/references/restricted-cli.md skill/critty-ai-review/scripts/claude_review_gate.py skill/critty-ai-cowork/SKILL.md
 //go:embed skill/critty-ai-review/references/codex-cli.md skill/critty-ai-review/scripts/codex_review_server.py skill/critty-ai-review/scripts/codex-review-requirements.txt
-//go:embed skill/critty-cli/references/configuration.md
+//go:embed skill/critty-cli/references/configuration.md skill/critty-cli/references/forms.md
 //go:embed skill/critty-history/SKILL.md
 //go:embed skill/critty-approval/references/*.md skill/critty/references/*.md
 var skillContent embed.FS
@@ -243,6 +243,7 @@ func integrations() map[string][]integrationFile {
 			skillResource("critty-ai-review", "scripts/codex_review_server.py", dir),
 			skillResource("critty-ai-review", "scripts/codex-review-requirements.txt", dir),
 			skillResource("critty-cli", "references/configuration.md", dir),
+			skillResource("critty-cli", "references/forms.md", dir),
 			skillResource("critty-approval", "references/requests.md", dir),
 			skillResource("critty-approval", "references/feedback-authorization.md", dir),
 			skillResource("critty", "references/temporary-tree.md", dir),
