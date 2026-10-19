@@ -9,7 +9,7 @@
   <a href="https://github.com/crittylabs/critty/actions/workflows/ci.yml"><img src="https://github.com/crittylabs/critty/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
 </p>
 
-Review code, refine plans, make choices, and approve actions with your coding agent in the terminal.
+Review changes, refine documents, make choices, and approve actions with your agent in the terminal.
 
 You can review a diff, file, or document on its own.  Your agent can also attach a document asking for your permission or a decision.  You can agree in advance on which actions need your approval, such as pushing code or deploying.
 
@@ -19,6 +19,7 @@ For example:
 
 - Review code changes alongside screenshots and questions from your agent.
 - Leave inline feedback on a plan or document.
+- Review updates to notes, reports, or configuration files outside Git before applying them.
 - Choose an implementation approach before coding starts.
 - Check a proposed PR's text and destination before authorizing publication.
 
@@ -34,6 +35,7 @@ For example:
 - **Approvals and choices** — read requests in attached documents, confirm details or allow actions with checkboxes, and choose between alternatives with radio buttons.  These requests can accompany a code review or stand on their own.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
+- **Review changes outside Git** — review proposed edits to documents and configuration files before updating the originals.  Create, split, rename, or delete files through the same feedback and approval workflow.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
@@ -140,9 +142,21 @@ critty --session <id>      # Resume a saved review
 
 Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
+### Review changes outside Git
+
+Use Critty for personal notes, reports, configuration files, and other text files that are not in a repository.  Your agent can propose edits, create files, split a long document, or rename and remove files while keeping the originals unchanged until you approve.
+
+For example:
+
+> Use critty to review updates to my notes before applying them.  Split the long meeting notes into a summary and action items, and keep the originals unchanged until I approve.
+
+The agent prepares copies with `critty tmp`, edits them, and opens the proposed diff with a request to apply it.  Leave comments and review revisions as usual.  After you approve the review and select the permission checkbox, the agent applies the reviewed changes.  Critty checks for changes to the originals and retains backups for recovery.
+
+See the [workflow for changes outside source control](internal/cli/skill/critty/references/temporary-tree.md) and `critty tmp --help` for details.
+
 <a id="approvals-and-choices"></a>
 
-### Review code and approve the next actions
+### Review changes and approve the next actions
 
 Agree with your agent on which actions need your approval, such as committing, pushing a branch, or deploying.  Keep your project rules for reviews, approvals, and choices in `CLAUDE.md` or `AGENTS.md`.
 
