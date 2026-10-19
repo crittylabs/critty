@@ -18,6 +18,7 @@
 
 ### Fixed
 
+- Markdown code spans, bold, italic, and inline links can continue across source lines within a paragraph in documents and diffs.  Formatting respects block boundaries, preserves source lines and comment locations, and stays literal when patch context is incomplete.
 - `critty doctor` recommends enabling Herdr image rendering only when local configuration explicitly disables it.  Unset settings use the current Herdr default of enabled.
 
 ## 1.3.2

@@ -425,6 +425,26 @@ def scenarios() -> None:
     )
     try:
         dry_run_viewer()
+        paragraph_source = "**日本語 é first\nsecond**\n\n`code\ncontinued`\n"
+        (WORK / "paragraph.md").write_text(paragraph_source)
+        paragraph = Round("paragraph-markdown", ["paragraph.md"])
+        paragraph.wait_screen("continued", "multiline Markdown rendered")
+        screen = paragraph.screen()
+        assert "second**" not in screen and "`code" not in screen, screen
+        assert "continued`" not in screen, screen
+        tmux("resize-pane", "-t", paragraph.pane, "-x", "54", "-y", "24")
+        paragraph.wait_screen("continued", "multiline Markdown after resize")
+        paragraph.click("second")
+        paragraph.keys("Enter")
+        paragraph.text("Keep source line anchors.")
+        paragraph.keys("C-s")
+        wait_until(lambda: paragraph.comments(), "multiline Markdown comment saved")
+        assert paragraph.comments()[0]["start_line"] == 2, paragraph.comments()
+        assert (WORK / "paragraph.md").read_text() == paragraph_source
+        paragraph.finish(False)
+        report(
+            "multiline Markdown keeps formatting, source text and comment lines after resize"
+        )
         marker_job = ROOT / "doctor-marker.job.json"
         marker_job.write_text(
             json.dumps(
