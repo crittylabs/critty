@@ -116,6 +116,7 @@ func ApplyBulk(items []Item, targets []int, answers map[string]Answer, answer An
 		default:
 			answer.Value = selecting
 		}
+		answer.Text = answers[item.ID].Text
 		answers[item.ID] = answer
 	}
 }

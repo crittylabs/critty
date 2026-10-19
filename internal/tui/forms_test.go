@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -377,7 +379,7 @@ func TestFormApprovalGrantsHumanConsent(t *testing.T) {
 		t.Fatal(app.err)
 	}
 	ev := takeEvent(t, ch)
-	if !ev.Approved || !ev.Result.Consents["a"]["publish"] {
+	if !ev.Approved || !ev.Result.Consents["a"]["publish"] || ev.Result.ImageBase != app.session.Dir {
 		t.Fatalf("human consent lost: %+v", ev)
 	}
 	if _, err := os.Stat(filepath.Join(app.session.Dir, "result-1.json")); err != nil {
@@ -510,5 +512,58 @@ func TestSelectAllForm(t *testing.T) {
 	saved, err := app.session.LoadForms()
 	if err != nil || saved.Version != 2 || saved.Documents[0].Answers["auth"].Value != false || !saved.Documents[0].Answers["auth"].Human {
 		t.Fatalf("saved: %v %+v", err, saved)
+	}
+}
+
+func TestFormTextAnswers(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Other <!-- form: id=q value=other text -->\n- [ ] Plain <!-- form: id=q value=plain -->\n")
+	d := app.forms.Document(app.tab().path)
+	content := func() string { return ansi.Strip(app.contentViewport.GetContent()) }
+	typeAnswer := func(text string) {
+		app.modalTextarea.SetValue(text)
+		app = clickModalAction(t, app, "Save")
+	}
+	if !strings.Contains(content(), "✎  Reason") {
+		t.Fatalf("text field badge: %q", content())
+	}
+	app.tab().cursorLine = 1
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if app.modal != formTextModal {
+		t.Fatal("Enter did not open the text field")
+	}
+	typeAnswer("  Because it is simpler.\nSecond line  ")
+	if app.modal != noModal || d.Answers["reason"].Value != "Because it is simpler.\nSecond line" || !d.Answers["reason"].Human || len(app.missingForms()) != 0 {
+		t.Fatalf("saved text: %+v", d.Answers["reason"])
+	}
+	if !strings.Contains(content(), "Because it is simpler.") || !strings.Contains(content(), "Second line") {
+		t.Fatalf("text not shown: %q", content())
+	}
+	app.toggleForm(1)
+	typeAnswer("See ![diagram](attachments/diagram.png)")
+	if path, _ := app.commentImagePath("attachments/diagram.png"); !slices.ContainsFunc(slices.Collect(maps.Keys(app.commentImages)), func(key commentImageKey) bool { return key.path == path }) {
+		t.Fatal("answer image was not registered for preview")
+	}
+	app.toggleForm(1)
+	typeAnswer("")
+	if d.Answers["reason"].Value != "" || len(app.missingForms()) != 1 {
+		t.Fatal("clearing the text did not unanswer the field")
+	}
+
+	app.toggleForm(2)
+	if app.modal != formTextModal || d.Answers["q"].Value != "other" {
+		t.Fatal("choice with text did not open the editor after selection")
+	}
+	typeAnswer("Use exponential backoff")
+	app.toggleForm(3)
+	if d.Answers["q"].Value != "plain" || strings.Contains(content(), "exponential") {
+		t.Fatalf("note shown for another choice: %+v", d.Answers["q"])
+	}
+	app.toggleForm(2)
+	if app.modalTextarea.Value() != "Use exponential backoff" {
+		t.Fatalf("draft note not restored: %q", app.modalTextarea.Value())
+	}
+	app = pressKey(app, tea.KeyEscape)
+	if app.modal != noModal || d.Answers["q"].Value != "other" || !strings.Contains(content(), "exponential") {
+		t.Fatalf("closing the editor changed the choice: %v %+v", app.modal, d.Answers["q"])
 	}
 }

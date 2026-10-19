@@ -253,6 +253,10 @@ func (m *AppModel) toggleForm(line int) bool {
 			continue
 		}
 		m.tab().cursorOnForm = true
+		if form.IsTextField(item) {
+			m.openFormText(item)
+			return true
+		}
 		previous := maps.Clone(d.Answers)
 		answer := form.Answer{Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
 		if item.SelectAll != nil {
@@ -262,6 +266,7 @@ func (m *AppModel) toggleForm(line int) bool {
 			answer.Value = !form.Selected(item, d.Answers[item.ID])
 			if item.Choice {
 				answer.Value = item.Value
+				answer.Text = d.Answers[item.ID].Text
 			}
 			d.Answers[item.ID] = answer
 		}
@@ -270,11 +275,128 @@ func (m *AppModel) toggleForm(line int) bool {
 			m.err = err
 		} else {
 			m.err = nil
+			if item.Text {
+				m.openFormText(item)
+			}
 		}
 		m.rebuildContent()
 		return true
 	}
 	return false
+}
+
+// openFormTextAt opens the editor for the text field on line, if any.
+func (m *AppModel) openFormTextAt(line int) bool {
+	if m.readOnly || m.forms == nil {
+		return false
+	}
+	row, ok := m.formRows[m.tab().path][line]
+	if !ok || row.item == nil || !form.IsTextField(*row.item) {
+		return false
+	}
+	m.tab().cursorOnForm = true
+	m.openFormText(*row.item)
+	return true
+}
+
+// openFormText edits a text field's value, or the note on a selected choice.
+func (m *AppModel) openFormText(item form.Item) {
+	text := m.formText(item)
+	m.modal = formTextModal
+	m.editingFormLine = item.Line
+	m.modalFocus = 0
+	m.modalTextarea.Placeholder = "Type your answer..."
+	m.modalTextarea.Reset()
+	m.modalTextarea.SetValue(text)
+	m.modalInitial = m.modalTextarea.Value()
+	m.modalTextarea.Focus()
+}
+
+// editingFormItem returns the item edited by the form text modal.
+func (m *AppModel) editingFormItem() (*review.FormDocument, *form.Item) {
+	d := m.forms.Document(m.tab().path)
+	if d == nil {
+		return nil, nil
+	}
+	row, ok := m.formRows[d.Path()][m.editingFormLine]
+	if !ok || row.item == nil || row.item.Line != m.editingFormLine {
+		return nil, nil
+	}
+	return d, row.item
+}
+
+// formText returns the text shown for item, which is empty for a choice
+// that is not selected.
+func (m *AppModel) formText(item form.Item) string {
+	d := m.forms.Document(m.tab().path)
+	if d == nil || !item.Text {
+		return ""
+	}
+	answer := d.Answers[item.ID]
+	if form.IsTextField(item) {
+		text, _ := answer.Value.(string)
+		return text
+	}
+	if !form.Selected(item, answer) {
+		return ""
+	}
+	return answer.Text
+}
+
+func (m *AppModel) formTextLabel() string {
+	if _, item := m.editingFormItem(); item != nil {
+		return item.Label
+	}
+	return ""
+}
+
+// saveFormText keeps the editor open when saving fails so the text survives.
+func (m *AppModel) saveFormText() {
+	d, item := m.editingFormItem()
+	if item == nil {
+		m.discardTextModal()
+		return
+	}
+	text := strings.TrimSpace(m.modalTextarea.Value())
+	previous := d.Answers[item.ID]
+	answer := form.Answer{Value: text, Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+	if item.Choice {
+		answer.Value, answer.Text = item.Value, text
+	}
+	d.Answers[item.ID] = answer
+	if err := m.session.SaveForms(*m.forms); err != nil {
+		d.Answers[item.ID] = previous
+		m.err = err
+		return
+	}
+	m.err = nil
+	m.discardTextModal()
+	m.rebuildContent()
+}
+
+// formTextRows renders the text answer below the last line of its item,
+// formatted like a comment body with links and image previews.
+func (m *AppModel) formTextRows(line int, width int) []string {
+	d := m.forms.Document(m.tab().path)
+	if d == nil {
+		return nil
+	}
+	row, ok := m.formRows[d.Path()][line]
+	if !ok || row.item == nil || row.item.EndLine != line {
+		return nil
+	}
+	text := m.formText(*row.item)
+	if text == "" {
+		return nil
+	}
+	first := m.formRows[d.Path()][row.item.Line]
+	prefix := d.Content[first.offset:row.item.Offset]
+	indent := strings.Repeat(" ", lipgloss.Width(expandDisplayTabs(prefix[:len(prefix)-len(strings.TrimLeft(prefix, " \t"))]))+6)
+	rows := strings.Split(m.renderCommentContent(d.Answers[row.item.ID].Author, text, "", max(1, width-len(indent))), "\n")
+	for i := range rows {
+		rows[i] = indent + rows[i]
+	}
+	return rows
 }
 
 // formDisplayLine hides only parsed metadata and retains each original line.
@@ -324,7 +446,9 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 		tint, tagColor = formChip.requiredBadge, formChip.red
 	}
 	symbol := "☐"
-	if checkbox.Choice {
+	if form.IsTextField(*checkbox) {
+		symbol = "✎"
+	} else if checkbox.Choice {
 		symbol = "○"
 		if selected {
 			symbol = "●"

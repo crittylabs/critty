@@ -71,13 +71,16 @@ Task lists in attached `.md` or `.markdown` files are interactive.  `<!-- form: 
 
 `tags=api,ui` adds an item to named sets within its document.  A checkbox with an explicit ID and `select-all=api` selects every item with any listed tag, or clears them all when all are selected; nested select-all items follow their own tags.  It shows a mixed state when only some are selected, and it cannot be `required`, `consent`, or a choice.  A select-all item has no answer of its own.  Each target's answer is a human answer, including `consent`; `via` names the select-all item when that operation set it.  Critty rejects a tag matching no other item, cycles, and select-alls covering two choices of one field.
 
-`forms.json` stores definitions, draft answers, and human provenance separately from source documents and comments.  Its version is 1, or 2 when any item uses `tags` or `select-all`; older Critty releases reject these attributes.  Changed field definitions reset their answers.  Changed target snapshots or attachment contents, order, or membership reset all required confirmations and consents; ordinary explicit-ID answers survive unchanged definitions.
+`text` makes an item a text field whose answer `value` is the entered string; an empty string is unanswered, and `required` demands text.  On a choice, `text` lets the reviewer add a note, exported as the answer's `text` only while that choice is selected.  Text fields cannot be `consent` or have tags.  Text is Markdown, entered and shown like a comment body.  Pasted images are saved in the session and referenced by `attachments/` paths relative to the result's `image_base`.  These files are removed with the session.  When carrying answers into a durable document, such as an ADR or design document, copy each referenced image into that document's own asset directory and rewrite the links relative to the document.  Do this before cleaning up the session.
+
+`forms.json` stores definitions, draft answers, and human provenance separately from source documents and comments.  Its version is 1, or 2 when any item uses `tags`, `select-all`, or `text`; older Critty releases reject these attributes.  Changed field definitions reset their answers.  Changed target snapshots or attachment contents, order, or membership reset all required confirmations and consents; ordinary explicit-ID answers survive unchanged definitions.
 
 `--result FILE` requires an interactive attachment form.  It writes the result atomically before printing approval; omit it for ordinary document approval.  The parent directory must exist, the file must be outside the session directory, and it must not overwrite reviewed input.  The same self-contained result is saved as `result-<round>.json`, returned in IPC's `result`, and appended to finish output regardless of templates.
 
 | Result field | Meaning |
 | --- | --- |
 | `version`, `session`, `round` | Schema version, session ID, and completed round. |
+| `image_base` | Session directory that resolves `attachments/` image paths in answers and comments. |
 | `review_revision`, `reviewed_target` | Revision identifier and the exact reviewed input. |
 | `attachments` | Ordered documents with source paths, snapshots, field `definitions`, and `answers`. |
 | `approved` | Human review outcome, including required-confirmation checks. |

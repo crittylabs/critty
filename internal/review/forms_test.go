@@ -141,3 +141,22 @@ func TestSelectAllFormVersion(t *testing.T) {
 		t.Fatalf("reload: %v %+v", err, loaded)
 	}
 }
+
+func TestFormResultOmitsDraftNotes(t *testing.T) {
+	items, err := form.Parse("- [ ] Other <!-- form: id=q value=other text -->\n- [ ] Plain <!-- form: id=q value=plain -->\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := map[string]form.Answer{"q": {Value: "plain", Text: "draft", Human: true}}
+	state := FormState{Version: 2, Documents: []FormDocument{{Items: items, Answers: answers}}}
+	if text := state.Result(false, 1).Documents[0].Answers["q"].Text; text != "" {
+		t.Fatalf("exported draft note %q", text)
+	}
+	if answers["q"].Text != "draft" {
+		t.Fatal("result changed the draft")
+	}
+	answers["q"] = form.Answer{Value: "other", Text: "note", Human: true}
+	if text := state.Result(false, 1).Documents[0].Answers["q"].Text; text != "note" {
+		t.Fatalf("lost selected note: %q", text)
+	}
+}

@@ -52,6 +52,7 @@ const (
 	openSourceModal
 	fileSelectModal
 	lightboxModal
+	formTextModal
 )
 
 // FinishEvent is emitted on the finish channel when the reviewer finishes a
@@ -156,6 +157,7 @@ type AppModel struct {
 	// Editing state
 	editingID            string // ID of the parent comment being edited or replied to
 	editingReplyID       string // ID of the reply being edited; empty when editing the parent
+	editingFormLine      int    // line of the form item whose text is being edited
 	modalInitial         string // textarea value when the current text modal opened
 	modalOpenedAt        time.Time
 	modalOpeningClick    tea.Mouse
@@ -828,7 +830,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.modal == deleteConfirmModal {
 		return m.handleDeleteConfirmModal(msg)
 	}
-	if m.modal == commentModal || m.modal == fileCommentModal || m.modal == replyModal || m.modal == editModal {
+	if m.modal == commentModal || m.modal == fileCommentModal || m.modal == replyModal || m.modal == editModal || m.modal == formTextModal {
 		return m.handleTextModal(msg)
 	}
 	if m.modal == finishModal {
@@ -1224,6 +1226,8 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.openCommentThread(anns[t.cursorAnnoIdx].id)
 					return m, nil
 				}
+			} else if m.focused == contentPane && !t.selecting && t.cursorSide == "" && m.openFormTextAt(t.cursorLine) {
+				return m, nil
 			} else if t.state != nil {
 				m.openLineComment()
 				return m, nil
@@ -1434,6 +1438,10 @@ func (m *AppModel) latestOwnReply(c *review.Comment) *review.Reply {
 }
 
 func (m *AppModel) modalSubmit() {
+	if m.modal == formTextModal {
+		m.saveFormText()
+		return
+	}
 	t := m.tab()
 	body := strings.TrimSpace(m.modalTextarea.Value())
 	if m.modalTextarea.Value() == m.modalInitial || (body == "" && m.modalInitial == "") {
@@ -2074,7 +2082,7 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 	var result *review.FormResult
 	if m.forms != nil && m.forms.HasForms() {
 		value := m.forms.Result(approved, m.session.CJ.ReviewRound)
-		value.Session = m.session.Key
+		value.Session, value.ImageBase = m.session.Key, m.session.Dir
 		value.Verdict = verdict
 		value.ReviewComment = m.session.SubmissionComment()
 		if err := m.session.SaveFormResult(value); err != nil {
@@ -3409,7 +3417,7 @@ type modalButtonSpec struct {
 
 func (m *AppModel) isTextModal() bool {
 	return m.modal == commentModal || m.modal == fileCommentModal ||
-		m.modal == replyModal || m.modal == editModal || m.modal == finishModal
+		m.modal == replyModal || m.modal == editModal || m.modal == finishModal || m.modal == formTextModal
 }
 
 func (m *AppModel) hasModalResolution() bool {
@@ -4507,7 +4515,7 @@ func (m AppModel) renderWithModal(background string) string {
 func (m AppModel) renderWithModalLayout(background string) (string, []modalMouseRegion) {
 	frameStyle := modalStyle
 	switch m.modal {
-	case commentModal, fileCommentModal, replyModal, editModal:
+	case commentModal, fileCommentModal, replyModal, editModal, formTextModal:
 		frameStyle = frameStyle.BorderForeground(commentFocusedBorderColor)
 	}
 	var modalContent string
@@ -4597,9 +4605,13 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		regions = append(regions, contentRegions...)
 		regions = append(regions, closeRegion)
 
-	case fileCommentModal:
-		title, closeRegion := modalTitle("Add File Comment", innerWidth)
-		path := contextBoxStyle.Width(innerWidth - 2).Render(m.tab().displayPath())
+	case fileCommentModal, formTextModal:
+		titleText, context := "Add File Comment", m.tab().displayPath()
+		if m.modal == formTextModal {
+			titleText, context = "Answer", m.formTextLabel()
+		}
+		title, closeRegion := modalTitle(titleText, innerWidth)
+		path := contextBoxStyle.Width(innerWidth - 2).Render(context)
 		prefix, textareaRegion := layoutModalTextarea(
 			title+"\n"+path+"\n\n", m.clipboardTextareaView(), innerWidth)
 		regions = append(regions, textareaRegion)

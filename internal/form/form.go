@@ -37,6 +37,8 @@ type Item struct {
 	// Tags and SelectAll are sorted sets, so reordering keeps fingerprints.
 	Tags      []string `json:"tags,omitempty"`
 	SelectAll []string `json:"select_all,omitempty"`
+	// Text makes a choice accept a note, or another item a text field.
+	Text bool `json:"text,omitempty"`
 }
 
 type Answer struct {
@@ -47,6 +49,9 @@ type Answer struct {
 	Round    int    `json:"round,omitempty"`
 	// Via names the select-all item whose human operation set this answer.
 	Via string `json:"via,omitempty"`
+	// Text holds the note on a choice with text, kept as a draft while
+	// another choice is selected.
+	Text string `json:"text,omitempty"`
 }
 
 // Parse uses the Markdown AST so examples, escaped lists, and quotations are inert.
@@ -130,8 +135,11 @@ func Parse(source string) ([]Item, error) {
 			return ast.WalkStop, err
 		}
 		item.Definition = definition.String()
-		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice) {
-			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, or have a value", item.Line)
+		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice || item.Text) {
+			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, text, or have a value", item.Line)
+		}
+		if item.Text && (item.Consent || !item.Choice && item.Tags != nil) {
+			return ast.WalkStop, fmt.Errorf("line %d: text fields cannot be consent or have tags", item.Line)
 		}
 		if item.ID == "" {
 			if item.Required || item.Consent || item.Choice || item.SelectAll != nil {
@@ -215,6 +223,8 @@ func attributes(item *Item, source string) error {
 			item.Required = true
 		case key == "consent" && !assigned:
 			item.Consent = true
+		case key == "text" && !assigned:
+			item.Text = true
 		case key == "tags" && assigned:
 			if item.Tags, err = tagList(key, value); err != nil {
 				return err
@@ -251,12 +261,12 @@ func Defaults(items []Item) map[string]Answer {
 		}
 		if _, exists := answers[item.ID]; !exists {
 			var value any = false
-			if item.Choice {
+			if item.Choice || item.Text {
 				value = ""
 			}
 			answers[item.ID] = Answer{Value: value}
 		}
-		if item.Initial && !item.Consent && !item.Required {
+		if item.Initial && !item.Consent && !item.Required && (item.Choice || !item.Text) {
 			var value any = true
 			if item.Choice {
 				value = item.Value
@@ -268,17 +278,27 @@ func Defaults(items []Item) map[string]Answer {
 }
 
 func Selected(item Item, answer Answer) bool {
-	if item.Choice {
+	switch {
+	case item.Choice:
 		return answer.Value == item.Value
+	case item.Text:
+		value, ok := answer.Value.(string)
+		return ok && value != ""
 	}
 	return answer.Value == true
+}
+
+// IsTextField reports whether item is a text field rather than a choice
+// accepting a note.
+func IsTextField(item Item) bool {
+	return item.Text && !item.Choice
 }
 
 func Satisfied(item Item, answer Answer) bool {
 	if !answer.Human {
 		return false
 	}
-	if item.Choice {
+	if item.Choice || item.Text {
 		value, ok := answer.Value.(string)
 		return ok && value != ""
 	}

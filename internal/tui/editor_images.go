@@ -52,7 +52,7 @@ func (m AppModel) editorModal() modalType {
 		modal = m.lightbox.returnTo
 	}
 	switch modal {
-	case commentModal, fileCommentModal, replyModal, editModal:
+	case commentModal, fileCommentModal, replyModal, editModal, formTextModal:
 		return modal
 	}
 	return noModal

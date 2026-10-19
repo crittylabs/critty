@@ -156,3 +156,30 @@ func TestApplyBulk(t *testing.T) {
 		t.Fatal("selection did not replace another choice")
 	}
 }
+
+func TestTextFields(t *testing.T) {
+	items, err := Parse("- [x] Reason <!-- form: id=reason text required -->\n- [ ] Other <!-- form: id=q value=other text tags=t -->\n- [ ] Plain <!-- form: id=q value=plain -->\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsTextField(items[0]) || IsTextField(items[1]) {
+		t.Fatalf("text kinds: %+v", items)
+	}
+	defaults := Defaults(items)
+	if defaults["reason"].Value != "" || Selected(items[0], defaults["reason"]) {
+		t.Fatal("initial mark answered a text field")
+	}
+	if !Satisfied(items[0], Answer{Value: "because", Human: true}) || Satisfied(items[0], Answer{Value: "", Human: true}) {
+		t.Fatal("text field satisfaction")
+	}
+	for _, source := range []string{
+		"- [ ] A <!-- form: id=a text consent -->",
+		"- [ ] A <!-- form: id=a text tags=t -->",
+		"- [ ] All <!-- form: id=all select-all=t text -->\n- [ ] B <!-- form: tags=t -->",
+		"- [ ] A <!-- form: id=a text=yes -->",
+	} {
+		if _, err := Parse(source); err == nil {
+			t.Errorf("accepted %q", source)
+		}
+	}
+}

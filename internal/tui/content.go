@@ -372,6 +372,13 @@ func (m *AppModel) rebuildContent() {
 					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
 				}
 			}
+			for _, row := range m.formTextRows(lineNum, textWidth) {
+				if item := m.formRows[t.path][lineNum].item; item != nil {
+					layout.formControls = append(layout.formControls, formControl{line: item.Line,
+						rect: mouseRect{left: gutterWidth, right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+				}
+				layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
+			}
 		} else {
 			// Get the display content: Chroma-highlighted or raw
 			displayLine := documentDisplayLine(t, i, line)
