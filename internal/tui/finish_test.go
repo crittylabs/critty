@@ -74,8 +74,8 @@ func TestFinishPendingSummary(t *testing.T) {
 		content, _ := app.finishModalContent(70)
 		plain := strings.Join(strings.Fields(ansi.Strip(content)), " ")
 		const status = "0/1 💬 0/1 ☐ 0/1 ○ 0/1 ☐"
-		if !strings.Contains(plain, status) || strings.Index(plain, status) < strings.Index(plain, "Abort q") || strings.Contains(plain, "a/r/c: select") {
-			t.Fatalf("progress counters are not below the buttons: %s", plain)
+		if !strings.Contains(plain, status) || strings.Index(plain, status) > strings.Index(plain, "Abort q") || strings.Contains(plain, "a/r/c: select") {
+			t.Fatalf("progress counters are not above the buttons: %s", plain)
 		}
 		for _, label := range []string{"0/1 ☐", "0/1 ○"} {
 			if !hasForeground(content, progressColors.required, label) {
@@ -829,6 +829,15 @@ func TestFinishOverallHistoryStartsAtLatestComment(t *testing.T) {
 	if !strings.Contains(content, "Latest overall feedback.") {
 		t.Fatal("latest overall feedback not visible on opening")
 	}
+	plain := ansi.Strip(content)
+	previous := -1
+	for _, text := range []string{"Latest overall feedback.", "Overall comment (optional)", "Approve", "💬", "Back"} {
+		position := strings.Index(plain, text)
+		if position <= previous {
+			t.Fatalf("%q is missing or out of order: %s", text, plain)
+		}
+		previous = position
+	}
 	for _, region := range regions {
 		if region.action.scrollable && (region.action.scrollOffset == 0 || region.action.scrollOffset == region.action.scrollMaxOffset) {
 			t.Fatal("history did not start at the latest comment")
@@ -840,7 +849,7 @@ func TestFinishOverallHistoryStartsAtLatestComment(t *testing.T) {
 	}
 }
 
-func TestFinishCtrlSOnlyFocusesSubmitFromEditor(t *testing.T) {
+func TestFinishCtrlSReturnsToSelectedVerdict(t *testing.T) {
 	app, ch := newFinishTestApp(t, nil)
 	app.openFinishModal()
 	for _, focus := range []int{finishApprove, finishReject, finishComment, finishSubmit, finishBack, finishAbort} {
@@ -851,12 +860,15 @@ func TestFinishCtrlSOnlyFocusesSubmitFromEditor(t *testing.T) {
 			t.Fatal("C-s acted outside the overall editor")
 		}
 	}
-	app.modalFocus = finishText
-	app.modalTextarea.Focus()
+	app.modalFocus = finishApprove
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	if app.modalFocus != finishText || !app.modalTextarea.Focused() {
+		t.Fatal("Shift+Tab did not focus the overall editor")
+	}
 	app, _ = updateApp(app, tea.PasteMsg{Content: "Overall summary"})
 	app, cmd := updateApp(app, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
-	if isQuit(cmd) || app.modal != finishModal || app.modalFocus != finishSubmit || app.modalTextarea.Focused() || app.modalTextarea.Value() != "Overall summary" {
-		t.Fatal("C-s did not focus Submit without sending")
+	if isQuit(cmd) || app.modal != finishModal || app.modalFocus != finishComment || app.modalTextarea.Focused() || app.modalTextarea.Value() != "Overall summary" || app.session.CJ.RoundState.ReviewCommentDraft != "Overall summary" {
+		t.Fatal("C-s did not save the draft and focus Comment without sending")
 	}
 	select {
 	case <-ch:
@@ -903,14 +915,14 @@ func TestFinishVerdictGroupNavigation(t *testing.T) {
 				if app.finishVerdict != step.verdict || app.modalFocus != app.finishVerdictFocus() {
 					t.Fatalf("key %d: verdict = %s, focus = %d", step.key, app.finishVerdict, app.modalFocus)
 				}
-				for _, key := range []rune{tea.KeyTab, tea.KeyDown} {
-					app = pressKey(app, key)
+				for _, key := range []tea.KeyPressMsg{{Code: tea.KeyTab, Mod: tea.ModShift}, {Code: tea.KeyUp}} {
+					app, _ = updateApp(app, key)
 					if app.modalFocus != finishText || !app.modalTextarea.Focused() {
-						t.Fatal("Tab/Down did not focus the editor")
+						t.Fatal("Shift+Tab/Up did not focus the editor")
 					}
-					app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+					app = pressKey(app, tea.KeyTab)
 					if app.modalFocus != app.finishVerdictFocus() || app.modalTextarea.Focused() {
-						t.Fatal("Shift+Tab did not return to the selected verdict")
+						t.Fatal("Tab did not return to the selected verdict")
 					}
 				}
 			}
@@ -923,15 +935,15 @@ func TestFinishVerdictGroupNavigation(t *testing.T) {
 	}
 }
 
-func TestFinishButtonsUpFocusesEditor(t *testing.T) {
+func TestFinishButtonsUpFocusesVerdict(t *testing.T) {
 	for _, focus := range []int{finishSubmit, finishBack, finishAbort} {
 		app, _ := newFinishTestApp(t, nil)
 		app.openFinishModal()
 		app.modalTextarea.SetValue("Preserved draft")
 		app.modalFocus = focus
 		app = pressKey(app, tea.KeyUp)
-		if app.modalFocus != finishText || !app.modalTextarea.Focused() || app.modalTextarea.Value() != "Preserved draft" {
-			t.Fatalf("Up from %d did not focus the editor with its draft", focus)
+		if app.modalFocus != app.finishVerdictFocus() || app.modalTextarea.Focused() || app.modalTextarea.Value() != "Preserved draft" {
+			t.Fatalf("Up from %d did not focus the verdict or preserve the draft", focus)
 		}
 	}
 }
@@ -973,8 +985,8 @@ func TestFinishInputAutoCommentPreservesExplicitChoices(t *testing.T) {
 			t.Fatalf("%s: verdict after input = %s, want %s", scenario, app.finishVerdict, want)
 		}
 		app, _ = updateApp(app, tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
-		if app.finishVerdict != want {
-			t.Fatalf("%s: C-s changed verdict", scenario)
+		if app.finishVerdict != want || app.modalFocus != app.finishVerdictFocus() || app.modalTextarea.Focused() {
+			t.Fatalf("%s: C-s did not return to the selected verdict", scenario)
 		}
 	}
 }

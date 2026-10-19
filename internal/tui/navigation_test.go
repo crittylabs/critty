@@ -607,7 +607,7 @@ func TestFinishDialogBracketNavigationRoundTrips(t *testing.T) {
 
 	// Brackets typed into the overall comment stay in the editor.
 	app = pressKey(app, 'q')
-	app = pressKey(app, tea.KeyTab)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: ']', Text: "]"})
 	if app.modal != finishModal || app.modalTextarea.Value() != "]" {
 		t.Fatalf("] in the editor: modal %v, text %q; want the dialog to keep the input", app.modal, app.modalTextarea.Value())

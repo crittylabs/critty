@@ -134,7 +134,7 @@ func TestFinishMouseSubmitMissingConfirmationKeepsButtonsAligned(t *testing.T) {
 	}
 }
 
-func TestFinishTabOrderPlacesInputBeforeSubmit(t *testing.T) {
+func TestFinishTabOrderFollowsLayout(t *testing.T) {
 	for _, thread := range []bool{false, true} {
 		t.Run(fmt.Sprintf("thread=%t", thread), func(t *testing.T) {
 			app, _ := newFinishTestApp(t, nil)
@@ -149,11 +149,11 @@ func TestFinishTabOrderPlacesInputBeforeSubmit(t *testing.T) {
 			if app.modalFocus != finishApprove || app.modalTextarea.Focused() {
 				t.Fatal("initial focus is not on the verdict group")
 			}
-			forward := []int{finishText, finishBack, finishAbort, finishSubmit}
+			var forward []int
 			if thread {
 				forward = append(forward, finishProgressStart+int(progressThreads))
 			}
-			forward = append(forward, finishApprove)
+			forward = append(forward, finishBack, finishAbort, finishSubmit, finishText, finishApprove)
 			for _, focus := range forward {
 				app = pressKey(app, tea.KeyTab)
 				if app.modalFocus != focus || app.modalTextarea.Focused() != (focus == finishText) {
@@ -161,11 +161,11 @@ func TestFinishTabOrderPlacesInputBeforeSubmit(t *testing.T) {
 				}
 			}
 			app.modalFocus = finishSubmit
-			backward := []int{finishAbort, finishBack, finishText, finishApprove}
+			backward := []int{finishAbort, finishBack}
 			if thread {
 				backward = append(backward, finishProgressStart+int(progressThreads))
 			}
-			backward = append(backward, finishSubmit)
+			backward = append(backward, finishApprove, finishText, finishSubmit)
 			for _, focus := range backward {
 				app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 				if app.modalFocus != focus || app.modalTextarea.Focused() != (focus == finishText) {

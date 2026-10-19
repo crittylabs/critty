@@ -548,7 +548,7 @@ def scenarios() -> None:
             "plan.md",
             "Existing feedback.",
         )
-        unchanged.keys("q", "Tab")
+        unchanged.keys("q", "BTab")
         unchanged.text("Preserve draft.")
         unchanged.keys("Tab", "a", "Enter")
         wait_until(
@@ -669,7 +669,7 @@ def scenarios() -> None:
                 assert not json.loads(receipt.read_text())["pruned"]
             else:
                 assert "critty: warning: history:" not in submission.err.read_text()
-            submission.keys("q", "Down")
+            submission.keys("q", "BTab")
             body = f"Overall comment: {verdict}."
             submission.text(body)
             submission.wait_screen("● Comment", "first input selects Comment")
@@ -714,7 +714,7 @@ def scenarios() -> None:
         )
 
         draft = Round("submit-draft", ["plan.md"])
-        draft.keys("q", "Tab")
+        draft.keys("q", "BTab")
         draft.text("Saved draft.")
         draft.keys("Escape")
         draft.keys("q", "q")
@@ -733,7 +733,7 @@ def scenarios() -> None:
         wait_until(
             lambda: "Saved draft" in resumed_draft.screen(), "restored overall draft"
         )
-        resumed_draft.keys("Tab")
+        resumed_draft.keys("BTab")
         resumed_draft.text(" Updated draft.")
         resumed_draft.wait_screen("Updated draft", "updated overall draft")
         cli("stop", "--session", draft.session)
@@ -889,7 +889,7 @@ def scenarios() -> None:
         form.click(r"1/1 💬", last=True)
         form.settle()
         assert not form.result.exists(), "counter click submitted the review"
-        form.keys("q", "Down", "C-s", "Tab", "Tab", "Tab", "Enter")
+        form.keys("q", "BTab", "C-s", "Tab", "Tab", "Tab", "Enter")
         form.wait_screen("L5/", "Submit counter focuses unchecked consent")
         form.keys("q")
         form.wait_screen("Optional items remain unanswered", "optional items notice")

@@ -37,7 +37,7 @@ func TestSubmitProgressCountersFocusAndNavigate(t *testing.T) {
 				app.activeTab = 1
 				app.openFinishModal()
 				app.modalTextarea.SetValue("Keep this overall draft.")
-				app.modalFocus = finishSubmit
+				app.modalFocus = app.finishVerdictFocus()
 				for count := progressThreads; count <= kind; count++ {
 					app = pressKey(app, tea.KeyTab)
 				}

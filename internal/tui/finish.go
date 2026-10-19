@@ -166,13 +166,13 @@ func (m *AppModel) finishFocusedAction() (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) finishFocusOrder() []int {
-	order := []int{m.finishVerdictFocus(), finishText, finishBack, finishAbort, finishSubmit}
+	order := []int{finishText, m.finishVerdictFocus()}
 	for _, count := range m.progressCounts() {
 		if count.total > 0 {
 			order = append(order, finishProgressStart+int(count.kind))
 		}
 	}
-	return order
+	return append(order, finishBack, finishAbort, finishSubmit)
 }
 
 func (m *AppModel) requestFinishAbort() (tea.Model, tea.Cmd) {
@@ -207,7 +207,11 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+s":
 		if m.modalFocus == finishText {
-			m.modalFocus = finishSubmit
+			m.saveFinishDraft()
+			if m.err != nil {
+				return m, nil
+			}
+			m.modalFocus = m.finishVerdictFocus()
 			m.modalTextarea.Blur()
 		}
 		return m, nil
@@ -263,17 +267,22 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.modalFocus = order[min(len(order)-1, slices.Index(order, m.modalFocus)+1)]
 		m.selectFinishVerdict(m.modalFocus)
 	case "up":
-		if m.modalFocus == finishSubmit || m.modalFocus == finishBack || m.modalFocus == finishAbort {
+		if m.modalFocus >= finishApprove && m.modalFocus <= finishReject {
 			m.modalFocus = finishText
 			return m, m.modalTextarea.Focus()
+		}
+		if m.modalFocus >= finishSubmit {
+			m.modalFocus = m.finishVerdictFocus()
+			break
 		}
 		m.scrollFinishReference(-1)
 	case "k":
 		m.scrollFinishReference(-1)
 	case "down":
 		if m.modalFocus >= finishApprove && m.modalFocus <= finishReject {
-			m.modalFocus = finishText
-			return m, m.modalTextarea.Focus()
+			order := m.finishFocusOrder()
+			m.modalFocus = order[2]
+			break
 		}
 		m.scrollFinishReference(1)
 	case "j":
@@ -370,8 +379,7 @@ func (m AppModel) finishNotices(width int) string {
 func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Submit review"), width)
 	content := title + "\n"
-	choices, choiceRegions := m.finishChoices(width, strings.Count(content, "\n"))
-	content += choices + "\n"
+	choices, _ := m.finishChoices(width, 0)
 	var reference strings.Builder
 	reference.WriteString(strings.TrimSpace(m.formSummary(max(1, width-4))))
 	var latestThread threadLayout
@@ -391,11 +399,16 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 			reference.WriteString(strings.Join(thread.lines, "\n"))
 		}
 	}
-	regions := append([]modalMouseRegion{closeRegion}, choiceRegions...)
+	regions := []modalMouseRegion{closeRegion}
 	buttons, _ := m.finishButtons(width, 0)
 	progress, _ := m.layoutProgressCounts(width, 0, progressKind(m.modalFocus-finishProgressStart))
 	notice := m.finishNotices(width)
-	available := m.height - modalStyle.GetVerticalFrameSize() - lipgloss.Height(content) - m.finishTextareaHeight() - lipgloss.Height(buttons) - lipgloss.Height(progress) - lipgloss.Height(notice) - 4
+	available := m.height - modalStyle.GetVerticalFrameSize() - lipgloss.Height(content) - lipgloss.Height(choices) - m.finishTextareaHeight() - lipgloss.Height(buttons) - lipgloss.Height(progress) - lipgloss.Height(notice) - 4
+	// Keep actions reachable; counters still show pending items in small terminals.
+	if available < 0 {
+		available += lipgloss.Height(notice)
+		notice = ""
+	}
 	if reference.Len() > 0 && available >= 3 {
 		height := min(8, available)
 		initialOffset := latestThreadStart + latestThread.initialOffset(height-2)
@@ -412,17 +425,20 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 	}
 	content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), width)
 	regions = append(regions, textareaRegion)
-	buttons, buttonRegions := m.finishButtons(width, strings.Count(content, "\n"))
-	content += buttons
-	regions = append(regions, buttonRegions...)
-	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n")+1, progressKind(m.modalFocus-finishProgressStart))
-	content += "\n" + progress
+	choices, choiceRegions := m.finishChoices(width, strings.Count(content, "\n"))
+	content += choices + "\n"
+	regions = append(regions, choiceRegions...)
+	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n"), progressKind(m.modalFocus-finishProgressStart))
+	content += progress + "\n"
 	for _, region := range progressRegions {
 		regions = append(regions, modalMouseRegion{rect: region.rect, action: modalMouseAction{focus: finishProgressStart + int(region.kind)}})
 	}
 	if notice != "" {
-		content += "\n" + notice
+		content += notice + "\n"
 	}
+	buttons, buttonRegions := m.finishButtons(width, strings.Count(content, "\n"))
+	content += buttons
+	regions = append(regions, buttonRegions...)
 	return content, regions
 }
 

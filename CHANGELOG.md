@@ -14,7 +14,7 @@
 
 ### Changed
 
-- Dialog action buttons align to the right, with the primary action last.  Keyboard focus follows the displayed order, and buttons wrap with their shortcut hints in narrow terminals.
+- Dialog action buttons align to the right, with the primary action last.  Keyboard focus follows the displayed order, and buttons wrap with their shortcut hints in narrow terminals.  In Submit, the overall comment precedes the verdict choices, and progress counts precede the actions.  Start on the selected verdict; use `Shift-Tab` to write a comment and `C-s` to return to the verdict before pressing `Enter`.
 
 ### Fixed
 
