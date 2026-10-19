@@ -7,13 +7,29 @@ description: Stress-test a plan, decision, or idea through questions in Critty, 
 
 Turn an idea or draft into a record of decisions the user can inspect and correct.  Use a question attachment for choices, comments for reasoning, and successive revisions to show what the answers change.  This skill owns the interview; `/critty` owns terminal launch, waiting, feedback collection, and recovery.  Use `/critty-cli` for attachment and result contracts.
 
-Inspired by Matt Pocock's [grilling](https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md) and [grill-with-docs](https://github.com/mattpocock/skills/blob/main/skills/engineering/grill-with-docs/SKILL.md) skills.  Critty supplies the interaction; the resulting vocabulary and decisions remain usable by their document workflows.
+Inspired by Matt Pocock's [grilling](https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md) (`grill-me`) and [grill-with-docs](https://github.com/mattpocock/skills/blob/main/skills/engineering/grill-with-docs/SKILL.md) skills.  Their installation is optional: the interview procedure is defined here, and the documentation contract is bundled in [compatible artifacts](references/artifacts.md).  Critty supplies the interaction; the resulting vocabulary and decisions remain usable by those document workflows.
 
-## Choose the output
+## Agree on the output and destination
 
-For an interview alone, preserve the shared understanding in the conversation, as `grilling` / `grill-me` do.  For an interview with domain documentation, follow [compatible artifacts](references/artifacts.md): update `GLOSSARY.md` as terms are settled and offer qualifying ADRs under `docs/adr/`.  A request to work like `grill-with-docs` selects this documentation mode.  Merely reading an existing document does not select it.  Honor an explicit output request; clarify only when the intended mode is unclear.
+Treat artifact types and their destinations as interview decisions.  Inspect the project, existing documents, and the caller's storage conventions before preparing the first question round.  Honor explicit choices without asking again; present the remaining choices in the question attachment with concrete recommendations and reasons.
 
-The artifact reference is bundled, so the external skills need not be installed.  Question attachments and JSON exports are interview evidence, not replacements for the glossary, ADRs, or conversation needed by a later specification step.
+Offer the relevant outputs separately, allowing combinations:
+
+- A decision summary or design note that stands on its own, with decisions, rationale, scope, constraints, and deferrals.
+- A glossary for settled domain terms.
+- ADRs for qualifying architecture decisions, with their alternatives and rationale.
+- Conversation-only output when the user wants no standalone files.  Record this choice explicitly; unchecked artifact items do not select it.
+
+Use independent checkboxes for requested files so the user can select a summary, glossary, ADRs, or any combination.  Attach `type=file` and a concrete `default="..."` to each summary or glossary checkbox, and `type=directory` to the ADR checkbox.  Prefer continuing an existing record.  Offer suitable project paths or the user's customary document location, explaining the recommendation; adapt example paths to the actual project.  When only a destination remains, use a standalone typed field.  Leave new output paths unrestricted; use `existing` only when a destination must already exist.
+
+Read selected checkbox inputs from `text`, or standalone path fields from `value`, and require a usable path for every selected file output before final confirmation.  Unselected drafts are not destinations.  If the discussion reveals useful terminology or architecture decisions, offer the relevant artifact rather than silently adding it to the output.  Keep undecided artifact types and destinations open across rounds.
+
+For selected glossary or ADR outputs, follow [compatible artifacts](references/artifacts.md), applying only the selected parts.  A request to work like `grill-with-docs` selects both types; confirm their concrete destinations and honor any explicit narrower scope.  Merely reading an existing document does not select an output type.  Explain when the discussion produces no content qualifying for a selected artifact.
+
+
+Agree on the languages of question attachments, confirmations, and artifacts alongside the output choices.  Recommend languages from the chat, the project's conventions, and any explicit user preference.  When several choices fit, present language choices in the question attachment; allow different languages for discussion and project documents, or for different artifacts.  Prefer discussing an artifact in its intended language when that suits the user, so translation is not deferred until delivery.  Honor an explicit choice without asking again.  Switch subsequent rounds and pending artifacts when the user changes that choice or the project context calls for an agreed adjustment.  Preserve settled decisions and established domain terms when translating.
+
+Question attachments, JSON exports, and Critty history are interview evidence.  Offer a history export separately when requested; it is not a substitute for the selected artifacts.  For conversation-only output, preserve the decisions, rationale, constraints, and deferrals in the conversation.
 
 ## Identify what needs a decision
 
@@ -56,7 +72,25 @@ brief outages without leaving requests running indefinitely.
 Recommendation: keep credentials and raw customer records local.
 
 - [ ] Describe the boundary. <!-- form: id=local-data text -->
+
+## Q3. How should the final understanding be delivered?
+
+Recommendation: save documents so the decisions can be maintained with the project.
+
+- [ ] Save documents (recommended). <!-- form: id=delivery value=documents tags=recommended -->
+- [ ] Keep the result in the conversation only. <!-- form: id=delivery value=conversation -->
+
+## Q4. If saving documents, which artifacts and destinations?
+
+Choose one or more and edit their paths.  Recommendation: start with a decision
+summary; add a glossary or ADRs if the discussion needs them.
+
+- [ ] Decision summary (recommended). <!-- form: id=output-summary checkbox type=file default="docs/retry-policy.md" tags=recommended -->
+- [ ] Domain glossary. <!-- form: id=output-glossary checkbox type=file default="GLOSSARY.md" -->
+- [ ] Architecture decisions. <!-- form: id=output-adrs checkbox type=directory default="docs/adr/" -->
 ```
+
+Ask only unresolved output questions; omit file choices for an explicit conversation-only request.  If conversation-only is selected, disregard file selections and their drafts.  If documents are selected but no artifact or usable destination is chosen, keep the output decision open.
 
 Keep unchanged questions' IDs and choice definitions stable.  Use a new ID when the meaning changes, even if the wording is similar.  Leave every item unchecked; recommendations are tags, and only the user's own selections are answers.
 
@@ -76,7 +110,7 @@ Confirm answers, Comment, and Reject submissions can supply interview answers wi
 
 Revise the decision record from the actual responses.  Explain what each changed answer affects, including earlier conclusions that now need another look.  Reply to substantive feedback using `/critty`'s comment workflow.
 
-In documentation mode, record newly settled terms and accepted ADRs before opening the next round, using the artifact reference and the caller's review policy.  Keep tentative answers in the question attachment until confirmed.  Carry a concise account of answers and rationale into the conversation as well, including exact constraints and explicit deferrals, so a following skill can continue without interpreting Critty JSON.
+For selected glossary and ADR outputs, record newly settled terms and accepted ADRs before opening the next round, using the artifact reference and the caller's review policy.  Keep tentative answers in the question attachment until confirmed.  Carry a concise account of answers and rationale into the conversation as well, including exact constraints and explicit deferrals, so a following skill can continue without interpreting Critty JSON.
 
 Replace the question attachment with the next round, keeping settled decisions visible in a compact record.  Resume the same session with the complete ordered attachment list and fresh output paths:
 
@@ -88,8 +122,10 @@ Follow `/critty`'s launch and wait procedure for every round.  Its approval cond
 
 ## Confirm shared understanding
 
-When no actionable questions remain, present the resulting decisions, rationale, scope, explicit deferrals, and remaining risks in the same session.  Resume with `--no-answers` so the user approves with the ordinary Approve.  Ask the user to confirm that this accurately captures the shared understanding.  Unanswered questions remain open unless the user explicitly defers or removes them; a stalled interview is not completion.
+When no actionable questions remain, present the resulting decisions, rationale, scope, explicit deferrals, remaining risks, and each selected artifact type with its destination path in the same session.  Specify exact paths for authored files, or the task and session IDs and any chosen export folder for history.  Include the artifact contents or pending changes in this confirmation.  For conversation-only output, state that choice explicitly.  Resume with `--no-answers` so the user approves with the ordinary Approve.  Ask the user to confirm that this accurately captures the shared understanding.  Unanswered questions remain open unless the user explicitly defers or removes them; a stalled interview is not completion.
 
-Finish only after that confirmation, with no unacknowledged open decisions.  In documentation mode, verify the glossary and ADRs against [compatible artifacts](references/artifacts.md) and report their paths; explain when nothing qualified for a file.  Honor other requested document outputs within their authorized scope.  In every document written from the interview, copy images from answers and comments into that document's own asset directory and link them relative to the document before the session is cleaned up.  Return the confirmed decisions, rationale, exact constraints, and deferrals to the conversation for a later `to-spec` or equivalent synthesis step.  Do not run or publish that step without the user's request.
+After confirmation, save or apply every agreed artifact under the caller's review and permission rules.  Read back the saved files, verify them against the confirmed content, and return clickable links to their actual paths.  For selected history output, use `/critty-history` to verify task membership and retention, and return the task and session IDs and any exported document links.  A save failure leaves the deliverable incomplete; preserve the drafts and report the blocker before cleanup.  Finish only after confirmation and verified delivery, with no unacknowledged open decisions.
+
+Verify selected glossary and ADR outputs against [compatible artifacts](references/artifacts.md); explain when nothing qualified for a file.  In every document written from the interview, copy images from answers and comments into that document's own asset directory and link them relative to the document before the session is cleaned up.  Return the confirmed decisions, rationale, exact constraints, and deferrals to the conversation for a later `to-spec` or equivalent synthesis step.  Do not run or publish that step without the user's request.
 
 Interview approval confirms understanding only; implementation, publication, and other operations follow the caller's separate authorization rules.  Use `/critty-history` when the interview task is complete, retaining evidence according to its policy.  Remove only the returned scratch directory once its files are no longer needed and the confirmed understanding is available outside it; keep `.critty/tmp/.gitignore` and other tasks' directories.
