@@ -607,3 +607,64 @@ func TestFormListModal(t *testing.T) {
 		t.Fatalf("click did not go to Reason: modal %v line %d", app.modal, app.tab().cursorLine)
 	}
 }
+
+func TestRankFieldReordersInPlace(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "# Lead\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
+	d := app.forms.Document(app.tab().path)
+	rows := func() []string {
+		var labels []string
+		for _, line := range strings.Split(ansi.Strip(app.contentViewport.GetContent()), "\n") {
+			for _, label := range []string{"Alpha", "Beta", "Gamma", "After"} {
+				if strings.Contains(line, label) {
+					labels = append(labels, label)
+				}
+			}
+		}
+		return labels
+	}
+	if !strings.Contains(ansi.Strip(app.contentViewport.GetContent()), "Unranked") || len(app.missingForms()) != 0 {
+		t.Fatal("unranked field not marked")
+	}
+	if content := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(content, " 1  Alpha") || !strings.Contains(content, " 3  Gamma") {
+		t.Fatalf("unranked items lack numbers: %q", content)
+	}
+	app.tab().cursorLine, app.tab().cursorOnForm = 2, true
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModAlt})
+	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"a", "b", "c"}) || !d.Answers["lead"].Human {
+		t.Fatalf("M-↑ on the first item did not confirm the order: %+v", d.Answers["lead"])
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
+	if got := rows(); !slices.Equal(got, []string{"Beta", "Alpha", "Gamma", "After"}) {
+		t.Fatalf("display order: %v", got)
+	}
+	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"b", "a", "c"}) || !d.Answers["lead"].Human {
+		t.Fatalf("answer: %+v", d.Answers["lead"])
+	}
+	if app.tab().cursorLine != 2 || app.rankMove(app.tab(), 2) != 1 || app.rankMove(app.tab(), 3) != -1 || app.rankMove(app.tab(), 4) != 0 {
+		t.Fatal("moved rows are not tracked")
+	}
+	app = pressKey(app, 'j')
+	if app.tab().cursorLine != 4 {
+		t.Fatalf("cursor did not follow display order: line %d", app.tab().cursorLine)
+	}
+	rowTop := map[int]int{}
+	for _, control := range app.contentLayout.formControls {
+		if _, ok := rowTop[control.line]; !ok {
+			rowTop[control.line] = control.rect.top
+		}
+	}
+	x, y := contentScreenPoint(app, gutterWidth+4, rowTop[4])
+	app = pressMouse(app, x, y)
+	_, y = contentScreenPoint(app, gutterWidth+4, rowTop[2])
+	app = moveMouse(app, x, y)
+	if d.Answers["lead"].Human {
+		t.Fatal("dragging saved before release")
+	}
+	app = releaseMouse(app, x, y)
+	if got := rows(); !slices.Equal(got, []string{"Beta", "Gamma", "Alpha", "After"}) {
+		t.Fatalf("dragging did not move Gamma to Alpha: %v", got)
+	}
+	if order, _ := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !d.Answers["lead"].Human || !slices.Equal(order, []string{"b", "c", "a"}) {
+		t.Fatalf("dragged order not saved: %+v", d.Answers["lead"])
+	}
+}

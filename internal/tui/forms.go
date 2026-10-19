@@ -253,6 +253,11 @@ func (m *AppModel) toggleForm(line int) bool {
 			continue
 		}
 		m.tab().cursorOnForm = true
+		if item.Rank {
+			m.saveRank(d, item.ID, m.rankLayout(d, item.ID).order)
+			m.rebuildContent()
+			return true
+		}
 		if form.IsTextField(item) {
 			m.openFormText(item)
 			return true
@@ -434,6 +439,12 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	label := highlightInlineWith(strings.TrimSpace(raw[column+3:]), formChip.link, formChip.code)
 	if checkbox.SelectAll != nil {
 		return indent + m.selectAllDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
+	}
+	if checkbox.Rank {
+		// The drag handle sits between the line number and the rank.
+		handle := lipgloss.NewStyle().Foreground(formChip.cyan).Render("⇅") + " "
+		indent = strings.TrimSuffix(indent, "  ")
+		return indent + handle + m.rankDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
 	}
 	answer := d.Answers[checkbox.ID]
 	selected := form.Selected(*checkbox, answer)

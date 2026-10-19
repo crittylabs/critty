@@ -39,6 +39,8 @@ type Item struct {
 	SelectAll []string `json:"select_all,omitempty"`
 	// Text makes a choice accept a note, or another item a text field.
 	Text bool `json:"text,omitempty"`
+	// Rank makes items sharing an ID one field ordered by the reviewer.
+	Rank bool `json:"rank,omitempty"`
 }
 
 type Answer struct {
@@ -135,6 +137,12 @@ func Parse(source string) ([]Item, error) {
 			return ast.WalkStop, err
 		}
 		item.Definition = definition.String()
+		if item.Rank {
+			if !item.Choice || item.Consent || item.Text || item.Tags != nil || item.SelectAll != nil {
+				return ast.WalkStop, fmt.Errorf("line %d: rank requires a value and cannot be consent, text, or tagged", item.Line)
+			}
+			item.Choice = false
+		}
 		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice || item.Text) {
 			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, text, or have a value", item.Line)
 		}
@@ -142,7 +150,7 @@ func Parse(source string) ([]Item, error) {
 			return ast.WalkStop, fmt.Errorf("line %d: text fields cannot be consent or have tags", item.Line)
 		}
 		if item.ID == "" {
-			if item.Required || item.Consent || item.Choice || item.SelectAll != nil {
+			if item.Required || item.Consent || item.Choice || item.Rank || item.SelectAll != nil {
 				return ast.WalkStop, fmt.Errorf("line %d: form requires an explicit id", item.Line)
 			}
 			item.ID = fmt.Sprintf("auto:%d", item.Line)
@@ -159,6 +167,12 @@ func Parse(source string) ([]Item, error) {
 			return nil, fmt.Errorf("line %d: consent cannot have a value", item.Line)
 		}
 		for _, old := range groups[item.ID] {
+			if old.Rank || item.Rank {
+				if !old.Rank || !item.Rank || old.Value == item.Value || old.Required != item.Required {
+					return nil, fmt.Errorf("line %d: inconsistent ranking for %q", item.Line, item.ID)
+				}
+				continue
+			}
 			if !old.Choice || !item.Choice {
 				return nil, fmt.Errorf("line %d: duplicate boolean id %q", item.Line, item.ID)
 			}
@@ -167,6 +181,11 @@ func Parse(source string) ([]Item, error) {
 			}
 		}
 		groups[item.ID] = append(groups[item.ID], item)
+	}
+	for id, group := range groups {
+		if group[0].Rank && len(group) < 2 {
+			return nil, fmt.Errorf("line %d: ranking %q needs at least two items", group[0].Line, id)
+		}
 	}
 	if _, err := Targets(items); err != nil {
 		return nil, err
@@ -225,6 +244,8 @@ func attributes(item *Item, source string) error {
 			item.Consent = true
 		case key == "text" && !assigned:
 			item.Text = true
+		case key == "rank" && !assigned:
+			item.Rank = true
 		case key == "tags" && assigned:
 			if item.Tags, err = tagList(key, value); err != nil {
 				return err
@@ -261,12 +282,15 @@ func Defaults(items []Item) map[string]Answer {
 		}
 		if _, exists := answers[item.ID]; !exists {
 			var value any = false
-			if item.Choice || item.Text {
+			switch {
+			case item.Rank:
+				value = nil
+			case item.Choice || item.Text:
 				value = ""
 			}
 			answers[item.ID] = Answer{Value: value}
 		}
-		if item.Initial && !item.Consent && !item.Required && (item.Choice || !item.Text) {
+		if item.Initial && !item.Consent && !item.Required && !item.Rank && (item.Choice || !item.Text) {
 			var value any = true
 			if item.Choice {
 				value = item.Value
@@ -279,6 +303,8 @@ func Defaults(items []Item) map[string]Answer {
 
 func Selected(item Item, answer Answer) bool {
 	switch {
+	case item.Rank:
+		return len(rankValues(answer.Value)) > 0
 	case item.Choice:
 		return answer.Value == item.Value
 	case item.Text:
@@ -298,11 +324,53 @@ func Satisfied(item Item, answer Answer) bool {
 	if !answer.Human {
 		return false
 	}
+	if item.Rank {
+		return len(rankValues(answer.Value)) > 0
+	}
 	if item.Choice || item.Text {
 		value, ok := answer.Value.(string)
 		return ok && value != ""
 	}
 	return answer.Value == true
+}
+
+// RankOrder returns the values of a ranking in the answered order, or in
+// source order with ranked false until a complete ranking is answered.
+func RankOrder(items []Item, id string, answer Answer) (values []string, ranked bool) {
+	for _, item := range items {
+		if item.ID == id && item.Rank {
+			values = append(values, item.Value)
+		}
+	}
+	answered := rankValues(answer.Value)
+	if len(answered) != len(values) {
+		return values, false
+	}
+	for _, value := range values {
+		if !slices.Contains(answered, value) {
+			return values, false
+		}
+	}
+	return answered, true
+}
+
+// rankValues accepts answers decoded from JSON as well as those set in memory.
+func rankValues(value any) []string {
+	switch value := value.(type) {
+	case []string:
+		return value
+	case []any:
+		values := make([]string, 0, len(value))
+		for _, v := range value {
+			text, ok := v.(string)
+			if !ok {
+				return nil
+			}
+			values = append(values, text)
+		}
+		return values
+	}
+	return nil
 }
 
 type Heading struct {

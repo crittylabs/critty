@@ -102,9 +102,9 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 		}
 		state.Documents = append(state.Documents, FormDocument{AttachedDocument: d, Items: items, Answers: form.Defaults(items)})
 		for _, item := range items {
-			if item.Tags != nil || item.SelectAll != nil || item.Text {
+			if item.Tags != nil || item.SelectAll != nil || item.Text || item.Rank {
 				// Readers of version 1 know neither select-all items without
-				// answers nor text answers.
+				// answers nor text and ranking answers.
 				state.Version = 2
 			}
 		}

@@ -65,6 +65,17 @@ func (m *AppModel) formAnswerSummary(items []form.Item, field form.Item, answer 
 		return line
 	}
 	switch {
+	case field.Rank:
+		order, _ := form.RankOrder(items, field.ID, answer)
+		labels := make([]string, len(order))
+		for i, value := range order {
+			for _, item := range items {
+				if item.ID == field.ID && item.Value == value {
+					labels[i] = fmt.Sprintf("%d. %s", i+1, item.Label)
+				}
+			}
+		}
+		return strings.Join(labels, "  ")
 	case field.Choice:
 		for _, item := range items {
 			if item.ID == field.ID && form.Selected(item, answer) {
@@ -187,7 +198,7 @@ func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMous
 			status, statusColor = "✓", formChip.green
 		}
 		label := row.item.Label
-		if row.item.Choice {
+		if row.item.Choice || row.item.Rank {
 			label = row.item.ID
 		}
 		text := lipgloss.NewStyle().Foreground(statusColor).Bold(true).Render(status) + " " + label

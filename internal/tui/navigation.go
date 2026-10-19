@@ -41,7 +41,8 @@ func (m *AppModel) visualLines(t *FileTab) []lineRef {
 		return m.diffVisualLines(t)
 	}
 	lines := make([]lineRef, 0, t.doc.LineCount()+len(t.deletedAfter))
-	for line := 1; line <= t.doc.LineCount(); line++ {
+	for _, index := range m.lineOrder(t) {
+		line := index + 1
 		for _, del := range t.deletedAfter[line-1] {
 			lines = append(lines, lineRef{side: "old", line: del.OldLineNum})
 		}

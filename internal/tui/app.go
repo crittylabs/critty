@@ -153,6 +153,7 @@ type AppModel struct {
 	killRing          killRing
 	completion        completionState
 	mouseSelecting    bool
+	rankDrag          rankDragState
 	hoveredGutterLine int
 	hoveredGutterSide string
 	contentLayout     renderedContentLayout
@@ -878,6 +879,11 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.String() == "space" || msg.String() == " " {
 		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
+			return m, nil
+		}
+	}
+	if direction := map[string]int{"alt+up": -1, "alt+down": 1}[msg.String()]; direction != 0 {
+		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.moveRank(t.cursorLine, direction) {
 			return m, nil
 		}
 	}
@@ -3294,7 +3300,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 					m.focused = contentPane
 					m.tab().cursorLine, m.tab().cursorSide, m.tab().cursorOnAnnotation = control.line, "", false
 					m.tab().cursorOnForm = true
-					m.toggleForm(control.line)
+					if !m.startRankDrag(control.line) {
+						m.toggleForm(control.line)
+					}
 					return m, nil
 				}
 			}
@@ -3548,6 +3556,10 @@ func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd
 	if len(m.tabs) == 0 {
 		return m, nil
 	}
+	if m.rankDrag.active {
+		m.dragRank(msg.Mouse())
+		return m, nil
+	}
 	if !m.mouseSelecting {
 		m.updateGutterHover(msg.Mouse())
 		return m, nil
@@ -3581,6 +3593,10 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 
 func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
 	if len(m.tabs) == 0 {
+		return m, nil
+	}
+	if m.rankDrag.active {
+		m.finishRankDrag()
 		return m, nil
 	}
 	if !m.mouseSelecting || msg.Mouse().Button != tea.MouseLeft {
@@ -4218,6 +4234,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "enter", desc: "comment/open"},
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
+		{keys: "M-↑/↓", desc: "move ranked item"},
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},

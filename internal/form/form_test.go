@@ -183,3 +183,34 @@ func TestTextFields(t *testing.T) {
 		}
 	}
 }
+
+func TestRankFields(t *testing.T) {
+	items, err := Parse("1. [ ] A <!-- form: id=r rank value=a required -->\n2. [x] B <!-- form: id=r rank value=b required -->\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaults := Defaults(items)
+	if order, ranked := RankOrder(items, "r", defaults["r"]); ranked || !slices.Equal(order, []string{"a", "b"}) || Satisfied(items[0], defaults["r"]) {
+		t.Fatalf("initial ranking: %v %v", order, ranked)
+	}
+	answer := Answer{Value: []any{"b", "a"}, Human: true}
+	if order, ranked := RankOrder(items, "r", answer); !ranked || !slices.Equal(order, []string{"b", "a"}) || !Satisfied(items[1], answer) {
+		t.Fatalf("decoded ranking: %v %v", order, ranked)
+	}
+	if _, ranked := RankOrder(items, "r", Answer{Value: []any{"a", "c"}}); ranked {
+		t.Fatal("accepted a ranking of other values")
+	}
+	for _, source := range []string{
+		"- [ ] A <!-- form: id=r rank value=a -->",
+		"- [ ] A <!-- form: id=r rank -->\n- [ ] B <!-- form: id=r rank -->",
+		"- [ ] A <!-- form: rank value=a -->\n- [ ] B <!-- form: rank value=b -->",
+		"- [ ] A <!-- form: id=r rank value=a -->\n- [ ] B <!-- form: id=r value=b -->",
+		"- [ ] A <!-- form: id=r rank value=a -->\n- [ ] B <!-- form: id=r rank value=a -->",
+		"- [ ] A <!-- form: id=r rank value=a text -->\n- [ ] B <!-- form: id=r rank value=b -->",
+		"- [ ] A <!-- form: id=r rank value=a tags=t -->\n- [ ] B <!-- form: id=r rank value=b -->",
+	} {
+		if _, err := Parse(source); err == nil {
+			t.Errorf("accepted %q", source)
+		}
+	}
+}
