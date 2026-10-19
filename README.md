@@ -253,6 +253,12 @@ A comment in a Claude Code review requests a second opinion from Codex Astra.  C
 
 ![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/a5710b35-fa00-40e3-9faa-7160fe5fc190)
 
+### Answering a questionnaire with form widgets
+
+Recorded with a v1.4.0 development build.
+
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/4f8bcb38-2d3c-42b2-b0b6-2b1c81d9016b)
+
 ### Review progress and pending items
 
 ![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/bd175503-3d16-4c54-ba87-6fc11a624604)
