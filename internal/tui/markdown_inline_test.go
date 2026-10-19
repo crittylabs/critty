@@ -13,6 +13,10 @@ func TestInlineMarkdownParser(t *testing.T) {
 	}{
 		{"", "", ""},
 		{"   ", "   ", ""},
+		{" plain \t ", " plain \t ", ""},
+		{"**bold**  ", "bold  ", ""},
+		{"`code`  ", " code   ", ""},
+		{"[label](https://example.org)  ", "label  ", "https://example.org"},
 		{"**bold `literal ** stars` end**", "bold  literal ** stars  end", ""},
 		{"``a ` b``", " a ` b ", ""},
 		{"[**label**](https://example.org/a_(b))", "label", "https://example.org/a_(b)"},

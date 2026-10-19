@@ -15,7 +15,11 @@ func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) strin
 	}
 	// Keep list markers and other block syntax in this inline-only input.
 	const prefix = "x "
-	source := []byte(prefix + line)
+	// Markdown discards trailing spaces, but diff fragments must join without
+	// changing the source text between highlighted words.
+	content := strings.TrimRight(line, " \t")
+	suffix := line[len(content):]
+	source := []byte(prefix + content)
 	root := parser.New(parser.WithExtensions(extension.LinkifyParser)).Parse(source)
 	var render func(ast.Node, lipgloss.Style) string
 	children := func(n ast.Node, style lipgloss.Style) string {
@@ -51,5 +55,5 @@ func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) strin
 		}
 		return children(n, style)
 	}
-	return strings.TrimPrefix(render(root, lipgloss.NewStyle()), prefix)
+	return strings.TrimPrefix(render(root, lipgloss.NewStyle()), prefix) + suffix
 }

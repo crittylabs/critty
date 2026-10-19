@@ -142,25 +142,41 @@ func TestDeletedMarkdownLinesWrap(t *testing.T) {
 	}
 }
 
-func TestInlineDiffDisplayLinesUseDistinctBackgrounds(t *testing.T) {
+func TestInlineDiffDisplayLinesPreserveTextAndBackgrounds(t *testing.T) {
 	initAdaptiveStyles(true)
-	segments := []gitpkg.InlineSegment{
-		{Content: "common ", Changed: false},
-		{Content: "added", Changed: true},
+	before := "Review code with your coding agent."
+	after := "Review documents with your agent."
+	patch, err := gitpkg.ParsePatch(strings.NewReader("diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-" + before + "\n+" + after + "\n"))
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	rendered := strings.Join(inlineDiffDisplayLines(segments, true, 80, diffCommonTextBg, diffAddedTextBg, nil), "\n")
 	commonBackground := bgToAnsi(diffCommonTextBg.GetBackground())
-	changedBackground := bgToAnsi(diffAddedTextBg.GetBackground())
-	if commonBackground == changedBackground {
-		t.Fatal("expected common and changed text to use distinct backgrounds")
-	}
 	if commonBackground == bgToAnsi(diffChangedLineBg.GetBackground()) ||
 		commonBackground == bgToAnsi(diffDeletedLineBg.GetBackground()) {
 		t.Fatal("expected replacement-line common text to use a neutral background")
 	}
-	if !strings.Contains(rendered, commonBackground) || !strings.Contains(rendered, changedBackground) {
-		t.Errorf("rendered line does not contain both backgrounds: %q", rendered)
+	diff := patch.Files[0].Diff
+	for _, tc := range []struct {
+		name, want string
+		segments   []gitpkg.InlineSegment
+		changed    lipgloss.Style
+	}{
+		{"old", before, diff.DeletedAfter[0][0].Inline, diffDeletedTextBg},
+		{"new", after, diff.InlineChanges[1], diffAddedTextBg},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := strings.Join(inlineDiffDisplayLines(tc.segments, true, 80, diffCommonTextBg, tc.changed, nil), "\n")
+			if text := ansi.Strip(got); text != tc.want {
+				t.Fatalf("rendered text = %q, want %q", text, tc.want)
+			}
+			changedBackground := bgToAnsi(tc.changed.GetBackground())
+			if commonBackground == changedBackground {
+				t.Fatal("expected common and changed text to use distinct backgrounds")
+			}
+			if !strings.Contains(got, commonBackground) || !strings.Contains(got, changedBackground) {
+				t.Errorf("rendered line does not contain both backgrounds: %q", got)
+			}
+		})
 	}
 }
 
