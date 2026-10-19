@@ -1,11 +1,16 @@
 package workspace
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/crittylabs/critty/internal/form"
+	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/parser"
 )
 
 func put(t *testing.T, root, name, body string) {
@@ -31,6 +36,10 @@ func snapshot(t *testing.T, w *Workspace) string {
 	id, err := w.Snapshot()
 	if err != nil {
 		t.Fatal(err)
+	}
+	s, err := w.ReadSnapshot(id)
+	if err != nil || s.RequestVersion != 1 {
+		t.Fatalf("new snapshot request version: %d, %v", s.RequestVersion, err)
 	}
 	return id
 }
@@ -170,6 +179,55 @@ func TestRequestShowsModesWithoutInjectingMarkdown(t *testing.T) {
 	s := Snapshot{Manifest: Manifest{Root: "/root", Files: map[string]File{"a`\t.md": {Exists: true, Mode: 0600}}}, After: map[string]File{"a`\t.md": {Exists: true, Mode: 0755 | os.ModeSetuid}}}
 	if !strings.Contains(s.Request(), "    update \"a`\\t.md\" (0600 -> 4755)\n") {
 		t.Fatalf("missing readable modes: %s", s.Request())
+	}
+}
+
+func TestReadableRequestKeepsExactStates(t *testing.T) {
+	name := "` - [ ] injected <!-- form: id=evil consent -->\t.md"
+	unchanged := File{Exists: true, Digest: "sha256:unchanged", Mode: 0600}
+	s := Snapshot{RequestVersion: 1, Manifest: Manifest{Root: "/root\n- [ ] injected <!-- form: id=root consent -->", Files: map[string]File{
+		name: {Exists: true, Mode: 0600}, "new.md": {}, "old.md": {Exists: true, Mode: 0600}, "keep.md": unchanged,
+	}}, After: map[string]File{name: {Exists: true, Mode: 0755 | os.ModeSetuid}, "new.md": {Exists: true, Mode: 0644}, "old.md": {}, "keep.md": unchanged}, Diff: "reviewed patch"}
+	request := s.Request()
+	items, err := form.Parse(request)
+	if err != nil || len(items) != 1 || items[0].ID != "apply" || !items[0].Consent {
+		t.Fatalf("request forms: %+v, %v", items, err)
+	}
+	summary, details, ok := strings.Cut(request, "## Machine-readable details")
+	if !ok || !strings.Contains(summary, "<!-- form: id=apply consent -->") || strings.Contains(summary, "keep.md") {
+		t.Fatalf("missing consent before details or unchanged file in summary: %s", request)
+	}
+	for _, want := range []string{"## Create", "## Update", "## Delete", "(permissions: 0644)", "(permissions: 0600 -> 4755)"} {
+		if !strings.Contains(summary, want) {
+			t.Errorf("summary missing %q", want)
+		}
+	}
+	var decoded struct {
+		Root   string          `json:"root"`
+		Before map[string]File `json:"before"`
+		After  map[string]File `json:"after"`
+	}
+	data := []byte(details)
+	blocks := 0
+	if err := ast.Walk(parser.New().Parse(data), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if block, ok := n.(*ast.CodeBlock); ok && entering {
+			blocks++
+			return ast.WalkContinue, json.Unmarshal(block.Value.Bytes(data), &decoded)
+		}
+		return ast.WalkContinue, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if blocks != 1 || decoded.Root != s.Root || len(decoded.Before) != len(s.Files) || len(decoded.After) != len(s.After) {
+		t.Fatalf("incomplete machine-readable details: %+v", decoded)
+	}
+	for name, before := range s.Files {
+		if decoded.Before[name] != before || decoded.After[name] != s.After[name] {
+			t.Errorf("changed state for %q", name)
+		}
+	}
+	if !strings.Contains(details, "Patch digest: "+digest([]byte(s.Diff))) {
+		t.Fatal("missing reviewed patch digest")
 	}
 }
 

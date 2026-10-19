@@ -966,7 +966,12 @@ def scenarios() -> None:
         (tree / "raw.bin").write_bytes(b"\x00\xff\r\n")
         frozen = json.loads(cli("tmp", "snapshot", prepared["id"]).stdout)
         attachment = Path(frozen["attachment"])
-        consent_line = len(attachment.read_text().splitlines())
+        consent_line = next(
+            number
+            for number, line in enumerate(attachment.read_text().splitlines(), 1)
+            if line.startswith("- [ ] ")
+            and line.endswith("<!-- form: id=apply consent -->")
+        )
         temporary = Round(
             "temporary-tree",
             [

@@ -35,8 +35,9 @@ type Manifest struct {
 
 type Snapshot struct {
 	Manifest
-	After map[string]File `json:"after"`
-	Diff  string          `json:"diff"`
+	RequestVersion int             `json:"request_version,omitempty"`
+	After          map[string]File `json:"after"`
+	Diff           string          `json:"diff"`
 }
 
 type Workspace struct {
@@ -404,7 +405,7 @@ func (w *Workspace) Snapshot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	s := Snapshot{Manifest: w.Manifest, After: map[string]File{}}
+	s := Snapshot{Manifest: w.Manifest, RequestVersion: 1, After: map[string]File{}}
 	contents := map[string][]byte{}
 	for name := range w.Files {
 		f, b, err := inspect(tree, name)
@@ -490,6 +491,48 @@ func (w *Workspace) Snapshot() (string, error) {
 }
 
 func (s Snapshot) Request() string {
+	if s.RequestVersion == 0 {
+		return s.legacyRequest()
+	}
+	var b strings.Builder
+	b.WriteString("# Apply reviewed files\n\nApply the attached changes to files in this folder:\n\n")
+	fmt.Fprintf(&b, "    %s\n", strconv.Quote(s.Root))
+	for _, op := range []string{"Create", "Update", "Delete"} {
+		var files strings.Builder
+		for _, name := range sortedNames(s.Files) {
+			before, after := s.Files[name], s.After[name]
+			if before == after {
+				continue
+			}
+			kind := "Update"
+			if !before.Exists {
+				kind = "Create"
+			} else if !after.Exists {
+				kind = "Delete"
+			}
+			if kind != op {
+				continue
+			}
+			fmt.Fprintf(&files, "    %s", strconv.Quote(name))
+			if !before.Exists {
+				fmt.Fprintf(&files, " (permissions: %s)", displayMode(after))
+			} else if after.Exists && before.Mode != after.Mode {
+				fmt.Fprintf(&files, " (permissions: %s -> %s)", displayMode(before), displayMode(after))
+			}
+			files.WriteByte('\n')
+		}
+		if files.Len() > 0 {
+			fmt.Fprintf(&b, "\n## %s\n\n%s", op, files.String())
+		}
+	}
+	b.WriteString("\nA rename appears as a deletion and a creation.  Files not listed above stay unchanged.\n\nBefore applying, Critty checks that the destination files still match their saved originals.\n\nNew folders use your process's default permissions (0777 filtered by umask).  Replaced files do not retain ownership, ACLs, extended attributes, or hard-link relationships.  Changes to configuration files may affect running tools.\n\n- [ ] Apply these changes to the listed destinations. <!-- form: id=apply consent -->\n\n## Machine-readable details\n\nThe JSON records the destination folder and exact before/after states, including unchanged files.  The patch digest identifies the reviewed diff.\n\n")
+	b.WriteString(s.exactStates())
+	fmt.Fprintf(&b, "\n\nPatch digest: %s\n", digest([]byte(s.Diff)))
+	return b.String()
+}
+
+// Preserve requests attached to reviews created before request versioning.
+func (s Snapshot) legacyRequest() string {
 	var summary strings.Builder
 	fmt.Fprintf(&summary, "    Root: %s\n", strconv.Quote(s.Root))
 	for _, name := range sortedNames(s.Files) {
@@ -505,6 +548,10 @@ func (s Snapshot) Request() string {
 		}
 		fmt.Fprintf(&summary, "    %s %s (%s -> %s)\n", op, strconv.Quote(name), displayMode(before), displayMode(after))
 	}
+	return "# Apply reviewed files\n\nApply the attached diff and mode changes to these destinations.  A rename or split combines creation, updates, and deletion.\n\n" + summary.String() + "\nNew parent directories use 0777 subject to the process umask.  File replacement changes the inode; ownership, ACLs, extended attributes, and hard-link relationships are not preserved.  Configuration changes may affect running tools.\n\n## Exact states\n\n" + s.exactStates() + "\n\nPatch digest: " + digest([]byte(s.Diff)) + "\n\n- [ ] Apply these changes to the listed destinations. <!-- form: id=apply consent -->\n"
+}
+
+func (s Snapshot) exactStates() string {
 	b, _ := json.MarshalIndent(struct {
 		Root   string          `json:"root"`
 		Before map[string]File `json:"before"`
@@ -515,7 +562,7 @@ func (s Snapshot) Request() string {
 	for i := range lines {
 		lines[i] = "    " + lines[i]
 	}
-	return "# Apply reviewed files\n\nApply the attached diff and mode changes to these destinations.  A rename or split combines creation, updates, and deletion.\n\n" + summary.String() + "\nNew parent directories use 0777 subject to the process umask.  File replacement changes the inode; ownership, ACLs, extended attributes, and hard-link relationships are not preserved.  Configuration changes may affect running tools.\n\n## Exact states\n\n" + strings.Join(lines, "\n") + "\n\nPatch digest: " + digest([]byte(s.Diff)) + "\n\n- [ ] Apply these changes to the listed destinations. <!-- form: id=apply consent -->\n"
+	return strings.Join(lines, "\n")
 }
 
 func displayMode(f File) string {
@@ -539,6 +586,9 @@ func (w *Workspace) ReadSnapshot(id string) (Snapshot, error) {
 	dir := filepath.Join(w.Dir, "snapshots", id)
 	if err := readJSON(filepath.Join(dir, "snapshot.json"), &s); err != nil {
 		return s, err
+	}
+	if s.RequestVersion < 0 || s.RequestVersion > 1 {
+		return s, fmt.Errorf("unsupported application request version: %d", s.RequestVersion)
 	}
 	a, _ := json.Marshal(s.Manifest)
 	b, _ := json.Marshal(w.Manifest)
