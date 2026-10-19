@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -206,6 +207,57 @@ func TestDoctorIntegrations(t *testing.T) {
 	}
 }
 
+func TestDoctorGitRequirements(t *testing.T) {
+	oldOutput, oldLook := commandOutput, lookPath
+	t.Cleanup(func() { commandOutput, lookPath = oldOutput, oldLook })
+	for _, tt := range []struct {
+		name, output, status string
+		missing, failed      bool
+	}{
+		{name: "missing", missing: true, status: "warn"},
+		{name: "unusable", failed: true, status: "warn"},
+		{name: "unrecognized", output: "another program 2.31.0", status: "warn"},
+		{name: "malformed", output: "git version 2.31.bad", status: "warn"},
+		{name: "overflow", output: "git version 999999999999999999999.31.0", status: "warn"},
+		{name: "old", output: "git version 2.28.0", status: "warn"},
+		{name: "range support only", output: "git version 2.30.9", status: "warn"},
+		{name: "minimum", output: "git version 2.31.0\n", status: "ok"},
+		{name: "newer minor", output: "git version 2.43.0", status: "ok"},
+		{name: "new major", output: "git version 3.0.0", status: "ok"},
+		{name: "Apple", output: "git version 2.39.5 (Apple Git-154)", status: "ok"},
+		{name: "Windows", output: "git version 2.43.0.windows.1", status: "ok"},
+		{name: "release candidate", output: "git version 2.31.0.rc0", status: "warn"},
+		{name: "hyphenated candidate", output: "git version 2.31.0-rc1", status: "warn"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			lookPath = func(name string) (string, error) {
+				if name != "git" {
+					t.Fatalf("unexpected executable: %s", name)
+				}
+				if tt.missing {
+					return "", exec.ErrNotFound
+				}
+				return "/tools/git", nil
+			}
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				if tt.missing || cmd.Path != "/tools/git" || strings.Join(cmd.Args[1:], " ") != "--version" || cmd.Stdin != nil {
+					t.Fatalf("unexpected Git probe: %+v", cmd)
+				}
+				if tt.failed {
+					return nil, errors.New("cannot execute")
+				}
+				return []byte(tt.output), nil
+			}
+			r := doctorReport{}
+			r.checkGit()
+			d := diagnosticFor(t, r, "git/version")
+			if d.Status != tt.status || !strings.Contains(d.Message+d.Advice, "2.31.0") {
+				t.Fatalf("Git diagnostic = %+v, want %s with minimum version", d, tt.status)
+			}
+		})
+	}
+}
+
 func TestDoctorPythonRequirements(t *testing.T) {
 	oldOutput, oldLook := commandOutput, lookPath
 	t.Cleanup(func() { commandOutput, lookPath = oldOutput, oldLook })
@@ -337,6 +389,9 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 		var r doctorReport
 		if err := json.Unmarshal(out.Bytes(), &r); err != nil || len(r.Checks) == 0 {
 			t.Fatalf("invalid report %s: %v", out.String(), err)
+		}
+		if d := diagnosticFor(t, r, "git/version"); d.Status != "warn" {
+			t.Fatalf("missing Git must warn without failing standalone reviews: %+v", d)
 		}
 	}
 	first := integrations()["codex"][0]

@@ -60,6 +60,7 @@ func (r doctorReport) write(w io.Writer, asJSON bool) error {
 // names; other groups use the name itself.
 var doctorSections = map[string]string{
 	"integrations": "Integrations",
+	"git":          "Git",
 	"ai":           "AI reviews",
 	"images":       "Images",
 	"terminal":     "Terminal binding",
@@ -192,8 +193,8 @@ func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "doctor", Aliases: []string{"check"},
 		Short: "Diagnose integrations, review history, launchers and image settings",
-		Long: `Check project and global integrations against this build, Python and MCP
-requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
+		Long: `Check project and global integrations against this build, Git 2.31+,
+Python and MCP requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
 image settings. History checks report backup capacity, idle records, and interrupted
 cleanup with suggested commands. They inspect saved records without deleting data.
 Desktop checks inspect installed applications and commands without
@@ -215,6 +216,7 @@ warnings or informational results. The former check command remains an alias.`,
 			}
 			r := doctorReport{Version: versionString()}
 			r.checkIntegrations(integrations())
+			r.checkGit()
 			r.checkAI(python)
 			r.checkImages()
 			r.checkHistory()

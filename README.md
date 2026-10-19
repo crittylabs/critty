@@ -59,6 +59,8 @@ Release binaries are available for macOS and Linux on amd64 and arm64.  Building
 
 ### Check prerequisites
 
+Git 2.31.0 or later is required for repository reviews and `critty tmp`, including updates to files outside Git.  Standalone documents and attachment-only reviews can run without Git.  Prefer a maintained Git package with current security fixes.
+
 After installing the binary, run:
 
 ```bash
