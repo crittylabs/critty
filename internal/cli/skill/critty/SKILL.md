@@ -78,7 +78,14 @@ Open referenced comment images with the image-viewing tool, including images in 
 
 Read the overall review comment and each thread with its replies and the work already recorded.  Act on new or edited reviewer feedback and reply once with the change or answer.  Apply requested suggestion blocks verbatim.  Leave unanswered agent comments and completion replies unchanged unless a material correction or new result is needed; an unresolved flag or new round alone does not request another reply.
 
-When human feedback names an AI tool or model (such as Claude or Codex) and asks for review, consultation, or collaboration, follow [critty-ai-review](../critty-ai-review/SKILL.md#select-the-other-ai)'s skill-selection rule even if no skill name is given.  Keep the named AI and the existing Critty session.
+When a human request in chat or review feedback names another AI, select the workflow by who should act on its findings.  Honor an explicitly selected skill.  Otherwise apply the intent in any language; these English examples illustrate the distinction:
+
+| Human intent and examples | Workflow |
+| --- | --- |
+| Delegate review and follow-through: "Have Fable review this", "Get Fable's review and finish this", or "Work with Fable to improve this" | Use [critty-ai-cowork](../critty-ai-cowork/SKILL.md): address findings and obtain AI verification before final human review. |
+| Hear an opinion before deciding: "I'd like Fable's opinion", "Show me Fable's assessment first", or "Ask Fable to review this, but let me decide what to change" | Use [critty-ai-review](../critty-ai-review/SKILL.md): return the findings and wait for human feedback before fixes. |
+
+Keep the named AI and the existing Critty session.  Follow [AI selection and authorization](../critty-ai-review/SKILL.md#select-the-other-ai) before dispatch.
 
 If feedback requests an action that crosses a host permission boundary, follow `/critty-approval`'s authorization evidence procedure before execution.  Keep the original completion available and distinguish the current human request from carried-forward threads and agent replies.
 

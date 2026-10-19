@@ -1,6 +1,6 @@
 ---
 name: critty-ai-cowork
-description: Work with another AI through Critty to refine requested work, including human review comments asking for collaboration with a named AI such as Claude or Codex, then present it for final human review. Use critty-ai-review for a second opinion or consultation with human input between rounds.
+description: Work with another AI through Critty to refine requested work, including human requests that delegate review and follow-through to a named AI such as Claude or Codex, then present it for final human review. Use critty-ai-review for a second opinion or consultation with human input between rounds.
 ---
 
 # Cowork with Another AI
