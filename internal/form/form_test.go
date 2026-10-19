@@ -1,6 +1,8 @@
 package form
 
 import (
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -66,5 +68,91 @@ func TestMultilineMetadataAndNestedItems(t *testing.T) {
 		if strings.Contains(item.Label, "form:") {
 			t.Fatalf("multiline metadata in label: %q", item.Label)
 		}
+	}
+}
+
+func TestSelectAllDefinitions(t *testing.T) {
+	source := "- [x] All <!-- form: id=all select-all=sections -->\n" +
+		"- [ ] API <!-- form: id=all-api tags=sections select-all=api -->\n" +
+		"- [ ] UI <!-- form: id=all-ui tags='sections' select-all=\"ui, api\" -->\n" +
+		"- [ ] Auth <!-- form: id=auth tags=security,api,api -->\n" +
+		"- [ ] Keys <!-- form: id=keys tags=ui -->\n" +
+		"- [ ] Small <!-- form: id=size value=small tags=ui -->\n" +
+		"- [ ] Large <!-- form: id=size value=large -->\n"
+	items, err := Parse(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(items[3].Tags, []string{"api", "security"}) || !slices.Equal(items[2].SelectAll, []string{"api", "ui"}) {
+		t.Fatalf("tag sets: %+v", items)
+	}
+	targets, err := Targets(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int][]int{0: {3, 4, 5}, 1: {3}, 2: {3, 4, 5}}
+	if !maps.EqualFunc(targets, want, slices.Equal) {
+		t.Fatalf("targets: %v", targets)
+	}
+	defaults := Defaults(items)
+	if _, ok := defaults["all"]; ok {
+		t.Fatal("select-all item has an answer")
+	}
+	if CountSelected(items, targets[0], defaults) != 0 {
+		t.Fatal("initial select-all mark selected targets")
+	}
+}
+
+func TestInvalidSelectAll(t *testing.T) {
+	for _, source := range []string{
+		"- [ ] A <!-- form: select-all=a -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a required -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a value=x -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a consent -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a,b -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: tags= -->",
+		"- [ ] A <!-- form: tags=a,,b -->",
+		"- [ ] A <!-- form: tags=a* -->",
+		"- [ ] A <!-- form: tags=a tags=b -->",
+		"- [ ] A <!-- form: id=a select-all=b tags=a -->\n- [ ] B <!-- form: id=b select-all=a tags=b -->",
+		"- [ ] All <!-- form: id=all select-all=q -->\n- [ ] A <!-- form: id=q value=a tags=q -->\n- [ ] B <!-- form: id=q value=b tags=q -->",
+	} {
+		t.Run(source, func(t *testing.T) {
+			if _, err := Parse(source); err == nil {
+				t.Fatal("accepted invalid definition")
+			}
+		})
+	}
+}
+
+func TestApplyBulk(t *testing.T) {
+	items, err := Parse("- [ ] All <!-- form: id=all select-all=t -->\n" +
+		"- [ ] A <!-- form: id=a tags=t consent -->\n" +
+		"- [ ] B <!-- form: id=b tags=t -->\n" +
+		"- [ ] Yes <!-- form: id=q value=yes tags=t -->\n" +
+		"- [ ] No <!-- form: id=q value=no -->\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets, err := Targets(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := Defaults(items)
+	answers["b"] = Answer{Value: true, Human: true}
+	human := Answer{Human: true, Author: "Human", Via: "all"}
+	ApplyBulk(items, targets[0], answers, human)
+	if CountSelected(items, targets[0], answers) != 3 || !Satisfied(items[1], answers["a"]) || answers["b"].Via != "all" || answers["q"].Value != "yes" {
+		t.Fatalf("partial selection was not completed: %+v", answers)
+	}
+	ApplyBulk(items, targets[0], answers, human)
+	if CountSelected(items, targets[0], answers) != 0 || answers["q"].Value != "" {
+		t.Fatalf("full selection was not cleared: %+v", answers)
+	}
+	answers["q"] = Answer{Value: "no", Human: true}
+	ApplyBulk(items, targets[0], answers, human)
+	if answers["q"].Value != "yes" {
+		t.Fatal("selection did not replace another choice")
 	}
 }

@@ -114,3 +114,30 @@ func TestSelfContainedFormResults(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectAllFormVersion(t *testing.T) {
+	s, err := OpenSession(t.TempDir(), "forms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ReviewInput{Scope: "document", Files: map[string]ReviewedFile{}}
+	plain := []AttachedDocument{{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] Note <!-- form: id=note -->\n", Revision: "one"}}
+	state, err := s.BeginForms(input, plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Version != 1 {
+		t.Fatalf("plain form version: %d", state.Version)
+	}
+	tagged := []AttachedDocument{{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] All <!-- form: id=all select-all=t -->\n- [ ] Note <!-- form: id=note tags=t -->\n", Revision: "two"}}
+	state, err = s.BeginForms(input, tagged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := state.Documents[0].Answers["all"]; state.Version != 2 || ok {
+		t.Fatalf("select-all state: %+v", state)
+	}
+	if loaded, err := s.LoadForms(); err != nil || loaded.Version != 2 {
+		t.Fatalf("reload: %v %+v", err, loaded)
+	}
+}

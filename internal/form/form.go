@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/mattn/go-shellwords"
@@ -33,6 +34,9 @@ type Item struct {
 	EndLine    int    `json:"end_line"`
 	Offset     int    `json:"offset"`
 	Metadata   []Span `json:"metadata,omitempty"`
+	// Tags and SelectAll are sorted sets, so reordering keeps fingerprints.
+	Tags      []string `json:"tags,omitempty"`
+	SelectAll []string `json:"select_all,omitempty"`
 }
 
 type Answer struct {
@@ -41,6 +45,8 @@ type Answer struct {
 	Author   string `json:"author,omitempty"`
 	Revision string `json:"review_revision,omitempty"`
 	Round    int    `json:"round,omitempty"`
+	// Via names the select-all item whose human operation set this answer.
+	Via string `json:"via,omitempty"`
 }
 
 // Parse uses the Markdown AST so examples, escaped lists, and quotations are inert.
@@ -124,8 +130,11 @@ func Parse(source string) ([]Item, error) {
 			return ast.WalkStop, err
 		}
 		item.Definition = definition.String()
+		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice) {
+			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, or have a value", item.Line)
+		}
 		if item.ID == "" {
-			if item.Required || item.Consent || item.Choice {
+			if item.Required || item.Consent || item.Choice || item.SelectAll != nil {
 				return ast.WalkStop, fmt.Errorf("line %d: form requires an explicit id", item.Line)
 			}
 			item.ID = fmt.Sprintf("auto:%d", item.Line)
@@ -151,7 +160,33 @@ func Parse(source string) ([]Item, error) {
 		}
 		groups[item.ID] = append(groups[item.ID], item)
 	}
+	if _, err := Targets(items); err != nil {
+		return nil, err
+	}
 	return items, nil
+}
+
+func tagList(key, value string) ([]string, error) {
+	seen := map[string]bool{}
+	var tags []string
+	for tag := range strings.SplitSeq(value, ",") {
+		tag = strings.Trim(tag, " \t\n\r\f\v")
+		if !validTag(tag) {
+			return nil, fmt.Errorf("invalid tag %q in %s", tag, key)
+		}
+		if !seen[tag] {
+			seen[tag] = true
+			tags = append(tags, tag)
+		}
+	}
+	slices.Sort(tags)
+	return tags, nil
+}
+
+func validTag(tag string) bool {
+	return tag != "" && strings.IndexFunc(tag, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("_-.", r))
+	}) < 0
 }
 
 func attributes(item *Item, source string) error {
@@ -180,6 +215,14 @@ func attributes(item *Item, source string) error {
 			item.Required = true
 		case key == "consent" && !assigned:
 			item.Consent = true
+		case key == "tags" && assigned:
+			if item.Tags, err = tagList(key, value); err != nil {
+				return err
+			}
+		case key == "select-all" && assigned:
+			if item.SelectAll, err = tagList(key, value); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("invalid form attribute %q", word)
 		}
@@ -203,6 +246,9 @@ func Fingerprint(items []Item, id string) (string, error) {
 func Defaults(items []Item) map[string]Answer {
 	answers := map[string]Answer{}
 	for _, item := range items {
+		if item.SelectAll != nil {
+			continue
+		}
 		if _, exists := answers[item.ID]; !exists {
 			var value any = false
 			if item.Choice {

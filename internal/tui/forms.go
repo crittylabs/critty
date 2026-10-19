@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"image/color"
+	"maps"
 	"sort"
 	"strings"
 
@@ -54,7 +55,7 @@ func (m *AppModel) formReviewItems() []formReviewItem {
 		}
 		seen := map[string]bool{}
 		for _, item := range d.Items {
-			if seen[item.ID] {
+			if seen[item.ID] || item.SelectAll != nil {
 				continue
 			}
 			seen[item.ID] = true
@@ -120,11 +121,20 @@ func (m *AppModel) markVisibleForms() {
 	}
 }
 
-func (m *AppModel) indexForms() {
+func (m *AppModel) indexForms() error {
 	m.formRows = map[string]map[int]formRow{}
+	m.formTargets = map[string]map[string][]int{}
 	m.formViewed = nil
 	for i := range m.forms.Documents {
 		d := &m.forms.Documents[i]
+		targets, err := form.Targets(d.Items)
+		if err != nil {
+			return fmt.Errorf("attachment %s: %w", d.Name, err)
+		}
+		m.formTargets[d.Path()] = map[string][]int{}
+		for index, leaves := range targets {
+			m.formTargets[d.Path()][d.Items[index].ID] = leaves
+		}
 		starts := []int{0}
 		for j, char := range d.Content {
 			if char == '\n' {
@@ -155,6 +165,7 @@ func (m *AppModel) indexForms() {
 		}
 		m.formRows[d.Path()] = rows
 	}
+	return nil
 }
 
 func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff string) error {
@@ -219,8 +230,7 @@ func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff stri
 		return err
 	}
 	m.forms = &state
-	m.indexForms()
-	return nil
+	return m.indexForms()
 }
 
 func (m *AppModel) missingForms() []string {
@@ -243,15 +253,20 @@ func (m *AppModel) toggleForm(line int) bool {
 			continue
 		}
 		m.tab().cursorOnForm = true
-		var value any = !form.Selected(item, d.Answers[item.ID])
-		if item.Choice {
-			value = item.Value
+		previous := maps.Clone(d.Answers)
+		answer := form.Answer{Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+		if item.SelectAll != nil {
+			answer.Via = item.ID
+			form.ApplyBulk(d.Items, m.formTargets[d.Path()][item.ID], d.Answers, answer)
+		} else {
+			answer.Value = !form.Selected(item, d.Answers[item.ID])
+			if item.Choice {
+				answer.Value = item.Value
+			}
+			d.Answers[item.ID] = answer
 		}
-		previous := d.Answers[item.ID]
-		d.Answers[item.ID] = form.Answer{Value: value, Human: true, Author: m.author,
-			Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
 		if err := m.session.SaveForms(*m.forms); err != nil {
-			d.Answers[item.ID] = previous
+			d.Answers = previous
 			m.err = err
 		} else {
 			m.err = nil
@@ -295,6 +310,9 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	prefix := raw[:column]
 	indent := expandDisplayTabs(prefix[:len(prefix)-len(strings.TrimLeft(prefix, " \t"))]) + "  "
 	label := highlightInlineWith(strings.TrimSpace(raw[column+3:]), formChip.link, formChip.code)
+	if checkbox.SelectAll != nil {
+		return indent + m.selectAllDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
+	}
 	answer := d.Answers[checkbox.ID]
 	selected := form.Selected(*checkbox, answer)
 	// The badge uses the terminal's ANSI color, except for required items;
@@ -323,6 +341,43 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	}
 	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
 	return indent + badge + inlineColors(background, " "+label, true), lipgloss.Width(indent), true
+}
+
+// selectAllState reports how many targets of a select-all item are selected.
+func (m *AppModel) selectAllState(d *review.FormDocument, item *form.Item) (selected, total int) {
+	targets := m.formTargets[d.Path()][item.ID]
+	return form.CountSelected(d.Items, targets, d.Answers), len(targets)
+}
+
+// selectAllDisplay labels select-all items so that their state does not depend
+// on color alone.
+func (m *AppModel) selectAllDisplay(d *review.FormDocument, item *form.Item, label string, background lipgloss.Style) string {
+	selected, total := m.selectAllState(d, item)
+	tint, tagColor, symbol := color.Color(lipgloss.Cyan), formChip.cyan, "☐"
+	if selected == total {
+		tint, tagColor, symbol = lipgloss.Green, formChip.green, "✓"
+	} else if selected > 0 {
+		symbol = "⊟"
+	}
+	tag := lipgloss.NewStyle().Foreground(tagColor).Bold(true)
+	tags := tag.Render("All")
+	if selected > 0 && selected < total {
+		tags += " " + tag.Render("Mixed")
+	}
+	label += fmt.Sprintf(" (%d/%d)", selected, total)
+	consents := 0
+	for _, i := range m.formTargets[d.Path()][item.ID] {
+		if d.Items[i].Consent {
+			consents++
+		}
+	}
+	if consents == 1 {
+		label += " " + tag.Render("1 consent")
+	} else if consents > 1 {
+		label += " " + tag.Render(fmt.Sprintf("%d consents", consents))
+	}
+	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
+	return badge + inlineColors(background, " "+tags+" "+label, true)
 }
 
 func (m *AppModel) formSummary(width int) string {

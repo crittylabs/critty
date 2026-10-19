@@ -478,3 +478,37 @@ func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectAllForm(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] Check all <!-- form: id=all select-all=api -->\n- [ ] Auth <!-- form: id=auth tags=api -->\n- [ ] Errors <!-- form: id=errors tags=api consent -->\n")
+	line := func() string {
+		return ansi.Strip(strings.Split(app.contentViewport.GetContent(), "\n")[0])
+	}
+	if !strings.Contains(line(), "☐  All Check all (0/2) 1 consent") {
+		t.Fatalf("initial display: %q", line())
+	}
+	if len(app.formReviewItems()) != 2 {
+		t.Fatal("select-all item counted as an answer")
+	}
+	app.toggleForm(1)
+	d := app.forms.Document(app.tab().path)
+	if !strings.Contains(line(), "✓  All Check all (2/2)") || d.Answers["errors"].Via != "all" || !d.Answers["errors"].Human {
+		t.Fatalf("select all: %q %+v", line(), d.Answers)
+	}
+	if !app.tab().cursorOnForm || app.tab().cursorLine != 1 {
+		t.Fatal("focus left the select-all item")
+	}
+	app.toggleForm(2)
+	if !strings.Contains(line(), "⊟  All Mixed Check all (1/2)") || d.Answers["auth"].Via != "" {
+		t.Fatalf("mixed: %q %+v", line(), d.Answers)
+	}
+	app.toggleForm(1)
+	app.toggleForm(1)
+	if !strings.Contains(line(), "☐  All Check all (0/2)") {
+		t.Fatalf("clear all: %q", line())
+	}
+	saved, err := app.session.LoadForms()
+	if err != nil || saved.Version != 2 || saved.Documents[0].Answers["auth"].Value != false || !saved.Documents[0].Answers["auth"].Human {
+		t.Fatalf("saved: %v %+v", err, saved)
+	}
+}

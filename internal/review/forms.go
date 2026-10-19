@@ -74,7 +74,7 @@ func (s *Session) LoadForms() (FormState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return state, err
 	}
-	if state.Version != 1 {
+	if state.Version != 1 && state.Version != 2 {
 		return state, fmt.Errorf("unsupported form version: %d", state.Version)
 	}
 	return state, nil
@@ -97,6 +97,12 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 			return state, err
 		}
 		state.Documents = append(state.Documents, FormDocument{AttachedDocument: d, Items: items, Answers: form.Defaults(items)})
+		for _, item := range items {
+			if item.Tags != nil || item.SelectAll != nil {
+				// Readers of version 1 do not know select-all items have no answers.
+				state.Version = 2
+			}
+		}
 	}
 	data, err := json.Marshal(struct {
 		Input ReviewInput
@@ -113,6 +119,9 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 				continue
 			}
 			for _, item := range d.Items {
+				if item.SelectAll != nil {
+					continue
+				}
 				if !item.Explicit && prev.Revision != d.Revision || (item.Required || item.Consent) && old.Revision != state.Revision {
 					continue
 				}

@@ -95,6 +95,8 @@ type AppModel struct {
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
 	formViewed    map[string]map[int]bool
+	// formTargets maps select-all IDs to item indices by document path.
+	formTargets   map[string]map[string][]int
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
@@ -4082,7 +4084,16 @@ func (m AppModel) renderFooter() string {
 		}
 	}
 	if row, ok := m.formRows[t.path][t.cursorLine]; ok && row.item != nil && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" {
-		items = append([]string{k("space", "answer")}, items...)
+		action := "answer"
+		if row.item.SelectAll != nil {
+			action = "select all"
+			if d := m.forms.Document(t.path); d != nil {
+				if selected, total := m.selectAllState(d, row.item); selected == total {
+					action = "clear all"
+				}
+			}
+		}
+		items = append([]string{k("space", action)}, items...)
 	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
 

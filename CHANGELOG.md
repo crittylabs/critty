@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Attachment forms can select or clear groups of items at once.  Add `tags=` to items and a checkbox with `select-all=` to control every item with those tags, such as all checks in a section or every recommended answer.  It shows a mixed state when only some are selected, and individual changes update it.  Each target, including consents, records a human answer.  Documents using these attributes require this release.  See [critty-cli](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#forms-and-exported-results).
+
 ### Fixed
 
 - `critty doctor` recommends enabling Herdr image rendering only when local configuration explicitly disables it.  Unset settings use the current Herdr default of enabled.
