@@ -13,13 +13,28 @@ import (
 
 func TestDoctorTerminalMarker(t *testing.T) {
 	old := lookPath
+	oldProbe := probeDoctorMarker
 	lookPath = func(name string) (string, error) { return "", exec.ErrNotFound }
-	t.Cleanup(func() { lookPath = old })
-	for _, mode := range []string{"unprobed", "invalid", "notified", "legacy"} {
+	t.Cleanup(func() { lookPath, probeDoctorMarker = old, oldProbe })
+	for _, mode := range []string{"unprobed", "local", "local failure", "invalid", "notified", "legacy"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			var id string
 			want := "info"
+			probeDoctorMarker = func(origin terminalbinding.Origin) (markerProbeResult, error) {
+				if mode == "local" {
+					return markerProbeResult{Checked: true, Target: terminalbinding.Target{Kind: "tmux", Origin: origin}}, nil
+				}
+				if mode == "local failure" {
+					return markerProbeResult{}, errors.New("cannot read pane")
+				}
+				return markerProbeResult{Reason: "no current TTY available"}, nil
+			}
+			if mode == "local" {
+				want = "ok"
+			} else if mode == "local failure" {
+				want = "warn"
+			}
 			if mode == "invalid" {
 				id, want = "invalid", "warn"
 			}
@@ -29,7 +44,7 @@ func TestDoctorTerminalMarker(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				target := terminalbinding.Target{Kind: "terminal", Origin: terminalbinding.CaptureOrigin(os.Getpid())}
+				target := terminalbinding.Target{Kind: "terminal", Origin: terminalbinding.Origin{PID: os.Getpid(), Started: "test"}}
 				if mode == "legacy" {
 					target = terminalbinding.Target{Kind: "tmux", Socket: "/unused/socket", Pane: "%1"}
 				}

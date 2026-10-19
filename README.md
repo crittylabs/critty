@@ -67,7 +67,7 @@ After installing the binary, run:
 critty doctor
 ```
 
-Run it in the terminal where you plan to use Critty.  It checks installed agent integrations, review launchers, image settings, and Python/MCP prerequisites for optional AI reviews.  Follow its suggestions for the features you plan to use, then rerun it after setup.
+Run it in the terminal where you plan to use Critty.  It checks installed agent integrations, review launchers, image settings, and Python/MCP prerequisites for optional AI reviews.  It also tests a local marker round trip with a three-second wait, without launching an agent; unsupported terminal contexts are reported as skipped.  Follow its suggestions for the features you plan to use, then rerun it after setup.
 
 ### Agent skills
 

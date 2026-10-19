@@ -20,6 +20,60 @@ func testTarget(pane string) Target {
 	return Target{Kind: "tmux", Socket: "/tmp/test.sock", Pane: pane}
 }
 
+func TestProbeCurrentTerminal(t *testing.T) {
+	for _, mode := range []string{"pane", "notification", "wrong notification", "display failure", "timeout"} {
+		t.Run(mode, func(t *testing.T) {
+			s := testStore(t)
+			if err := s.Register(testTarget("%99")); err != nil {
+				t.Fatal(err)
+			}
+			target := testTarget("%1")
+			if mode == "notification" {
+				target = Target{}
+			}
+			var marker string
+			display := func(text string) error {
+				marker = text
+				if mode == "display failure" {
+					return errors.New("display unavailable")
+				}
+				if mode == "notification" || mode == "wrong notification" {
+					return s.Notify(strings.TrimPrefix(text, markerPrefix), testTarget("%2"))
+				}
+				return nil
+			}
+			snapshot := func(_ context.Context, current Target) (string, error) {
+				if current != target || mode == "notification" {
+					t.Fatalf("probe read another terminal: %+v", current)
+				}
+				if mode == "timeout" {
+					return "", nil
+				}
+				return marker, nil
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
+			defer cancel()
+			resolved, err := s.Probe(ctx, target, display, snapshot)
+			wantError := mode == "wrong notification" || mode == "display failure" || mode == "timeout"
+			if (err != nil) != wantError {
+				t.Fatalf("probe = %+v, %v; want error %t", resolved, err, wantError)
+			}
+			if !wantError && resolved.Kind != "tmux" {
+				t.Fatalf("probe did not resolve a terminal: %+v", resolved)
+			}
+			entries, err := os.ReadDir(s.dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), "request-") {
+					t.Fatalf("probe left a request behind: %s", entry.Name())
+				}
+			}
+		})
+	}
+}
+
 func prepare(t *testing.T, s *Store) Request {
 	t.Helper()
 	r, err := s.Prepare()

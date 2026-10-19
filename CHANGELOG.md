@@ -4,7 +4,7 @@
 
 ### Added
 
-- Check Git prerequisites with `critty doctor`.  It reports the installed executable and version, warns when Git is missing or below the 2.31.0 feature baseline, and recommends a maintained package with current security fixes.  Git-independent document and attachment reviews remain available.  See [requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#environment-diagnostics).
+- Check Git prerequisites and local marker delivery with `critty doctor`.  It reports Git's path and version, warns when Git is missing or below 2.31.0, and recommends a maintained package.  In a foreground terminal it tests a marker round trip with a three-second wait, without launching an agent.  Unsupported terminal contexts are skipped; Git-independent reviews remain available.  See [setup](https://github.com/crittylabs/critty#check-prerequisites).
 
 - Review updates to notes, reports, configuration files, and other text files outside Git before applying them.  Create, split, rename, or delete files through reviewed copies with `critty tmp prepare`, `snapshot`, and `apply`.  The [workflow](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty/references/temporary-tree.md) keeps originals unchanged until approval and explicit consent to apply, checks for concurrent edits, and retains backups and progress for retries.  Application is atomic per file, not across the batch.
 

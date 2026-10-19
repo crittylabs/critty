@@ -424,6 +424,11 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 
 func stubDoctorTerminal(t *testing.T) {
 	t.Helper()
+	oldMarker := probeDoctorMarker
+	t.Cleanup(func() { probeDoctorMarker = oldMarker })
+	probeDoctorMarker = func(terminalbinding.Origin) (markerProbeResult, error) {
+		return markerProbeResult{Reason: "no current TTY available"}, nil
+	}
 	old := checkTerminalImages
 	t.Cleanup(func() { checkTerminalImages = old })
 	checkTerminalImages = func() (tui.ImageCapability, error) {

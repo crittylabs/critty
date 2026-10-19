@@ -302,6 +302,61 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
+        marker_job = ROOT / "doctor-marker.job.json"
+        marker_job.write_text(
+            json.dumps(
+                {
+                    "name": "doctor-marker",
+                    "args": ["doctor", "--json"],
+                    "root": str(ROOT),
+                    "binary": str(BINARY),
+                    "tmux": str(TMUX),
+                }
+            )
+        )
+        agent_called = ROOT / "unexpected-agent-call"
+        for name in ["claude", "codex"]:
+            stub = ROOT / "bin" / name
+            stub.write_text(
+                f"#!/bin/sh\nprintf invoked > {shlex.quote(str(agent_called))}\nexit 99\n"
+            )
+            stub.chmod(0o755)
+        try:
+            tmux(
+                "new-window",
+                "-t",
+                "scenario",
+                "-n",
+                "doctor-marker",
+                "-c",
+                str(WORK),
+                shlex.join(
+                    [
+                        sys.executable,
+                        str(Path(__file__).resolve()),
+                        "--child",
+                        str(marker_job),
+                    ]
+                ),
+            )
+            wait_until(
+                lambda: (ROOT / "doctor-marker.exit.json").exists(),
+                "local marker diagnosis completed",
+            )
+            marker_output = (ROOT / "doctor-marker.stdout").read_text()
+            diagnosis = json.loads(marker_output)
+            marker = next(
+                c for c in diagnosis["checks"] if c["check"] == "terminal/marker"
+            )
+            assert marker["status"] == "ok", marker
+            assert "local marker round trip" in marker["message"], marker
+            assert "CRITTY-" not in marker_output, marker_output
+            assert not agent_called.exists(), "doctor launched an agent CLI"
+        finally:
+            for name in ["claude", "codex"]:
+                (ROOT / "bin" / name).unlink()
+        report("doctor checks a local marker without an agent or JSON contamination")
+
         patch = WORK / "standalone.diff"
         patch.write_text(
             "diff --git a/standalone.go b/standalone.go\n"

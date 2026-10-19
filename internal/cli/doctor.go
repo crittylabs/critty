@@ -199,6 +199,10 @@ image settings. History checks report backup capacity, idle records, and interru
 cleanup with suggested commands. They inspect saved records without deleting data.
 Desktop checks inspect installed applications and commands without
 opening windows or testing automation permission.
+In a foreground terminal, doctor also tests a local marker round trip with a
+three-second wait, without launching an agent. It writes the marker to the TTY,
+keeping redirected JSON clean. Terminals without a readable multiplexer pane
+or active tfil are skipped.
 Use --terminal-request with a prepared, displayed marker to test terminal binding.
 Add --terminal-notify-only to require a filter notification and skip registered
 pane screens. This consumes that one-time request; no review is opened.

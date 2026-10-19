@@ -220,16 +220,47 @@ func (s *Store) Notify(id string, target Target) error {
 // Resolve prefers notifications and otherwise scans only live registrations' visible screens.
 // It consumes the request once a destination is selected, before the caller launches its UI.
 func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error)) (Target, error) {
-	return s.resolve(ctx, id, snapshot, false)
+	return s.resolve(ctx, id, snapshot, false, nil)
 }
 
 // ResolveNotification tests the terminal filter callback without falling back to
 // registered pane screens. It consumes the request only after a notification.
 func (s *Store) ResolveNotification(ctx context.Context, id string) (Target, error) {
-	return s.resolve(ctx, id, nil, true)
+	return s.resolve(ctx, id, nil, true, nil)
 }
 
-func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error), notifyOnly bool) (Target, error) {
+// Probe checks a marker displayed in the caller's own terminal, without a
+// wrapper registration.  An empty target tests filter notifications only.
+func (s *Store) Probe(ctx context.Context, target Target, display func(string) error, snapshot func(context.Context, Target) (string, error)) (resolved Target, err error) {
+	if target.Kind != "" {
+		if err := target.Validate(); err != nil {
+			return Target{}, err
+		}
+	}
+	request, err := s.Prepare()
+	if err != nil {
+		return Target{}, err
+	}
+	defer func() {
+		err = errors.Join(err, s.locked(func() error {
+			e := os.Remove(filepath.Join(s.dir, "request-"+request.ID+".json"))
+			if errors.Is(e, os.ErrNotExist) {
+				return nil
+			}
+			return e
+		}))
+	}()
+	if err := display(request.Marker); err != nil {
+		return Target{}, err
+	}
+	resolved, err = s.resolve(ctx, request.ID, snapshot, target.Kind == "", []Target{target})
+	if err == nil && target.Kind != "" && (resolved.Kind != target.Kind || resolved.Socket != target.Socket || resolved.Pane != target.Pane || resolved.Workspace != target.Workspace || resolved.Tab != target.Tab) {
+		return Target{}, fmt.Errorf("marker resolved to a different terminal")
+	}
+	return resolved, err
+}
+
+func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error), notifyOnly bool, candidates []Target) (Target, error) {
 	// Let a notification arriving with the just-rendered marker reach the intake first.
 	if err := pause(ctx, 150*time.Millisecond); err != nil {
 		return Target{}, err
@@ -245,7 +276,10 @@ func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Co
 				return err
 			}
 			if len(p.Notifications) == 0 && !notifyOnly {
-				targets, err = s.candidates()
+				targets = candidates
+				if targets == nil {
+					targets, err = s.candidates()
+				}
 			}
 			return err
 		})
@@ -301,6 +335,12 @@ func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Co
 		if err := pause(ctx, 100*time.Millisecond); err != nil {
 			if notifyOnly {
 				return Target{}, fmt.Errorf("no terminal filter notification received; check tfil --critty-notify and its Critty executable and XDG_STATE_HOME")
+			}
+			if candidates != nil {
+				if lastErr != nil {
+					return Target{}, fmt.Errorf("cannot read the current terminal screen: %w", lastErr)
+				}
+				return Target{}, fmt.Errorf("local terminal marker was not observed before timeout")
 			}
 			if lastErr != nil {
 				return Target{}, fmt.Errorf("cannot read registered terminal screens (check socket access): %w", lastErr)

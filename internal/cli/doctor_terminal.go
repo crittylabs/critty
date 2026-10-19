@@ -13,12 +13,30 @@ import (
 	"github.com/tklauser/ps"
 )
 
+type markerProbeResult struct {
+	Checked bool
+	Reason  string
+	Target  terminalbinding.Target
+}
+
+var probeDoctorMarker = probeCurrentTerminalMarker
+
 func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 	r.checkCodexWrapper()
 	origin := terminalbinding.CaptureOrigin(os.Getpid())
 	resolved := false
 	if request == "" {
-		r.add("terminal/marker", "info", "terminal binding has not been tested", "Prepare a request with `critty terminal prepare`, display its marker in agent output, then run `critty doctor --terminal-request ID`.")
+		result, err := probeDoctorMarker(origin)
+		advice := "To test the agent output path, prepare a request with `critty terminal prepare`, display its marker in agent output, then run `critty doctor --terminal-request ID`."
+		switch {
+		case err != nil:
+			r.add("terminal/marker", "warn", "local marker check failed: "+err.Error(), "Check the current multiplexer connection or tfil --critty-notify, then retry doctor.")
+		case !result.Checked:
+			r.add("terminal/marker", "info", "skipped: "+result.Reason, advice)
+		default:
+			r.add("terminal/marker", "ok", "local marker round trip succeeded via "+result.Target.Kind+"; agent output path untested", advice)
+			origin, resolved = result.Target.Origin, true
+		}
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
