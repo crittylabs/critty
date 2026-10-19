@@ -19,6 +19,8 @@ import (
 //go:embed skill/critty-ai-review/references/codex-cli.md skill/critty-ai-review/scripts/codex_review_server.py skill/critty-ai-review/scripts/codex-review-requirements.txt
 //go:embed skill/critty-cli/references/configuration.md skill/critty-cli/references/forms.md
 //go:embed skill/critty-history/SKILL.md
+//go:embed skill/critty-grill/SKILL.md
+//go:embed skill/critty-grill/references/*.md
 //go:embed skill/critty-approval/references/*.md skill/critty/references/*.md
 var skillContent embed.FS
 
@@ -86,7 +88,7 @@ var skillVariants = map[string]skillVariant{
 	},
 }
 
-var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork", "critty-history"}
+var skillNames = []string{"critty", "critty-cli", "critty-approval", "critty-ai-review", "critty-ai-cowork", "critty-history", "critty-grill"}
 
 // renderSkill returns the embedded skill rewritten for the named agent.
 func renderSkill(name, agent string) ([]byte, error) {
@@ -235,6 +237,8 @@ func integrations() map[string][]integrationFile {
 	} {
 		files := []integrationFile{
 			skillFile("critty-history", agent, dir),
+			skillFile("critty-grill", agent, dir),
+			skillResource("critty-grill", "references/artifacts.md", dir),
 			skillFile("critty-ai-review", agent, dir),
 			skillFile("critty-ai-cowork", agent, dir),
 			skillResource("critty-ai-review", "references/restricted-cli.md", dir),
@@ -325,7 +329,7 @@ Targets:
   prompts      Stock finish prompt templates (customize after copying)
   all          claude-code + codex + opencode + antigravity
 
-Agent targets include critty-cli, critty-approval, critty-history, critty-ai-review,
+Agent targets include critty-cli, critty-approval, critty-history, critty-grill, critty-ai-review,
 and critty-ai-cowork, with their reference files and review gate. The interactive
 critty workflow is a skill except in OpenCode, where it is a command.
 

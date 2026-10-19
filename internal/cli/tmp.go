@@ -13,7 +13,18 @@ import (
 )
 
 func newTmpCommand() *cobra.Command {
-	cmd := &cobra.Command{Use: "tmp", Short: "Prepare and apply bounded edits outside source control", Long: "Prepare independent copies under .critty/tmp, review a fixed snapshot, then apply only its approved changes.  Targets are explicit root-relative file paths, including missing paths for additions.  Deletions, renames, and splits are supported.  Symlinks and special files are rejected; select their intended regular-file targets instead.  Commands emit JSON.  Original files are changed only by apply."}
+	cmd := &cobra.Command{Use: "tmp", Short: "Create scratch directories or prepare bounded file edits", Long: "Create scratch directories under .critty/tmp for review documents and results, or prepare independent copies, review a fixed snapshot, then apply only its approved changes.  Targets for prepare are explicit root-relative file paths, including missing paths for additions.  Deletions, renames, and splits are supported.  Symlinks and special files are rejected; select their intended regular-file targets instead.  Commands emit JSON.  Original files are changed only by apply."}
+	create := &cobra.Command{Use: "create", Short: "Create an empty scratch directory under .critty/tmp", Long: "Create a unique, private scratch directory under the current directory's .critty/tmp and print its absolute path as the directory field in JSON.  No Git repository, source copies, or application manifest are created.  Retain this directory while its documents or results are needed, then remove only that directory.  Keep .critty/tmp/.gitignore.", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		dir, err := workspace.CreateScratch(cwd)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]string{"directory": dir})
+	}}
 	var source string
 	prepare := &cobra.Command{Use: "prepare --root <directory> -- <file>...", Short: "Copy registered targets into an isolated review tree", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
@@ -78,7 +89,7 @@ func newTmpCommand() *cobra.Command {
 	if err := apply.MarkFlagRequired("result"); err != nil {
 		panic(err)
 	}
-	cmd.AddCommand(prepare, snapshot, apply)
+	cmd.AddCommand(create, prepare, snapshot, apply)
 	return cmd
 }
 

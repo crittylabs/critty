@@ -246,6 +246,15 @@ func storage(cwd string) (string, error) {
 	return dir, nil
 }
 
+// CreateScratch allocates an empty directory without registering file edits.
+func CreateScratch(cwd string) (string, error) {
+	dir, err := storage(cwd)
+	if err != nil {
+		return "", err
+	}
+	return os.MkdirTemp(dir, "scratch-")
+}
+
 func Prepare(cwd, source string, names []string) (*Workspace, error) {
 	rootPath, err := filepath.Abs(source)
 	if err != nil {
