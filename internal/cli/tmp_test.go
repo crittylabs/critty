@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,53 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/workspace"
 )
+
+func TestTmpCreate(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	root, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previous string
+	for range 2 {
+		cmd := newTmpCommand()
+		var output bytes.Buffer
+		cmd.SetOut(&output)
+		cmd.SetArgs([]string{"create"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		var result struct {
+			Directory string `json:"directory"`
+		}
+		if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if !filepath.IsAbs(result.Directory) || filepath.Dir(result.Directory) != filepath.Join(root, ".critty", "tmp") || result.Directory == previous {
+			t.Fatalf("invalid scratch directory: %q", result.Directory)
+		}
+		entries, err := os.ReadDir(result.Directory)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("scratch directory is not empty: %v, %v", entries, err)
+		}
+		info, err := os.Stat(result.Directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm()&0077 != 0 {
+			t.Fatalf("scratch directory is not private: %v", info.Mode())
+		}
+		previous = result.Directory
+	}
+	ignore, err := os.ReadFile(filepath.Join(root, ".critty", "tmp", ".gitignore"))
+	if err != nil || string(ignore) != "*\n" {
+		t.Fatalf("scratch ignore: %q, %v", ignore, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".git")); !os.IsNotExist(err) {
+		t.Fatalf("unexpected repository: %v", err)
+	}
+}
 
 func TestWorkspaceConsentBindsSnapshot(t *testing.T) {
 	for _, version := range []int{0, 1} {

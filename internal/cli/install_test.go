@@ -44,6 +44,8 @@ func destinations(t *testing.T, target string) []string {
 // additionalSkillResources lists the extra skill files every agent target installs.
 var additionalSkillResources = []string{
 	"critty-history/SKILL.md",
+	"critty-grill/SKILL.md",
+	"critty-grill/references/artifacts.md",
 	"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
 	"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
 	"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",

@@ -45,6 +45,28 @@ func snapshot(t *testing.T, w *Workspace) string {
 }
 func allow(Snapshot) error { return nil }
 
+func TestScratchRejectsRedirectedStorage(t *testing.T) {
+	for _, target := range []string{".critty", ".critty/tmp", ".critty/tmp/.gitignore"} {
+		t.Run(target, func(t *testing.T) {
+			root, outside := t.TempDir(), t.TempDir()
+			path := filepath.Join(root, filepath.FromSlash(target))
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(outside, path); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := CreateScratch(root); err == nil {
+				t.Fatal("accepted redirected storage")
+			}
+			entries, err := os.ReadDir(outside)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("redirected directory changed: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
 func TestSplitRenameAndCreation(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, "old.md", "one\ntwo\n")
