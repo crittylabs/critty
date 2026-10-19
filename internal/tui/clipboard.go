@@ -21,7 +21,15 @@ func (m *AppModel) pasteClipboardImage() tea.Cmd {
 	id := m.clipboardID
 	m.clipboardPending = true
 	m.clipboardStatus = "Reading clipboard… (ESC to cancel)"
+	pathOnly := m.pathInputType() != ""
 	return func() tea.Msg {
+		if pathOnly {
+			text, err := clipboard.ReadText()
+			if err == nil {
+				err = clipboard.ErrNoImage
+			}
+			return clipboardImageMsg{id: id, text: text, err: err}
+		}
 		data, err := clipboard.ReadImage()
 		msg := clipboardImageMsg{id: id, data: data, err: err}
 		if errors.Is(err, clipboard.ErrNoImage) {
@@ -46,7 +54,7 @@ func (m *AppModel) finishClipboardImage(msg clipboardImageMsg) tea.Cmd {
 	if errors.Is(msg.err, clipboard.ErrNoImage) {
 		m.killRing.interrupt()
 		var cmd tea.Cmd
-		m.modalTextarea, cmd = m.modalTextarea.Update(tea.PasteMsg{Content: msg.text})
+		cmd = m.updateModalTextarea(tea.PasteMsg{Content: msg.text})
 		return cmd
 	}
 	if msg.err != nil {

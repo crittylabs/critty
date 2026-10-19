@@ -214,3 +214,114 @@ func TestRankFields(t *testing.T) {
 		}
 	}
 }
+
+func TestPathInputs(t *testing.T) {
+	for _, tt := range []struct {
+		name, annotation string
+		kind             InputType
+		standalone       bool
+		value, text      any
+	}{
+		{"file", `type=file default='my file.md'`, InputFile, true, "my file.md", ""},
+		{"directory", `type=directory default='~/日本語'`, InputDirectory, true, "~/日本語", ""},
+		{"path", `type=path`, InputPath, true, "", ""},
+		{"choice", `value=custom type=directory default='/my docs'`, InputDirectory, false, "", ""},
+		{"checkbox", `checkbox type=file default='$HOME/report.md' tags=docs`, InputFile, false, false, "$HOME/report.md"},
+		{"multiline checkbox", `checkbox text default='First line'`, "", false, false, "First line"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			items, err := Parse("- [ ] Input <!-- form: id=target " + tt.annotation + " -->\n")
+			if err != nil {
+				t.Fatal(err)
+			}
+			item := items[0]
+			answer := Defaults(items)["target"]
+			if item.Type != tt.kind || IsTextField(item) != tt.standalone || answer.Value != tt.value || answer.Text != tt.text {
+				t.Fatalf("item=%+v answer=%+v", item, answer)
+			}
+			if answer.Human || Satisfied(item, answer) || Selected(item, answer) {
+				t.Fatal("author's default counted as a human answer")
+			}
+		})
+	}
+	for _, annotation := range []string{
+		`type=unknown`, `type=file text`, `type=file consent`, `checkbox`,
+		`checkbox type=file value=custom`, `default=hello`, `type=file tags=docs`,
+		`existing`, `text existing`, `type=path existing=true`, `type=path rank value=a`, "type=path default='first\nsecond'",
+	} {
+		t.Run(annotation, func(t *testing.T) {
+			if _, err := Parse("- [ ] Input <!-- form: id=target " + annotation + " -->\n"); err == nil {
+				t.Fatal("accepted invalid input definition")
+			}
+		})
+	}
+}
+
+func TestAssociatedInputDrafts(t *testing.T) {
+	items, err := Parse("- [ ] Notes <!-- form: id=where value=notes type=directory default='/notes' tags=preferred -->\n" +
+		"- [ ] Project <!-- form: id=where value=project type=directory default='/project' -->\n" +
+		"- [ ] History <!-- form: id=where value=history -->\n" +
+		"- [ ] Copy <!-- form: id=copy checkbox type=file default='/copy.md' tags=preferred -->\n" +
+		"- [ ] All <!-- form: id=all select-all=preferred -->\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := Defaults(items)
+	human := Answer{Human: true, Author: "Human"}
+	answers["where"] = SelectAnswer(items, items[0], answers["where"], true, human)
+	if answers["where"].Text != "/notes" {
+		t.Fatal("first choice lost its default")
+	}
+	answers["where"] = Answer{Value: "notes", Text: "/custom notes", Human: true}
+	answers["where"] = SelectAnswer(items, items[1], answers["where"], true, human)
+	if answers["where"].Text != "/project" {
+		t.Fatal("choice inherited another option's input")
+	}
+	cleared := answers["where"]
+	cleared.Text = "" // An explicitly cleared value stays empty.
+	answers["where"] = cleared
+	answers["where"] = SelectAnswer(items, items[0], answers["where"], true, human)
+	if answers["where"].Text != "/custom notes" {
+		t.Fatal("choice draft was not restored")
+	}
+	previous := answers["where"]
+	answers["where"] = SelectAnswer(items, items[2], answers["where"], true, human)
+	if answers["where"].Text != "" || len(previous.Drafts) != 2 {
+		t.Fatal("plain choice leaked a note or changed the previous answer")
+	}
+	answers["where"] = SelectAnswer(items, items[1], answers["where"], true, human)
+	if answers["where"].Text != "" {
+		t.Fatal("cleared draft was replaced by the default")
+	}
+	targets, err := Targets(items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ApplyBulk(items, targets[4], answers, human)
+	if answers["where"].Text != "/custom notes" || answers["copy"].Text != "/copy.md" || answers["copy"].Value != true {
+		t.Fatalf("bulk selection lost associated input: %+v", answers)
+	}
+	ApplyBulk(items, targets[4], answers, human)
+	if answers["copy"].Value != false || answers["copy"].Text != "/copy.md" {
+		t.Fatal("clearing the checkbox lost its draft")
+	}
+}
+
+func TestExistingPathDefinition(t *testing.T) {
+	items, err := Parse("- [ ] Input <!-- form: id=input type=file existing -->\n")
+	if err != nil || len(items) != 1 || !items[0].Existing {
+		t.Fatalf("existing path: items=%+v err=%v", items, err)
+	}
+	before, err := Fingerprint(items, "input")
+	if err != nil {
+		t.Fatal(err)
+	}
+	items[0].Existing = false
+	after, err := Fingerprint(items, "input")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before == after {
+		t.Fatal("existing requirement did not change the definition")
+	}
+}

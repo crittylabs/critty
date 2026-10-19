@@ -910,6 +910,77 @@ def scenarios() -> None:
             "header and Submit counters navigate; drafts and human answers export; unchecked consent grants nothing"
         )
 
+        (WORK / "path dirs").mkdir()
+        (WORK / "path dirs" / "report.md").write_text("report\n")
+        (WORK / "paths.md").write_text(
+            '- [ ] Output <!-- form: id=output type=file default="new.md" required -->\n'
+            '- [ ] Notes <!-- form: id=where value=notes type=directory default="path dirs/" -->\n'
+            '- [ ] Project <!-- form: id=where value=project type=directory default="./" -->\n'
+            '- [ ] Copy <!-- form: id=copy checkbox type=file default="path dirs/copy.md" -->\n'
+            '- [ ] Source <!-- form: id=source type=file existing default="path dirs/report.md" -->\n'
+        )
+        paths = Round(
+            "path-inputs",
+            [
+                "--null",
+                "--attachment",
+                "paths.md",
+                "--result",
+                str(ROOT / "paths.json"),
+            ],
+        )
+        paths.keys("Space")
+        paths.wait_screen("File", "path editor")
+        paths.wait_screen("File does not exist", "missing leaf notice")
+        paths.keys("C-u")
+        paths.text("missing/new.md")
+        paths.wait_screen("Parent directory does not exist", "missing parent notice")
+        paths.keys("C-s", "Space", "C-u")
+        paths.text("path dirs/re")
+        paths.wait_screen("report.md", "path completion without @")
+        paths.keys("Tab")
+        paths.wait_screen("path dirs/report.md", "completed path with spaces")
+        paths.keys("C-s")
+        paths.keys("j", "Space")
+        paths.wait_screen("Directory", "radio directory input")
+        paths.keys("C-u")
+        paths.text("custom notes/")
+        paths.keys("C-s", "j", "Space", "C-s", "k", "Space")
+        paths.wait_screen("custom notes/", "per-choice path draft")
+        paths.keys("Escape")
+        paths.keys("j", "j", "Space")
+        paths.wait_screen("File", "checkbox file input")
+        paths.keys("C-s", "Space", "j", "Space", "C-u")
+        paths.text("missing.md")
+        paths.wait_screen("File does not exist", "existing input missing leaf")
+        paths.keys("C-s")
+        paths.wait_screen("File does not exist", "existing input rejects missing leaf")
+        paths.keys("C-u")
+        paths.text("missing/source.md")
+        paths.keys("C-s")
+        paths.wait_screen(
+            "Parent directory does not exist", "existing input rejects missing parent"
+        )
+        paths.keys("C-u")
+        paths.text("path dirs/report.md")
+        paths.keys("C-s")
+        paths.finish(True)
+        result = json.loads((ROOT / "paths.json").read_text())
+        answers = result["attachments"][0]["answers"]
+        assert result["version"] == 3 and result["approved"], result
+        assert answers["output"]["value"] == "path dirs/report.md", answers
+        assert answers["output"]["human"], answers
+        assert answers["source"]["value"] == "path dirs/report.md", answers
+        assert answers["source"]["human"], answers
+        assert answers["where"]["value"] == "notes", answers
+        assert answers["where"]["text"] == "custom notes/", answers
+        assert not answers["copy"]["value"] and "text" not in answers["copy"], answers
+        assert all("drafts" not in answer for answer in answers.values()), answers
+        assert "Interactive form result (version 3)" in paths.out.read_text()
+        report(
+            "path inputs complete raw names, accept new paths with notices, enforce existing, and export only selected drafts"
+        )
+
         failure = Round(
             "save-failure",
             [

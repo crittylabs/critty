@@ -527,9 +527,9 @@ func TestFormTextAnswers(t *testing.T) {
 		t.Fatalf("text field badge: %q", content())
 	}
 	app.tab().cursorLine = 1
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeySpace})
 	if app.modal != formTextModal {
-		t.Fatal("Enter did not open the text field")
+		t.Fatal("Space did not open the text field")
 	}
 	typeAnswer("  Because it is simpler.\nSecond line  ")
 	if app.modal != noModal || d.Answers["reason"].Value != "Because it is simpler.\nSecond line" || !d.Answers["reason"].Human || len(app.missingForms()) != 0 {

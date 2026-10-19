@@ -86,9 +86,11 @@ func (m *AppModel) formAnswerSummary(items []form.Item, field form.Item, answer 
 			}
 		}
 		return ""
-	case field.Text:
+	case form.IsTextField(field):
 		text, _ := answer.Value.(string)
 		return firstLine(text)
+	case field.Checkbox && answer.Text != "":
+		return firstLine(answer.Text)
 	case field.Consent:
 		return "Allowed on approval"
 	case field.Required:

@@ -472,14 +472,14 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	}
 }
 
-func TestHelpModalScrollsSearchShortcuts(t *testing.T) {
+func TestHelpModalScrollsToBottom(t *testing.T) {
 	app := newISearchApp(t, 1)
 	app.version = "v1.0.0"
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 24})
 	app = pressAltKey(app, '?')
 	app = pressKey(app, tea.KeyEnd)
-	if app.helpOffset == 0 || !strings.Contains(ansi.Strip(app.View().Content), "Selection and dialogs") {
-		t.Fatal("end did not show the bottom of keyboard help")
+	if app.helpOffset == 0 || !strings.Contains(ansi.Strip(app.View().Content), "pending/completed item") {
+		t.Fatalf("end did not show the bottom of keyboard help (offset %d):\n%s", app.helpOffset, ansi.Strip(app.View().Content))
 	}
 	if !strings.Contains(ansi.Strip(app.View().Content), "C-: ctrl+, M-: meta/alt+, S-: shift+") {
 		t.Fatal("modifier legend scrolled out of keyboard help")

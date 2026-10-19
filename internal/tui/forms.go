@@ -268,19 +268,41 @@ func (m *AppModel) toggleForm(line int) bool {
 			answer.Via = item.ID
 			form.ApplyBulk(d.Items, m.formTargets[d.Path()][item.ID], d.Answers, answer)
 		} else {
-			answer.Value = !form.Selected(item, d.Answers[item.ID])
-			if item.Choice {
-				answer.Value = item.Value
-				answer.Text = d.Answers[item.ID].Text
+			selected := item.Choice || !form.Selected(item, d.Answers[item.ID])
+			d.Answers[item.ID] = form.SelectAnswer(d.Items, item, d.Answers[item.ID], selected, answer)
+		}
+		var targets []form.Item
+		if item.SelectAll != nil {
+			for _, i := range m.formTargets[d.Path()][item.ID] {
+				targets = append(targets, d.Items[i])
 			}
-			d.Answers[item.ID] = answer
+		} else {
+			targets = []form.Item{item}
+		}
+		for _, target := range targets {
+			proposed := d.Answers[target.ID]
+			if target.Type == "" || !form.Selected(target, proposed) {
+				continue
+			}
+			if err := m.validateFormPath(target, proposed.Text); err != nil {
+				d.Answers = previous
+				m.openFormText(target)
+				m.pendingFormAnswer = &proposed
+				m.modalTextarea.SetValue(proposed.Text)
+				m.modalInitial = proposed.Text
+				m.resizePathInput()
+				m.refreshPathInfo()
+				m.clipboardStatus = err.Error()
+				m.rebuildContent()
+				return true
+			}
 		}
 		if err := m.session.SaveForms(*m.forms); err != nil {
 			d.Answers = previous
 			m.err = err
 		} else {
 			m.err = nil
-			if item.Text {
+			if item.Text && form.Selected(item, d.Answers[item.ID]) {
 				m.openFormText(item)
 			}
 		}
@@ -290,22 +312,11 @@ func (m *AppModel) toggleForm(line int) bool {
 	return false
 }
 
-// openFormTextAt opens the editor for the text field on line, if any.
-func (m *AppModel) openFormTextAt(line int) bool {
-	if m.readOnly || m.forms == nil {
-		return false
-	}
-	row, ok := m.formRows[m.tab().path][line]
-	if !ok || row.item == nil || !form.IsTextField(*row.item) {
-		return false
-	}
-	m.tab().cursorOnForm = true
-	m.openFormText(*row.item)
-	return true
-}
-
-// openFormText edits a text field's value, or the note on a selected choice.
+// openFormText edits standalone input or input on a selected control.
 func (m *AppModel) openFormText(item form.Item) {
+	m.clipboardStatus = ""
+	m.pendingFormAnswer = nil
+	m.pathInfo = formPathState{}
 	text := m.formText(item)
 	m.modal = formTextModal
 	m.editingFormLine = item.Line
@@ -313,8 +324,14 @@ func (m *AppModel) openFormText(item form.Item) {
 	m.modalTextarea.Placeholder = "Type your answer..."
 	m.modalTextarea.Reset()
 	m.modalTextarea.SetValue(text)
+	m.completion = completionState{}
+	if item.Type != "" {
+		m.modalTextarea.Placeholder = "Type a path..."
+		m.resizePathInput()
+	}
 	m.modalInitial = m.modalTextarea.Value()
 	m.modalTextarea.Focus()
+	m.refreshPathInfo()
 }
 
 // editingFormItem returns the item edited by the form text modal.
@@ -363,10 +380,27 @@ func (m *AppModel) saveFormText() {
 		return
 	}
 	text := strings.TrimSpace(m.modalTextarea.Value())
+	if item.Type != "" {
+		text = m.modalTextarea.Value()
+		if err := m.validateFormPath(*item, text); err != nil {
+			m.clipboardStatus = err.Error()
+			return
+		}
+	}
 	previous := d.Answers[item.ID]
+	selected := previous
+	if m.pendingFormAnswer != nil {
+		selected = *m.pendingFormAnswer
+	}
 	answer := form.Answer{Value: text, Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
-	if item.Choice {
-		answer.Value, answer.Text = item.Value, text
+	if !form.IsTextField(*item) {
+		answer.Value, answer.Text, answer.Drafts = selected.Value, text, maps.Clone(selected.Drafts)
+		if item.Choice {
+			if answer.Drafts == nil {
+				answer.Drafts = map[string]string{}
+			}
+			answer.Drafts[item.Value] = text
+		}
 	}
 	d.Answers[item.ID] = answer
 	if err := m.session.SaveForms(*m.forms); err != nil {
@@ -470,6 +504,9 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	tag := lipgloss.NewStyle().Foreground(tagColor).Bold(true)
 	if checkbox.Required {
 		label = lipgloss.NewStyle().Bold(true).Render(label) + " " + tag.Render("Required")
+	}
+	if checkbox.Default != "" && !answer.Human {
+		label += " " + tag.Render("Default")
 	}
 	if checkbox.Consent {
 		label += " " + tag.Render("Consent")

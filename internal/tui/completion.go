@@ -10,6 +10,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sahilm/fuzzy"
+
+	"github.com/crittylabs/critty/internal/form"
 )
 
 const completionMenuRows = 10
@@ -33,19 +35,21 @@ func (item completionItem) label() string {
 	return item.name
 }
 
-// completionToken is the @path being typed, split at the last directory
+// completionToken is the path being typed, split at the last directory
 // separator before the cursor.
 type completionToken struct {
-	start      int    // rune index of '@' in the line
-	queryStart int    // rune index after the last unescaped '/' or the '@'
-	raw        string // escaped text between '@' and the cursor
+	start      int    // rune index of '@', or zero for a path field
+	queryStart int    // rune index at the start of the basename
+	raw        string // text up to the cursor, escaped only for @references
 	dir        string // unescaped directory part, empty or ending with '/'
 	query      string // unescaped text after dir
+	plain      bool   // a path field, without @ or reference escaping
 }
 
 type completionKey struct {
 	row, column int
 	line        string
+	kind        form.InputType
 }
 
 type completionListing struct {
@@ -110,6 +114,17 @@ func findCompletionToken(line []rune, cursor int) (completionToken, bool) {
 	return completionToken{}, false
 }
 
+func findPathCompletionToken(line []rune, cursor int) completionToken {
+	start := 0
+	for i, r := range line[:cursor] {
+		if r == '/' {
+			start = i + 1
+		}
+	}
+	return completionToken{plain: true, queryStart: start, raw: string(line[:cursor]),
+		dir: string(line[:start]), query: string(line[start:cursor])}
+}
+
 func readCompletionDir(dir string) []completionItem {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -155,18 +170,35 @@ func filterCompletionItems(entries []completionItem, query string) []completionI
 	return items
 }
 
-func (m *AppModel) completionItems(token completionToken) []completionItem {
-	dir := m.sourcePath(token.dir)
+func (m *AppModel) completionItems(token completionToken, kind form.InputType) []completionItem {
+	dir := token.dir
+	if strings.HasPrefix(dir, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			dir = filepath.Join(home, strings.TrimPrefix(dir, "~/"))
+		}
+	}
+	dir = m.sourcePath(dir)
 	listing := &m.completion.listing
 	if listing.dir != dir {
 		*listing = completionListing{dir: dir, entries: readCompletionDir(dir)}
 	}
-	return filterCompletionItems(listing.entries, token.query)
+	items := filterCompletionItems(listing.entries, token.query)
+	if kind != form.InputDirectory {
+		return items
+	}
+	var dirs []completionItem
+	for _, item := range items {
+		if item.dir {
+			dirs = append(dirs, item)
+		}
+	}
+	return dirs
 }
 
 // refreshCompletion derives the menu from the textarea after every update,
 // keeping the selection while the text and cursor are unchanged.
 func (m *AppModel) refreshCompletion() {
+	m.refreshPathInfo()
 	c := &m.completion
 	if !m.isTextModal() || m.modalFocus != 0 || !m.modalTextarea.Focused() {
 		*c = completionState{listing: c.listing}
@@ -174,13 +206,17 @@ func (m *AppModel) refreshCompletion() {
 	}
 	row, column := m.modalTextarea.Line(), m.modalTextarea.Column()
 	line := []rune(strings.Split(m.modalTextarea.Value(), "\n")[row])
-	key := completionKey{row: row, column: column, line: string(line)}
+	kind := m.pathInputType()
+	key := completionKey{row: row, column: column, line: string(line), kind: kind}
 	if key == c.key {
 		return
 	}
 	c.key = key
 	c.items, c.selected, c.offset = nil, -1, 0
 	token, ok := findCompletionToken(line, column)
+	if kind != "" {
+		token, ok = findPathCompletionToken(line, column), true
+	}
 	if !ok {
 		c.token, c.dismissed = completionToken{}, false
 		return
@@ -190,7 +226,7 @@ func (m *AppModel) refreshCompletion() {
 		return
 	}
 	c.dismissed = false
-	c.items = m.completionItems(token)
+	c.items = m.completionItems(token, kind)
 }
 
 // handleCompletionKey consumes the menu keys while candidates exist, so Tab
@@ -246,15 +282,38 @@ func (m *AppModel) acceptCompletion() {
 	c := &m.completion
 	item := c.items[max(0, c.selected)]
 	text := escapeReferencePath(item.name)
+	if c.token.plain {
+		text = item.name
+		// Replace the rest of this component when the cursor is within it.
+		line := []rune(c.key.line)
+		end := c.key.column
+		for end < len(line) && line[end] != '/' {
+			end++
+		}
+		if item.dir && end < len(line) && line[end] == '/' {
+			end++
+		}
+		for range end - c.key.column {
+			m.modalTextarea, _ = m.modalTextarea.Update(tea.KeyPressMsg{Code: tea.KeyDelete})
+		}
+	}
 	if item.dir {
 		text += "/"
-	} else {
+	} else if !c.token.plain {
 		text += " "
 	}
 	for range m.modalTextarea.Column() - c.token.queryStart {
 		m.modalTextarea, _ = m.modalTextarea.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
 	m.modalTextarea.InsertString(text)
+	if c.token.plain {
+		m.resizePathInput()
+		if !item.dir {
+			c.dismissed = true
+			c.dismissedRaw = string([]rune(m.modalTextarea.Value())[:m.modalTextarea.Column()])
+			c.items, c.selected = nil, -1
+		}
+	}
 }
 
 func renderCompletionMenu(items []completionItem, selected, offset, maxWidth int) string {
@@ -286,16 +345,16 @@ func renderCompletionMenu(items []completionItem, selected, offset, maxWidth int
 	return strings.Join(lines, "\n")
 }
 
-// completionLayer places the menu under the '@', or above it when the screen
-// bottom is too close. Without room in either direction, no menu is shown.
-func (m AppModel) completionLayer(regions []modalMouseRegion, width, height int) *lipgloss.Layer {
+// completionLayout places the menu under the path, or above it when the
+// screen bottom is too close, and shares its bounds with mouse hit testing.
+func (m AppModel) completionLayout(regions []modalMouseRegion, width, height int) (string, mouseRect) {
 	c := m.completion
-	if !c.active() {
-		return nil
+	if !c.active() || (m.pathInputType() != "" && m.clipboardStatus != "") {
+		return "", mouseRect{}
 	}
 	cursor := m.editorCursor()
 	if cursor == nil {
-		return nil
+		return "", mouseRect{}
 	}
 	for _, region := range regions {
 		if !region.action.textarea {
@@ -303,7 +362,7 @@ func (m AppModel) completionLayer(regions []modalMouseRegion, width, height int)
 		}
 		x, y := region.rect.left+cursor.X, region.rect.top+cursor.Y
 		if y < region.rect.top || y >= region.rect.bottom {
-			return nil
+			return "", mouseRect{}
 		}
 		line := []rune(c.key.line)
 		x -= ansi.StringWidth(string(line[c.token.start:min(len(line), c.key.column)]))
@@ -315,9 +374,34 @@ func (m AppModel) completionLayer(regions []modalMouseRegion, width, height int)
 			top = y - menuHeight
 		}
 		if top < 0 {
-			return nil
+			return "", mouseRect{}
 		}
-		return lipgloss.NewLayer(menu).X(max(0, min(x, width-menuWidth))).Y(top).Z(2)
+		left := max(0, min(x, width-menuWidth))
+		return menu, mouseRect{left: left, right: left + menuWidth, top: top, bottom: top + menuHeight}
 	}
-	return nil
+	return "", mouseRect{}
+}
+
+func (m AppModel) completionLayer(regions []modalMouseRegion, width, height int) *lipgloss.Layer {
+	menu, rect := m.completionLayout(regions, width, height)
+	if menu == "" {
+		return nil
+	}
+	return lipgloss.NewLayer(menu).X(rect.left).Y(rect.top).Z(2)
+}
+
+func (m *AppModel) handleCompletionClick(mouse tea.Mouse) bool {
+	if !m.completion.active() {
+		return false
+	}
+	_, rect := m.completionLayout(m.modalMouseRegions(), m.width, m.height)
+	if !rect.contains(mouse) {
+		return false
+	}
+	index := m.completion.offset + mouse.Y - rect.top - 1
+	if mouse.Y > rect.top && mouse.Y < rect.bottom-1 && index < len(m.completion.items) {
+		m.completion.selected = index
+		m.acceptCompletion()
+	}
+	return true
 }
