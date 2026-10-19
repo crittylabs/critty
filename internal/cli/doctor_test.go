@@ -343,12 +343,12 @@ func TestDoctorTmuxInheritedSetting(t *testing.T) {
 
 func TestDoctorHerdrConfig(t *testing.T) {
 	for _, tt := range []struct{ config, status, message string }{
-		{"", "info", "unset"},
+		{"", "info", "current Herdr default: true"},
 		{"[experimental]\nkitty_graphics = false\n", "warn", "false"},
 		{"[terminal]\nkitty_graphics = true\n[experimental]\nkitty_graphics = false\n", "info", "true"},
 		{"terminal.kitty_graphics = false\n", "warn", "false"},
 		{"[terminal]\nkitty_graphics = 'false'\n", "warn", "invalid"},
-		{"[other]\ntext = '''\n[terminal]\nkitty_graphics = false\n'''\n", "info", "unset"},
+		{"[other]\ntext = '''\n[terminal]\nkitty_graphics = false\n'''\n", "info", "current Herdr default: true"},
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		t.Setenv("HERDR_CONFIG_PATH", path)
@@ -360,6 +360,10 @@ func TestDoctorHerdrConfig(t *testing.T) {
 		d := diagnosticFor(t, r, "images/herdr")
 		if d.Status != tt.status || !strings.Contains(d.Message, tt.message) {
 			t.Fatalf("config %q: %+v", tt.config, d)
+		}
+		wantEnableAdvice := tt.status == "warn" && tt.message == "false"
+		if strings.Contains(d.Advice, "Set `[terminal] kitty_graphics = true`") != wantEnableAdvice {
+			t.Fatalf("config %q: unexpected enable advice: %+v", tt.config, d)
 		}
 	}
 }

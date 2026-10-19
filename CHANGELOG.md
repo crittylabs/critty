@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- `critty doctor` recommends enabling Herdr image rendering only when local configuration explicitly disables it.  Unset settings use the current Herdr default of enabled.
+
 ## 1.3.2
 
 ### Changed

@@ -506,13 +506,15 @@ func (r *doctorReport) checkHerdrImages() {
 		enabled = cfg.Experimental.KittyGraphics
 	}
 	status, message := "info", "kitty_graphics unset (current Herdr default: true)"
+	advice := "This checks local config only; running server and remote client settings may differ."
 	if enabled != nil {
 		message = fmt.Sprintf("kitty_graphics=%t in %s", *enabled, path)
 		if !*enabled {
 			status = "warn"
+			advice = "Set `[terminal] kitty_graphics = true` for images. Restart the server or reattach the client after changing it. " + advice
 		}
 	}
-	r.add("images/herdr", status, message, "Set `[terminal] kitty_graphics = true` for images. Restart the server or reattach the client after changing it. This checks local config only; remote server and client settings may differ.")
+	r.add("images/herdr", status, message, advice)
 }
 
 // Check every supported launcher for this platform, independently of launch priority
