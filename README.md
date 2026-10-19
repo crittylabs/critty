@@ -23,7 +23,7 @@ For example:
 - Choose an implementation approach before coding starts.
 - Check a proposed PR's text and destination before authorizing publication.
 
-![An approval checklist with required confirmations and an inline image](https://github.com/user-attachments/assets/d22e2123-92f9-400d-8b35-f20f4c010db2)
+![An approval checklist with required confirmations and an inline image](https://github.com/user-attachments/assets/a5710b35-fa00-40e3-9faa-7160fe5fc190)
 
 [More videos and screenshots](#gallery).
 
@@ -31,12 +31,13 @@ For example:
 
 ## Key Features
 
-- **Code and document reviews** — read multi-file diffs and documents with syntax highlighting and inline comments.
+- **Code and document reviews** — read multi-file diffs in unified or side-by-side view, with syntax highlighting and inline comments.
 - **Approvals and choices** — read requests in attached documents, confirm details or allow actions with checkboxes, and choose between alternatives with radio buttons.  These requests can accompany a code review or stand on their own.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
-- **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.
-- **Review changes outside Git** — review proposed edits to documents and configuration files before updating the originals.  Create, split, rename, or delete files through the same feedback and approval workflow.
+- **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.  Use `--dry-run` for a read-only inspection in the current terminal.
+- **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
+- **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
 - **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
 - **Scriptable and Crit-compatible** — automate comments with a [Crit](https://crit.md/)-compatible review format and resume saved sessions.
@@ -89,6 +90,8 @@ Rerun the installer after upgrading.  In v1.2.0, Codex skills use `.codex/skills
 
 After installing or upgrading the skills, run `critty doctor` from your project to check for missing or outdated integration files.
 
+In v1.3.0, user settings move to `~/.config/critty/config.toml` and project `.critty.toml`.  Startup converts older JSON settings when the TOML destination is absent.  Local state and prompt paths also use Critty names; update custom launchers to use `CRITTY_HOST`.  See [configuration](docs/configuration.md) and the [release notes](CHANGELOG.md#130) for migration details.
+
 ### Terminals and multiplexers
 
 Floating panes require tmux 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use tmux or Herdr for agent reviews, or run Critty directly.
@@ -127,7 +130,7 @@ Critty opens in a tmux floating pane, a Herdr tab, or a new window of a supporte
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-<video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
+<video controls src="https://github.com/user-attachments/assets/6e03f631-17e4-44cd-b783-8d8723197b43"></video>
 
 For a manual review:
 
@@ -202,61 +205,61 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos recorded with the v1.2.0 candidate.
+Videos and screenshots recorded with the v1.3.0 candidate.
 
 ### Code review with inline comments
 
-<video controls src="https://github.com/user-attachments/assets/2842e136-b0bd-4a4f-9c66-d5a22ed52ea3"></video>
+<video controls src="https://github.com/user-attachments/assets/6e03f631-17e4-44cd-b783-8d8723197b43"></video>
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/e5d6b0c3-47c4-431d-a020-058f6cf9b414)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/d11fc222-464b-4be5-bc79-64fe9e6d1fbf)
 
 ### Review round trips with Claude Code
 
-<video controls src="https://github.com/user-attachments/assets/b78ebf6f-c406-44cd-b56d-b1793031f5b9"></video>
+<video controls src="https://github.com/user-attachments/assets/b266c2d7-0423-4166-bf3b-0979d7610921"></video>
 
 ### Review round trips with Codex
 
-<video controls src="https://github.com/user-attachments/assets/4e86ed2e-65c1-4aed-a499-e4d57e3736e2"></video>
+<video controls src="https://github.com/user-attachments/assets/148d2759-4735-47af-9fa6-4824b0542b2b"></video>
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-<video controls src="https://github.com/user-attachments/assets/1e8f2467-27fb-4a83-9685-9aedc40e1c8d"></video>
+<video controls src="https://github.com/user-attachments/assets/bbdd0003-3c5f-494e-bd88-965209e09e8f"></video>
 
 ### Reviewing a document
 
-<video controls src="https://github.com/user-attachments/assets/d8cf18f7-aa1d-4985-a993-f4c522eaf28c"></video>
+<video controls src="https://github.com/user-attachments/assets/4f2418e5-f270-468a-8814-7ca63869b771"></video>
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/5576979d-7943-4ae4-9578-37a9e01d8508)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/851bf36a-abff-4c42-8ee6-494feb7dba1f)
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/af8b4612-b968-49d1-b18a-e0b3d3a6350a)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/7f4c3355-69d9-45ef-94e7-fe34c3d2eb7b)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/76064e2d-e9f1-4c07-ae5d-4f7f3f1a16a7)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/cb0ebd4c-b417-4a95-a4f0-085224d45292)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/d22e2123-92f9-400d-8b35-f20f4c010db2)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/a5710b35-fa00-40e3-9faa-7160fe5fc190)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/8e52ed1c-3854-4786-9a9a-950efe4e79a7)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/bd175503-3d16-4c54-ba87-6fc11a624604)
 
 ### Submitting with unfinished items
 
-![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/67093884-2089-4044-8b7e-2b9d2fbed91b)
+![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/e4bc0d5e-33b4-475c-b2f7-59bfc09ab308)
 
 ### Incremental search
 
-![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/c87a24e4-dbea-4c1f-996b-0cad6844d306)
+![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/a94be6fc-5c97-4767-a764-fc839b615c38)
 
 ## Contributing
 

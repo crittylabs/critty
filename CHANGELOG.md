@@ -2,39 +2,37 @@
 
 ## Unreleased
 
+## 1.3.0
+
 ### Added
 
-- Check Git prerequisites and local marker delivery with `critty doctor`.  It reports Git's path and version, warns when Git is missing or below 2.31.0, and recommends a maintained package.  In a foreground terminal it tests a marker round trip with a three-second wait, without launching an agent.  Unsupported terminal contexts are skipped; Git-independent reviews remain available.  See [setup](https://github.com/crittylabs/critty#check-prerequisites).
+- **History management** — group reviews by task with `critty history` and the bundled [critty-history skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-history/SKILL.md).  Save portable Markdown archives with attachments and images, inspect task storage, and defer maintenance across conversations.  Reviews are retained by default.  Automatic retention rotates eligible completed backups within a per-directory disk budget, while protecting ongoing reviews and explicit archives.  Ordinary reviews report history warnings; `critty doctor` provides fresh checks and remedies.  See [history settings](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#history-settings).
 
-- Review updates to notes, reports, configuration files, and other text files outside Git before applying them.  Create, split, rename, or delete files through reviewed copies with `critty tmp prepare`, `snapshot`, and `apply`.  The [workflow](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty/references/temporary-tree.md) keeps originals unchanged until approval and explicit consent to apply, checks for concurrent edits, and retains backups and progress for retries.  Application is atomic per file, not across the batch.
+- **Review before editing** — review proposed updates to notes, reports, configuration files, and other text outside Git while the originals stay untouched.  Use `critty tmp prepare`, `snapshot`, and `apply` to create, split, rename, or delete files through reviewed copies.  Originals stay unchanged until approval and explicit application consent.  Concurrent-edit checks, backups, and saved progress support safe retries; application is atomic per file, not across the batch.  See the [workflow](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty/references/temporary-tree.md).
 
-- Manage review history by task with `critty history` and the bundled [critty-history skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-history/SKILL.md).  Group multiple reviews with `--task` and save portable Markdown archives with attachments, images, and original session data.  Default `auto` retains backups quietly, offers maintenance beyond `keep_days`, and rotates the oldest completed backups within a per-directory allocated-disk budget.  Explicit archives, ongoing or busy reviews, and the task being finished are protected.  Inspect task sizes and updates, defer age questions across conversations, and list, verify, or explicitly delete archives through commands.  Ordinary reviews warn about capacity, old records, and interrupted cleanup; the skill responds to command reports or explicit maintenance requests.  `critty doctor` provides fresh history checks and suggested remedies.  Global start/end policies support fixed behavior; `cleanup_on_approve = true` remains an opt-in for reviews outside a task.  `clear` protects task members; retained completed reviews can be opened without reopening their task.
+- **Side-by-side diffs** — compare code in unified or side-by-side diffs.  Switch with the `Split: off/on` header control or `S`, and set `split = true` to start with two columns.  Both views preserve comment anchors and support supplied patches without original files; narrow panes temporarily use unified rendering.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
 
-- Compare diffs in unified or side-by-side view with the `Split: off/on` header control or `S`; set `split = true` to start with two columns.  Split views show all available source lines, including unchanged lines between hunks.  Keep the focused line or thread near the same screen position while switching, and choose whether to ignore whitespace-only changes with the fixed `Ignore: none/WS` control.  Both views support supplied patches without original files and preserve comment sides and line numbers.  Narrow panes temporarily use unified rendering.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
+- Check Git prerequisites and local marker delivery with `critty doctor`.  It reports missing Git or versions below 2.31.0 and tests marker delivery in a foreground terminal without launching an agent.  Unsupported terminal contexts are skipped; standalone documents and attachment-only reviews remain available without Git.  See [setup](https://github.com/crittylabs/critty#check-prerequisites).
 
-- Inspect Git changes, documents, patches, and attachments with `critty --dry-run` in the current terminal.  The read-only viewer keeps search and display controls without saving a session or history, migrating configuration, or enabling review edits and external applications.  Close it without submitting feedback.
+- Inspect changes, documents, patches, and attachments with `critty --dry-run` in the current terminal.  Search and display controls remain available without saving a review or history, migrating configuration, or allowing edits and external applications.
 
 ### Changed
 
-- Approval requests use a short description and ordinary approval for a single action.  Publication details and separate permissions or choices are covered by focused references in the [approval skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md).
+- User settings now use TOML: `$XDG_CONFIG_HOME/critty/config.toml` globally and `.critty.toml` in projects.  Existing JSON settings are converted once when the TOML destination is absent; remove or replace JSON `null` values before migration.  Review records and JSON command output keep their formats.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
 
-- AI review and cowork skills record task-scoped authorization for chat requests and Critty feedback, carrying it across covered revisions while keeping each review tied to its exact snapshot.  New services, broader access, and publication still require separate authorization.
+- Local state, configuration, custom prompts, and launcher variables use Critty names.  Startup migrates old paths only when the corresponding Critty destination is absent, without merging directories or retaining compatibility aliases.  Update launchers to use `CRITTY_HOST`.
 
-- Edit settings in `$XDG_CONFIG_HOME/critty/config.toml` or project `.critty.toml`, with TOML comments and tables.  Review records and JSON command output keep their formats.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
-
-- Use only Critty names for state, configuration, custom prompts, and launcher environment variables, without compatibility aliases or directory merges.
+- Approval requests use a short description and ordinary approval for a single action.  The [approval skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md) covers publication details and separate permissions or choices.  AI review and cowork skills carry authorization across covered task revisions while tying each review to its exact snapshot; new services, broader access, and publication require separate authorization.
 
 ### Fixed
 
-- Paste text with `C-v` in comment and reply editors.  Prefer plain text on Linux and macOS; when unavailable, extract text from HTML, or from RTF on macOS.  Image paste remains available.
+- Paste text with `C-v` in comment and reply editors.  Prefer plain text on Linux and macOS, with HTML text extraction when needed and an additional RTF fallback on macOS.  Image paste remains available.
 
-- Distinguish replaced attachments from current forms.  Commented snapshots appear last in collapsed, read-only attachment history, with an explanation that their checkboxes are inactive and answers belong in current attachments.
+- Replaced attachments appear in collapsed, read-only history after current attachments.  Their checkboxes are inactive, and answers belong to current forms.
 
-- Click Markdown links and plain web URLs to open them.  In attachment choices, links take priority over selection; click the checkbox, gaps, or trailing space to change the answer.
+- Markdown formatting and link click targets survive wrapped rows and deleted lines.  Links in attachment choices open without changing the answer; use the checkbox or surrounding space to select it.
 
-- Markdown code spans, emphasis, and links retain their formatting and click targets across wrapped rows, including deleted lines.
-
-- `critty review --help` explains that reviews outside a multiplexer open a desktop terminal window when available, instead of listing the removed `auto` launcher.
+- `critty review --help` explains desktop terminal launchers outside a multiplexer, replacing the removed `auto` launcher description.
 
 ## 1.2.0
 
