@@ -157,6 +157,8 @@ For example:
 
 The agent prepares copies with `critty tmp`, edits them, and opens the proposed diff with a request to apply it.  Leave comments and review revisions as usual.  After you approve the review and select the permission checkbox, the agent applies the reviewed changes.  Critty checks for changes to the originals and retains backups for recovery.
 
+The application request lists the destination and files to create, update, or delete before the permission checkbox.  Exact file states remain available as JSON at the end.
+
 See the [workflow for changes outside source control](internal/cli/skill/critty/references/temporary-tree.md) and `critty tmp --help` for details.
 
 <a id="approvals-and-choices"></a>
@@ -192,6 +194,8 @@ Request a second opinion with [critty-ai-review](internal/cli/skill/critty-ai-re
 For example:
 
 > Use critty-ai-review with Codex Astra to review these changes in the current session.
+
+Ask your agent to "Have Fable review this and finish it" to delegate revisions and follow-up through `critty-ai-cowork`.  Say "I'd like Fable's opinion first" to receive findings through `critty-ai-review` before deciding what to change.  The same distinction applies to other reviewers and languages; explicitly naming a skill selects that workflow.
 
 AI review requires an existing Critty session and authorized access to the chosen reviewer.  The bundled restricted CLI setups support Claude Code with Python 3.10+, or Codex with Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies.
 

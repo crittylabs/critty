@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.3.2
+
 ### Changed
 
 - File application requests put destinations, creations, updates, deletions, and the consent checkbox before the machine-readable details.  Exact file states remain available as JSON at the end of the request.
