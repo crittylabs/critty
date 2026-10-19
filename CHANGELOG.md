@@ -10,6 +10,10 @@
 
 - Bundled skills use explicit review commands that match their narrow tool grants.  AI review and cowork reuse task authorization for in-scope revisions, distinguish each assignment from host execution permission, and ask only for missing decisions or expanded scope. Requests to have another AI review and finish the work select cowork; requests to hear its opinion first return findings for the human to decide.
 
+### Fixed
+
+- `critty doctor` reports optional tfil installation and detected process ancestry together as information.  Missing or uninspectable ancestry no longer appears as a separate session check suggesting setup changes; marker tests remain the check for terminal binding.
+
 ## 1.3.1
 
 ### Fixed

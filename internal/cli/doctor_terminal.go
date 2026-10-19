@@ -24,7 +24,6 @@ var probeDoctorMarker = probeCurrentTerminalMarker
 func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 	r.checkCodexWrapper()
 	origin := terminalbinding.CaptureOrigin(os.Getpid())
-	resolved := false
 	if request == "" {
 		result, err := probeDoctorMarker(origin)
 		advice := "To test the agent output path, prepare a request with `critty terminal prepare`, display its marker in agent output, then run `critty doctor --terminal-request ID`."
@@ -35,7 +34,7 @@ func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 			r.add("terminal/marker", "info", "skipped: "+result.Reason, advice)
 		default:
 			r.add("terminal/marker", "ok", "local marker round trip succeeded via "+result.Target.Kind+"; agent output path untested", advice)
-			origin, resolved = result.Target.Origin, true
+			origin = result.Target.Origin
 		}
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -55,7 +54,6 @@ func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 			r.add("terminal/marker", "warn", err.Error(), advice)
 		} else {
 			origin = target.Origin
-			resolved = true
 			message := "visible marker resolved to " + target.Kind
 			if notifyOnly || target.Kind == "terminal" {
 				message = "visible marker resolved through a terminal filter notification"
@@ -63,12 +61,11 @@ func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 			r.add("terminal/marker", "ok", message, "")
 		}
 	}
+	message := "optional filter is not available on PATH; no action required"
 	if bin, err := lookPath("tfil"); err == nil {
-		r.add("terminal/tfil", "ok", "installed at "+bin, "Installation alone does not establish an active filter.")
-	} else {
-		r.add("terminal/tfil", "info", "tfil is not available on PATH", "tfil is optional; an active filter may also have been launched by an absolute path.")
+		message = "optional filter installed at " + bin
 	}
-	pid, err := tfilAncestor(origin.PID, func(pid int) (int, string, error) {
+	pid, _ := tfilAncestor(origin.PID, func(pid int) (int, string, error) {
 		p, err := ps.FindProcess(pid)
 		if err != nil {
 			return 0, "", err
@@ -76,14 +73,9 @@ func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 		return p.PPID(), p.Command(), nil
 	})
 	if pid != 0 {
-		r.add("terminal/tfil-session", "ok", fmt.Sprintf("tfil detected in terminal process ancestry (PID %d)", pid), "A marker test verifies terminal binding; process detection alone does not verify --critty-notify.")
-	} else if err != nil {
-		r.add("terminal/tfil-session", "info", "could not inspect the full terminal process ancestry", "Use a marker test to verify terminal binding, including daemon-backed sessions.")
-	} else if resolved && origin.PID == 0 {
-		r.add("terminal/tfil-session", "info", "resolved terminal did not supply client process metadata; tfil activity is unverified", "Update the Critty executable used by the wrapper or terminal filter, restart the client, and test a new marker.")
-	} else {
-		r.add("terminal/tfil-session", "info", "tfil was not detected in this process ancestry", "A daemon can hide the client ancestry. Use a marker test to check the originating terminal.")
+		message += fmt.Sprintf("; detected in process ancestry (PID %d), ancestry alone does not verify agent output notification", pid)
 	}
+	r.add("terminal/tfil", "info", message, "")
 }
 
 func (r *doctorReport) checkCodexWrapper() {
