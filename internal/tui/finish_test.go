@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -439,6 +440,8 @@ func TestMouseClickFinishModalConfirmActions(t *testing.T) {
 			app, cmd = clickMouseCmd(app, rect.right-1, rect.top)
 			if app.modal == finishResolveModal {
 				rect = finishRegion(t, app, 0)
+				assertRegionContainsRenderedText(t, app, rect, "Resolve All")
+				app.modalOpenedAt = time.Now().Add(-modalClickGuard)
 				app, cmd = clickMouseCmd(app, rect.right-1, rect.top)
 			}
 			if !isQuit(cmd) || app.modal != noModal {

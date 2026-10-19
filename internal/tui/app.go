@@ -2133,13 +2133,11 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.handleCompletionKey(msg) {
 		return m, nil
 	}
-	focusOrder := []int{0, 1, 2}
-	if m.pathInputType() != "" {
-		focusOrder = []int{0, 2, 1}
-	}
+	focusOrder := []int{0, 2}
 	if m.canSuggest() {
 		focusOrder = append(focusOrder, 3)
 	}
+	focusOrder = append(focusOrder, 1)
 	if m.modal == editModal {
 		for i := range m.modalDeleteTargets() {
 			focusOrder = append(focusOrder, m.modalDeleteStartFocus()+i)
@@ -4634,7 +4632,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 			content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), innerWidth)
 			contentRegions = append(contentRegions, textareaRegion)
-			buttons, buttonRegions := layoutModalButtonRow(buttonSpecs, innerWidth, strings.Count(content, "\n"))
+			buttons, buttonRegions := layoutModalActions(buttonSpecs, innerWidth, strings.Count(content, "\n"))
 			content += buttons
 			contentRegions = append(contentRegions, buttonRegions...)
 			return content, contentRegions
@@ -4679,11 +4677,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		}
 		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
 		regions = append(regions, textareaRegion)
-		layoutButtons := layoutModalButtonRow
-		if pathInput {
-			layoutButtons = layoutModalActions
-		}
-		buttons, buttonRegions := layoutButtons([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, innerWidth, strings.Count(prefix, "\n"))
@@ -4774,14 +4768,14 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), innerWidth)
 			contentRegions = append(contentRegions, textareaRegion)
 			buttonY := strings.Count(content, "\n")
-			buttonRow, buttonRegions := layoutModalButtonRow(buttonSpecs, innerWidth, buttonY)
+			buttonRow, buttonRegions := layoutModalActions(buttonSpecs, innerWidth, buttonY)
 			content += buttonRow
 			contentRegions = append(contentRegions, buttonRegions...)
 			buttonY += lipgloss.Height(buttonRow)
 			deleteStart := m.modalDeleteStartFocus()
 			for i, target := range m.modalDeleteTargets() {
 				content += "\n"
-				deleteRow, deleteRegions := layoutModalButtonRow([]modalButtonSpec{{
+				deleteRow, deleteRegions := layoutModalActions([]modalButtonSpec{{
 					rendered: m.renderDeleteButton(target.label, "", m.modalFocus == i+deleteStart),
 					action:   modalMouseAction{focus: i + deleteStart, deleteIndex: i},
 				}}, innerWidth, buttonY)
@@ -4813,7 +4807,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle("Discard changes?", innerWidth)
 		info := "Your unsaved comment changes will be lost."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderModalButton("Discard", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 			{rendered: m.renderModalButton("Keep Editing", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 		}, innerWidth, strings.Count(prefix, "\n"))
@@ -4829,7 +4823,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		info := "This cannot be undone."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderDeleteButton("Delete", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 			{rendered: m.renderModalButton("Keep", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 		}, innerWidth, strings.Count(prefix, "\n"))

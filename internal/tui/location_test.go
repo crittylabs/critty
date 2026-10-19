@@ -137,6 +137,10 @@ func TestGotoLineButtons(t *testing.T) {
 		app.openGotoLine()
 		app.lineInput.SetValue("2")
 		app = pressKey(app, tea.KeyTab)
+		if app.modalFocus != 2 || app.lineInput.Focused() {
+			t.Fatal("Tab did not focus Cancel")
+		}
+		app = pressKey(app, tea.KeyTab)
 		if app.modalFocus != 1 || app.lineInput.Focused() {
 			t.Fatal("Tab did not focus Go")
 		}

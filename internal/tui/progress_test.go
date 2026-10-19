@@ -37,7 +37,7 @@ func TestSubmitProgressCountersFocusAndNavigate(t *testing.T) {
 				app.activeTab = 1
 				app.openFinishModal()
 				app.modalTextarea.SetValue("Keep this overall draft.")
-				app.modalFocus = finishAbort
+				app.modalFocus = finishSubmit
 				for count := progressThreads; count <= kind; count++ {
 					app = pressKey(app, tea.KeyTab)
 				}
@@ -204,7 +204,6 @@ func TestUnansweredFormsCountersNavigate(t *testing.T) {
 		} else {
 			app = pressKey(app, tea.KeyTab)
 			app = pressKey(app, tea.KeyTab)
-			app = pressKey(app, tea.KeyTab)
 			app = pressKey(app, tea.KeyEnter)
 		}
 		if app.modal != noModal || app.tab().cursorLine != 2 || !app.tab().cursorOnForm || app.finishDraft != "Keep this draft." {
@@ -236,7 +235,7 @@ func TestResolveConfirmationCountersNavigateWithoutApproving(t *testing.T) {
 						}
 					}
 				} else {
-					for i := 0; i < int(kind)+2; i++ {
+					for i := 0; i < int(kind)+1; i++ {
 						app = pressKey(app, tea.KeyTab)
 					}
 					app = pressKey(app, tea.KeyEnter)

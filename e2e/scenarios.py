@@ -889,7 +889,7 @@ def scenarios() -> None:
         form.click(r"1/1 💬", last=True)
         form.settle()
         assert not form.result.exists(), "counter click submitted the review"
-        form.keys("q", "Down", "C-s", "Tab", "Tab", "Tab", "Tab", "Tab", "Enter")
+        form.keys("q", "Down", "C-s", "Tab", "Tab", "Tab", "Enter")
         form.wait_screen("L5/", "Submit counter focuses unchecked consent")
         form.keys("q")
         form.wait_screen("Optional items remain unanswered", "optional items notice")

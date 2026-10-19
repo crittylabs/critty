@@ -161,11 +161,7 @@ func (m *AppModel) handleLocationModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 			}
 			return m, m.submitGotoLine()
 		case "tab", "shift+tab":
-			step := 1
-			if msg.String() == "shift+tab" {
-				step = 2
-			}
-			m.modalFocus = (m.modalFocus + step) % 3
+			m.cycleModalFocus([]int{0, 2, 1}, msg.String() == "shift+tab")
 			if m.modalFocus == 0 {
 				return m, m.lineInput.Focus()
 			}
@@ -250,7 +246,7 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 			rect:   mouseRect{top: strings.Count(prefix, "\n"), bottom: strings.Count(prefix, "\n") + 1, right: width},
 			action: modalMouseAction{lineInput: true},
 		}}
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderModalButton("Go", "enter", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, width, strings.Count(content, "\n"))
@@ -263,7 +259,7 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitle("Open in editor?", width)
 	prefix := lipgloss.Wrap(title+"\n"+
 		target+"\nThis location is not in the review.\n\n", max(1, width), "")
-	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
+	buttons, regions := layoutModalActions([]modalButtonSpec{
 		{rendered: m.renderModalButton("Open", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Cancel", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))

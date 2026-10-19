@@ -166,7 +166,7 @@ func (m *AppModel) finishFocusedAction() (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) finishFocusOrder() []int {
-	order := []int{m.finishVerdictFocus(), finishText, finishSubmit, finishBack, finishAbort}
+	order := []int{m.finishVerdictFocus(), finishText, finishBack, finishAbort, finishSubmit}
 	for _, count := range m.progressCounts() {
 		if count.total > 0 {
 			order = append(order, finishProgressStart+int(count.kind))
@@ -200,9 +200,6 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		order := m.finishFocusOrder()
 		index := slices.Index(order, m.modalFocus)
 		m.modalFocus = order[(index+delta+len(order))%len(order)]
-		if index == 0 && delta == -1 {
-			m.modalFocus = finishAbort
-		}
 		if m.modalFocus == finishText {
 			return m, m.modalTextarea.Focus()
 		}
@@ -430,7 +427,7 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 }
 
 func (m AppModel) finishButtons(width, top int) (string, []modalMouseRegion) {
-	return layoutModalButtonRow([]modalButtonSpec{
+	return layoutModalActions([]modalButtonSpec{
 		{rendered: m.renderModalButton("Submit", "enter", m.modalFocus == finishSubmit), action: modalMouseAction{focus: finishSubmit}},
 		{rendered: m.renderModalButton("Back", "esc", m.modalFocus == finishBack), action: modalMouseAction{focus: finishBack}},
 		{rendered: m.renderModalButton("Abort", "q", m.modalFocus == finishAbort), action: modalMouseAction{focus: finishAbort}},
@@ -578,9 +575,9 @@ func (m *AppModel) handleFinishFormsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd
 	case "c", "C", "n", "N", "esc":
 		m.backFromFinishConfirmation()
 	case "tab", "shift+tab", "left", "right", "up", "down", "h", "j", "k", "l":
-		order := []int{finishReviewForms, finishCancelForms}
+		order := []int{finishCancelForms, finishReviewForms}
 		if m.canSubmitWithForms() {
-			order = []int{finishReviewForms, finishSubmitForms, finishCancelForms}
+			order = []int{finishReviewForms, finishCancelForms, finishSubmitForms}
 		}
 		for _, count := range m.progressCounts() {
 			if count.total > 0 {
@@ -643,10 +640,10 @@ func (m AppModel) finishFormsContent(width int) (string, []modalMouseRegion) {
 		{rendered: m.renderModalButton("Review", "r", m.modalFocus == finishReviewForms), action: modalMouseAction{focus: finishReviewForms}},
 	}
 	if m.canSubmitWithForms() {
-		specs = append(specs, modalButtonSpec{rendered: m.renderModalButton("Submit", "s", m.modalFocus == finishSubmitForms), action: modalMouseAction{focus: finishSubmitForms}})
+		specs = append([]modalButtonSpec{{rendered: m.renderModalButton("Submit", "s", m.modalFocus == finishSubmitForms), action: modalMouseAction{focus: finishSubmitForms}}}, specs...)
 	}
 	specs = append(specs, modalButtonSpec{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == finishCancelForms), action: modalMouseAction{focus: finishCancelForms}})
-	buttons, regions := layoutModalButtonRow(specs, width, strings.Count(prefix, "\n"))
+	buttons, regions := layoutModalActions(specs, width, strings.Count(prefix, "\n"))
 	content := prefix + buttons + "\n"
 	progress, progressRegions := m.layoutProgressCounts(width, strings.Count(content, "\n"), progressKind(m.modalFocus-finishProgressStart))
 	for _, region := range progressRegions {
@@ -670,7 +667,7 @@ func (m *AppModel) handleFinishConfirmationKey(msg tea.KeyPressMsg) (tea.Model, 
 	case "n", "N", "esc":
 		m.backFromFinishConfirmation()
 	case "tab", "shift+tab", "left", "right", "h", "l":
-		order := []int{0, 1}
+		order := []int{1, 0}
 		if m.modal == finishResolveModal {
 			for _, count := range m.progressCounts() {
 				if count.total > 0 {
@@ -736,7 +733,7 @@ func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
 	count := lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("%d unresolved thread(s)", m.unresolvedTotal()))
 	info := "Resolve all " + count + " before approving?"
 	prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", width, "")
-	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
+	buttons, regions := layoutModalActions([]modalButtonSpec{
 		{rendered: m.renderModalButton("Resolve All", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
@@ -751,7 +748,7 @@ func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
 func (m AppModel) finishAbortContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(finishColor(review.VerdictReject)).Render("Abort review?"), width)
 	prefix := lipgloss.Wrap(title+"\nExit without submitting?  Your comments and draft will be kept.\n\n", width, "")
-	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
+	buttons, regions := layoutModalActions([]modalButtonSpec{
 		{rendered: m.renderModalButton("Abort", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))

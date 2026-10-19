@@ -149,7 +149,7 @@ func TestFileCompletionDismissAndFallthrough(t *testing.T) {
 		t.Fatal("no match kept the menu")
 	}
 	editorMessage(&app, tea.KeyPressMsg{Code: tea.KeyTab})
-	if app.modalFocus != 1 || app.modalTextarea.Value() != "@mai\n@zz" {
+	if app.modalFocus != 2 || app.modalTextarea.Value() != "@mai\n@zz" {
 		t.Fatalf("tab without candidates: focus = %d, value = %q", app.modalFocus, app.modalTextarea.Value())
 	}
 	editorMessage(&app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})

@@ -12,6 +12,10 @@
 - `--answers` presents Comment as **Confirm answers** and selects it by default, so a questionnaire round can return answers without suggesting approval of the whole design.  The verdict stays `comment`, and the setting lasts for the session until `--no-answers`.
 - Press `F` or click **Answers** to list every form field grouped by its Markdown section, with its answer or what remains.  Choose a row to go to it, or show only unanswered items.
 
+### Changed
+
+- Dialog action buttons align to the right, with the primary action last.  Keyboard focus follows the displayed order, and buttons wrap with their shortcut hints in narrow terminals.
+
 ### Fixed
 
 - `critty doctor` recommends enabling Herdr image rendering only when local configuration explicitly disables it.  Unset settings use the current Herdr default of enabled.

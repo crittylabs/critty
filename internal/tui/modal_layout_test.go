@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -45,5 +46,31 @@ func TestModalActionsWrapWholeButtons(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestTextModalTabOrderMatchesActions(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] Answer <!-- form: id=answer text -->\n")
+	app.toggleForm(1)
+	for _, focus := range []int{2, 1, 0} {
+		app = pressKey(app, tea.KeyTab)
+		if app.modalFocus != focus || app.modalTextarea.Focused() != (focus == 0) {
+			t.Fatalf("focus=%d, want %d", app.modalFocus, focus)
+		}
+	}
+	var closeX, saveX int
+	for _, region := range app.modalMouseRegions() {
+		if region.action.close || region.action.textarea || region.action.scrollable {
+			continue
+		}
+		switch region.action.focus {
+		case 1:
+			saveX = region.rect.left
+		case 2:
+			closeX = region.rect.left
+		}
+	}
+	if closeX >= saveX {
+		t.Fatalf("Close at %d, Save at %d", closeX, saveX)
 	}
 }
