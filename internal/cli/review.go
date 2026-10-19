@@ -384,6 +384,11 @@ func saveReviewMode(sess *review.Session, mode *reviewMode) error {
 		}
 		mode.replaceDocuments = false
 	}
+	if answersMode || noAnswersMode {
+		if err := sess.SetAnswerMode(answersMode); err != nil {
+			return err
+		}
+	}
 	if mode.planContent != nil {
 		if _, err := review.SavePlanVersionAt(filepath.Dir(mode.docPath), mode.planContent); err != nil {
 			return err

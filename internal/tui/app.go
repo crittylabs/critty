@@ -80,6 +80,8 @@ type AppConfig struct {
 	FinishCh  chan<- FinishEvent
 	FocusPath string
 	FocusLine int
+	// Answers labels Comment as Confirm answers and selects it by default.
+	Answers bool
 }
 
 // gutterWidth is the total width of the left gutter: line number (5) + marker (1) + space (1).
@@ -100,6 +102,7 @@ type AppModel struct {
 	// formTargets maps select-all IDs to item indices by document path.
 	formTargets   map[string]map[string][]int
 	formList      formListState
+	answerMode    bool
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
@@ -304,6 +307,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		activeTab:       0,
 		session:         cfg.Session,
 		author:          cfg.Author,
+		answerMode:      cfg.Answers,
 		authorColors:    make(map[string]int),
 		finishCh:        cfg.FinishCh,
 		host:            reviewHost(),
@@ -385,6 +389,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		split:           cfg.Split,
 		session:         cfg.Session,
 		author:          cfg.Author,
+		answerMode:      cfg.Answers,
 		authorColors:    make(map[string]int),
 		finishCh:        cfg.FinishCh,
 		baseRef:         ref,

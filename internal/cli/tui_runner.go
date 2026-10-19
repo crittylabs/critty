@@ -36,6 +36,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	finishCh := make(chan tui.FinishEvent, 4)
 	appCfg := tui.AppConfig{
 		Documents: documents.Documents,
+		Answers:   documents.Answers,
 		Project:   reviewProjectLabel(cfg.ProjectRoot, sess),
 		Topic:     reviewTopicLabel(sess, mode),
 		Version:   versionString(),

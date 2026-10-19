@@ -27,6 +27,8 @@ func (d AttachedDocument) Path() string {
 type DocumentAttachments struct {
 	Version   int                `json:"version"`
 	Documents []AttachedDocument `json:"documents"`
+	// Answers labels submission for rounds that collect form answers.
+	Answers bool `json:"answers,omitempty"`
 }
 
 // ReadAttachedDocuments validates all inputs before changing session state.
@@ -135,7 +137,24 @@ func (s *Session) ReplaceDocuments(docs []AttachedDocument) error {
 			docs = append(docs, d)
 		}
 	}
-	data, err := json.MarshalIndent(DocumentAttachments{Version: 1, Documents: docs}, "", "  ")
+	return s.saveDocuments(DocumentAttachments{Version: 1, Documents: docs, Answers: old.Answers})
+}
+
+// SetAnswerMode records whether later rounds submit feedback as answers.
+func (s *Session) SetAnswerMode(on bool) error {
+	attachments, err := s.LoadDocuments()
+	if err != nil {
+		return err
+	}
+	attachments.Version, attachments.Answers = 1, on
+	if attachments.Documents == nil {
+		attachments.Documents = []AttachedDocument{}
+	}
+	return s.saveDocuments(attachments)
+}
+
+func (s *Session) saveDocuments(attachments DocumentAttachments) error {
+	data, err := json.MarshalIndent(attachments, "", "  ")
 	if err != nil {
 		return err
 	}

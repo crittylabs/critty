@@ -42,6 +42,12 @@ func TestPrepareDocumentAttachments(t *testing.T) {
 	if err := prepareDocuments(mode); err != nil || !mode.replaceDocuments || len(mode.documents) != 0 {
 		t.Fatalf("clear did not replace list: %+v, %v", mode, err)
 	}
+	oldAnswers, oldNoAnswers := answersMode, noAnswersMode
+	t.Cleanup(func() { answersMode, noAnswersMode = oldAnswers, oldNoAnswers })
+	clearAttachments, answersMode, noAnswersMode = false, true, true
+	if err := prepareDocuments(&reviewMode{}); err == nil {
+		t.Fatal("conflicting answer flags accepted")
+	}
 }
 
 func TestDocumentAttachmentsFinishPrompt(t *testing.T) {

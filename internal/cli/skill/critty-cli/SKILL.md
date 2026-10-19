@@ -75,6 +75,8 @@ Task lists in attached `.md` or `.markdown` files are interactive.  `<!-- form: 
 
 `forms.json` stores definitions, draft answers, and human provenance separately from source documents and comments.  Its version is 1, or 2 when any item uses `tags`, `select-all`, or `text`; older Critty releases reject these attributes.  Changed field definitions reset their answers.  Changed target snapshots or attachment contents, order, or membership reset all required confirmations and consents; ordinary explicit-ID answers survive unchanged definitions.
 
+`--answers` labels Comment as **Confirm answers** and selects it by default, for rounds that collect form answers without approving the design; the verdict remains `comment`.  The setting persists across the session's rounds until `--no-answers`.
+
 `--result FILE` requires an interactive attachment form.  It writes the result atomically before printing approval; omit it for ordinary document approval.  The parent directory must exist, the file must be outside the session directory, and it must not overwrite reviewed input.  The same self-contained result is saved as `result-<round>.json`, returned in IPC's `result`, and appended to finish output regardless of templates.
 
 | Result field | Meaning |

@@ -106,3 +106,26 @@ func TestDocumentAttachmentNamesAndValidation(t *testing.T) {
 		t.Fatal("directory accepted")
 	}
 }
+
+func TestAnswerModePersistsAcrossAttachmentChanges(t *testing.T) {
+	s, err := OpenSession(t.TempDir(), "answers")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAnswerMode(true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceDocuments([]AttachedDocument{{ID: "a", Source: "/q.md", Name: "q.md"}}); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := s.LoadDocuments()
+	if err != nil || !docs.Answers || len(docs.Documents) != 1 {
+		t.Fatalf("answer mode lost: %+v %v", docs, err)
+	}
+	if err := s.SetAnswerMode(false); err != nil {
+		t.Fatal(err)
+	}
+	if docs, err := s.LoadDocuments(); err != nil || docs.Answers || len(docs.Documents) != 1 {
+		t.Fatalf("answer mode not cleared: %+v %v", docs, err)
+	}
+}
