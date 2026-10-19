@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.3.1
+
+### Fixed
+
+- OpenCode’s `/critty` command now links to the installed supporting skills and review references.  `critty doctor` recognizes installations with these corrected links as current.
+
 ## 1.3.0
 
 ### Added

@@ -3,11 +3,15 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/parser"
 )
 
 func integrationContent(t *testing.T, target, dest string) string {
@@ -207,6 +211,58 @@ func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
 		if !strings.Contains(content, "'OpenCode'") {
 			t.Error("OpenCode file is not attributed to OpenCode")
 		}
+	}
+}
+
+func TestOpenCodeCommandLinksReachInstalledFiles(t *testing.T) {
+	for _, global := range []bool{false, true} {
+		t.Run(fmt.Sprintf("global=%v", global), func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+			t.Chdir(t.TempDir())
+			files := integrations()["opencode"]
+			var command string
+			for _, f := range files {
+				if err := installIntegrationFile(f, global); err != nil {
+					t.Fatal(err)
+				}
+				if filepath.Base(f.dest) == "critty.md" {
+					var err error
+					command, err = integrationDest(f, global)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			data, err := os.ReadFile(command)
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc := parser.New().Parse(data)
+			links := 0
+			err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+				link, ok := n.(*ast.Link)
+				if !entering || !ok {
+					return ast.WalkContinue, nil
+				}
+				u, err := url.Parse(link.Destination.Value(data))
+				if err != nil {
+					return ast.WalkStop, err
+				}
+				if u.IsAbs() || u.Host != "" || u.Path == "" {
+					return ast.WalkContinue, nil
+				}
+				links++
+				if _, err := os.Stat(filepath.Join(filepath.Dir(command), filepath.FromSlash(u.Path))); err != nil {
+					t.Errorf("broken command link %q: %v", link.Destination.Value(data), err)
+				}
+				return ast.WalkContinue, nil
+			})
+			if err != nil || links == 0 {
+				t.Fatalf("check command links: count=%d, error=%v", links, err)
+			}
+		})
 	}
 }
 

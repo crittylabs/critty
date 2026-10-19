@@ -203,6 +203,12 @@ func integrations() map[string][]integrationFile {
 				if err != nil {
 					return nil, err
 				}
+				// This command lives in commands/, not skills/critty/.  Rebase
+				// the embedded skill's known inline link prefixes accordingly.
+				data = bytes.ReplaceAll(data, []byte("](references/"), []byte("](../skills/critty/references/"))
+				for _, name := range skillNames {
+					data = bytes.ReplaceAll(data, []byte("](../"+name+"/"), []byte("](../skills/"+name+"/"))
+				}
 				return dropFrontmatterKeys(data, []string{"name"}), nil // commands are named by their file
 			},
 			dest:       filepath.Join(".opencode", "commands", "critty.md"),
