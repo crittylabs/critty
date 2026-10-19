@@ -668,3 +668,45 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 		t.Fatalf("dragged order not saved: %+v", d.Answers["lead"])
 	}
 }
+
+func TestCommentOnRankedItemNamesTheItem(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "Intro\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
+	t1 := app.tab()
+	t1.cursorLine, t1.cursorOnForm = 2, true
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
+	// Display order is now Beta, Alpha, Gamma.
+	t1 = app.tab()
+	t1.cursorOnForm = false
+	t1.selecting, t1.selectAnchor, t1.cursorLine = true, 3, 2
+	if start, end := app.selectionRange(); start != 2 || end != 2 {
+		t.Fatalf("selection inside a reordered ranking: %d-%d", start, end)
+	}
+	// Intro through Alpha would skip Beta, displayed between them.
+	t1.selectAnchor, t1.cursorLine = 1, 2
+	if start, end := app.selectionRange(); start != 1 || end != 3 {
+		t.Fatalf("selection entering a reordered ranking: %d-%d", start, end)
+	}
+	t1.selecting, t1.cursorLine = false, 2
+	app.openLineComment()
+	app.modalTextarea.SetValue("Alpha belongs lower")
+	app.modalSubmit()
+	comments := app.tab().state.Comments
+	if len(comments) != 1 || comments[0].StartLine != 2 || !strings.Contains(comments[0].Anchor, "value=a") {
+		t.Fatalf("comment does not name Alpha: %+v", comments)
+	}
+}
+
+func TestReorderedRegions(t *testing.T) {
+	for _, tt := range []struct {
+		order []int
+		want  [][2]int
+	}{
+		{[]int{0, 1, 2}, nil},
+		{[]int{0, 2, 1, 3}, [][2]int{{2, 3}}},
+		{[]int{1, 0, 2, 4, 5, 3}, [][2]int{{1, 2}, {4, 6}}},
+	} {
+		if got := reorderedRegions(tt.order); !slices.Equal(got, tt.want) {
+			t.Errorf("%v: got %v, want %v", tt.order, got, tt.want)
+		}
+	}
+}
