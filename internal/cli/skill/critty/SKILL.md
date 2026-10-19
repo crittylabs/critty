@@ -1,7 +1,7 @@
 ---
 name: critty
 description: Review code changes or a document with Critty's terminal UI and address the reviewer's inline comments round by round. Use when the user or an approval workflow selects Critty; a generic review request does not count.
-allowed-tools: Bash(critty review *), Bash(critty plan *), Bash(critty --session *), Bash(critty comment *), Bash(critty comments *), Bash(critty status *), Bash(critty terminal prepare), Read, Grep, Glob
+allowed-tools: Bash(critty review *), Bash(critty plan *), Bash(critty --session *), Bash(critty stop --session *), Bash(critty comment *), Bash(critty comments *), Bash(critty status *), Bash(critty terminal prepare), Read, Grep, Glob
 argument-hint: "[file]"
 ---
 
@@ -22,13 +22,15 @@ When existing files outside source control need review before application, read 
 Pass explicit arguments through.  Otherwise use the current request's subject: a versioned plan, a document, or Git changes.  Default to Git changes when no target is named; clarify only when competing current targets make the choice ambiguous.  An older plan elsewhere in the conversation does not select plan mode.
 
 ```bash
-critty $ARGUMENTS                  # explicit arguments, or current Git changes
-critty --staged                    # index only
-critty --scope=main...             # committed comparison
-critty plan <file>                 # versioned plan
-critty --diff=changes.diff         # supplied diff
-critty --null --attachment note.md # attachments only
+critty review $ARGUMENTS                  # explicit review arguments, or current Git changes
+critty review --staged                    # index only
+critty review --scope=main...             # committed comparison
+critty plan <file>                        # versioned plan
+critty review --diff=changes.diff         # supplied diff
+critty review --null --attachment note.md # attachments only
 ```
+
+Start reviews with `critty review`; resume with `critty --session <id>` before any other flags.  The `review` subcommand does not accept `--session`.  Keep dedicated subcommands such as `plan` and `stop`.  These forms match this skill's narrow tool grants; preparation, application, installation, and history maintenance use the host's normal permissions.
 
 Use `/critty-cli` for review input syntax, scope restrictions, attachment snapshots, focus and labels, or image support.  Use `/critty-approval` to prepare approval documents, publication drafts, and form decisions.  Retain the selected scope and input paths or diff producer for later rounds.
 
@@ -94,13 +96,13 @@ Refresh the input selected by the session and verify that it includes the reques
 
 | Review input | Refresh and continuation |
 | --- | --- |
-| Working tree or single document | Save revised files, then use the printed `critty --session <id>` command. |
+| Working tree or single document | Save revised files, then use `critty --session <id>`. |
 | Staged changes | Stage only revised changes belonging to this review, preserving unrelated edits.  Inspect the staged diff, then resume the session. |
 | Committed comparison | Arrange needed commits or ref updates through the caller's authorized workflow and check the comparison before resuming.  Working-tree edits alone do not update it. |
 | Versioned plan | Use `critty plan --session <id> <file>` (stdin also works). |
-| Supplied diff | Regenerate with the original producer, then use `critty --diff=changes.diff --session <id>` or pipe to `critty --diff --session <id>`. |
+| Supplied diff | Regenerate with the original producer, then use `critty --session <id> --diff=changes.diff` or pipe to `critty --session <id> --diff`. |
 | Attached documents | Add the complete ordered `--attachment` list again to replace saved snapshots; retain any form result option required by `/critty-approval`. |
 
-Plain `--session <id>` reuses saved plans, diffs, and attachments.  Retain the ID: omitting it creates another review.  Reopen from the original directory after submitted feedback, or after explicit chat instructions to resume an interruption.  For supplied diffs with incomplete context, check drifted comments against their anchors.
+`critty --session <id>` reuses saved plans, diffs, and attachments.  Retain the ID: omitting it creates another review.  Reopen from the original directory after submitted feedback, or after explicit chat instructions to resume an interruption.  For supplied diffs with incomplete context, check drifted comments against their anchors.
 
 Repeat Step 2, including a fresh Codex marker, then handle the next result.  Continue until approved or the user cancels or replaces the task.

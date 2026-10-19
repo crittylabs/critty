@@ -7,7 +7,7 @@ Use `critty tmp` when original files must stay unchanged until review, including
 3. Run `critty tmp snapshot <workspace-id>`.  It freezes the candidate and returns absolute `diff`, `attachment`, and `result` paths.  Review those exact files through the normal `/critty` loop:
 
    ```sh
-   critty --diff <diff> --attachment <attachment> --result <result> --task <task-id>
+   critty review --diff <diff> --attachment <attachment> --result <result> --task <task-id>
    ```
 
    Use a fresh terminal request when required by the host.  The application attachment names the source root, destinations, before/after states, and one consent to apply them.  Read all feedback and require both overall approval and that consent.  To revise, edit the tree, take a new snapshot, and resume the same session with the new diff, complete attachment list, and a fresh result path.

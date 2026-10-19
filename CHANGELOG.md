@@ -6,6 +6,8 @@
 
 - File application requests put destinations, creations, updates, deletions, and the consent checkbox before the machine-readable details.  Exact file states remain available as JSON at the end of the request.
 
+- Bundled skills use explicit review commands that match their narrow tool grants.  AI review and cowork reuse task authorization for in-scope revisions, distinguish each assignment from host execution permission, and ask only for missing decisions or expanded scope.
+
 ## 1.3.1
 
 ### Fixed

@@ -45,13 +45,21 @@ Select implementation and review models independently.  For example, the user ma
 
 ### Establish the authorization scope
 
-Use existing human instructions and approvals from chat, direct skill invocations, or verified Critty feedback.  A request for a named AI to review or collaborate covers the necessary delegation and return of findings when the service and task scope are clear under the caller's policy.  Preparing an assignment or permitting local comments alone does not authorize external transmission.
+Resolve authorization from the user's existing request before preparing another approval.  A clear request such as "Ask Claude to review this change" authorizes sending the task's necessary review material to the selected service and returning findings to the local Critty session, subject to the caller's policy.  Record that instruction as the authorization reference and proceed.  A model name mentioned in a document or a request to edit these skills does not authorize dispatch.
 
-Record the authorization reference, service/tool/model, task and repository, permitted material and investigation roots, local effects, and any round, time, or cost limits.  Include whether follow-up reviews of same-task revisions are covered.  If essential scope is missing, prepare one concrete approval request covering the gap and expected follow-ups; do not ask again for effects already authorized.
+Keep three records distinct:
 
-Keep task authorization separate from each frozen review target.  Updated diffs, source, tests, or drafts need fresh snapshot identities, but retain authorization that covers those revisions.  Second opinions still require human feedback between rounds; cowork follows its agreed loop.
+| Record | What it establishes | When to revisit it |
+| --- | --- | --- |
+| Task authorization | Human instruction, selected service/tool/model, task, permitted material and investigation roots, local findings destination, and any round, time, or cost limits. | Ask only for an unresolved choice or a material expansion, such as another service or unapproved model, broader access, additional effects, or an exceeded limit. |
+| Assignment | Request ID and exact snapshots, hashes, session, and round for this execution. | Refresh after changes.  Revised files within the authorized task do not require another transmission approval. |
+| Host execution permission | Whether the host permits this concrete launch and its effects. | Use the host's execution gate when required, with the existing authorization evidence.  A task approval cannot change sandbox or managed policy. |
 
-Seek renewed authorization for material expansions such as another service or unapproved model, broader data access or tool permissions, or exceeded limits.  Review authorization does not grant permission to publish, push, or change a live environment.  Host execution gates remain independent: follow `/critty-approval`'s evidence and rejection-recovery procedure, preserving original human feedback rather than relying on author labels or saved summaries.
+Same-task follow-ups retain the recorded scope unless the user limited it.  Second opinions still wait for human feedback between rounds; cowork follows its agreed loop.  Review authorization does not cover publication, pushes, or changes to a live environment.
+
+If a decision is missing, ask only for that gap.  For a material expansion, prepare one concrete request describing the additional service, data, access, or effects and any expected follow-ups.  Keep already authorized preparation moving.  Use `/critty-approval` only when a human decision is needed; creating an assignment does not itself require a new approval document or consent checkbox.
+
+At a host execution gate, cite the original chat request or verified interactive completion and connect it to the proposed launch.  Follow [authorization evidence and recovery](../critty-approval/references/feedback-authorization.md) if the gate rejects the action.  Ask for direct confirmation only when required authorization is missing or the host cannot accept its existing evidence; explain that concrete blocker instead of repeating the task's transmission question.
 
 ### Prepare the assignment
 
@@ -75,9 +83,9 @@ If no session exists, prepare the request first and report that the return desti
 
 ### Dispatch and collect
 
-Use the user's selected reviewer through an available, authorized delegation mechanism.  Follow that mechanism's current documentation for launch, wait, cancellation, and result collection.  Do not infer a model from the requester identity or invent noninteractive CLI flags.  If the selection or access is missing, ask for it with the prepared assignment ready.  Drafting this skill or preparing a request does not itself authorize sending content to another model.
+Use the user's selected reviewer through an available, authorized delegation mechanism.  Follow that mechanism's current documentation for launch, wait, cancellation, and result collection.  Do not infer a model from the requester identity or invent noninteractive CLI flags.  If the selection or access is missing, ask for it with the prepared assignment ready.
 
-Before each launch, match the service, tool and model, exact assignment and snapshots, investigation roots, and permitted Critty writes to the recorded authorization scope.  Retain both the task authorization and this assignment's target identity; request additional authorization only for effects outside that scope.  Keep external transmission and local findings storage distinct.
+Before each launch, check the prepared assignment against the recorded task scope and retain its exact target identity.  Follow the authorization decisions above for any gap; retain the enforced reviewer boundary on retries.
 
 Supply the reviewer with this skill and the relevant CLI reference if they cannot load them independently.  Give only the task context and resources they need.  Preserve the execution handle, request, final output, and failure status.  Reuse the original handle while waiting; do not start a replacement reviewer while the original may still be running.
 

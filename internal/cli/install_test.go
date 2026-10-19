@@ -173,7 +173,7 @@ func TestCodexSkillsUseCodexConventions(t *testing.T) {
 			}
 		}
 	}
-	for _, wanted := range []string{"`$critty-cli`", "'Codex'", "critty <arguments>"} {
+	for _, wanted := range []string{"`$critty-cli`", "'Codex'", "critty review <arguments>"} {
 		if !strings.Contains(skill, wanted) {
 			t.Errorf("Codex critty skill lacks %q", wanted)
 		}
@@ -190,7 +190,7 @@ func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
 	command := integrationContent(t, "opencode", filepath.Join(".opencode", "commands", "critty.md"))
 	cli := integrationContent(t, "opencode", filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"))
 
-	if !strings.Contains(command, "critty $ARGUMENTS") {
+	if !strings.Contains(command, "critty review $ARGUMENTS") {
 		t.Error("OpenCode command lost $ARGUMENTS")
 	}
 	if !strings.HasPrefix(command, "---\ndescription: ") {
@@ -283,7 +283,7 @@ func TestGeminiIntegration(t *testing.T) {
 			t.Error("Gemini skill is not attributed to Gemini")
 		}
 	}
-	if !strings.Contains(skill, "critty <arguments>") || strings.Contains(skill, "`/critty`") {
+	if !strings.Contains(skill, "critty review <arguments>") || strings.Contains(skill, "`/critty`") {
 		t.Error("Gemini skill invocation is not rewritten")
 	}
 }

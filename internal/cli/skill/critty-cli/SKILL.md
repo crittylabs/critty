@@ -16,7 +16,7 @@ For editing settings or locating custom prompts, read [configuration](references
 
 | Command | Effects |
 | --- | --- |
-| `critty --dry-run`, `review --dry-run` | View current Git changes, a document, a supplied patch, or attachments in the foreground terminal.  No session, history entry, exports, or configuration migration; review edits and external applications are disabled.  Cannot combine with `--session`, `--task`, `--result`, `--summary`, `--terminal-request`, `--launcher`, or `--clear-attachments`.  Closing exits without an approval result. |
+| `critty review --dry-run`, `critty --dry-run` | View current Git changes, a document, a supplied patch, or attachments in the foreground terminal.  No session, history entry, exports, or configuration migration; review edits and external applications are disabled.  Cannot combine with `--session`, `--task`, `--result`, `--summary`, `--terminal-request`, `--launcher`, or `--clear-attachments`.  Closing exits without an approval result. |
 | `comments`, `status` | Read local review state. |
 | `doctor` (`check` alias) | Compare installed integrations with embedded files and inspect local Python/MCP prerequisites and image forwarding settings, plus desktop launcher availability, Codex wrapper selection, and tfil detection for the current platform.  `--terminal-request ID` consumes a prepared request to test terminal binding without opening a review.  Desktop checks do not open windows or test automation permission.  Runs bounded Python imports and an image capability probe on its foreground controlling TTY.  Temporarily uses raw terminal input, then restores it; sends a transparent virtual placement, deletes it, and restores the cursor.  Does not start a reviewer, contact a model or package registry, or change stored settings. |
 | `terminal prepare` | Remove expired local marker requests, save a random marker with a two-minute expiry, and print its JSON.  No review content is read and no external service is contacted. |
@@ -47,15 +47,15 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 
 | Input | Command and source |
 | --- | --- |
-| Current Git changes | `critty` or `critty --scope=all`: HEAD versus working tree, including untracked files. |
-| Staged changes | `critty --staged` or `critty --scope=staged`: HEAD versus index. |
-| Unstaged changes | `critty --unstaged` or `critty --scope=unstaged`: index versus working tree, including untracked files. |
-| Committed comparison | `critty --scope=A..B` compares snapshots; `A...B` compares the merge base with B.  An omitted endpoint means HEAD. |
-| Document | `critty <file>` reads one current file. |
+| Current Git changes | `critty review` or `critty review --scope=all`: HEAD versus working tree, including untracked files. |
+| Staged changes | `critty review --staged` or `critty review --scope=staged`: HEAD versus index. |
+| Unstaged changes | `critty review --unstaged` or `critty review --scope=unstaged`: index versus working tree, including untracked files. |
+| Committed comparison | `critty review --scope=A..B` compares snapshots; `A...B` compares the merge base with B.  An omitted endpoint means HEAD. |
+| Document | `critty review <file>` reads one current file. |
 | Versioned plan | `critty plan <file>` saves numbered versions.  `critty plan --session <id> <file>` supplies a revision; reusing a name alone starts another review. |
-| Supplied diff | `critty --diff=changes.diff` or `critty --diff changes.diff`; bare `--diff` or `--diff=-` reads stdin.  Works outside Git. |
+| Supplied diff | `critty review --diff=changes.diff` or `critty review --diff changes.diff`; bare `--diff` or `--diff=-` reads stdin.  Works outside Git. |
 
-`critty review` is the explicit form of the default command.  Conflicting scope flags are rejected; `--scope` cannot accompany a document or supplied diff.  `--diff` cannot accompany `--scope`, `--code`, `--staged`, or `--unstaged`.  Relative and absolute input paths are accepted.
+`critty review` is the explicit form of the default command.  Prefer it for new reviews in agent workflows.  Resume with `critty --session <id>` before other flags: `review` does not accept `--session`.  These forms match the `/critty` skill's tool grants; shorter forms remain valid for new reviews.  Conflicting scope flags are rejected; `--scope` cannot accompany a document or supplied diff.  `--diff` cannot accompany `--scope`, `--code`, `--staged`, or `--unstaged`.  Relative and absolute input paths are accepted.
 
 Committed comparisons display the right endpoint, which may differ from disk.  A clean working tree does not fall back to commits.  Supplied diffs use saved snapshots; retain their producer command for later updates.  Scope selection stays fixed within a session.  Follow `/critty` to refresh the selected input between rounds.
 
@@ -63,7 +63,7 @@ Committed comparisons display the right endpoint, which may differ from disk.  A
 
 Repeated `--attachment FILE` flags on `review`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.  In the TUI, commented removed attachments appear after current files in collapsed, read-only attachment history.  Their forms are inactive and excluded from current answers; opening a comment reveals its historical snapshot.
 
-`critty --null --attachment FILE` reviews only attachments without requiring Git.  Empty diff input, including `--diff=/dev/null`, also supports attachment-only reviews.  At least one active attachment is required.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`, optionally replacing the complete attachment list.  Removing all attachments from an empty review is rejected.
+`critty review --null --attachment FILE` reviews only attachments without requiring Git.  Empty diff input, including `--diff=/dev/null`, also supports attachment-only reviews.  At least one active attachment is required.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`, optionally replacing the complete attachment list.  Removing all attachments from an empty review is rejected.
 
 ## Forms and exported results
 
@@ -139,7 +139,7 @@ critty comment --session <id> --json --file replies.json --author 'Claude Code'
 
 `--scope` stays fixed for a session.  Identical scope arguments, document paths, or plan names can have independent session IDs.  `--plan <slug>` selects a plan only when its name is unambiguous; prefer the ID.
 
-To resume a stopped session, run `critty --session <id>` from its original directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  To replace that input, use `critty plan --session <id> <file>` or `critty --diff=<file> --session <id>`.  The `/critty` skill covers the interactive review loop.
+To resume a stopped session, run `critty --session <id>` from its original directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  To replace that input, use `critty plan --session <id> <file>` or `critty --session <id> --diff=<file>`.  The `/critty` skill covers the interactive review loop.
 
 ## Display options
 
@@ -150,14 +150,14 @@ To resume a stopped session, run `critty --session <id>` from its original direc
 ```bash
 critty review --staged --project 'Critty' --topic 'Header display'
 critty --session <id> --topic 'Revised header'
-critty --topic ''                          # hide the topic label
+critty review --topic ''                   # hide the topic label
 ```
 
 Overrides persist in the session until replaced; an empty value hides the label.  They do not change scope or session selection.
 
 ### Startup focus
 
-`critty FILE:LINE` starts a document at a line; `--focus PATH[:LINE]` selects an initial file in any review, including resumed sessions.  Paths may be relative or absolute and must belong to the review; plans also accept their original path.  Lines are positive, 1-indexed new-side source coordinates.  Missing files and unavailable lines are rejected; omit the line for binary or deleted files.
+`critty review FILE:LINE` starts a document at a line; `--focus PATH[:LINE]` selects an initial file in any review, including resumed sessions.  Paths may be relative or absolute and must belong to the review; plans also accept their original path.  Lines are positive, 1-indexed new-side source coordinates.  Missing files and unavailable lines are rejected; omit the line for binary or deleted files.
 
 Explicit focus applies only to that invocation.  `--focus` wins over a document's line suffix; otherwise later rounds focus the first visible thread, in file and display order, with a new reply from another author.  Scope and tab order remain unchanged.
 

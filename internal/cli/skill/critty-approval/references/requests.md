@@ -10,7 +10,7 @@ Read the relevant sections when preparing publication, commit/tag inputs, or a r
 | PR, issue, comment, or message | Service and destination, operation (create or edit), existing item/thread when applicable, exact title/body, and applicable recipients, labels, visibility, attachments, or scheduling. |
 | Release or deployment | Candidate identity, environment, exact notes or artifacts, ordering and dependencies, material impact, and rollback where applicable. |
 | Local commit or application | Exact reviewed changes and message or target paths; state explicitly if approval also requests execution. |
-| AI review | Tool, model, service, assignment and source snapshots sent, investigation roots, and permitted local findings destination.  Distinguish local comment storage from hosted publication. |
+| AI review, when authorization is missing or expands | Tool, model, service, task and permitted material, investigation roots, local findings destination, follow-up scope, and limits.  Reuse existing authorization; bind each execution to exact snapshots in its assignment as described in [AI review authorization](../../critty-ai-review/SKILL.md#establish-the-authorization-scope). |
 
 If the review will create a commit, identify it as `reviewed-commit`, record its full parent SHA (`null` for an initial commit), and attach its exact message alongside the reviewed diff.  Record the resulting SHA separately after creation.  For tags to create, specify the target, annotation, and signing requirements.  A changed parent, diff, message, or tag input needs renewed approval.
 

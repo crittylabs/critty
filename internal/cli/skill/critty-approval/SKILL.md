@@ -24,7 +24,7 @@ Keep publication text separate from review instructions and controls.  The publi
 For changes and supporting documents:
 
 ```sh
-critty --staged --attachment APPROVAL.md --attachment PUBLICATION.md
+critty review --staged --attachment APPROVAL.md --attachment PUBLICATION.md
 ```
 
 For documents only, replace `--staged` with `--null`.  Attach only the files the request needs.  Add `--result RESULT.json` for a form; omit it for ordinary approval.
