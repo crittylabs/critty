@@ -41,6 +41,7 @@ type keyMap struct {
 	Images           key.Binding
 	Delete           key.Binding
 	FileComment      key.Binding
+	FormList         key.Binding
 	Help             key.Binding
 	FileTree         key.Binding
 }
@@ -74,6 +75,7 @@ var keys = keyMap{
 	Images:           key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "show/hide images or recheck support")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),
+	FormList:         key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "answer list")),
 	Help:             key.NewBinding(key.WithKeys("alt+?"), key.WithHelp("M-?", "help")),
 	FileTree:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "switch sidebar view")),
 }

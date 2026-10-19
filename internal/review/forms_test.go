@@ -114,3 +114,49 @@ func TestSelfContainedFormResults(t *testing.T) {
 		}
 	}
 }
+
+func TestSelectAllFormVersion(t *testing.T) {
+	s, err := OpenSession(t.TempDir(), "forms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ReviewInput{Scope: "document", Files: map[string]ReviewedFile{}}
+	plain := []AttachedDocument{{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] Note <!-- form: id=note -->\n", Revision: "one"}}
+	state, err := s.BeginForms(input, plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Version != 1 {
+		t.Fatalf("plain form version: %d", state.Version)
+	}
+	tagged := []AttachedDocument{{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] All <!-- form: id=all select-all=t -->\n- [ ] Note <!-- form: id=note tags=t -->\n", Revision: "two"}}
+	state, err = s.BeginForms(input, tagged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := state.Documents[0].Answers["all"]; state.Version != 2 || ok {
+		t.Fatalf("select-all state: %+v", state)
+	}
+	if loaded, err := s.LoadForms(); err != nil || loaded.Version != 2 {
+		t.Fatalf("reload: %v %+v", err, loaded)
+	}
+}
+
+func TestFormResultOmitsDraftNotes(t *testing.T) {
+	items, err := form.Parse("- [ ] Other <!-- form: id=q value=other text -->\n- [ ] Plain <!-- form: id=q value=plain -->\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := map[string]form.Answer{"q": {Value: "plain", Text: "draft", Human: true}}
+	state := FormState{Version: 2, Documents: []FormDocument{{Items: items, Answers: answers}}}
+	if text := state.Result(false, 1).Documents[0].Answers["q"].Text; text != "" {
+		t.Fatalf("exported draft note %q", text)
+	}
+	if answers["q"].Text != "draft" {
+		t.Fatal("result changed the draft")
+	}
+	answers["q"] = form.Answer{Value: "other", Text: "note", Human: true}
+	if text := state.Result(false, 1).Documents[0].Answers["q"].Text; text != "note" {
+		t.Fatalf("lost selected note: %q", text)
+	}
+}

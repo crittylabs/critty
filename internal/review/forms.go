@@ -4,8 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/crittylabs/critty/internal/form"
@@ -49,6 +51,8 @@ type FormResult struct {
 	ReviewComment *Comment                   `json:"review_comment,omitempty"`
 	Round         int                        `json:"round"`
 	Consents      map[string]map[string]bool `json:"consents,omitempty"`
+	// ImageBase resolves attachments/ images in text answers and comments.
+	ImageBase string `json:"image_base,omitempty"`
 }
 
 func ParseDocumentForm(d AttachedDocument) ([]form.Item, error) {
@@ -74,7 +78,7 @@ func (s *Session) LoadForms() (FormState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return state, err
 	}
-	if state.Version != 1 {
+	if state.Version != 1 && state.Version != 2 {
 		return state, fmt.Errorf("unsupported form version: %d", state.Version)
 	}
 	return state, nil
@@ -97,6 +101,13 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 			return state, err
 		}
 		state.Documents = append(state.Documents, FormDocument{AttachedDocument: d, Items: items, Answers: form.Defaults(items)})
+		for _, item := range items {
+			if item.Tags != nil || item.SelectAll != nil || item.Text || item.Rank {
+				// Readers of version 1 know neither select-all items without
+				// answers nor text and ranking answers.
+				state.Version = 2
+			}
+		}
 	}
 	data, err := json.Marshal(struct {
 		Input ReviewInput
@@ -113,6 +124,9 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 				continue
 			}
 			for _, item := range d.Items {
+				if item.SelectAll != nil {
+					continue
+				}
 				if !item.Explicit && prev.Revision != d.Revision || (item.Required || item.Consent) && old.Revision != state.Revision {
 					continue
 				}
@@ -206,6 +220,17 @@ func (state FormState) Missing() []string {
 
 func (state FormState) Result(approved bool, round int) FormResult {
 	approved = approved && len(state.Missing()) == 0
+	state.Documents = slices.Clone(state.Documents)
+	for i := range state.Documents {
+		d := &state.Documents[i]
+		d.Answers = maps.Clone(d.Answers)
+		for id, answer := range d.Answers {
+			if answer.Text != "" && !selectedAcceptsText(d.Items, id, answer) {
+				answer.Text = ""
+				d.Answers[id] = answer
+			}
+		}
+	}
 	result := FormResult{FormState: state, Approved: approved, Round: round}
 	if approved {
 		result.Consents = map[string]map[string]bool{}
@@ -222,6 +247,17 @@ func (state FormState) Result(approved bool, round int) FormResult {
 		}
 	}
 	return result
+}
+
+// selectedAcceptsText reports whether the selected choice keeps its note in
+// results; notes on other choices remain drafts.
+func selectedAcceptsText(items []form.Item, id string, answer form.Answer) bool {
+	for _, item := range items {
+		if item.ID == id && item.Choice && item.Text && form.Selected(item, answer) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Session) SaveFormResult(result FormResult) error {

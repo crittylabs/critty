@@ -142,11 +142,11 @@ Session and document directories separate repeated filenames.  Source snapshot f
 
 ### Main record and documents
 
-`review.md` is the entry point.  It records the project/task identities, saved sessions, round and verdict, overall and file comments, anchors, authors, timestamps, resolution state, replies, and any saved overall draft.  It links to readable attachments, source snapshots, and original review JSON.  Attachment metadata includes the original source, revision, and whether the attachment was removed.
+`review.md` is the entry point.  It records the project/task identities, saved sessions, round and verdict, overall and file comments, anchors, authors, timestamps, resolution state, replies, and any saved overall draft.  It links to readable attachments, source snapshots, and original review JSON.  Attachment metadata includes the original source, revision, and whether the attachment was removed.  Each current attachment with a form lists its saved answers once per field, with the answering author and round, and quotes text answers.
 
 `attachments/` holds saved document content rather than a fresh read of the current source file.  Attached documents retain their attachment IDs.  Other reviewed files use `source-<path-hash>` folders.  Partial snapshots are identified in the main record.  An attachment already represented in the round snapshots is not emitted twice.
 
-Each attachment or source snapshot has its own `assets/`.  Images referenced by comments or replies in `review.md` use the top-level `assets/`.  This keeps an attachment and its images together when browsing or reusing it.
+Each attachment or source snapshot has its own `assets/`.  Images referenced by comments, replies, or text answers in `review.md` use the top-level `assets/`.  This keeps an attachment and its images together when browsing or reusing it.
 
 ### Links and image provenance
 

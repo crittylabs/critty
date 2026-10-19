@@ -2,8 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -377,7 +379,7 @@ func TestFormApprovalGrantsHumanConsent(t *testing.T) {
 		t.Fatal(app.err)
 	}
 	ev := takeEvent(t, ch)
-	if !ev.Approved || !ev.Result.Consents["a"]["publish"] {
+	if !ev.Approved || !ev.Result.Consents["a"]["publish"] || ev.Result.ImageBase != app.session.Dir {
 		t.Fatalf("human consent lost: %+v", ev)
 	}
 	if _, err := os.Stat(filepath.Join(app.session.Dir, "result-1.json")); err != nil {
@@ -476,5 +478,235 @@ func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
 				t.Fatalf("incorrect approval or consent: %+v", ev.Result)
 			}
 		})
+	}
+}
+
+func TestSelectAllForm(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] Check all <!-- form: id=all select-all=api -->\n- [ ] Auth <!-- form: id=auth tags=api -->\n- [ ] Errors <!-- form: id=errors tags=api consent -->\n")
+	line := func() string {
+		return ansi.Strip(strings.Split(app.contentViewport.GetContent(), "\n")[0])
+	}
+	if !strings.Contains(line(), "☐  All Check all (0/2) 1 consent") {
+		t.Fatalf("initial display: %q", line())
+	}
+	if len(app.formReviewItems()) != 2 {
+		t.Fatal("select-all item counted as an answer")
+	}
+	app.toggleForm(1)
+	d := app.forms.Document(app.tab().path)
+	if !strings.Contains(line(), "✓  All Check all (2/2)") || d.Answers["errors"].Via != "all" || !d.Answers["errors"].Human {
+		t.Fatalf("select all: %q %+v", line(), d.Answers)
+	}
+	if !app.tab().cursorOnForm || app.tab().cursorLine != 1 {
+		t.Fatal("focus left the select-all item")
+	}
+	app.toggleForm(2)
+	if !strings.Contains(line(), "⊟  All Mixed Check all (1/2)") || d.Answers["auth"].Via != "" {
+		t.Fatalf("mixed: %q %+v", line(), d.Answers)
+	}
+	app.toggleForm(1)
+	app.toggleForm(1)
+	if !strings.Contains(line(), "☐  All Check all (0/2)") {
+		t.Fatalf("clear all: %q", line())
+	}
+	saved, err := app.session.LoadForms()
+	if err != nil || saved.Version != 2 || saved.Documents[0].Answers["auth"].Value != false || !saved.Documents[0].Answers["auth"].Human {
+		t.Fatalf("saved: %v %+v", err, saved)
+	}
+}
+
+func TestFormTextAnswers(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Other <!-- form: id=q value=other text -->\n- [ ] Plain <!-- form: id=q value=plain -->\n")
+	d := app.forms.Document(app.tab().path)
+	content := func() string { return ansi.Strip(app.contentViewport.GetContent()) }
+	typeAnswer := func(text string) {
+		app.modalTextarea.SetValue(text)
+		app = clickModalAction(t, app, "Save")
+	}
+	if !strings.Contains(content(), "✎  Reason") {
+		t.Fatalf("text field badge: %q", content())
+	}
+	app.tab().cursorLine = 1
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if app.modal != formTextModal {
+		t.Fatal("Enter did not open the text field")
+	}
+	typeAnswer("  Because it is simpler.\nSecond line  ")
+	if app.modal != noModal || d.Answers["reason"].Value != "Because it is simpler.\nSecond line" || !d.Answers["reason"].Human || len(app.missingForms()) != 0 {
+		t.Fatalf("saved text: %+v", d.Answers["reason"])
+	}
+	if !strings.Contains(content(), "Because it is simpler.") || !strings.Contains(content(), "Second line") {
+		t.Fatalf("text not shown: %q", content())
+	}
+	app.toggleForm(1)
+	typeAnswer("See ![diagram](attachments/diagram.png)")
+	if path, _ := app.commentImagePath("attachments/diagram.png"); !slices.ContainsFunc(slices.Collect(maps.Keys(app.commentImages)), func(key commentImageKey) bool { return key.path == path }) {
+		t.Fatal("answer image was not registered for preview")
+	}
+	app.toggleForm(1)
+	typeAnswer("")
+	if d.Answers["reason"].Value != "" || len(app.missingForms()) != 1 {
+		t.Fatal("clearing the text did not unanswer the field")
+	}
+
+	app.toggleForm(2)
+	if app.modal != formTextModal || d.Answers["q"].Value != "other" {
+		t.Fatal("choice with text did not open the editor after selection")
+	}
+	typeAnswer("Use exponential backoff")
+	app.toggleForm(3)
+	if d.Answers["q"].Value != "plain" || strings.Contains(content(), "exponential") {
+		t.Fatalf("note shown for another choice: %+v", d.Answers["q"])
+	}
+	app.toggleForm(2)
+	if app.modalTextarea.Value() != "Use exponential backoff" {
+		t.Fatalf("draft note not restored: %q", app.modalTextarea.Value())
+	}
+	app = pressKey(app, tea.KeyEscape)
+	if app.modal != noModal || d.Answers["q"].Value != "other" || !strings.Contains(content(), "exponential") {
+		t.Fatalf("closing the editor changed the choice: %v %+v", app.modal, d.Answers["q"])
+	}
+}
+
+func TestFormListModal(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "# Questions\n\n- [ ] All <!-- form: id=all select-all=r -->\n\n## Q1. Retry?\n\n- [ ] Bounded <!-- form: id=retry value=bounded tags=r -->\n- [ ] Manual <!-- form: id=retry value=manual -->\n\n## Q2. Why?\n\n- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Publish <!-- form: id=publish consent -->\n")
+	app.toggleForm(8)
+	view := func() string { return ansi.Strip(app.View().Content) }
+	if !strings.Contains(app.renderFooter(), "Answers") {
+		t.Fatal("no answer list button")
+	}
+	app = pressKey(app, 'F')
+	if app.modal != formListModal {
+		t.Fatal("F did not open the answer list")
+	}
+	for _, want := range []string{"Q1. Retry?", "✓ retry · Manual", "Q2. Why?", "! Reason", "○ Publish", "1 of 3 answered"} {
+		if !strings.Contains(view(), want) {
+			t.Fatalf("missing %q in %q", want, view())
+		}
+	}
+	if strings.Contains(view(), "All") {
+		t.Fatal("select-all item listed as an answer")
+	}
+	app = pressKey(app, 'u')
+	if strings.Contains(view(), "retry") || app.formList.selected != 0 {
+		t.Fatalf("filter kept answered items: %q", view())
+	}
+	app = pressKey(app, 'j')
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if app.modal != noModal || app.tab().cursorLine != 13 || !app.tab().cursorOnForm || app.focused != contentPane {
+		t.Fatalf("Enter did not go to Publish: modal %v line %d", app.modal, app.tab().cursorLine)
+	}
+	app = pressKey(app, 'F')
+	for _, region := range app.modalMouseRegions() {
+		if region.action.pick && region.action.pickIndex == 0 {
+			app = clickMouse(app, region.rect.left, region.rect.top)
+			break
+		}
+	}
+	if app.modal != noModal || app.tab().cursorLine != 12 {
+		t.Fatalf("click did not go to Reason: modal %v line %d", app.modal, app.tab().cursorLine)
+	}
+}
+
+func TestRankFieldReordersInPlace(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "# Lead\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
+	d := app.forms.Document(app.tab().path)
+	rows := func() []string {
+		var labels []string
+		for _, line := range strings.Split(ansi.Strip(app.contentViewport.GetContent()), "\n") {
+			for _, label := range []string{"Alpha", "Beta", "Gamma", "After"} {
+				if strings.Contains(line, label) {
+					labels = append(labels, label)
+				}
+			}
+		}
+		return labels
+	}
+	if !strings.Contains(ansi.Strip(app.contentViewport.GetContent()), "Unranked") || len(app.missingForms()) != 0 {
+		t.Fatal("unranked field not marked")
+	}
+	if content := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(content, " 1  Alpha") || !strings.Contains(content, " 3  Gamma") {
+		t.Fatalf("unranked items lack numbers: %q", content)
+	}
+	app.tab().cursorLine, app.tab().cursorOnForm = 2, true
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModAlt})
+	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"a", "b", "c"}) || !d.Answers["lead"].Human {
+		t.Fatalf("M-↑ on the first item did not confirm the order: %+v", d.Answers["lead"])
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
+	if got := rows(); !slices.Equal(got, []string{"Beta", "Alpha", "Gamma", "After"}) {
+		t.Fatalf("display order: %v", got)
+	}
+	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"b", "a", "c"}) || !d.Answers["lead"].Human {
+		t.Fatalf("answer: %+v", d.Answers["lead"])
+	}
+	if app.tab().cursorLine != 2 || app.rankMove(app.tab(), 2) != 1 || app.rankMove(app.tab(), 3) != -1 || app.rankMove(app.tab(), 4) != 0 {
+		t.Fatal("moved rows are not tracked")
+	}
+	app = pressKey(app, 'j')
+	if app.tab().cursorLine != 4 {
+		t.Fatalf("cursor did not follow display order: line %d", app.tab().cursorLine)
+	}
+	rowTop := map[int]int{}
+	for _, control := range app.contentLayout.formControls {
+		if _, ok := rowTop[control.line]; !ok {
+			rowTop[control.line] = control.rect.top
+		}
+	}
+	x, y := contentScreenPoint(app, gutterWidth+4, rowTop[4])
+	app = pressMouse(app, x, y)
+	_, y = contentScreenPoint(app, gutterWidth+4, rowTop[2])
+	app = moveMouse(app, x, y)
+	if d.Answers["lead"].Human {
+		t.Fatal("dragging saved before release")
+	}
+	app = releaseMouse(app, x, y)
+	if got := rows(); !slices.Equal(got, []string{"Beta", "Gamma", "Alpha", "After"}) {
+		t.Fatalf("dragging did not move Gamma to Alpha: %v", got)
+	}
+	if order, _ := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !d.Answers["lead"].Human || !slices.Equal(order, []string{"b", "c", "a"}) {
+		t.Fatalf("dragged order not saved: %+v", d.Answers["lead"])
+	}
+}
+
+func TestCommentOnRankedItemNamesTheItem(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "Intro\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
+	t1 := app.tab()
+	t1.cursorLine, t1.cursorOnForm = 2, true
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
+	// Display order is now Beta, Alpha, Gamma.
+	t1 = app.tab()
+	t1.cursorOnForm = false
+	t1.selecting, t1.selectAnchor, t1.cursorLine = true, 3, 2
+	if start, end := app.selectionRange(); start != 2 || end != 2 {
+		t.Fatalf("selection inside a reordered ranking: %d-%d", start, end)
+	}
+	// Intro through Alpha would skip Beta, displayed between them.
+	t1.selectAnchor, t1.cursorLine = 1, 2
+	if start, end := app.selectionRange(); start != 1 || end != 3 {
+		t.Fatalf("selection entering a reordered ranking: %d-%d", start, end)
+	}
+	t1.selecting, t1.cursorLine = false, 2
+	app.openLineComment()
+	app.modalTextarea.SetValue("Alpha belongs lower")
+	app.modalSubmit()
+	comments := app.tab().state.Comments
+	if len(comments) != 1 || comments[0].StartLine != 2 || !strings.Contains(comments[0].Anchor, "value=a") {
+		t.Fatalf("comment does not name Alpha: %+v", comments)
+	}
+}
+
+func TestReorderedRegions(t *testing.T) {
+	for _, tt := range []struct {
+		order []int
+		want  [][2]int
+	}{
+		{[]int{0, 1, 2}, nil},
+		{[]int{0, 2, 1, 3}, [][2]int{{2, 3}}},
+		{[]int{1, 0, 2, 4, 5, 3}, [][2]int{{1, 2}, {4, 6}}},
+	} {
+		if got := reorderedRegions(tt.order); !slices.Equal(got, tt.want) {
+			t.Errorf("%v: got %v, want %v", tt.order, got, tt.want)
+		}
 	}
 }

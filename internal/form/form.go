@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/mattn/go-shellwords"
@@ -33,6 +34,13 @@ type Item struct {
 	EndLine    int    `json:"end_line"`
 	Offset     int    `json:"offset"`
 	Metadata   []Span `json:"metadata,omitempty"`
+	// Tags and SelectAll are sorted sets, so reordering keeps fingerprints.
+	Tags      []string `json:"tags,omitempty"`
+	SelectAll []string `json:"select_all,omitempty"`
+	// Text makes a choice accept a note, or another item a text field.
+	Text bool `json:"text,omitempty"`
+	// Rank makes items sharing an ID one field ordered by the reviewer.
+	Rank bool `json:"rank,omitempty"`
 }
 
 type Answer struct {
@@ -41,6 +49,11 @@ type Answer struct {
 	Author   string `json:"author,omitempty"`
 	Revision string `json:"review_revision,omitempty"`
 	Round    int    `json:"round,omitempty"`
+	// Via names the select-all item whose human operation set this answer.
+	Via string `json:"via,omitempty"`
+	// Text holds the note on a choice with text, kept as a draft while
+	// another choice is selected.
+	Text string `json:"text,omitempty"`
 }
 
 // Parse uses the Markdown AST so examples, escaped lists, and quotations are inert.
@@ -124,8 +137,20 @@ func Parse(source string) ([]Item, error) {
 			return ast.WalkStop, err
 		}
 		item.Definition = definition.String()
+		if item.Rank {
+			if !item.Choice || item.Consent || item.Text || item.Tags != nil || item.SelectAll != nil {
+				return ast.WalkStop, fmt.Errorf("line %d: rank requires a value and cannot be consent, text, or tagged", item.Line)
+			}
+			item.Choice = false
+		}
+		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice || item.Text) {
+			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, text, or have a value", item.Line)
+		}
+		if item.Text && (item.Consent || !item.Choice && item.Tags != nil) {
+			return ast.WalkStop, fmt.Errorf("line %d: text fields cannot be consent or have tags", item.Line)
+		}
 		if item.ID == "" {
-			if item.Required || item.Consent || item.Choice {
+			if item.Required || item.Consent || item.Choice || item.Rank || item.SelectAll != nil {
 				return ast.WalkStop, fmt.Errorf("line %d: form requires an explicit id", item.Line)
 			}
 			item.ID = fmt.Sprintf("auto:%d", item.Line)
@@ -142,6 +167,12 @@ func Parse(source string) ([]Item, error) {
 			return nil, fmt.Errorf("line %d: consent cannot have a value", item.Line)
 		}
 		for _, old := range groups[item.ID] {
+			if old.Rank || item.Rank {
+				if !old.Rank || !item.Rank || old.Value == item.Value || old.Required != item.Required {
+					return nil, fmt.Errorf("line %d: inconsistent ranking for %q", item.Line, item.ID)
+				}
+				continue
+			}
 			if !old.Choice || !item.Choice {
 				return nil, fmt.Errorf("line %d: duplicate boolean id %q", item.Line, item.ID)
 			}
@@ -151,7 +182,38 @@ func Parse(source string) ([]Item, error) {
 		}
 		groups[item.ID] = append(groups[item.ID], item)
 	}
+	for id, group := range groups {
+		if group[0].Rank && len(group) < 2 {
+			return nil, fmt.Errorf("line %d: ranking %q needs at least two items", group[0].Line, id)
+		}
+	}
+	if _, err := Targets(items); err != nil {
+		return nil, err
+	}
 	return items, nil
+}
+
+func tagList(key, value string) ([]string, error) {
+	seen := map[string]bool{}
+	var tags []string
+	for tag := range strings.SplitSeq(value, ",") {
+		tag = strings.Trim(tag, " \t\n\r\f\v")
+		if !validTag(tag) {
+			return nil, fmt.Errorf("invalid tag %q in %s", tag, key)
+		}
+		if !seen[tag] {
+			seen[tag] = true
+			tags = append(tags, tag)
+		}
+	}
+	slices.Sort(tags)
+	return tags, nil
+}
+
+func validTag(tag string) bool {
+	return tag != "" && strings.IndexFunc(tag, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("_-.", r))
+	}) < 0
 }
 
 func attributes(item *Item, source string) error {
@@ -180,6 +242,18 @@ func attributes(item *Item, source string) error {
 			item.Required = true
 		case key == "consent" && !assigned:
 			item.Consent = true
+		case key == "text" && !assigned:
+			item.Text = true
+		case key == "rank" && !assigned:
+			item.Rank = true
+		case key == "tags" && assigned:
+			if item.Tags, err = tagList(key, value); err != nil {
+				return err
+			}
+		case key == "select-all" && assigned:
+			if item.SelectAll, err = tagList(key, value); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("invalid form attribute %q", word)
 		}
@@ -203,14 +277,20 @@ func Fingerprint(items []Item, id string) (string, error) {
 func Defaults(items []Item) map[string]Answer {
 	answers := map[string]Answer{}
 	for _, item := range items {
+		if item.SelectAll != nil {
+			continue
+		}
 		if _, exists := answers[item.ID]; !exists {
 			var value any = false
-			if item.Choice {
+			switch {
+			case item.Rank:
+				value = nil
+			case item.Choice || item.Text:
 				value = ""
 			}
 			answers[item.ID] = Answer{Value: value}
 		}
-		if item.Initial && !item.Consent && !item.Required {
+		if item.Initial && !item.Consent && !item.Required && !item.Rank && (item.Choice || !item.Text) {
 			var value any = true
 			if item.Choice {
 				value = item.Value
@@ -222,19 +302,99 @@ func Defaults(items []Item) map[string]Answer {
 }
 
 func Selected(item Item, answer Answer) bool {
-	if item.Choice {
+	switch {
+	case item.Rank:
+		return len(rankValues(answer.Value)) > 0
+	case item.Choice:
 		return answer.Value == item.Value
+	case item.Text:
+		value, ok := answer.Value.(string)
+		return ok && value != ""
 	}
 	return answer.Value == true
+}
+
+// IsTextField reports whether item is a text field rather than a choice
+// accepting a note.
+func IsTextField(item Item) bool {
+	return item.Text && !item.Choice
 }
 
 func Satisfied(item Item, answer Answer) bool {
 	if !answer.Human {
 		return false
 	}
-	if item.Choice {
+	if item.Rank {
+		return len(rankValues(answer.Value)) > 0
+	}
+	if item.Choice || item.Text {
 		value, ok := answer.Value.(string)
 		return ok && value != ""
 	}
 	return answer.Value == true
+}
+
+// RankOrder returns the values of a ranking in the answered order, or in
+// source order with ranked false until a complete ranking is answered.
+func RankOrder(items []Item, id string, answer Answer) (values []string, ranked bool) {
+	for _, item := range items {
+		if item.ID == id && item.Rank {
+			values = append(values, item.Value)
+		}
+	}
+	answered := rankValues(answer.Value)
+	if len(answered) != len(values) {
+		return values, false
+	}
+	for _, value := range values {
+		if !slices.Contains(answered, value) {
+			return values, false
+		}
+	}
+	return answered, true
+}
+
+// rankValues accepts answers decoded from JSON as well as those set in memory.
+func rankValues(value any) []string {
+	switch value := value.(type) {
+	case []string:
+		return value
+	case []any:
+		values := make([]string, 0, len(value))
+		for _, v := range value {
+			text, ok := v.(string)
+			if !ok {
+				return nil
+			}
+			values = append(values, text)
+		}
+		return values
+	}
+	return nil
+}
+
+type Heading struct {
+	Line int
+	Text string
+}
+
+// Headings lists Markdown headings in source order so form items can be
+// grouped by the section that asks them.
+func Headings(source string) ([]Heading, error) {
+	data := []byte(source)
+	var headings []Heading
+	err := ast.Walk(parser.New().Parse(data), func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		heading, ok := n.(*ast.Heading)
+		if !entering || !ok {
+			return ast.WalkContinue, nil
+		}
+		segments := heading.Source()
+		if len(segments) == 0 {
+			return ast.WalkSkipChildren, nil
+		}
+		title := strings.TrimSpace(string(text.NewLines(segments).Bytes(data)))
+		headings = append(headings, Heading{Line: strings.Count(source[:segments[0].Start], "\n") + 1, Text: title})
+		return ast.WalkSkipChildren, nil
+	})
+	return headings, err
 }

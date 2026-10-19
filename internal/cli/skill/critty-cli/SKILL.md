@@ -67,15 +67,16 @@ Repeated `--attachment FILE` flags on `review`, `plan`, or the default command s
 
 ## Forms and exported results
 
-Task lists in attached `.md` or `.markdown` files are interactive.  `<!-- form: id=check required -->` makes a confirmation, distinct `value` attributes on the same ID make a choice, and `<!-- form: id=publish consent -->` gates one operation.  `/critty-approval` defines when to use them and how to interpret permission.
+Task lists in attached `.md` or `.markdown` files are interactive forms: checkboxes, required confirmations, choices, consents, text answers, rankings, and select-all controls.  Read [attachment forms](references/forms.md) before writing a form or interpreting its answers; it lists each widget's annotation, answer value, and constraints.  `/critty-approval` defines when to use confirmations and consents and how to interpret permission.
 
-`forms.json` version 1 stores definitions, draft answers, and human provenance separately from source documents and comments.  Changed field definitions reset their answers.  Changed target snapshots or attachment contents, order, or membership reset all required confirmations and consents; ordinary explicit-ID answers survive unchanged definitions.
+`--answers` labels Comment as **Confirm answers** and selects it by default, for rounds that collect form answers without approving the design; the verdict remains `comment`.  The setting persists across the session's rounds until `--no-answers`.
 
 `--result FILE` requires an interactive attachment form.  It writes the result atomically before printing approval; omit it for ordinary document approval.  The parent directory must exist, the file must be outside the session directory, and it must not overwrite reviewed input.  The same self-contained result is saved as `result-<round>.json`, returned in IPC's `result`, and appended to finish output regardless of templates.
 
 | Result field | Meaning |
 | --- | --- |
 | `version`, `session`, `round` | Schema version, session ID, and completed round. |
+| `image_base` | Session directory that resolves `attachments/` image paths in answers and comments. |
 | `review_revision`, `reviewed_target` | Revision identifier and the exact reviewed input. |
 | `attachments` | Ordered documents with source paths, snapshots, field `definitions`, and `answers`. |
 | `approved` | Human review outcome, including required-confirmation checks. |

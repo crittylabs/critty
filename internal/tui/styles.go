@@ -400,6 +400,11 @@ var (
 	diffCommonTextBg  = lipgloss.NewStyle()
 	diffAddedTextBg   = lipgloss.NewStyle()
 	diffDeletedTextBg = lipgloss.NewStyle()
+	// rankMovedUp and rankMovedDown tint the line numbers of ranked items
+	// displayed above or below their source position, in yellow and blue
+	// rather than the diff colors so a lower rank does not read as removal.
+	rankMovedUp   = lipgloss.NewStyle()
+	rankMovedDown = lipgloss.NewStyle()
 
 	visualModeIndicator = lipgloss.NewStyle().
 				Bold(true).
@@ -513,6 +518,9 @@ func initAdaptiveStyles(hasDarkBG bool) {
 
 	diffDeletedTextBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#E8A8A8"), lipgloss.Color("#682828")))
+
+	rankMovedUp = lipgloss.NewStyle().Background(ld(lipgloss.Color("#EEDC9A"), lipgloss.Color("#5E5220")))
+	rankMovedDown = lipgloss.NewStyle().Background(ld(lipgloss.Color("#B8CCF0"), lipgloss.Color("#2A3F6E")))
 }
 
 // formChipPalette styles form labels, which sit on a gray chip after a

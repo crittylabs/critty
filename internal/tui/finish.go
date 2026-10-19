@@ -31,7 +31,7 @@ const (
 )
 
 func (m *AppModel) defaultFinishVerdict() review.Verdict {
-	if len(m.missingForms()) > 0 {
+	if m.answerMode || len(m.missingForms()) > 0 {
 		return review.VerdictComment
 	}
 	for _, tab := range m.tabs {
@@ -479,6 +479,16 @@ func finishColor(verdict review.Verdict) color.Color {
 	}
 }
 
+// commentLabel names the Comment verdict; answer rounds confirm the
+// submitted answers without approving the reviewed design.  Both start
+// with the same access key.
+func (m AppModel) commentLabel() string {
+	if m.answerMode {
+		return "Confirm answers"
+	}
+	return "Comment"
+}
+
 func (m AppModel) finishChoices(width, top int) (string, []modalMouseRegion) {
 	var choices []modalButtonSpec
 	for i, option := range []struct {
@@ -486,7 +496,7 @@ func (m AppModel) finishChoices(width, top int) (string, []modalMouseRegion) {
 		label   string
 	}{
 		{review.VerdictApprove, "Approve"},
-		{review.VerdictComment, "Comment"},
+		{review.VerdictComment, m.commentLabel()},
 		{review.VerdictReject, "Reject"},
 	} {
 		selected := m.finishVerdict == option.verdict

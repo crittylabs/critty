@@ -52,6 +52,8 @@ const (
 	openSourceModal
 	fileSelectModal
 	lightboxModal
+	formTextModal
+	formListModal
 )
 
 // FinishEvent is emitted on the finish channel when the reviewer finishes a
@@ -78,6 +80,8 @@ type AppConfig struct {
 	FinishCh  chan<- FinishEvent
 	FocusPath string
 	FocusLine int
+	// Answers labels Comment as Confirm answers and selects it by default.
+	Answers bool
 }
 
 // gutterWidth is the total width of the left gutter: line number (5) + marker (1) + space (1).
@@ -95,6 +99,10 @@ type AppModel struct {
 	forms         *review.FormState
 	formRows      map[string]map[int]formRow
 	formViewed    map[string]map[int]bool
+	// formTargets maps select-all IDs to item indices by document path.
+	formTargets   map[string]map[string][]int
+	formList      formListState
+	answerMode    bool
 	attachments   map[string]review.AttachedDocument
 	project       string
 	topic         string
@@ -145,6 +153,7 @@ type AppModel struct {
 	killRing          killRing
 	completion        completionState
 	mouseSelecting    bool
+	rankDrag          rankDragState
 	hoveredGutterLine int
 	hoveredGutterSide string
 	contentLayout     renderedContentLayout
@@ -154,6 +163,7 @@ type AppModel struct {
 	// Editing state
 	editingID            string // ID of the parent comment being edited or replied to
 	editingReplyID       string // ID of the reply being edited; empty when editing the parent
+	editingFormLine      int    // line of the form item whose text is being edited
 	modalInitial         string // textarea value when the current text modal opened
 	modalOpenedAt        time.Time
 	modalOpeningClick    tea.Mouse
@@ -227,6 +237,8 @@ type renderedScreenLayout struct {
 	hasFinishButton     bool
 	footerHelp          mouseRect
 	hasFooterHelp       bool
+	formListButton      mouseRect
+	hasFormListButton   bool
 	imagesButton        mouseRect
 	hasImagesButton     bool
 	modalRegions        []modalMouseRegion
@@ -296,6 +308,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		activeTab:       0,
 		session:         cfg.Session,
 		author:          cfg.Author,
+		answerMode:      cfg.Answers,
 		authorColors:    make(map[string]int),
 		finishCh:        cfg.FinishCh,
 		host:            reviewHost(),
@@ -377,6 +390,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		split:           cfg.Split,
 		session:         cfg.Session,
 		author:          cfg.Author,
+		answerMode:      cfg.Answers,
 		authorColors:    make(map[string]int),
 		finishCh:        cfg.FinishCh,
 		baseRef:         ref,
@@ -790,6 +804,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.modal == fileSelectModal {
 		return m.handleFileSelectModal(msg)
 	}
+	if m.modal == formListModal {
+		return m.handleFormListKey(msg)
+	}
 	m.locationError = ""
 	if m.modal == lightboxModal {
 		return m.handleLightboxKey(msg)
@@ -826,7 +843,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.modal == deleteConfirmModal {
 		return m.handleDeleteConfirmModal(msg)
 	}
-	if m.modal == commentModal || m.modal == fileCommentModal || m.modal == replyModal || m.modal == editModal {
+	if m.modal == commentModal || m.modal == fileCommentModal || m.modal == replyModal || m.modal == editModal || m.modal == formTextModal {
 		return m.handleTextModal(msg)
 	}
 	if m.modal == finishModal {
@@ -862,6 +879,11 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.String() == "space" || msg.String() == " " {
 		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
+			return m, nil
+		}
+	}
+	if direction := map[string]int{"alt+up": -1, "alt+down": 1}[msg.String()]; direction != 0 {
+		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.moveRank(t.cursorLine, direction) {
 			return m, nil
 		}
 	}
@@ -1011,6 +1033,10 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.rebuildContent()
 			return m, nil
 		}
+
+	case key.Matches(msg, keys.FormList):
+		m.openFormList()
+		return m, nil
 
 	case key.Matches(msg, keys.FileComment):
 		if m.readOnly {
@@ -1222,6 +1248,8 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.openCommentThread(anns[t.cursorAnnoIdx].id)
 					return m, nil
 				}
+			} else if m.focused == contentPane && !t.selecting && t.cursorSide == "" && m.openFormTextAt(t.cursorLine) {
+				return m, nil
 			} else if t.state != nil {
 				m.openLineComment()
 				return m, nil
@@ -1432,6 +1460,10 @@ func (m *AppModel) latestOwnReply(c *review.Comment) *review.Reply {
 }
 
 func (m *AppModel) modalSubmit() {
+	if m.modal == formTextModal {
+		m.saveFormText()
+		return
+	}
 	t := m.tab()
 	body := strings.TrimSpace(m.modalTextarea.Value())
 	if m.modalTextarea.Value() == m.modalInitial || (body == "" && m.modalInitial == "") {
@@ -2072,7 +2104,7 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 	var result *review.FormResult
 	if m.forms != nil && m.forms.HasForms() {
 		value := m.forms.Result(approved, m.session.CJ.ReviewRound)
-		value.Session = m.session.Key
+		value.Session, value.ImageBase = m.session.Key, m.session.Dir
 		value.Verdict = verdict
 		value.ReviewComment = m.session.SubmissionComment()
 		if err := m.session.SaveFormResult(value); err != nil {
@@ -2908,6 +2940,9 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	}
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
+	if button := m.formListButton(); button != "" {
+		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
+	}
 
 	full := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
@@ -3124,6 +3159,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal == fileSelectModal {
 		return m.handleFileSelectMouse(mouse)
 	}
+	if m.modal == formListModal {
+		return m.handleFormListMouse(mouse)
+	}
 	if m.modal == helpModal {
 		for _, region := range m.modalMouseRegions() {
 			if region.action.scrollable && region.rect.contains(mouse) {
@@ -3202,6 +3240,10 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 			return m, nil
 		}
 	}
+	if imageLayout.hasFormListButton && imageLayout.formListButton.contains(mouse) {
+		m.openFormList()
+		return m, nil
+	}
 	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
 		cmd := m.toggleImages()
 		return m, cmd
@@ -3258,7 +3300,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 					m.focused = contentPane
 					m.tab().cursorLine, m.tab().cursorSide, m.tab().cursorOnAnnotation = control.line, "", false
 					m.tab().cursorOnForm = true
-					m.toggleForm(control.line)
+					if !m.startRankDrag(control.line) {
+						m.toggleForm(control.line)
+					}
 					return m, nil
 				}
 			}
@@ -3407,7 +3451,7 @@ type modalButtonSpec struct {
 
 func (m *AppModel) isTextModal() bool {
 	return m.modal == commentModal || m.modal == fileCommentModal ||
-		m.modal == replyModal || m.modal == editModal || m.modal == finishModal
+		m.modal == replyModal || m.modal == editModal || m.modal == finishModal || m.modal == formTextModal
 }
 
 func (m *AppModel) hasModalResolution() bool {
@@ -3512,6 +3556,10 @@ func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd
 	if len(m.tabs) == 0 {
 		return m, nil
 	}
+	if m.rankDrag.active {
+		m.dragRank(msg.Mouse())
+		return m, nil
+	}
 	if !m.mouseSelecting {
 		m.updateGutterHover(msg.Mouse())
 		return m, nil
@@ -3545,6 +3593,10 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 
 func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
 	if len(m.tabs) == 0 {
+		return m, nil
+	}
+	if m.rankDrag.active {
+		m.finishRankDrag()
 		return m, nil
 	}
 	if !m.mouseSelecting || msg.Mouse().Button != tea.MouseLeft {
@@ -4082,11 +4134,31 @@ func (m AppModel) renderFooter() string {
 		}
 	}
 	if row, ok := m.formRows[t.path][t.cursorLine]; ok && row.item != nil && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" {
-		items = append([]string{k("space", "answer")}, items...)
+		action := "answer"
+		if row.item.SelectAll != nil {
+			action = "select all"
+			if d := m.forms.Document(t.path); d != nil {
+				if selected, total := m.selectAllState(d, row.item); selected == total {
+					action = "clear all"
+				}
+			}
+		}
+		items = append([]string{k("space", action)}, items...)
+	}
+	if button := m.formListButton(); button != "" {
+		items = append([]string{button}, items...)
 	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
 
 	return footerStyle.Width(m.width).Render(strings.Join(items, " · "))
+}
+
+// formListButton opens the answer list when any attachment has a form.
+func (m AppModel) formListButton() string {
+	if m.forms == nil || !m.forms.HasForms() {
+		return ""
+	}
+	return renderBarButton("Answers", "F")
 }
 
 func (m AppModel) footerHelpButton() string {
@@ -4161,6 +4233,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	general := renderHelpGroup("General", []helpItem{
 		{keys: "enter", desc: "comment/open"},
 		{keys: "f", desc: "file comment"},
+		{keys: "F", desc: "answer list"},
+		{keys: "M-↑/↓", desc: "move ranked item"},
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
@@ -4496,7 +4570,7 @@ func (m AppModel) renderWithModal(background string) string {
 func (m AppModel) renderWithModalLayout(background string) (string, []modalMouseRegion) {
 	frameStyle := modalStyle
 	switch m.modal {
-	case commentModal, fileCommentModal, replyModal, editModal:
+	case commentModal, fileCommentModal, replyModal, editModal, formTextModal:
 		frameStyle = frameStyle.BorderForeground(commentFocusedBorderColor)
 	}
 	var modalContent string
@@ -4510,6 +4584,11 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 	case gotoLineModal, openSourceModal:
 		content, locationRegions := m.locationModalContent(innerWidth)
 		regions = append(regions, locationRegions...)
+		modalContent = frameStyle.Width(modalWidth).Render(content)
+
+	case formListModal:
+		content, listRegions := m.formListModalContent(innerWidth, max(3, bgH-14))
+		regions = append(regions, listRegions...)
 		modalContent = frameStyle.Width(modalWidth).Render(content)
 
 	case fileSelectModal:
@@ -4586,9 +4665,13 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		regions = append(regions, contentRegions...)
 		regions = append(regions, closeRegion)
 
-	case fileCommentModal:
-		title, closeRegion := modalTitle("Add File Comment", innerWidth)
-		path := contextBoxStyle.Width(innerWidth - 2).Render(m.tab().displayPath())
+	case fileCommentModal, formTextModal:
+		titleText, context := "Add File Comment", m.tab().displayPath()
+		if m.modal == formTextModal {
+			titleText, context = "Answer", m.formTextLabel()
+		}
+		title, closeRegion := modalTitle(titleText, innerWidth)
+		path := contextBoxStyle.Width(innerWidth - 2).Render(context)
 		prefix, textareaRegion := layoutModalTextarea(
 			title+"\n"+path+"\n\n", m.clipboardTextareaView(), innerWidth)
 		regions = append(regions, textareaRegion)

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"image/color"
+	"maps"
 	"sort"
 	"strings"
 
@@ -54,7 +55,7 @@ func (m *AppModel) formReviewItems() []formReviewItem {
 		}
 		seen := map[string]bool{}
 		for _, item := range d.Items {
-			if seen[item.ID] {
+			if seen[item.ID] || item.SelectAll != nil {
 				continue
 			}
 			seen[item.ID] = true
@@ -120,11 +121,20 @@ func (m *AppModel) markVisibleForms() {
 	}
 }
 
-func (m *AppModel) indexForms() {
+func (m *AppModel) indexForms() error {
 	m.formRows = map[string]map[int]formRow{}
+	m.formTargets = map[string]map[string][]int{}
 	m.formViewed = nil
 	for i := range m.forms.Documents {
 		d := &m.forms.Documents[i]
+		targets, err := form.Targets(d.Items)
+		if err != nil {
+			return fmt.Errorf("attachment %s: %w", d.Name, err)
+		}
+		m.formTargets[d.Path()] = map[string][]int{}
+		for index, leaves := range targets {
+			m.formTargets[d.Path()][d.Items[index].ID] = leaves
+		}
 		starts := []int{0}
 		for j, char := range d.Content {
 			if char == '\n' {
@@ -155,6 +165,7 @@ func (m *AppModel) indexForms() {
 		}
 		m.formRows[d.Path()] = rows
 	}
+	return nil
 }
 
 func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff string) error {
@@ -219,8 +230,7 @@ func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff stri
 		return err
 	}
 	m.forms = &state
-	m.indexForms()
-	return nil
+	return m.indexForms()
 }
 
 func (m *AppModel) missingForms() []string {
@@ -243,23 +253,155 @@ func (m *AppModel) toggleForm(line int) bool {
 			continue
 		}
 		m.tab().cursorOnForm = true
-		var value any = !form.Selected(item, d.Answers[item.ID])
-		if item.Choice {
-			value = item.Value
+		if item.Rank {
+			m.saveRank(d, item.ID, m.rankLayout(d, item.ID).order)
+			m.rebuildContent()
+			return true
 		}
-		previous := d.Answers[item.ID]
-		d.Answers[item.ID] = form.Answer{Value: value, Human: true, Author: m.author,
-			Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+		if form.IsTextField(item) {
+			m.openFormText(item)
+			return true
+		}
+		previous := maps.Clone(d.Answers)
+		answer := form.Answer{Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+		if item.SelectAll != nil {
+			answer.Via = item.ID
+			form.ApplyBulk(d.Items, m.formTargets[d.Path()][item.ID], d.Answers, answer)
+		} else {
+			answer.Value = !form.Selected(item, d.Answers[item.ID])
+			if item.Choice {
+				answer.Value = item.Value
+				answer.Text = d.Answers[item.ID].Text
+			}
+			d.Answers[item.ID] = answer
+		}
 		if err := m.session.SaveForms(*m.forms); err != nil {
-			d.Answers[item.ID] = previous
+			d.Answers = previous
 			m.err = err
 		} else {
 			m.err = nil
+			if item.Text {
+				m.openFormText(item)
+			}
 		}
 		m.rebuildContent()
 		return true
 	}
 	return false
+}
+
+// openFormTextAt opens the editor for the text field on line, if any.
+func (m *AppModel) openFormTextAt(line int) bool {
+	if m.readOnly || m.forms == nil {
+		return false
+	}
+	row, ok := m.formRows[m.tab().path][line]
+	if !ok || row.item == nil || !form.IsTextField(*row.item) {
+		return false
+	}
+	m.tab().cursorOnForm = true
+	m.openFormText(*row.item)
+	return true
+}
+
+// openFormText edits a text field's value, or the note on a selected choice.
+func (m *AppModel) openFormText(item form.Item) {
+	text := m.formText(item)
+	m.modal = formTextModal
+	m.editingFormLine = item.Line
+	m.modalFocus = 0
+	m.modalTextarea.Placeholder = "Type your answer..."
+	m.modalTextarea.Reset()
+	m.modalTextarea.SetValue(text)
+	m.modalInitial = m.modalTextarea.Value()
+	m.modalTextarea.Focus()
+}
+
+// editingFormItem returns the item edited by the form text modal.
+func (m *AppModel) editingFormItem() (*review.FormDocument, *form.Item) {
+	d := m.forms.Document(m.tab().path)
+	if d == nil {
+		return nil, nil
+	}
+	row, ok := m.formRows[d.Path()][m.editingFormLine]
+	if !ok || row.item == nil || row.item.Line != m.editingFormLine {
+		return nil, nil
+	}
+	return d, row.item
+}
+
+// formText returns the text shown for item, which is empty for a choice
+// that is not selected.
+func (m *AppModel) formText(item form.Item) string {
+	d := m.forms.Document(m.tab().path)
+	if d == nil || !item.Text {
+		return ""
+	}
+	answer := d.Answers[item.ID]
+	if form.IsTextField(item) {
+		text, _ := answer.Value.(string)
+		return text
+	}
+	if !form.Selected(item, answer) {
+		return ""
+	}
+	return answer.Text
+}
+
+func (m *AppModel) formTextLabel() string {
+	if _, item := m.editingFormItem(); item != nil {
+		return item.Label
+	}
+	return ""
+}
+
+// saveFormText keeps the editor open when saving fails so the text survives.
+func (m *AppModel) saveFormText() {
+	d, item := m.editingFormItem()
+	if item == nil {
+		m.discardTextModal()
+		return
+	}
+	text := strings.TrimSpace(m.modalTextarea.Value())
+	previous := d.Answers[item.ID]
+	answer := form.Answer{Value: text, Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+	if item.Choice {
+		answer.Value, answer.Text = item.Value, text
+	}
+	d.Answers[item.ID] = answer
+	if err := m.session.SaveForms(*m.forms); err != nil {
+		d.Answers[item.ID] = previous
+		m.err = err
+		return
+	}
+	m.err = nil
+	m.discardTextModal()
+	m.rebuildContent()
+}
+
+// formTextRows renders the text answer below the last line of its item,
+// formatted like a comment body with links and image previews.
+func (m *AppModel) formTextRows(line int, width int) []string {
+	d := m.forms.Document(m.tab().path)
+	if d == nil {
+		return nil
+	}
+	row, ok := m.formRows[d.Path()][line]
+	if !ok || row.item == nil || row.item.EndLine != line {
+		return nil
+	}
+	text := m.formText(*row.item)
+	if text == "" {
+		return nil
+	}
+	first := m.formRows[d.Path()][row.item.Line]
+	prefix := d.Content[first.offset:row.item.Offset]
+	indent := strings.Repeat(" ", lipgloss.Width(expandDisplayTabs(prefix[:len(prefix)-len(strings.TrimLeft(prefix, " \t"))]))+6)
+	rows := strings.Split(m.renderCommentContent(d.Answers[row.item.ID].Author, text, "", max(1, width-len(indent))), "\n")
+	for i := range rows {
+		rows[i] = indent + rows[i]
+	}
+	return rows
 }
 
 // formDisplayLine hides only parsed metadata and retains each original line.
@@ -295,6 +437,15 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	prefix := raw[:column]
 	indent := expandDisplayTabs(prefix[:len(prefix)-len(strings.TrimLeft(prefix, " \t"))]) + "  "
 	label := highlightInlineWith(strings.TrimSpace(raw[column+3:]), formChip.link, formChip.code)
+	if checkbox.SelectAll != nil {
+		return indent + m.selectAllDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
+	}
+	if checkbox.Rank {
+		// The drag handle sits between the line number and the rank.
+		handle := lipgloss.NewStyle().Foreground(formChip.cyan).Render("⇅") + " "
+		indent = strings.TrimSuffix(indent, "  ")
+		return indent + handle + m.rankDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
+	}
 	answer := d.Answers[checkbox.ID]
 	selected := form.Selected(*checkbox, answer)
 	// The badge uses the terminal's ANSI color, except for required items;
@@ -306,7 +457,9 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 		tint, tagColor = formChip.requiredBadge, formChip.red
 	}
 	symbol := "☐"
-	if checkbox.Choice {
+	if form.IsTextField(*checkbox) {
+		symbol = "✎"
+	} else if checkbox.Choice {
 		symbol = "○"
 		if selected {
 			symbol = "●"
@@ -323,6 +476,43 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	}
 	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
 	return indent + badge + inlineColors(background, " "+label, true), lipgloss.Width(indent), true
+}
+
+// selectAllState reports how many targets of a select-all item are selected.
+func (m *AppModel) selectAllState(d *review.FormDocument, item *form.Item) (selected, total int) {
+	targets := m.formTargets[d.Path()][item.ID]
+	return form.CountSelected(d.Items, targets, d.Answers), len(targets)
+}
+
+// selectAllDisplay labels select-all items so that their state does not depend
+// on color alone.
+func (m *AppModel) selectAllDisplay(d *review.FormDocument, item *form.Item, label string, background lipgloss.Style) string {
+	selected, total := m.selectAllState(d, item)
+	tint, tagColor, symbol := color.Color(lipgloss.Cyan), formChip.cyan, "☐"
+	if selected == total {
+		tint, tagColor, symbol = lipgloss.Green, formChip.green, "✓"
+	} else if selected > 0 {
+		symbol = "⊟"
+	}
+	tag := lipgloss.NewStyle().Foreground(tagColor).Bold(true)
+	tags := tag.Render("All")
+	if selected > 0 && selected < total {
+		tags += " " + tag.Render("Mixed")
+	}
+	label += fmt.Sprintf(" (%d/%d)", selected, total)
+	consents := 0
+	for _, i := range m.formTargets[d.Path()][item.ID] {
+		if d.Items[i].Consent {
+			consents++
+		}
+	}
+	if consents == 1 {
+		label += " " + tag.Render("1 consent")
+	} else if consents > 1 {
+		label += " " + tag.Render(fmt.Sprintf("%d consents", consents))
+	}
+	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
+	return badge + inlineColors(background, " "+tags+" "+label, true)
 }
 
 func (m *AppModel) formSummary(width int) string {

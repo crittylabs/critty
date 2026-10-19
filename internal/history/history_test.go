@@ -17,6 +17,7 @@ import (
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/parser"
 
+	"github.com/crittylabs/critty/internal/form"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -82,9 +83,19 @@ func TestArchiveIsPortableAndPreservesOriginals(t *testing.T) {
 	documents := []review.AttachedDocument{
 		{ID: "a_doc", Name: "attached.md", Source: filepath.Join(store.CWD, "attached.md"), Revision: "sha256:original", Content: content},
 		{ID: "a_other", Name: "another.md", Source: filepath.Join(store.CWD, "another.md"), Content: "# Section\n"},
+		{ID: "a_form", Name: "form.md", Source: filepath.Join(store.CWD, "form.md"), Content: "- [ ] Why? <!-- form: id=why text -->\n- [x] Keep <!-- form: id=keep -->\n- [ ] Unanswered <!-- form: id=open -->\n"},
 	}
 	first.CJ.RoundState.Files[documents[0].Path()] = review.SnapshotFile{Content: content}
 	if err := first.ReplaceDocuments(documents); err != nil {
+		t.Fatal(err)
+	}
+	items, err := form.Parse(documents[2].Content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := form.Defaults(items)
+	answers["why"] = form.Answer{Value: "Measured.\n![answer](" + managed + ")", Human: true, Author: "Human", Round: 1}
+	if err := first.SaveForms(review.FormState{Version: 2, Documents: []review.FormDocument{{AttachedDocument: documents[2], Items: items, Answers: answers}}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := first.Save(); err != nil {
@@ -144,7 +155,7 @@ func TestArchiveIsPortableAndPreservesOriginals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{first.Key, second.Key, "Final direction", "Reply by Agent", "Resolved: true"} {
+	for _, want := range []string{first.Key, second.Key, "Final direction", "Reply by Agent", "Resolved: true", "✎ Why? (`why`) — Human, round 1", "> Measured.", "✓ Keep (`keep`) — initial value", "☐ Unanswered (`open`)"} {
 		if !strings.Contains(string(main), want) {
 			t.Fatalf("missing %q in archive", want)
 		}

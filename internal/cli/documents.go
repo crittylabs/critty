@@ -14,12 +14,15 @@ var attachmentPaths []string
 var clearAttachments bool
 var resultPath string
 var summaryPath string
+var answersMode, noAnswersMode bool
 
 func addAttachmentFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&resultPath, "result", "", "Save the self-contained form result as JSON")
 	cmd.Flags().StringVar(&summaryPath, "summary", "", "Save verdict, all threads, and attachment identities as JSON")
 	cmd.Flags().StringArrayVar(&attachmentPaths, "attachment", nil, "Attach a document before the review (repeatable)")
 	cmd.Flags().BoolVar(&clearAttachments, "clear-attachments", false, "remove all attached documents from a saved review")
+	cmd.Flags().BoolVar(&answersMode, "answers", false, "label Comment as Confirm answers for rounds that collect form answers")
+	cmd.Flags().BoolVar(&noAnswersMode, "no-answers", false, "restore the Comment label after --answers")
 }
 
 func prepareDocuments(mode *reviewMode) error {
@@ -28,6 +31,9 @@ func prepareDocuments(mode *reviewMode) error {
 	}
 	if len(attachmentPaths) > 0 && clearAttachments {
 		return fmt.Errorf("--attachment cannot be combined with --clear-attachments")
+	}
+	if answersMode && noAnswersMode {
+		return fmt.Errorf("--answers cannot be combined with --no-answers")
 	}
 	if clearAttachments && mode.sessionKey == "" {
 		return fmt.Errorf("--clear-attachments requires --session")

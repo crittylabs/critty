@@ -975,3 +975,22 @@ func TestFinishInputAutoCommentPreservesExplicitChoices(t *testing.T) {
 		}
 	}
 }
+
+func TestAnswerModeSubmitLabel(t *testing.T) {
+	app, _ := newFinishTestApp(t, nil)
+	app.answerMode = true
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	app = pressKey(app, 'q')
+	if app.modal != finishModal || app.finishVerdict != review.VerdictComment {
+		t.Fatalf("answer rounds should default to Confirm answers: %v %v", app.modal, app.finishVerdict)
+	}
+	if view := ansi.Strip(app.View().Content); !strings.Contains(view, "● Confirm answers") || strings.Contains(view, "● Comment") || strings.Contains(view, "○ Comment") {
+		t.Fatalf("label: %q", view)
+	}
+	app = pressKey(app, 'a')
+	app = pressKey(app, 'c')
+	if app.finishVerdict != review.VerdictComment {
+		t.Fatal("c did not select Confirm answers")
+	}
+}

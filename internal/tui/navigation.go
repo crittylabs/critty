@@ -17,6 +17,24 @@ func (m *AppModel) selectionRange() (int, int) {
 	if start > end {
 		start, end = end, start
 	}
+	if t.selectSide != "" {
+		return start, end
+	}
+	// Source ranges inside a reordered region are not contiguous on screen,
+	// so a selection there names one line, and a selection entering one
+	// covers the whole region.
+	for _, block := range reorderedRegions(m.lineOrder(t)) {
+		inside := func(line int) bool { return line >= block[0] && line <= block[1] }
+		if inside(t.selectAnchor) && inside(t.cursorLine) {
+			return t.cursorLine, t.cursorLine
+		}
+		if inside(start) {
+			start = block[0]
+		}
+		if inside(end) {
+			end = block[1]
+		}
+	}
 	return start, end
 }
 
@@ -26,6 +44,25 @@ func (m *AppModel) selectionSide() string {
 		return t.selectSide
 	}
 	return t.cursorSide
+}
+
+// reorderedRegions returns the first and last source lines of each
+// smallest run of display positions whose lines are displayed out of
+// source order.  order lists zero-based line indices in display order.
+func reorderedRegions(order []int) [][2]int {
+	var regions [][2]int
+	start, last := -1, -1
+	for i, line := range order {
+		if start < 0 && line != i {
+			start = i
+		}
+		last = max(last, line)
+		if start >= 0 && last == i {
+			regions = append(regions, [2]int{start + 1, i + 1})
+			start = -1
+		}
+	}
+	return regions
 }
 
 type lineRef struct {
@@ -41,7 +78,8 @@ func (m *AppModel) visualLines(t *FileTab) []lineRef {
 		return m.diffVisualLines(t)
 	}
 	lines := make([]lineRef, 0, t.doc.LineCount()+len(t.deletedAfter))
-	for line := 1; line <= t.doc.LineCount(); line++ {
+	for _, index := range m.lineOrder(t) {
+		line := index + 1
 		for _, del := range t.deletedAfter[line-1] {
 			lines = append(lines, lineRef{side: "old", line: del.OldLineNum})
 		}

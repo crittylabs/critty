@@ -255,7 +255,8 @@ func (m *AppModel) rebuildContent() {
 			}
 		}
 	}
-	for i, line := range t.doc.Lines {
+	for _, i := range m.lineOrder(t) {
+		line := t.doc.Lines[i]
 		lineNum := i + 1
 		lineTarget := contentMouseTarget{line: lineNum}
 
@@ -305,14 +306,19 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		// Line number
-		var numStr string
+		numStyle := lineNumStyle
 		if isCursor {
-			numStr = cursorLineNumStyle.Render(fmt.Sprintf("%d", lineNum))
+			numStyle = cursorLineNumStyle
 		} else if isSelected {
-			numStr = selectedLineNumStyle.Render(fmt.Sprintf("%d", lineNum))
-		} else {
-			numStr = lineNumStyle.Render(fmt.Sprintf("%d", lineNum))
+			numStyle = selectedLineNumStyle
 		}
+		switch m.rankMove(t, lineNum) {
+		case -1:
+			numStyle = numStyle.Background(rankMovedUp.GetBackground())
+		case 1:
+			numStyle = numStyle.Background(rankMovedDown.GetBackground())
+		}
+		numStr := numStyle.Render(fmt.Sprintf("%d", lineNum))
 
 		// Check if this line is part of a table block
 		if len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight {
@@ -371,6 +377,13 @@ func (m *AppModel) rebuildContent() {
 				} else {
 					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
 				}
+			}
+			for _, row := range m.formTextRows(lineNum, textWidth) {
+				if item := m.formRows[t.path][lineNum].item; item != nil {
+					layout.formControls = append(layout.formControls, formControl{line: item.Line,
+						rect: mouseRect{left: gutterWidth, right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+				}
+				layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
 			}
 		} else {
 			// Get the display content: Chroma-highlighted or raw
