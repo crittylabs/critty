@@ -107,16 +107,6 @@ func ApplyBulk(items []Item, targets []int, answers map[string]Answer, answer An
 	selecting := CountSelected(items, targets, answers) < len(targets)
 	for _, i := range targets {
 		item := items[i]
-		switch {
-		case item.Choice && selecting:
-			answer.Value = item.Value
-		case item.Choice:
-			// Every target choice is selected, so no other choice is lost.
-			answer.Value = ""
-		default:
-			answer.Value = selecting
-		}
-		answer.Text = answers[item.ID].Text
-		answers[item.ID] = answer
+		answers[item.ID] = SelectAnswer(items, item, answers[item.ID], selecting, answer)
 	}
 }

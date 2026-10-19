@@ -160,3 +160,46 @@ func TestFormResultOmitsDraftNotes(t *testing.T) {
 		t.Fatalf("lost selected note: %q", text)
 	}
 }
+
+func TestPathFormDefaultsAndPersistence(t *testing.T) {
+	s, err := OpenSession(t.TempDir(), "paths")
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := "- [ ] Output <!-- form: id=output type=file default='my file.md' required -->\n" +
+		"- [ ] Copy <!-- form: id=copy checkbox type=file default='copy.md' -->\n"
+	docs := []AttachedDocument{{ID: "a", Source: "/paths.md", Name: "paths.md", Content: content},
+		{ID: "b", Source: "/text.md", Name: "text.md", Content: "- [ ] Comment <!-- form: id=comment text -->\n"}}
+	input := ReviewInput{Scope: "diff", Files: map[string]ReviewedFile{}}
+	state, err := s.BeginForms(input, docs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Version != 3 || len(state.Missing()) != 1 || state.Result(true, 1).Approved {
+		t.Fatalf("default supplied confirmation or version downgraded: %+v", state)
+	}
+	state.Documents[0].Answers["output"] = form.Answer{Value: "日本語 report.md", Human: true}
+	state.Documents[0].Answers["copy"] = form.Answer{Value: false, Text: "private draft", Human: true, Drafts: map[string]string{"unused": "hidden"}}
+	if err := s.SaveForms(state); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := s.BeginForms(input, docs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.Documents[0].Answers["output"].Value != "日本語 report.md" || !resumed.Result(true, 2).Approved {
+		t.Fatal("saved path did not survive resume")
+	}
+	result := resumed.Result(true, 2)
+	if result.Documents[0].Answers["copy"].Text != "" || result.Documents[0].Answers["copy"].Drafts != nil || resumed.Documents[0].Answers["copy"].Text != "private draft" {
+		t.Fatal("export leaked a draft or modified saved state")
+	}
+	docs[0].Content = strings.ReplaceAll(content, "my file.md", "new default.md")
+	changed, err := s.BeginForms(input, docs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed.Documents[0].Answers["output"].Human || changed.Documents[0].Answers["output"].Value != "new default.md" {
+		t.Fatal("changed default retained the previous answer")
+	}
+}

@@ -22,6 +22,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
@@ -152,6 +153,7 @@ type AppModel struct {
 	clipboardStatus   string
 	killRing          killRing
 	completion        completionState
+	pathInfo          formPathState
 	mouseSelecting    bool
 	rankDrag          rankDragState
 	hoveredGutterLine int
@@ -163,6 +165,7 @@ type AppModel struct {
 	// Editing state
 	editingID            string // ID of the parent comment being edited or replied to
 	editingReplyID       string // ID of the reply being edited; empty when editing the parent
+	pendingFormAnswer    *form.Answer
 	editingFormLine      int    // line of the form item whose text is being edited
 	modalInitial         string // textarea value when the current text modal opened
 	modalOpenedAt        time.Time
@@ -764,7 +767,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.isTextModal() && m.modalFocus == 0 {
 		before := m.modalTextarea.Value()
-		m.modalTextarea, cmd = m.modalTextarea.Update(msg)
+		cmd = m.updateModalTextarea(msg)
 		if _, pasted := msg.(tea.PasteMsg); pasted || m.modalTextarea.Value() != before {
 			m.killRing.interrupt()
 		}
@@ -1248,8 +1251,6 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.openCommentThread(anns[t.cursorAnnoIdx].id)
 					return m, nil
 				}
-			} else if m.focused == contentPane && !t.selecting && t.cursorSide == "" && m.openFormTextAt(t.cursorLine) {
-				return m, nil
 			} else if t.state != nil {
 				m.openLineComment()
 				return m, nil
@@ -2132,12 +2133,15 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.handleCompletionKey(msg) {
 		return m, nil
 	}
-	focusCount := 3
+	focusOrder := []int{0, 2}
 	if m.canSuggest() {
-		focusCount++
+		focusOrder = append(focusOrder, 3)
 	}
+	focusOrder = append(focusOrder, 1)
 	if m.modal == editModal {
-		focusCount += len(m.modalDeleteTargets())
+		for i := range m.modalDeleteTargets() {
+			focusOrder = append(focusOrder, m.modalDeleteStartFocus()+i)
+		}
 	}
 
 	switch msg.String() {
@@ -2151,11 +2155,7 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.scrollModalReference(1)
 		return m, nil
 	case "tab", "shift+tab":
-		if msg.String() == "shift+tab" {
-			m.modalFocus = (m.modalFocus + focusCount - 1) % focusCount
-		} else {
-			m.modalFocus = (m.modalFocus + 1) % focusCount
-		}
+		m.cycleModalFocus(focusOrder, msg.String() == "shift+tab")
 		if m.modalFocus == 0 {
 			m.modalTextarea.Focus()
 		} else {
@@ -2174,6 +2174,10 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		} else if m.modal == editModal && m.modalFocus >= m.modalDeleteStartFocus() {
 			m.openDeleteConfirmation(m.modalFocus - m.modalDeleteStartFocus())
+			return m, nil
+		}
+		if m.modalFocus == 0 && m.pathInputType() != "" {
+			m.modalSubmit()
 			return m, nil
 		}
 	case "ctrl+s":
@@ -2209,7 +2213,7 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		var cmd tea.Cmd
-		m.modalTextarea, cmd = m.modalTextarea.Update(msg)
+		cmd = m.updateModalTextarea(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -2247,7 +2251,10 @@ func (m *AppModel) discardTextModal() {
 	m.modalInitial = ""
 	m.modalTextarea.Blur()
 	m.modalTextarea.Reset()
+	m.modalTextarea.SetHeight(6)
 	m.completion = completionState{}
+	m.pathInfo = formPathState{}
+	m.pendingFormAnswer = nil
 }
 
 func (m *AppModel) resumeTextModal() {
@@ -2357,6 +2364,9 @@ func (m *AppModel) recalculateLayout() {
 	}
 	m.modalTextarea.SetWidth(modalWidth - 10)
 	m.modalTextarea.SetHeight(6)
+	if m.pathInputType() != "" {
+		m.resizePathInput()
+	}
 	if m.modal == finishModal {
 		m.modalTextarea.SetHeight(m.finishTextareaHeight())
 	}
@@ -3459,6 +3469,9 @@ func (m *AppModel) hasModalResolution() bool {
 }
 
 func (m *AppModel) handleTextModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
+	if m.handleCompletionClick(mouse) {
+		return m, nil
+	}
 	for _, region := range m.modalMouseRegions() {
 		if !region.rect.contains(mouse) {
 			continue
@@ -4273,9 +4286,11 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
+		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
 		{keys: "←/→ (verdict) · ↓ · ↑ (buttons)", desc: "select approve/comment/reject · edit overall comment"},
 		{keys: "]/} · [/{ (outside input)", desc: "first thread/form item · last one; braces skip resolved; close without one"},
+		{keys: "space (form checkbox)", desc: "unchecked: check and edit input; checked: uncheck, keep input draft"},
 		{keys: "r/esc (forms)", desc: "review/cancel"},
 		{keys: "tab · enter (dialog counters)", desc: "focus count · jump to first pending/completed item"},
 	}, innerWidth)
@@ -4364,39 +4379,6 @@ func renderButton(label, hint string, labelStyle, keyStyle lipgloss.Style) strin
 		renderedHint.WriteString(keyStyle.Render(key))
 	}
 	return labelStyle.Render(label+" ") + renderedHint.String()
-}
-
-func layoutModalButtonRow(specs []modalButtonSpec, width, top int) (string, []modalMouseRegion) {
-	var row strings.Builder
-	regions := make([]modalMouseRegion, 0, len(specs))
-	x, y := 0, top
-	for _, spec := range specs {
-		buttonWidth := lipgloss.Width(spec.rendered)
-		gap := 0
-		if x > 0 {
-			gap = 2
-		}
-		if x > 0 && x+gap+buttonWidth > width {
-			row.WriteByte('\n')
-			x = 0
-			y++
-			gap = 0
-		}
-		if gap > 0 {
-			row.WriteString("  ")
-			x += gap
-		}
-		row.WriteString(spec.rendered)
-		regions = append(regions, modalMouseRegion{
-			rect: mouseRect{
-				left: x, top: y,
-				right: x + buttonWidth, bottom: y + lipgloss.Height(spec.rendered),
-			},
-			action: spec.action,
-		})
-		x += buttonWidth
-	}
-	return row.String(), regions
 }
 
 func layoutModalTextarea(before, textareaView string, width int) (string, modalMouseRegion) {
@@ -4574,6 +4556,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		frameStyle = frameStyle.BorderForeground(commentFocusedBorderColor)
 	}
 	var modalContent string
+	var modalNoticeHeight int
 	var regions []modalMouseRegion
 	bgW := lipgloss.Width(background)
 	bgH := lipgloss.Height(background)
@@ -4649,7 +4632,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 			content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), innerWidth)
 			contentRegions = append(contentRegions, textareaRegion)
-			buttons, buttonRegions := layoutModalButtonRow(buttonSpecs, innerWidth, strings.Count(content, "\n"))
+			buttons, buttonRegions := layoutModalActions(buttonSpecs, innerWidth, strings.Count(content, "\n"))
 			content += buttons
 			contentRegions = append(contentRegions, buttonRegions...)
 			return content, contentRegions
@@ -4669,19 +4652,45 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		titleText, context := "Add File Comment", m.tab().displayPath()
 		if m.modal == formTextModal {
 			titleText, context = "Answer", m.formTextLabel()
+			if kind := m.pathInputType(); kind != "" {
+				switch kind {
+				case form.InputFile:
+					titleText = "File"
+				case form.InputDirectory:
+					titleText = "Directory"
+				default:
+					titleText = "Path"
+				}
+			}
 		}
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		path := contextBoxStyle.Width(innerWidth - 2).Render(context)
-		prefix, textareaRegion := layoutModalTextarea(
-			title+"\n"+path+"\n\n", m.clipboardTextareaView(), innerWidth)
+		textareaView := m.clipboardTextareaView()
+		pathInput := m.pathInputType() != ""
+		if pathInput {
+			textareaView, _ = m.editorView()
+		}
+		before := title + "\n" + path + "\n\n"
+		if pathInput {
+			title, closeRegion = modalTitleRow(modalTitleStyle.MarginBottom(0).Render(titleText), innerWidth)
+			before = title + "\n" + path + "\n"
+		}
+		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
 		regions = append(regions, textareaRegion)
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
 		regions = append(regions, closeRegion)
 		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons)
+		if notice, tint := m.pathNotice(); pathInput && notice != "" {
+			status := lipgloss.NewStyle().Foreground(tint).Bold(true).
+				Width(innerWidth).Align(lipgloss.Right).Render(notice)
+			withNotice := frameStyle.Width(modalWidth).Render(prefix + buttons + "\n" + status)
+			modalNoticeHeight = lipgloss.Height(withNotice) - lipgloss.Height(modalContent)
+			modalContent = withNotice
+		}
 
 	case replyModal, editModal:
 		titleText := "Edit Comment"
@@ -4759,14 +4768,14 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), innerWidth)
 			contentRegions = append(contentRegions, textareaRegion)
 			buttonY := strings.Count(content, "\n")
-			buttonRow, buttonRegions := layoutModalButtonRow(buttonSpecs, innerWidth, buttonY)
+			buttonRow, buttonRegions := layoutModalActions(buttonSpecs, innerWidth, buttonY)
 			content += buttonRow
 			contentRegions = append(contentRegions, buttonRegions...)
 			buttonY += lipgloss.Height(buttonRow)
 			deleteStart := m.modalDeleteStartFocus()
 			for i, target := range m.modalDeleteTargets() {
 				content += "\n"
-				deleteRow, deleteRegions := layoutModalButtonRow([]modalButtonSpec{{
+				deleteRow, deleteRegions := layoutModalActions([]modalButtonSpec{{
 					rendered: m.renderDeleteButton(target.label, "", m.modalFocus == i+deleteStart),
 					action:   modalMouseAction{focus: i + deleteStart, deleteIndex: i},
 				}}, innerWidth, buttonY)
@@ -4798,7 +4807,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle("Discard changes?", innerWidth)
 		info := "Your unsaved comment changes will be lost."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderModalButton("Discard", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 			{rendered: m.renderModalButton("Keep Editing", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 		}, innerWidth, strings.Count(prefix, "\n"))
@@ -4814,7 +4823,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		info := "This cannot be undone."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
-		buttons, buttonRegions := layoutModalButtonRow([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
 			{rendered: m.renderDeleteButton("Delete", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 			{rendered: m.renderModalButton("Keep", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 		}, innerWidth, strings.Count(prefix, "\n"))
@@ -4853,6 +4862,10 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 
 	mx := (bgW - modalW) / 2
 	my := (bgH - modalH) / 2
+	if modalNoticeHeight > 0 {
+		// Grow a notice below the actions without recentering the controls.
+		my = min((bgH-(modalH-modalNoticeHeight))/2, bgH-modalH)
+	}
 	if mx < 0 {
 		mx = 0
 	}

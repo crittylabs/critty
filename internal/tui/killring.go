@@ -73,7 +73,7 @@ func (m *AppModel) updateKillRing(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if kill, backward := killDirection(msg, m.modalTextarea.KeyMap); kill {
 		before := []rune(m.modalTextarea.Value())
 		var cmd tea.Cmd
-		m.modalTextarea, cmd = m.modalTextarea.Update(msg)
+		cmd = m.updateModalTextarea(msg)
 		after := m.modalTextarea.Value()
 		removed := len(before) - utf8.RuneCountInString(after)
 		if removed > 0 {
@@ -112,6 +112,6 @@ func (m *AppModel) updateKillRing(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.modalTextarea.SetCursorColumn(r.yank.column)
 	}
 	var cmd tea.Cmd
-	m.modalTextarea, cmd = m.modalTextarea.Update(tea.PasteMsg{Content: r.entries[r.yank.index]})
+	cmd = m.updateModalTextarea(tea.PasteMsg{Content: r.entries[r.yank.index]})
 	return true, cmd
 }

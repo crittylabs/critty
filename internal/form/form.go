@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -19,6 +20,14 @@ type Span struct {
 	Start int `json:"start"`
 	End   int `json:"end"`
 }
+
+type InputType string
+
+const (
+	InputFile      InputType = "file"
+	InputDirectory InputType = "directory"
+	InputPath      InputType = "path"
+)
 
 type Item struct {
 	ID         string `json:"id"`
@@ -37,8 +46,14 @@ type Item struct {
 	// Tags and SelectAll are sorted sets, so reordering keeps fingerprints.
 	Tags      []string `json:"tags,omitempty"`
 	SelectAll []string `json:"select_all,omitempty"`
-	// Text makes a choice accept a note, or another item a text field.
+	// Text adds string input to a control, or makes a standalone input field.
 	Text bool `json:"text,omitempty"`
+	// Type selects single-line path input; Text remains true for string fields.
+	Type     InputType `json:"type,omitempty"`
+	Default  string    `json:"default,omitempty"`
+	Existing bool      `json:"existing,omitempty"`
+	// Checkbox keeps a boolean control alongside an associated input.
+	Checkbox bool `json:"checkbox,omitempty"`
 	// Rank makes items sharing an ID one field ordered by the reviewer.
 	Rank bool `json:"rank,omitempty"`
 }
@@ -51,9 +66,11 @@ type Answer struct {
 	Round    int    `json:"round,omitempty"`
 	// Via names the select-all item whose human operation set this answer.
 	Via string `json:"via,omitempty"`
-	// Text holds the note on a choice with text, kept as a draft while
-	// another choice is selected.
+	// Text holds the current associated input; unchecked checkbox input
+	// remains a draft until that checkbox is selected again.
 	Text string `json:"text,omitempty"`
+	// Drafts holds per-choice input values while another option is selected.
+	Drafts map[string]string `json:"drafts,omitempty"`
 }
 
 // Parse uses the Markdown AST so examples, escaped lists, and quotations are inert.
@@ -146,8 +163,11 @@ func Parse(source string) ([]Item, error) {
 		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice || item.Text) {
 			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, text, or have a value", item.Line)
 		}
-		if item.Text && (item.Consent || !item.Choice && item.Tags != nil) {
+		if IsTextField(item) && (item.Consent || item.Tags != nil) {
 			return ast.WalkStop, fmt.Errorf("line %d: text fields cannot be consent or have tags", item.Line)
+		}
+		if item.Checkbox && (!item.Text || item.Choice) {
+			return ast.WalkStop, fmt.Errorf("line %d: checkbox requires an input and cannot have a value", item.Line)
 		}
 		if item.ID == "" {
 			if item.Required || item.Consent || item.Choice || item.Rank || item.SelectAll != nil {
@@ -244,6 +264,19 @@ func attributes(item *Item, source string) error {
 			item.Consent = true
 		case key == "text" && !assigned:
 			item.Text = true
+		case key == "existing" && !assigned:
+			item.Existing = true
+		case key == "checkbox" && !assigned:
+			item.Checkbox = true
+		case key == "type" && assigned:
+			switch InputType(value) {
+			case InputFile, InputDirectory, InputPath:
+				item.Type, item.Text = InputType(value), true
+			default:
+				return fmt.Errorf("invalid input type %q", value)
+			}
+		case key == "default" && assigned:
+			item.Default = value
 		case key == "rank" && !assigned:
 			item.Rank = true
 		case key == "tags" && assigned:
@@ -257,6 +290,18 @@ func attributes(item *Item, source string) error {
 		default:
 			return fmt.Errorf("invalid form attribute %q", word)
 		}
+	}
+	if seen["type"] && seen["text"] {
+		return fmt.Errorf("type and text cannot be combined")
+	}
+	if item.Existing && item.Type == "" {
+		return fmt.Errorf("existing requires a path input")
+	}
+	if seen["default"] && !item.Text {
+		return fmt.Errorf("default requires a text or path input")
+	}
+	if item.Type != "" && strings.ContainsAny(item.Default, "\r\n") {
+		return fmt.Errorf("path default must be a single line")
 	}
 	return nil
 }
@@ -285,17 +330,25 @@ func Defaults(items []Item) map[string]Answer {
 			switch {
 			case item.Rank:
 				value = nil
-			case item.Choice || item.Text:
+			case item.Choice || IsTextField(item):
 				value = ""
+				if IsTextField(item) {
+					value = item.Default
+				}
 			}
 			answers[item.ID] = Answer{Value: value}
 		}
-		if item.Initial && !item.Consent && !item.Required && !item.Rank && (item.Choice || !item.Text) {
+		if item.Checkbox {
+			answer := answers[item.ID]
+			answer.Text = item.Default
+			answers[item.ID] = answer
+		}
+		if item.Initial && !item.Consent && !item.Required && !item.Rank && !IsTextField(item) {
 			var value any = true
 			if item.Choice {
 				value = item.Value
 			}
-			answers[item.ID] = Answer{Value: value}
+			answers[item.ID] = Answer{Value: value, Text: item.Default}
 		}
 	}
 	return answers
@@ -307,17 +360,16 @@ func Selected(item Item, answer Answer) bool {
 		return len(rankValues(answer.Value)) > 0
 	case item.Choice:
 		return answer.Value == item.Value
-	case item.Text:
+	case IsTextField(item):
 		value, ok := answer.Value.(string)
-		return ok && value != ""
+		return answer.Human && ok && value != ""
 	}
 	return answer.Value == true
 }
 
-// IsTextField reports whether item is a text field rather than a choice
-// accepting a note.
+// IsTextField distinguishes standalone string input from associated input.
 func IsTextField(item Item) bool {
-	return item.Text && !item.Choice
+	return item.Text && !item.Choice && !item.Checkbox
 }
 
 func Satisfied(item Item, answer Answer) bool {
@@ -327,11 +379,52 @@ func Satisfied(item Item, answer Answer) bool {
 	if item.Rank {
 		return len(rankValues(answer.Value)) > 0
 	}
-	if item.Choice || item.Text {
+	if item.Choice || IsTextField(item) {
 		value, ok := answer.Value.(string)
 		return ok && value != ""
 	}
 	return answer.Value == true
+}
+
+// SelectAnswer preserves associated input when toggling a checkbox or
+// switching choices.  Each option keeps its own draft and initial suggestion.
+func SelectAnswer(items []Item, item Item, previous Answer, selected bool, answer Answer) Answer {
+	answer.Value = selected
+	answer.Text = previous.Text
+	answer.Drafts = maps.Clone(previous.Drafts)
+	if !item.Choice {
+		return answer
+	}
+	if selected {
+		answer.Value = item.Value
+	} else {
+		answer.Value = ""
+	}
+	textOptions := 0
+	for _, old := range items {
+		if old.ID != item.ID || !old.Choice || !old.Text {
+			continue
+		}
+		textOptions++
+		if Selected(old, previous) {
+			if answer.Drafts == nil {
+				answer.Drafts = map[string]string{}
+			}
+			answer.Drafts[old.Value] = previous.Text
+		}
+	}
+	answer.Text = ""
+	if selected && item.Text {
+		if draft, exists := answer.Drafts[item.Value]; exists {
+			answer.Text = draft
+		} else if textOptions == 1 && previous.Text != "" {
+			// Version 2 retained one shared draft after selecting a plain option.
+			answer.Text = previous.Text
+		} else {
+			answer.Text = item.Default
+		}
+	}
+	return answer
 }
 
 // RankOrder returns the values of a ranking in the answered order, or in

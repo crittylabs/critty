@@ -78,7 +78,7 @@ func (s *Session) LoadForms() (FormState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return state, err
 	}
-	if state.Version != 1 && state.Version != 2 {
+	if state.Version != 1 && state.Version != 2 && state.Version != 3 {
 		return state, fmt.Errorf("unsupported form version: %d", state.Version)
 	}
 	return state, nil
@@ -102,10 +102,14 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 		}
 		state.Documents = append(state.Documents, FormDocument{AttachedDocument: d, Items: items, Answers: form.Defaults(items)})
 		for _, item := range items {
+			if item.Type != "" || item.Default != "" || item.Checkbox || item.Choice && item.Text {
+				state.Version = 3
+				break
+			}
 			if item.Tags != nil || item.SelectAll != nil || item.Text || item.Rank {
 				// Readers of version 1 know neither select-all items without
 				// answers nor text and ranking answers.
-				state.Version = 2
+				state.Version = max(state.Version, 2)
 			}
 		}
 	}
@@ -225,10 +229,11 @@ func (state FormState) Result(approved bool, round int) FormResult {
 		d := &state.Documents[i]
 		d.Answers = maps.Clone(d.Answers)
 		for id, answer := range d.Answers {
+			answer.Drafts = nil
 			if answer.Text != "" && !selectedAcceptsText(d.Items, id, answer) {
 				answer.Text = ""
-				d.Answers[id] = answer
 			}
+			d.Answers[id] = answer
 		}
 	}
 	result := FormResult{FormState: state, Approved: approved, Round: round}
@@ -249,11 +254,10 @@ func (state FormState) Result(approved bool, round int) FormResult {
 	return result
 }
 
-// selectedAcceptsText reports whether the selected choice keeps its note in
-// results; notes on other choices remain drafts.
+// selectedAcceptsText keeps associated input only on selected controls.
 func selectedAcceptsText(items []form.Item, id string, answer form.Answer) bool {
 	for _, item := range items {
-		if item.ID == id && item.Choice && item.Text && form.Selected(item, answer) {
+		if item.ID == id && item.Text && !form.IsTextField(item) && form.Selected(item, answer) {
 			return true
 		}
 	}

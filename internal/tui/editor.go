@@ -116,7 +116,19 @@ func (m *AppModel) finishExternalEdit(msg editorFinishedMsg) {
 		m.err = fmt.Errorf("reading editor file: %w", err)
 		return
 	}
-	m.modalTextarea.SetValue(string(content))
+	text := string(content)
+	if m.pathInputType() != "" {
+		var valid bool
+		text, valid = singleLinePath(text)
+		if !valid {
+			m.err = fmt.Errorf("path must be a single line")
+			return
+		}
+	}
+	m.modalTextarea.SetValue(text)
+	if m.pathInputType() != "" {
+		m.resizePathInput()
+	}
 	m.modalFocus = 0
 	m.modalTextarea.Focus()
 }
