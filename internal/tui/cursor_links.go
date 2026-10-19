@@ -169,6 +169,9 @@ func (m AppModel) linkArgument(destination string, editor bool) (string, bool) {
 }
 
 func (m AppModel) openLink(destination string, editor bool) tea.Cmd {
+	if m.readOnly {
+		return nil
+	}
 	arg, ok := m.linkArgument(destination, editor)
 	if !ok {
 		return nil

@@ -231,6 +231,9 @@ func (m *AppModel) missingForms() []string {
 }
 
 func (m *AppModel) toggleForm(line int) bool {
+	if m.readOnly {
+		return false
+	}
 	d := m.forms.Document(m.tab().path)
 	if d == nil {
 		return false

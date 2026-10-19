@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 		"It provides an interactive TUI for humans and scriptable CLI commands for agents.\n\n" +
 		"Run `critty` to review the current git changes, `critty --staged` to review only the index, " +
 		"`critty <file>` to review a document, " +
-		"or `critty --session <id>` to resume a saved review.",
+		"or `critty --session <id>` to resume a saved review.  Use `critty --dry-run` for a read-only view in the current terminal without saving a session.",
 	Args:         cobra.MaximumNArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,22 +64,42 @@ func reconnectSession(key string) error {
 }
 
 func Execute() int {
+	preRun := rootCmd.PersistentPreRunE
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if reviewDryRun {
+			if err := validateDryRunFlags(cmd); err != nil {
+				return err
+			}
+			if err := os.Setenv("GIT_OPTIONAL_LOCKS", "0"); err != nil {
+				return err
+			}
+		} else if err := runStartupMigration(); err != nil {
+			return err
+		}
+		if preRun != nil {
+			return preRun(cmd, args)
+		}
+		return nil
+	}
+	defer func() { rootCmd.PersistentPreRunE = preRun }()
+	if err := rootCmd.Execute(); err != nil {
+		return 1
+	}
+	return 0
+}
+
+func runStartupMigration() error {
 	project, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		return 1
+		return err
 	}
 	if out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output(); err == nil {
 		project = strings.TrimSpace(string(out))
 	}
 	if err := migration.Run(project, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		return 1
+		return err
 	}
-	if err := rootCmd.Execute(); err != nil {
-		return 1
-	}
-	return 0
+	return nil
 }
 
 func init() {

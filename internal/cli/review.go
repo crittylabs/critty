@@ -60,6 +60,8 @@ With a file argument, reviews that document.
 With --diff[=FILE], reads a Git unified diff from a file or stdin (-), without
 requiring a repository.  A file argument after --diff is also accepted.
 With --null, reviews only attachments without requiring a repository.
+With --dry-run, opens a read-only view in the current terminal without saving
+a session, starting a review server, or enabling review edits.
 
 Inside Herdr the TUI opens in a dedicated tab; inside tmux it opens in a
 nonmodal floating pane on capable servers, with a split on older servers.
@@ -158,6 +160,10 @@ func runReview(args []string) error {
 	}
 	if err := mode.validateTarget(); err != nil {
 		return err
+	}
+
+	if reviewDryRun {
+		return runDryReview(cfg, mode)
 	}
 
 	sess, err := openReviewSession(cfg, mode)

@@ -100,6 +100,9 @@ func (m *AppModel) hasFinishFeedback(path string, c review.Comment) bool {
 }
 
 func (m *AppModel) openFinishModal() {
+	if m.readOnly {
+		return
+	}
 	m.persist()
 	m.modal = finishModal
 	m.finishVerdict = m.defaultFinishVerdict()

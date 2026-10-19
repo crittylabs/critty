@@ -1249,3 +1249,60 @@ func TestAccessKeyUnderline(t *testing.T) {
 		})
 	}
 }
+
+func TestReadOnlyViewer(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "notes.md")
+	content := "# Notes\n\n- [ ] Confirm this change\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dataRoot := filepath.Join(root, "state")
+	app := NewApp(path, AppConfig{ReadOnly: true, Session: &review.Session{Dir: dataRoot}})
+	editorMessage(&app, docRenderedMsg{})
+	editorMessage(&app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	if app.session != nil || app.err != nil {
+		t.Fatalf("read-only initialization: %v, %v", app.session, app.err)
+	}
+	for _, msg := range []tea.KeyPressMsg{{Code: tea.KeyEnter}, {Code: 'f'}, {Code: 'e', Mod: tea.ModAlt}, {Code: tea.KeySpace}} {
+		editorMessage(&app, msg)
+		if app.modal != noModal || len(app.tab().state.Comments) != 0 {
+			t.Fatalf("read-only key opened editor: %v", msg)
+		}
+	}
+	if app.toggleForm(3) {
+		t.Fatal("read-only form was changed")
+	}
+	if err := app.SaveUnsubmittedDraft(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dataRoot); !os.IsNotExist(err) {
+		t.Fatalf("session storage exists: %v", err)
+	}
+	saved, err := os.ReadFile(path)
+	if err != nil || string(saved) != content {
+		t.Fatalf("source changed: %q, %v", saved, err)
+	}
+	app.locationError = ""
+	plain := ansi.Strip(app.View().Content)
+	if !strings.Contains(plain, "Dry run") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
+		t.Fatalf("missing read-only UI: %s", plain)
+	}
+	editorMessage(&app, tea.KeyPressMsg{Code: '/'})
+	if !app.isearch.active {
+		t.Fatal("read-only search unavailable")
+	}
+	editorMessage(&app, tea.KeyPressMsg{Code: tea.KeyEscape})
+	rect, ok := app.finishButtonRect()
+	if !ok {
+		t.Fatal("Close button missing")
+	}
+	_, cmd := clickMouseCmd(app, rect.left, rect.top)
+	if !isQuit(cmd) {
+		t.Fatal("Close did not quit the viewer")
+	}
+	_, cmd = pressKeyCmd(app, 'q')
+	if !isQuit(cmd) {
+		t.Fatal("q did not quit the viewer")
+	}
+}

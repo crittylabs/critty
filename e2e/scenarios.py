@@ -261,6 +261,128 @@ def report(message: str) -> None:
     print(f"PASS {message}", flush=True)
 
 
+def dry_run_viewer() -> None:
+    root = ROOT / "dry-view"
+    work, state, config = root / "work", root / "state", root / "config"
+    for directory in [work, state / "tcrit", config / "tcrit"]:
+        directory.mkdir(parents=True)
+    (config / "tcrit" / "config.json").write_text('{"author":"Legacy"}')
+    (state / "tcrit" / "sentinel").write_text("keep old data")
+    env = environment()
+    env.update(XDG_STATE_HOME=str(state), XDG_CONFIG_HOME=str(config))
+    for args in [
+        ["init", "-q"],
+        ["config", "user.name", "Test"],
+        ["config", "user.email", "test@example.com"],
+    ]:
+        subprocess.run(["git", *args], cwd=work, env=env, check=True)
+    note = work / "notes.md"
+    note.write_text("# Notes\n\nOriginal content.\n")
+    subprocess.run(["git", "add", "notes.md"], cwd=work, env=env, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=work, env=env, check=True)
+    note.write_text("# Notes\n\nChanged content.\n- [ ] Confirm\n")
+    subprocess.run(["git", "add", "notes.md"], cwd=work, env=env, check=True)
+
+    def snapshot() -> dict[str, tuple[int, bytes]]:
+        return {
+            str(path.relative_to(root)): (path.stat().st_mtime_ns, path.read_bytes())
+            for directory in [work, state, config]
+            for path in directory.rglob("*")
+            if path.is_file()
+        }
+
+    before = snapshot()
+    for flag in [
+        "session",
+        "task",
+        "result",
+        "summary",
+        "terminal-request",
+        "launcher",
+        "clear-attachments",
+    ]:
+        option = f"--{flag}" if flag == "clear-attachments" else f"--{flag}=unused"
+        result = subprocess.run(
+            [str(BINARY), "--dry-run", option],
+            cwd=work,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        assert (
+            result.returncode != 0
+            and f"cannot be combined with --{flag}" in result.stderr
+        ), result
+        assert snapshot() == before, f"invalid dry-run changed files: {flag}"
+
+    for name, args in [
+        ("dry-git", ["--dry-run"]),
+        ("dry-staged", ["review", "--dry-run", "--staged"]),
+        ("dry-doc", ["--dry-run", "notes.md"]),
+    ]:
+        job = root / f"{name}.job.json"
+        job.write_text(
+            json.dumps(
+                {
+                    "name": name,
+                    "args": args,
+                    "root": str(root),
+                    "binary": str(BINARY),
+                    "tmux": str(TMUX),
+                }
+            )
+        )
+        pane = tmux(
+            "new-window",
+            "-d",
+            "-P",
+            "-F",
+            "#{pane_id}",
+            "-t",
+            "scenario",
+            "-n",
+            name,
+            shlex.join(
+                [sys.executable, str(Path(__file__).resolve()), "--child", str(job)]
+            ),
+        )
+
+        def screen(pane: str = pane) -> str:
+            return tmux("capture-pane", "-p", "-t", pane)
+
+        wait_until(
+            lambda screen=screen: "Close q" in screen(), "dry-run viewer rendered"
+        )
+        assert "Dry run" in screen(), screen()
+        assert snapshot() == before, "dry-run wrote files during startup"
+        tmux("send-keys", "-t", pane, "Enter", "f", "Space")
+        tmux("send-keys", "-l", "-t", pane, "\x1be")
+        wait_until(
+            lambda screen=screen: "editing is disabled" in screen(),
+            "external editor refused",
+        )
+        assert "Type your" not in screen(), screen()
+        assert snapshot() == before, "dry-run wrote files after edit keys"
+        if name == "dry-doc":
+            rows = screen().splitlines()
+            y, row = next((y, row) for y, row in enumerate(rows, 1) if "Close q" in row)
+            x = row.index("Close q") + 1
+            tmux("send-keys", "-l", "-t", pane, f"\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m")
+        else:
+            tmux("send-keys", "-t", pane, "q")
+        result_path = root / f"{name}.exit.json"
+        wait_until(result_path.exists, "dry-run closed")
+        assert json.loads(result_path.read_text())["code"] == 0
+        assert not (root / f"{name}.stdout").read_text()
+        assert not (root / f"{name}.stderr").read_text()
+        assert snapshot() == before, "dry-run wrote files on exit"
+    report(
+        "dry-run views Git and documents without session files, edits, exports, or migration"
+    )
+
+
 def scenarios() -> None:
     for path in [WORK, STATE, CONFIG / "tcrit", ROOT / "bin"]:
         path.mkdir(parents=True, exist_ok=True)
@@ -302,6 +424,7 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
+        dry_run_viewer()
         marker_job = ROOT / "doctor-marker.job.json"
         marker_job.write_text(
             json.dumps(

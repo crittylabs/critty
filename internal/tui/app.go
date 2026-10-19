@@ -63,6 +63,7 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
+	ReadOnly  bool
 	Documents []review.AttachedDocument
 	Project   string
 	Topic     string
@@ -85,6 +86,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	readOnly      bool
 	images        imageDisplay
 	commentImages map[commentImageKey]*previewSide
 	imageBodies   map[string][]markdownImageRef
@@ -269,6 +271,9 @@ func (m *AppModel) tab() *FileTab {
 }
 
 func NewApp(filePath string, cfg AppConfig) AppModel {
+	if cfg.ReadOnly {
+		cfg.Session = nil
+	}
 	ta := textarea.New()
 	ta.SetVirtualCursor(false)
 	ta.Placeholder = "Type your comment..."
@@ -281,6 +286,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	}
 
 	m := AppModel{
+		readOnly:        cfg.ReadOnly,
 		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
@@ -307,6 +313,9 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 
 // NewCodeReviewApp creates a multi-file code review TUI.
 func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppModel {
+	if cfg.ReadOnly {
+		cfg.Session = nil
+	}
 	ta := textarea.New()
 	ta.SetVirtualCursor(false)
 	ta.Placeholder = "Type your comment..."
@@ -357,6 +366,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		readOnly:        cfg.ReadOnly,
 		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
@@ -831,6 +841,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	if len(m.tabs) == 0 {
 		if key.Matches(msg, keys.Quit) {
+			if m.readOnly {
+				return m, tea.Quit
+			}
 			m.openFinishModal()
 		}
 		return m, nil
@@ -890,6 +903,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, keys.Quit):
+		if m.readOnly {
+			return m, tea.Quit
+		}
 		// Finishing is an explicit act: q opens the Approve/Finish modal.
 		m.openFinishModal()
 		return m, nil
@@ -997,6 +1013,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, keys.FileComment):
+		if m.readOnly {
+			return m, nil
+		}
 		if !t.selecting && t.state != nil {
 			for _, c := range t.state.Comments {
 				if isGeneralCommentScope(c.Scope) {
@@ -1374,6 +1393,9 @@ func (m *AppModel) openCommentDelete(id string) {
 }
 
 func (m *AppModel) openLineComment() {
+	if m.readOnly {
+		return
+	}
 	if m.tab().path == overallCommentsPath {
 		return
 	}
@@ -1894,7 +1916,7 @@ func (m *AppModel) modalDeleteStartFocus() int {
 
 // persist writes every tab's comments back into the session and saves it.
 func (m *AppModel) persist() {
-	if m.session == nil {
+	if m.readOnly || m.session == nil {
 		return
 	}
 	for i := range m.tabs {
@@ -2676,6 +2698,9 @@ func (m AppModel) renderReviewBar() string {
 	} else if m.topic != "" {
 		text += reviewBarStyle.Render(headerLabel(m.topic) + " — ")
 	}
+	if m.readOnly {
+		text += reviewBarStyle.Bold(true).Render("Dry run · read-only · ")
+	}
 	text += reviewBarStyle.Render("review the ")
 	if style, ok := scopeWordStyle(scope); ok {
 		text += style.Render(scope) + reviewBarStyle.Render(" ")
@@ -2720,6 +2745,9 @@ func headerLabel(value string) string {
 
 // submitButton renders the button that opens the finish dialog.
 func (m AppModel) submitButton() string {
+	if m.readOnly {
+		return renderBarButton("Close", "q")
+	}
 	return renderBarButton("Submit", "q")
 }
 
@@ -3148,6 +3176,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		}
 	}
 	if rect, ok := m.finishButtonRect(); ok && rect.contains(mouse) {
+		if m.readOnly {
+			return m, tea.Quit
+		}
 		m.openFinishModal()
 		return m, nil
 	}
@@ -3996,6 +4027,9 @@ const footerMinHeight = 22
 // renderFooter renders the key hints and the Help button, or "" when the
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
+	if m.readOnly && !m.isearch.active && m.locationError == "" && m.height >= footerMinHeight {
+		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · Dry run: read-only · /: search · v: select · M-w: copy reference · q: close")
+	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
 		return m.renderISearchPrompt() + "\n" + controls
@@ -4109,6 +4143,20 @@ func renderHelpGroup(title string, items []helpItem, width int) string {
 }
 
 func (m AppModel) renderHelp(innerWidth int) string {
+	if m.readOnly {
+		return renderHelpGroup("Dry run (read-only)", []helpItem{
+			{keys: "q/C-c", desc: "close without saving"},
+			{keys: "up/down,j/k · PgUp/PgDn", desc: "move / scroll"},
+			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
+			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
+			{keys: "v · esc", desc: "select lines / cancel"},
+			{keys: "M-w", desc: "copy reference"},
+			{keys: "s/t", desc: "toggle sidebar / view"},
+			{keys: "w/W · S · I", desc: "whitespace / split / images"},
+			{keys: "M-g · M-p", desc: "go to line / open file"},
+			{keys: "M-? · esc", desc: "help / close help"},
+		}, innerWidth)
+	}
 	columnWidth := (innerWidth - 4) / 3
 	general := renderHelpGroup("General", []helpItem{
 		{keys: "enter", desc: "comment/open"},

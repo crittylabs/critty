@@ -12,6 +12,8 @@
 
 - Compare diffs in unified or side-by-side view with the `Split: off/on` header control or `S`; set `split = true` to start with two columns.  Split views show all available source lines, including unchanged lines between hunks.  Keep the focused line or thread near the same screen position while switching, and choose whether to ignore whitespace-only changes with the fixed `Ignore: none/WS` control.  Both views support supplied patches without original files and preserve comment sides and line numbers.  Narrow panes temporarily use unified rendering.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
 
+- Inspect Git changes, documents, patches, and attachments with `critty --dry-run` in the current terminal.  The read-only viewer keeps search and display controls without saving a session or history, migrating configuration, or enabling review edits and external applications.  Close it without submitting feedback.
+
 ### Changed
 
 - Approval requests use a short description and ordinary approval for a single action.  Publication details and separate permissions or choices are covered by focused references in the [approval skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md).

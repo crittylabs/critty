@@ -48,6 +48,10 @@ var startOpener = func(name, arg string) error {
 // openImageExternally opens an image file or web URL with the desktop's
 // default application, except in remote sessions.
 func (m *AppModel) openImageExternally(target imageTarget) tea.Cmd {
+	if m.readOnly {
+		m.locationError = "Dry run: external applications are disabled"
+		return nil
+	}
 	source := m.imageSource()
 	return func() tea.Msg {
 		return externalOpenMsg{openImageTarget(source, target)}
