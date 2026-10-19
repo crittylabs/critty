@@ -29,44 +29,50 @@ Run `critty tmp create` once for the interview and read the JSON `directory` fie
 
 Write `QUESTIONS.md` there with a short topic summary, settled decisions relevant to this round, and numbered questions with stable descriptive IDs.  For each question, state the decision, its consequences, and a recommended answer with a reason.
 
-Use unchecked choice items for mutually exclusive answers, marking the recommendation in prose.  Include an alternative answer via comment when the listed choices are not exhaustive.  Use comments alone for open-ended questions; ask the user to comment on that question.  Unchecked items and silence mean unanswered, not rejection or agreement.  Use ordinary choices rather than `consent`: these are design answers, not permission to execute operations.  Leave questions optional so the user can submit partial answers or challenge the premise.
+Use unchecked choice items for mutually exclusive answers.  Tag the one recommended choice of each question with `tags=recommended`, and put an item with `select-all=recommended` before the questions so the user can accept every recommendation at once and then change individual answers.  Add `text` to an "Other" choice when the listed choices are not exhaustive, and offer a `value=defer text` choice so the user can postpone a decision with a reason.  Use a standalone `text` item for open-ended questions, and a `rank` field when the decision is an order of priorities.  Keep comments for challenging a premise or discussing a question.
+
+Unchecked items and silence mean unanswered, not rejection or agreement.  A deferral is an answer that keeps the decision open.  Use ordinary choices rather than `consent`: these are design answers, not permission to execute operations.  Leave questions optional so the user can submit partial answers.
 
 ```markdown
 # Retry policy — round 1
 
-Choose answers and add explanations as comments on each question.
-Submitting answers advances the interview; it does not authorize implementation.
+Choose answers, and comment on any question whose premise looks wrong.
+Confirming answers advances the interview; it does not authorize implementation.
+
+- [ ] Accept all recommendations <!-- form: id=accept-recommended select-all=recommended -->
 
 ## Q1. Should failed uploads retry automatically?
 
 Recommendation: retry transient failures up to three times, to recover from
 brief outages without leaving requests running indefinitely.
 
-- [ ] Retry transient failures up to three times (recommended). <!-- form: id=upload-retry value=bounded -->
+- [ ] Retry transient failures up to three times (recommended). <!-- form: id=upload-retry value=bounded tags=recommended -->
 - [ ] Let the caller retry manually. <!-- form: id=upload-retry value=manual -->
-- [ ] Use another policy; explain in a comment. <!-- form: id=upload-retry value=other -->
+- [ ] Use another policy. <!-- form: id=upload-retry value=other text -->
+- [ ] Decide later. <!-- form: id=upload-retry value=defer text -->
 
 ## Q2. What data must never leave the device?
 
 Recommendation: keep credentials and raw customer records local.
-Accept this recommendation or describe the boundary in a comment on Q2.
+
+- [ ] Describe the boundary. <!-- form: id=local-data text -->
 ```
 
-Keep unchanged questions' IDs and choice definitions stable.  Use a new ID when the meaning changes, even if the wording is similar.  Do not preselect a recommendation or manufacture human answers.  This workflow uses the existing choice and comment features; it does not require bulk-selection controls.
+Keep unchanged questions' IDs and choice definitions stable.  Use a new ID when the meaning changes, even if the wording is similar.  Leave every item unchecked; recommendations are tags, and only the user's own selections are answers.
 
 ## Collect and apply answers
 
 Follow `/critty` for task registration, launch, and completion handling.  Start an attachment-only review with the question document; optionally attach necessary source excerpts as context.  For example, after the launch preparation required by that skill:
 
 ```sh
-critty --null --attachment '<directory>/QUESTIONS.md' --result '<directory>/result-1.json' --summary '<directory>/summary-1.json'
+critty review --null --answers --attachment '<directory>/QUESTIONS.md' --result '<directory>/result-1.json' --summary '<directory>/summary-1.json'
 ```
 
-Include the task ID and terminal request when required by `/critty`.  Omit `--result` when there are no form fields.  Preserve the original completion output and use fresh result and summary paths for every invocation.
+`--answers` labels the Comment verdict as **Confirm answers** for question rounds; the verdict remains `comment`.  Include the task ID and terminal request when required by `/critty`.  Omit `--result` when there are no form fields.  Preserve the original completion output and use fresh result and summary paths for every invocation.
 
-After completion, match the session, round, attachment snapshots, and definitions before reading answers.  Read all comments and replies, including resolved threads and referenced images.  For forms, use the result's `attachments[].answers` values and human provenance; the summary alone has no form answers.  An initial value without human provenance is not an answer.
+After completion, match the session, round, attachment snapshots, and definitions before reading answers.  Read all comments and replies, including resolved threads and referenced images.  For forms, use the result's `attachments[].answers` values, `text` notes, and human provenance; the summary alone has no form answers.  An initial value without human provenance is not an answer.  `via` marks answers set by accepting all recommendations.  Text answers are Markdown; read images they reference through the result's `image_base`.
 
-Comment and Reject submissions can supply interview answers without approving the design.  Treat those answers as provisional and carry them into the next round for confirmation.  If a choice and comment conflict, keep that decision open and ask for clarification; do not silently prefer one.  An unexplained alternative remains open.  An overall Approve does not answer blank questions.
+Confirm answers, Comment, and Reject submissions can supply interview answers without approving the design.  Treat those answers as provisional and carry them into the next round for confirmation.  If a choice and comment conflict, keep that decision open and ask for clarification; do not silently prefer one.  An unexplained alternative remains open.  An overall Approve does not answer blank questions.
 
 Revise the decision record from the actual responses.  Explain what each changed answer affects, including earlier conclusions that now need another look.  Reply to substantive feedback using `/critty`'s comment workflow.
 
@@ -82,8 +88,8 @@ Follow `/critty`'s launch and wait procedure for every round.  Its approval cond
 
 ## Confirm shared understanding
 
-When no actionable questions remain, present the resulting decisions, rationale, scope, explicit deferrals, and remaining risks in the same session.  Ask the user to confirm that this accurately captures the shared understanding.  Unanswered questions remain open unless the user explicitly defers or removes them; a stalled interview is not completion.
+When no actionable questions remain, present the resulting decisions, rationale, scope, explicit deferrals, and remaining risks in the same session.  Resume with `--no-answers` so the user approves with the ordinary Approve.  Ask the user to confirm that this accurately captures the shared understanding.  Unanswered questions remain open unless the user explicitly defers or removes them; a stalled interview is not completion.
 
-Finish only after that confirmation, with no unacknowledged open decisions.  In documentation mode, verify the glossary and ADRs against [compatible artifacts](references/artifacts.md) and report their paths; explain when nothing qualified for a file.  Honor other requested document outputs within their authorized scope.  Return the confirmed decisions, rationale, exact constraints, and deferrals to the conversation for a later `to-spec` or equivalent synthesis step.  Do not run or publish that step without the user's request.
+Finish only after that confirmation, with no unacknowledged open decisions.  In documentation mode, verify the glossary and ADRs against [compatible artifacts](references/artifacts.md) and report their paths; explain when nothing qualified for a file.  Honor other requested document outputs within their authorized scope.  In every document written from the interview, copy images from answers and comments into that document's own asset directory and link them relative to the document before the session is cleaned up.  Return the confirmed decisions, rationale, exact constraints, and deferrals to the conversation for a later `to-spec` or equivalent synthesis step.  Do not run or publish that step without the user's request.
 
 Interview approval confirms understanding only; implementation, publication, and other operations follow the caller's separate authorization rules.  Use `/critty-history` when the interview task is complete, retaining evidence according to its policy.  Remove only the returned scratch directory once its files are no longer needed and the confirmed understanding is available outside it; keep `.critty/tmp/.gitignore` and other tasks' directories.
