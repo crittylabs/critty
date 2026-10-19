@@ -22,6 +22,7 @@ import (
 	"github.com/yuin/goldmark/v2/parser"
 	nethtml "golang.org/x/net/html"
 
+	"github.com/crittylabs/critty/internal/form"
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/xdg"
@@ -467,6 +468,10 @@ func (w *archiveWriter) session(main *strings.Builder, session *review.Session) 
 			}
 		}
 	}
+	forms, err := session.LoadForms()
+	if err != nil {
+		return err
+	}
 	for _, doc := range docs.Documents {
 		target := w.links[doc.Source]
 		body := doc.Content
@@ -480,6 +485,11 @@ func (w *archiveWriter) session(main *strings.Builder, session *review.Session) 
 			return err
 		}
 		fmt.Fprintf(main, "Attachment: %s  \nSource: %s  \nRevision: %s  \nRemoved: %t\n\n", archiveLink(doc.Name, target), markdownText(doc.Source), doc.Revision, doc.Removed)
+		if d := forms.Document(doc.Path()); d != nil && !doc.Removed {
+			if err := w.answers(main, session, d); err != nil {
+				return err
+			}
+		}
 	}
 	paths := make([]string, 0, len(session.CJ.RoundState.Files))
 	for path := range session.CJ.RoundState.Files {
@@ -508,6 +518,63 @@ func (w *archiveWriter) session(main *strings.Builder, session *review.Session) 
 		}
 		fmt.Fprintf(main, "Snapshot: %s (partial: %t)\n\n", archiveLink(path, target), snapshot.Partial)
 	}
+	return nil
+}
+
+// answers lists the saved form answers of an attachment once per field.
+// Text is Markdown, so its images are captured like those in comments.
+func (w *archiveWriter) answers(main *strings.Builder, session *review.Session, d *review.FormDocument) error {
+	var fields []form.Item
+	for _, item := range d.Items {
+		if item.SelectAll == nil && !slices.ContainsFunc(fields, func(field form.Item) bool { return field.ID == item.ID }) {
+			fields = append(fields, item)
+		}
+	}
+	if len(fields) == 0 {
+		return nil
+	}
+	main.WriteString("Form answers:\n\n")
+	for _, field := range fields {
+		answer := d.Answers[field.ID]
+		state, label, note := "☐", field.Label, ""
+		switch {
+		case field.Choice:
+			state = "○"
+			for _, item := range d.Items {
+				if item.ID == field.ID && form.Selected(item, answer) {
+					state, label = "●", item.Label
+					if item.Text {
+						note = answer.Text
+					}
+				}
+			}
+		case field.Text:
+			if form.Selected(field, answer) {
+				state = "✎"
+				note, _ = answer.Value.(string)
+			}
+		case form.Selected(field, answer):
+			state = "✓"
+		}
+		fmt.Fprintf(main, "- %s %s (`%s`)", state, markdownText(label), strings.ReplaceAll(field.ID, "`", ""))
+		if answer.Human {
+			fmt.Fprintf(main, " — %s, round %d", markdownText(answer.Author), answer.Round)
+			if answer.Via != "" {
+				fmt.Fprintf(main, " via `%s`", strings.ReplaceAll(answer.Via, "`", ""))
+			}
+		} else if state != "☐" && state != "○" {
+			main.WriteString(" — initial value")
+		}
+		main.WriteString("\n")
+		if note != "" {
+			body, err := w.rewriteMarkdown(note, session.Meta.CWD, ".", session.Dir)
+			if err != nil {
+				return err
+			}
+			main.WriteString("\n  > " + strings.ReplaceAll(body, "\n", "\n  > ") + "\n\n")
+		}
+	}
+	main.WriteString("\n")
 	return nil
 }
 
