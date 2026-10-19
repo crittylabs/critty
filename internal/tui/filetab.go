@@ -64,6 +64,7 @@ type FileTab struct {
 	chromaLines      []string         // syntax-highlighted lines (nil for markdown)
 	deletedLineCache map[int][]string // pre-highlighted deleted line content, keyed by afterLine
 	isMarkdown       bool
+	markdown         *markdownCache
 }
 
 // changeChunk represents a contiguous block of changed lines.
@@ -98,6 +99,7 @@ func (ft *FileTab) ensureHighlightCache() {
 	ext := strings.ToLower(filepath.Ext(ft.path))
 	ft.isMarkdown = ext == ".md" || ext == ".markdown"
 	if ft.isMarkdown {
+		ft.ensureMarkdownCache()
 		return
 	}
 	highlight := newCodeHighlighter(ft.path)

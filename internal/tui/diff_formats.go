@@ -502,15 +502,25 @@ func (m *AppModel) diffCell(line *diffLine, width int, marker string, before boo
 	textWidth := max(1, width-gutterWidth-1)
 	decorate := m.isearchDecorator(ref)
 	var rows []string
-	if ref.side == "old" {
-		rows = deletedDisplayLines(line.text, line.styled, line.inline, t.isMarkdown, textWidth, decorate)
+	if t.isMarkdown {
+		oldSide := before || ref.side == "old"
+		sourceLine := ref.line
+		if before && ref.side != "old" {
+			sourceLine = line.oldLine
+		}
+		content := t.markdownDisplayLine(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
+		if ref.side == "old" && len(line.inline) == 0 {
+			content = inlineBackground(diffDeletedLineBg, content)
+		} else if line.changed && len(line.inline) == 0 {
+			content = inlineBackground(diffChangedLineBg, content)
+		}
+		rows = markdownDisplayRows(content, textWidth, decorate)
+	} else if ref.side == "old" {
+		rows = deletedDisplayLines(line.text, line.styled, line.inline, false, textWidth, decorate)
 	} else if len(line.inline) > 0 {
 		rows = inlineDiffDisplayLines(line.inline, t.isMarkdown, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
 	} else {
 		text := line.styled
-		if t.isMarkdown {
-			text = highlightMarkdown(linkedDisplayLine(line.text, m.imageSpans(ref.line, false), displaySourceText))
-		}
 		if decorate != nil {
 			text, _ = decorate(text)
 		}

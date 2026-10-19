@@ -229,7 +229,17 @@ func (m *AppModel) rebuildContent() {
 				cached = cachedHL[di]
 			}
 			decorate := m.isearchDecorator(lineRef{side: "old", line: del.OldLineNum})
-			for wi, content := range deletedDisplayLines(del.Content, cached, del.Inline, isMarkdown, textWidth, decorate) {
+			var rows []string
+			if isMarkdown {
+				content := t.markdownDisplayLine(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
+				if len(del.Inline) == 0 {
+					content = inlineBackground(diffDeletedLineBg, content)
+				}
+				rows = markdownDisplayRows(content, textWidth, decorate)
+			} else {
+				rows = deletedDisplayLines(del.Content, cached, del.Inline, false, textWidth, decorate)
+			}
+			for wi, content := range rows {
 				if isSelected {
 					content = inlineBackground(selectedLineBg, ansi.Strip(content))
 				} else if isSidebarHighlight {
@@ -322,7 +332,13 @@ func (m *AppModel) rebuildContent() {
 
 		// Check if this line is part of a table block
 		if len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight {
-			for wi, styledLine := range inlineDiffDisplayLines(inlineChanges, isMarkdown, textWidth, diffCommonTextBg, diffAddedTextBg, decorate) {
+			var rows []string
+			if isMarkdown {
+				rows = markdownDisplayRows(t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.imageSpans(lineNum, false)), textWidth, decorate)
+			} else {
+				rows = inlineDiffDisplayLines(inlineChanges, false, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
+			}
+			for wi, styledLine := range rows {
 				if wi == 0 {
 					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, styledLine), lineTarget)
 				} else {
@@ -390,7 +406,7 @@ func (m *AppModel) rebuildContent() {
 			displayLine := documentDisplayLine(t, i, line)
 
 			if isMarkdown {
-				displayLine = highlightMarkdown(linkedDisplayLine(line, m.imageSpans(lineNum, false), displaySourceText))
+				displayLine = t.markdownDisplayLine(lineNum, false, line, nil, m.imageSpans(lineNum, false))
 			}
 			displayLine = highlight(displayLine)
 			if isSelected {
@@ -598,6 +614,14 @@ var (
 
 // highlightMarkdown applies markdown syntax highlighting to a single line.
 func highlightMarkdown(line string) string {
+	return highlightMarkdownWith(line, highlightInline)
+}
+
+func highlightMarkdownBlock(line string) string {
+	return highlightMarkdownWith(line, func(s string) string { return s })
+}
+
+func highlightMarkdownWith(line string, inline func(string) string) string {
 	trimmed := strings.TrimSpace(line)
 
 	if reHr.MatchString(line) {
@@ -605,16 +629,16 @@ func highlightMarkdown(line string) string {
 	}
 
 	if strings.HasPrefix(trimmed, "#### ") {
-		return mdH4Style.Render(highlightInline(line))
+		return mdH4Style.Render(inline(line))
 	}
 	if strings.HasPrefix(trimmed, "### ") {
-		return mdH3Style.Render(highlightInline(line))
+		return mdH3Style.Render(inline(line))
 	}
 	if strings.HasPrefix(trimmed, "## ") {
-		return mdH2Style.Render(highlightInline(line))
+		return mdH2Style.Render(inline(line))
 	}
 	if strings.HasPrefix(trimmed, "# ") {
-		return mdH1Style.Render(highlightInline(line))
+		return mdH1Style.Render(inline(line))
 	}
 
 	if reTableSep.MatchString(line) {
@@ -627,7 +651,7 @@ func highlightMarkdown(line string) string {
 			if i == 0 || i == len(cells)-1 {
 				parts = append(parts, cell)
 			} else {
-				parts = append(parts, highlightInline(cell))
+				parts = append(parts, inline(cell))
 			}
 		}
 		return strings.Join(parts, mdTablePipe.Render("|"))
@@ -635,7 +659,7 @@ func highlightMarkdown(line string) string {
 
 	if loc := reBlockquote.FindStringSubmatchIndex(line); loc != nil {
 		rest := line[loc[4]:loc[5]]
-		return mdBlockquoteBar.Render("▎") + " " + mdBlockquoteStyle.Render(highlightInline(rest))
+		return mdBlockquoteBar.Render("▎") + " " + mdBlockquoteStyle.Render(inline(rest))
 	}
 
 	if loc := reCheckbox.FindStringSubmatchIndex(line); loc != nil {
@@ -643,23 +667,23 @@ func highlightMarkdown(line string) string {
 		checked := line[loc[4]:loc[5]]
 		rest := line[loc[6]:loc[7]]
 		if checked == "x" || checked == "X" {
-			return indent + mdCheckboxDone.Render("✓") + " " + mdCheckboxDoneText.Render(highlightInline(rest))
+			return indent + mdCheckboxDone.Render("✓") + " " + mdCheckboxDoneText.Render(inline(rest))
 		}
-		return indent + mdCheckboxOpen.Render("☐") + " " + highlightInline(rest)
+		return indent + mdCheckboxOpen.Render("☐") + " " + inline(rest)
 	}
 
 	if loc := reListItem.FindStringSubmatchIndex(line); loc != nil {
 		indent := line[loc[2]:loc[3]]
 		rest := line[loc[4]:loc[5]]
-		return mdListMarkerStyle.Render(indent) + highlightInline(rest)
+		return mdListMarkerStyle.Render(indent) + inline(rest)
 	}
 	if loc := reNumList.FindStringSubmatchIndex(line); loc != nil {
 		marker := line[loc[2]:loc[3]]
 		rest := line[loc[4]:loc[5]]
-		return mdListMarkerStyle.Render(marker) + highlightInline(rest)
+		return mdListMarkerStyle.Render(marker) + inline(rest)
 	}
 
-	return highlightInline(line)
+	return inline(line)
 }
 
 func inlineBackground(style lipgloss.Style, content string) string {
@@ -722,12 +746,17 @@ func inlineColors(style lipgloss.Style, content string, foreground bool) string 
 // inlineDiffDisplayLines renders an inline diff wrapped to width.  decorate,
 // when not nil, highlights search matches before wrapping.
 func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, width int, base, changed lipgloss.Style, decorate func(string) (string, bool)) []string {
+	if isMarkdown {
+		var source strings.Builder
+		for _, segment := range segments {
+			source.WriteString(segment.Content)
+		}
+		parsed := parseMarkdownSource([]string{source.String()}, nil)
+		return markdownDisplayRows(parsed.lines[0].render(segments, base, changed, nil), width, decorate)
+	}
 	var b strings.Builder
 	for _, segment := range segments {
 		content := displaySourceText(segment.Content)
-		if isMarkdown {
-			content = highlightMarkdown(content)
-		}
 		style := base
 		if segment.Changed {
 			style = changed
