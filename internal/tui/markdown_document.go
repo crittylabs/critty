@@ -284,7 +284,11 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			}
 		}
 		write := func(value string, background lipgloss.Style) {
-			value = style.Render(displaySourceText(value))
+			tokenStyle := style
+			if len(inline) > 0 {
+				tokenStyle = tokenStyle.Background(background.GetBackground())
+			}
+			value = tokenStyle.Render(displaySourceText(value))
 			if len(inline) > 0 {
 				value = inlineBackground(background, value)
 			}
