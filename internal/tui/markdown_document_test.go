@@ -203,3 +203,61 @@ func FuzzMarkdownSourceLines(f *testing.F) {
 		}
 	})
 }
+
+func TestMarkdownCodeWordDiffHighlightsChangedText(t *testing.T) {
+	defer initAdaptiveStyles(true)
+	for _, pair := range []struct{ before, after, oldText, newText string }{
+		{"Use `--dry-run` for inspection.", "Use `critty view` for inspection.", "--dry-run", "critty view"},
+		{"Use `git status --short`.", "Use `git status --branch`.", "short", "branch"},
+		{"表示 `日本語 é old` です。", "表示 `日本語 é new` です。", "old", "new"},
+	} {
+		patch, err := gitpkg.ParsePatch(strings.NewReader("diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-" + pair.before + "\n+" + pair.after + "\n"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		diff := patch.Files[0].Diff
+		for _, dark := range []bool{false, true} {
+			initAdaptiveStyles(dark)
+			for _, tt := range []struct {
+				name, source, changedText string
+				segments                  []gitpkg.InlineSegment
+				style                     lipgloss.Style
+			}{
+				{"old", pair.before, pair.oldText, diff.DeletedAfter[0][0].Inline, diffDeletedTextBg},
+				{"new", pair.after, pair.newText, diff.InlineChanges[1], diffAddedTextBg},
+			} {
+				t.Run(fmt.Sprintf("%s/%s/dark=%t", tt.changedText, tt.name, dark), func(t *testing.T) {
+					parsed := parseMarkdownSource([]string{tt.source}, nil)
+					rendered := parsed.lines[0].render(tt.segments, diffCommonTextBg, tt.style, nil)
+					runes, styles := renderedCells(rendered)
+					text := string(runes)
+					start := strings.Index(text, tt.changedText)
+					if start < 0 {
+						t.Fatalf("changed code missing: %q", text)
+					}
+					first := len([]rune(text[:start]))
+					for i := first; i < first+len([]rune(tt.changedText)); i++ {
+						if !sameColor(styles[i].Bg, tt.style.GetBackground()) {
+							t.Fatalf("changed code %q at %d has background %v, want %v", runes[i], i, styles[i].Bg, tt.style.GetBackground())
+						}
+					}
+					for _, width := range []int{12, 80} {
+						rows := inlineDiffDisplayLines(tt.segments, true, width, diffCommonTextBg, tt.style, nil)
+						var highlighted strings.Builder
+						for _, row := range rows {
+							chars, cells := renderedCells(row)
+							for i, r := range chars {
+								if r != ' ' && sameColor(cells[i].Bg, tt.style.GetBackground()) {
+									highlighted.WriteRune(r)
+								}
+							}
+						}
+						if !strings.Contains(highlighted.String(), strings.ReplaceAll(tt.changedText, " ", "")) {
+							t.Fatalf("width %d lost changed code: %q", width, highlighted.String())
+						}
+					}
+				})
+			}
+		}
+	}
+}

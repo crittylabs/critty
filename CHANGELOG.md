@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- Word-level diff highlights remain visible inside Markdown code spans.
 - Markdown code spans, bold, italic, and inline links now continue across source lines in documents and diffs.  Formatting is limited to a paragraph and stops at blank lines or other block boundaries to keep rendering responsive.  Source lines and comment locations are preserved; incomplete patch context stays literal.
 - `critty doctor` no longer treats an unset Herdr image setting as disabled; Herdr enables image rendering by default.
 
