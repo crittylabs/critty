@@ -12,6 +12,7 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 - Write skills, tests, and other repository text in English regardless of the language used in development instructions.  Use other languages only where the content requires them, such as multilingual test cases.
 - Update `README.md` in the release preparation commit.  For major visual changes or headline features, propose recording new demos.
 - Upload screenshots, demo videos, and other binary files that will be replaced later to GitHub, such as issue or PR attachments and release assets, and reference their URLs instead of committing them.  Keep only stable brand assets such as logos under `assets/`.
+- Embed GitHub videos using standalone attachment URLs so GitHub generates the player.  Handwritten `<video>` elements can bypass its media-host rewrite and fail the signed-in page's content security policy.  Verify playback and seeking in the rendered README and hosting issue, both signed in and signed out; downloading the files alone does not verify playback.
 - Research [Crit](https://github.com/tomasz-tomczyk/crit)'s current implementation and documentation when changing the review format or workflow, and use the findings to inform specification and compatibility decisions.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.  Never write a bare `@` in commit subjects; goreleaser copies them into release notes, where they become mentions.
 
