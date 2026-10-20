@@ -68,7 +68,7 @@ func ParseDocumentForm(d AttachedDocument) ([]form.Item, error) {
 
 func (s *Session) LoadForms() (FormState, error) {
 	var state FormState
-	data, err := os.ReadFile(filepath.Join(s.Dir, "forms.json"))
+	data, err := s.readFile("forms.json")
 	if os.IsNotExist(err) {
 		return state, nil
 	}
@@ -155,10 +155,7 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 }
 
 func (s *Session) SaveForms(state FormState) error {
-	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
-		return err
-	}
-	return WriteJSON(filepath.Join(s.Dir, "forms.json"), state)
+	return s.writeJSON("forms.json", state)
 }
 
 // WriteJSON replaces a result only after its complete contents are written.
@@ -266,5 +263,5 @@ func selectedAcceptsText(items []form.Item, id string, answer form.Answer) bool 
 
 func (s *Session) SaveFormResult(result FormResult) error {
 	// Keep each completed round even when a later round replaces the drafts.
-	return WriteJSON(filepath.Join(s.Dir, fmt.Sprintf("result-%d.json", result.Round)), result)
+	return s.writeJSON(fmt.Sprintf("result-%d.json", result.Round), result)
 }

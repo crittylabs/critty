@@ -261,7 +261,7 @@ def report(message: str) -> None:
     print(f"PASS {message}", flush=True)
 
 
-def dry_run_viewer() -> None:
+def transient_views() -> None:
     root = ROOT / "dry-view"
     work, state, config = root / "work", root / "state", root / "config"
     for directory in [work, state / "tcrit", config / "tcrit"]:
@@ -291,36 +291,81 @@ def dry_run_viewer() -> None:
             if path.is_file()
         }
 
-    before = snapshot()
-    for flag in [
-        "session",
-        "task",
-        "result",
-        "summary",
-        "terminal-request",
-        "launcher",
-        "clear-attachments",
-    ]:
-        option = f"--{flag}" if flag == "clear-attachments" else f"--{flag}=unused"
-        result = subprocess.run(
-            [str(BINARY), "--dry-run", option],
+    form = work / "form.md"
+    form.write_text(
+        "# Questionnaire\n\n- [ ] Confirm demo <!-- form: id=confirm required -->\n"
+    )
+    patch = work / "input.diff"
+    patch.write_text(
+        subprocess.run(
+            ["git", "diff", "--cached"],
             cwd=work,
             env=env,
             text=True,
             capture_output=True,
+            check=True,
+        ).stdout
+    )
+    before = snapshot()
+    for args in [["--help"], ["review", "--help"], ["view", "--help"]]:
+        help_text = subprocess.run(
+            [str(BINARY), *args],
+            cwd=work,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        assert "--demo" not in help_text and "--dry-run" not in help_text, help_text
+    assert snapshot() == before, "help changed files"
+    for command in [[], ["review"]]:
+        result = subprocess.run(
+            [str(BINARY), *command, "--dry-run"],
+            cwd=work,
+            env=env,
+            capture_output=True,
+            text=True,
             check=False,
-            timeout=10,
         )
-        assert (
-            result.returncode != 0
-            and f"cannot be combined with --{flag}" in result.stderr
-        ), result
-        assert snapshot() == before, f"invalid dry-run changed files: {flag}"
+        assert result.returncode != 0 and "unknown flag: --dry-run" in result.stderr, (
+            result
+        )
+        assert snapshot() == before, "removed dry-run option changed files"
+    for prefix in [["view"], ["review", "--demo"]]:
+        for flag in [
+            "session",
+            "task",
+            "result",
+            "summary",
+            "terminal-request",
+            "launcher",
+            "clear-attachments",
+        ]:
+            option = f"--{flag}" if flag == "clear-attachments" else f"--{flag}=unused"
+            result = subprocess.run(
+                [str(BINARY), *prefix, option],
+                cwd=work,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+            assert result.returncode != 0 and (
+                "cannot be combined" in result.stderr or "unknown flag" in result.stderr
+            ), result
+            assert snapshot() == before, (
+                f"invalid transient invocation changed files: {prefix} {flag}"
+            )
 
     for name, args in [
-        ("dry-git", ["--dry-run"]),
-        ("dry-staged", ["review", "--dry-run", "--staged"]),
-        ("dry-doc", ["--dry-run", "notes.md"]),
+        ("view-git", ["view"]),
+        ("view-staged", ["view", "--staged"]),
+        ("view-doc", ["view", "notes.md"]),
+        ("view-patch", ["view", "--diff=input.diff"]),
+        ("demo-git", ["review", "--demo"]),
+        ("demo-doc", ["review", "--demo", "notes.md"]),
+        ("demo-forms", ["review", "--demo", "--null", "--attachment=form.md"]),
     ]:
         job = root / f"{name}.job.json"
         job.write_text(
@@ -352,34 +397,77 @@ def dry_run_viewer() -> None:
         def screen(pane: str = pane) -> str:
             return tmux("capture-pane", "-p", "-t", pane)
 
+        demo = name.startswith("demo")
         wait_until(
-            lambda screen=screen: "Close q" in screen(), "dry-run viewer rendered"
+            lambda demo=demo: ("Submit q" if demo else "Close q") in screen(),
+            "transient UI rendered",
         )
-        assert "Dry run" in screen(), screen()
-        assert snapshot() == before, "dry-run wrote files during startup"
-        tmux("send-keys", "-t", pane, "Enter", "f", "Space")
-        tmux("send-keys", "-l", "-t", pane, "\x1be")
-        wait_until(
-            lambda screen=screen: "editing is disabled" in screen(),
-            "external editor refused",
-        )
-        assert "Type your" not in screen(), screen()
-        assert snapshot() == before, "dry-run wrote files after edit keys"
-        if name == "dry-doc":
-            rows = screen().splitlines()
-            y, row = next((y, row) for y, row in enumerate(rows, 1) if "Close q" in row)
-            x = row.index("Close q") + 1
-            tmux("send-keys", "-l", "-t", pane, f"\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m")
-        else:
+        assert ("Demo" if demo else "View") in screen(), screen()
+        assert snapshot() == before, "transient mode wrote files during startup"
+        if demo:
+            if name == "demo-forms":
+                tmux("send-keys", "-t", pane, "n", "Space")
+                wait_until(
+                    lambda: "✓" in screen() and "Confirm demo" in screen(),
+                    "demo form answered",
+                )
+            tmux("send-keys", "-t", pane, "f")
+            wait_until(
+                lambda: "Add File Comment" in screen(), "demo comment editor opened"
+            )
+            tmux("send-keys", "-l", "-t", pane, "Disposable demo comment")
+            tmux("send-keys", "-t", pane, "C-s")
+            wait_until(
+                lambda: (
+                    "Disposable demo comment" in screen()
+                    and "Add File Comment" not in screen()
+                ),
+                "demo comment saved in memory",
+            )
+            assert snapshot() == before, "demo persisted edits"
             tmux("send-keys", "-t", pane, "q")
+            wait_until(lambda: "Overall comment" in screen(), "demo Submit opened")
+            if name == "demo-forms":
+                tmux("send-keys", "-t", pane, "a", "Enter")
+                wait_until(
+                    lambda: "Resolve all & approve?" in screen(),
+                    "demo approval confirms unresolved comments",
+                )
+                tmux("send-keys", "-t", pane, "y")
+            elif name == "demo-doc":
+                tmux("send-keys", "-t", pane, "q")
+                wait_until(
+                    lambda: "Abort review?" in screen(), "demo abort confirmation"
+                )
+                tmux("send-keys", "-t", pane, "y")
+            else:
+                tmux("send-keys", "-t", pane, "c", "Enter")
+        else:
+            tmux("send-keys", "-t", pane, "Enter", "f", "Space")
+            tmux("send-keys", "-l", "-t", pane, "\x1be")
+            wait_until(
+                lambda: "editing is disabled" in screen(),
+                "view external editor refused",
+            )
+            assert "Type your" not in screen(), screen()
+            assert snapshot() == before, "view wrote files after edit keys"
+            if name == "view-doc":
+                rows = screen().splitlines()
+                y, row = next(
+                    (y, row) for y, row in enumerate(rows, 1) if "Close q" in row
+                )
+                x = row.index("Close q") + 1
+                tmux("send-keys", "-l", "-t", pane, f"\x1b[<0;{x};{y}M\x1b[<0;{x};{y}m")
+            else:
+                tmux("send-keys", "-t", pane, "q")
         result_path = root / f"{name}.exit.json"
-        wait_until(result_path.exists, "dry-run closed")
+        wait_until(result_path.exists, "transient UI closed")
         assert json.loads(result_path.read_text())["code"] == 0
         assert not (root / f"{name}.stdout").read_text()
         assert not (root / f"{name}.stderr").read_text()
-        assert snapshot() == before, "dry-run wrote files on exit"
+        assert snapshot() == before, "transient mode wrote files on exit"
     report(
-        "dry-run views Git and documents without session files, edits, exports, or migration"
+        "view stays read-only; demo edits comments, answers forms, and submits without review files, exports, or migration"
     )
 
 
@@ -424,7 +512,7 @@ def scenarios() -> None:
         "sleep 600",
     )
     try:
-        dry_run_viewer()
+        transient_views()
         paragraph_source = "**日本語 é first\nsecond**\n\n`code\ncontinued`\n"
         (WORK / "paragraph.md").write_text(paragraph_source)
         paragraph = Round("paragraph-markdown", ["paragraph.md"])

@@ -35,7 +35,7 @@ For example:
 - **Approvals and questionnaires** — confirm details, allow actions, choose alternatives, write answers, select paths, and rank options in attached documents.  These requests can accompany a code review or stand on their own.
 - **Design interviews** — work through questions with your agent using [critty-grill](internal/cli/skill/critty-grill/SKILL.md), then save an agreed decision summary, glossary, or ADR.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
-- **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.  Use `--dry-run` for a read-only inspection in the current terminal.
+- **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.  Use `critty view` for a read-only inspection in the current terminal.
 - **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).

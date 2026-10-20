@@ -21,12 +21,8 @@ func (s *Session) SaveAttachment(data []byte) (string, error) {
 	if ext == "" {
 		return "", fmt.Errorf("unsupported image type")
 	}
-	if s.Dir == "" {
+	if s.Dir == "" && !s.InMemory() {
 		return "", fmt.Errorf("no review directory")
-	}
-	dir := filepath.Join(s.Dir, "attachments")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", err
 	}
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
@@ -35,6 +31,17 @@ func (s *Session) SaveAttachment(data []byte) (string, error) {
 	id[6] = (id[6] & 0x0f) | 0x40
 	id[8] = (id[8] & 0x3f) | 0x80
 	name := fmt.Sprintf("%x-%x-%x-%x-%x%s", id[:4], id[4:6], id[6:8], id[8:10], id[10:], ext)
+	if s.InMemory() && s.Dir == "" {
+		dir, err := os.MkdirTemp("", "critty-demo-*")
+		if err != nil {
+			return "", err
+		}
+		s.Dir, s.memoryDir = dir, dir
+	}
+	dir := filepath.Join(s.Dir, "attachments")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
 	f, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return "", err

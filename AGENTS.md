@@ -49,6 +49,7 @@ Before every changelog update:
 - Keep dialogs usable in small terminals and after resizing.  Keep confirm and cancel controls reachable, let users scroll content that does not fit, and restore focus appropriately when dialogs close.
 - Keep editing behavior consistent across input fields.  Preserve existing Emacs-style editing and paste operations when adding shortcuts, and document new key bindings in the help.
 - For visual experiments, show alternatives together in a preview and get feedback before staging the final implementation.
+- Use the hidden `critty review --demo` option for interactive demos in the current terminal.  Review controls work normally, but comments, answers, and submission stay in memory and are discarded on exit.  It creates no saved review, history, IPC server, or agent result.  Temporary files for external editors and pasted images are allowed; demo image files are removed on exit.  Do not combine it with session, task, export, terminal-request, or launcher options.  Use `critty view` for read-only inspection.
 - Critty detects the terminal background, so check light and dark schemes in separate native windows titled with the scheme and build, and keep the previous build open for comparison.
 - Diagnose color and background glitches by inspecting the emitted ANSI sequences before changing the palette.  In tmux, `tmux capture-pane -e` can reveal the actual terminal output.
 

@@ -77,7 +77,7 @@ func regularFile(path string) bool {
 
 func (m *AppModel) openSourceEditor(location sourceLocation) tea.Cmd {
 	if m.readOnly {
-		m.locationError = "Dry run: editing is disabled"
+		m.locationError = "View: editing is disabled"
 		return nil
 	}
 	for _, tab := range m.tabs {
