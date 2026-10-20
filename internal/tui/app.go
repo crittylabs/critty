@@ -4360,10 +4360,11 @@ func renderBarButton(label, hint string) string {
 	return renderButton(label, hint, modalBtnFocusedLabel.Bold(true), modalBtnFocusedKey)
 }
 
-// renderAccessKeyBarButton renders a bar button whose key is the first
-// letter of its label, underlining that letter instead of adding a hint.
+// renderAccessKeyBarButton highlights the first letter with the bar key style.
 func renderAccessKeyBarButton(label string) string {
-	return renderAccessKey(label+" ", modalBtnFocusedLabel.Bold(true))
+	_, size := utf8.DecodeRuneInString(label)
+	style := modalBtnFocusedLabel.Padding(0)
+	return style.Render(" ") + modalBtnFocusedKey.Render(label[:size]) + style.Render(label[size:]+" ")
 }
 
 // renderAccessKey underlines the first character of label to show that it
