@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.4.0
+
 ### Added
 
 - **Design interviews**: use [critty-grill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-grill/SKILL.md) to stress-test an idea or document with your agent.  Choose decision summaries, glossaries, ADRs, or a combination, and agree on their destinations and languages before saving.
@@ -16,7 +18,7 @@
 ### Changed
 
 - Use `critty view` to inspect changes, documents, patches, and attachments without starting or saving a review.  It replaces `--dry-run`; search and display controls remain available in the current terminal.
-- Dialog actions align to the right, with the primary action last and shortcut hints kept with their buttons.  Primary actions stand out in blue, while Abort and destructive actions stay red as focus moves.  Submit places the overall comment before the verdict choices and keeps progress counts above the actions; save a comment to return to the selected verdict, then press Enter to submit.  See in-app Help for controls.
+- Dialogs make the primary action easier to find, with blue buttons at the right and red warnings for Abort and destructive actions.  Submit starts on the verdict choices: choose a verdict and press Enter, or Shift-Tab to write a comment and save it to return to the verdict.  See in-app Help for controls.
 - The Images control highlights its `I` shortcut like Split highlights `S`.
 
 ### Fixed

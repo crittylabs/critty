@@ -13,7 +13,11 @@ Review changes, refine documents, make choices, and approve actions with your ag
 
 You can review a diff, file, or document on its own.  Your agent can also attach a document asking for your permission or a decision.  You can agree in advance on which actions need your approval, such as pushing code or deploying.
 
-When your agent needs your input, it prepares the request and opens the review in Critty.  You can comment on individual lines, use checkboxes to confirm details or allow actions, and choose options with radio buttons.  You can also write answers, choose file or directory paths, rank options, and select related items together.  Your comments and answers go back to the agent.
+When your agent needs your input, it prepares the request and opens a review in Critty.  Comment on individual lines, answer questions, confirm details, or authorize actions.  Your comments and answers go back to the agent.
+
+Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
+
+<video controls src="https://github.com/user-attachments/assets/9257b1f7-f5de-4a0b-848d-8d2637a0d251"></video>
 
 For example:
 
@@ -22,8 +26,6 @@ For example:
 - Review updates to notes, reports, or configuration files outside Git before applying them.
 - Choose an implementation approach before coding starts.
 - Check a proposed PR's text and destination before authorizing publication.
-
-![An approval checklist with required confirmations and an inline image](https://github.com/user-attachments/assets/a5710b35-fa00-40e3-9faa-7160fe5fc190)
 
 [More videos and screenshots](#gallery).
 
@@ -131,7 +133,7 @@ Critty opens in a tmux floating pane, a Herdr tab, or a new window of a supporte
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-<video controls src="https://github.com/user-attachments/assets/6e03f631-17e4-44cd-b783-8d8723197b43"></video>
+<video controls src="https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac"></video>
 
 For a manual review:
 
@@ -220,67 +222,67 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos and screenshots may show an earlier version where the interface is largely unchanged.
+Videos and screenshots captured with the v1.4.0 candidate.
 
 ### Code review with inline comments
 
-<video controls src="https://github.com/user-attachments/assets/6e03f631-17e4-44cd-b783-8d8723197b43"></video>
+<video controls src="https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac"></video>
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/d11fc222-464b-4be5-bc79-64fe9e6d1fbf)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/f829cd70-a84a-4542-bbec-4d20faeaff55)
 
 ### Review round trips with Claude Code
 
-<video controls src="https://github.com/user-attachments/assets/b266c2d7-0423-4166-bf3b-0979d7610921"></video>
+<video controls src="https://github.com/user-attachments/assets/4575f5c2-7417-4ef0-9e23-c280879a144d"></video>
 
 ### Review round trips with Codex
 
-<video controls src="https://github.com/user-attachments/assets/148d2759-4735-47af-9fa6-4824b0542b2b"></video>
+<video controls src="https://github.com/user-attachments/assets/7e41be84-b528-4a92-8b16-93b83bc07be7"></video>
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-<video controls src="https://github.com/user-attachments/assets/bbdd0003-3c5f-494e-bd88-965209e09e8f"></video>
+<video controls src="https://github.com/user-attachments/assets/a0b2341d-8970-4ae0-91ed-524f4a1f028e"></video>
 
 ### Reviewing a document
 
-<video controls src="https://github.com/user-attachments/assets/4f2418e5-f270-468a-8814-7ca63869b771"></video>
+<video controls src="https://github.com/user-attachments/assets/8b879462-5a18-4ecd-9116-1ed9e2134f52"></video>
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/851bf36a-abff-4c42-8ee6-494feb7dba1f)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/c1ca1ae0-3787-4680-92a8-1f5164235c13)
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/7f4c3355-69d9-45ef-94e7-fe34c3d2eb7b)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/e2867076-6b8b-487d-a5bb-996db9171c0f)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/cb0ebd4c-b417-4a95-a4f0-085224d45292)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/29cb0420-c57c-402d-abc0-5b921d71bd05)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/a5710b35-fa00-40e3-9faa-7160fe5fc190)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/45d94f32-80a4-40df-b1c4-c4fa15cf9495)
 
 ### Answering a questionnaire with form widgets
 
-Recorded with a v1.4.0 development build.
+See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/4f8bcb38-2d3c-42b2-b0b6-2b1c81d9016b)
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/312e3afd-b628-4590-a0af-ad5d86947819)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/bd175503-3d16-4c54-ba87-6fc11a624604)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/35d5c52b-4054-40f8-a9fa-b294c7c32f1d)
 
 ### Submitting with unfinished items
 
-![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/e4bc0d5e-33b4-475c-b2f7-59bfc09ab308)
+![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/92354ab0-8cd6-4a30-9acf-0ce2d393bbba)
 
 ### Incremental search
 
-![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/a94be6fc-5c97-4767-a764-fc839b615c38)
+![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/10957eee-d215-4d9c-9009-6c641a192f7e)
 
 ## Contributing
 
