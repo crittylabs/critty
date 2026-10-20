@@ -13,7 +13,7 @@ Review changes, refine documents, make choices, and approve actions with your ag
 
 You can review a diff, file, or document on its own.  Your agent can also attach a document asking for your permission or a decision.  You can agree in advance on which actions need your approval, such as pushing code or deploying.
 
-When your agent needs your input, it prepares the request and opens the review in Critty.  You can comment on individual lines, use checkboxes to confirm details or allow actions, and choose options with radio buttons.  Your comments and answers go back to the agent.
+When your agent needs your input, it prepares the request and opens the review in Critty.  You can comment on individual lines, use checkboxes to confirm details or allow actions, and choose options with radio buttons.  You can also write answers, choose file or directory paths, rank options, and select related items together.  Your comments and answers go back to the agent.
 
 For example:
 
@@ -32,7 +32,8 @@ For example:
 ## Key Features
 
 - **Code and document reviews** — read multi-file diffs in unified or side-by-side view, with syntax highlighting and inline comments.
-- **Approvals and choices** — read requests in attached documents, confirm details or allow actions with checkboxes, and choose between alternatives with radio buttons.  These requests can accompany a code review or stand on their own.
+- **Approvals and questionnaires** — confirm details, allow actions, choose alternatives, write answers, select paths, and rank options in attached documents.  These requests can accompany a code review or stand on their own.
+- **Design interviews** — work through questions with your agent using [critty-grill](internal/cli/skill/critty-grill/SKILL.md), then save an agreed decision summary, glossary, or ADR.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.  Use `--dry-run` for a read-only inspection in the current terminal.
 - **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
@@ -60,7 +61,7 @@ Release binaries are available for macOS and Linux on amd64 and arm64.  Building
 
 ### Check prerequisites
 
-Git 2.31.0 or later is required for repository reviews and `critty tmp`, including updates to files outside Git.  Standalone documents and attachment-only reviews can run without Git.  Prefer a maintained Git package with current security fixes.
+Git 2.31.0 or later is required for repository reviews and the `critty tmp` workflow for applying changes outside Git.  Standalone documents, attachment-only reviews, and scratch directories created with `critty tmp create` can run without Git.  Prefer a maintained Git package with current security fixes.
 
 After installing the binary, run:
 
@@ -187,6 +188,16 @@ The agent can also open a request document on its own, without a code diff.  Use
 
 Read the request and supporting material, leave comments, and use the checkboxes or radio buttons to give your answers.  Submit your decision, and the agent continues from your feedback and answers.  The installed skills handle the interaction with Critty.
 
+### Answer questionnaires and refine ideas
+
+Use attachment forms to give written answers, select file or directory paths, rank options, or select related items together.  Open **Answers** to check your selections and written answers before submitting, find unanswered fields, and jump back to revise them.  For questionnaire rounds, your agent can make **Confirm answers** the default Submit action.  Choosing it returns your answers to the agent without approving the whole design.  See [attachment forms](internal/cli/skill/critty-cli/references/forms.md).
+
+Use [critty-grill](internal/cli/skill/critty-grill/SKILL.md) to work through a design with your agent:
+
+> Use critty-grill to stress-test this plan.  Agree on which decisions to record and where to save them.
+
+The agent asks questions through comments and form choices, then confirms the shared understanding before saving a decision summary, glossary, ADRs, or a combination.  You choose the destinations and languages together.
+
 ### AI review and collaboration (Experimental)
 
 Request a second opinion with [critty-ai-review](internal/cli/skill/critty-ai-review/SKILL.md), or use [critty-ai-cowork](internal/cli/skill/critty-ai-cowork/SKILL.md) to let your agent address findings with another AI before your final review.  Findings return to the same Critty comment threads.
@@ -209,7 +220,7 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos and screenshots recorded with the v1.3.0 candidate.
+Videos and screenshots may show an earlier version where the interface is largely unchanged.
 
 ### Code review with inline comments
 

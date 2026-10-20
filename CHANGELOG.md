@@ -4,22 +4,23 @@
 
 ### Added
 
-- **Design interviews** — use the bundled [critty-grill skill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-grill/SKILL.md) to stress-test ideas or existing documents through questions, form choices, and inline comments.  Choose decision summaries, glossaries, ADRs, or a combination, with editable destination paths and suitable languages for the discussion and artifacts.  Each round follows the dependencies between decisions, then confirms the shared understanding and selected artifacts before saving them.
-- Create private scratch directories for review documents and results with `critty tmp create`.  It returns a unique path under `.critty/tmp/` without requiring Git or preparing file changes.
-- Attachment forms can select or clear groups of items at once.  Add `tags=` to items and a checkbox with `select-all=` to control every item with those tags, such as all checks in a section or every recommended answer.  It shows a mixed state when only some are selected, and individual changes update it.  Each target, including consents, records a human answer.  Documents using these attributes require this release.  See [attachment forms](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/forms.md).
-- Attachment forms can collect written answers and file or directory paths, independently or attached to choices and checkboxes.  Use `text` for multiline answers with pasted image previews, or `type=file`, `type=directory`, and `type=path` for path completion, with optional `default=` suggestions.  Missing paths show notices and remain valid; add `existing` to require an existing path.  Each choice keeps its own input when switching options; only selected inputs are exported.  Answers stay separate from review comments, and history archives list them in `review.md` with their images.  These input definitions require this release.  See [attachment forms](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/forms.md).
-- Attachment forms can ask for a ranking, such as which changes should lead release notes.  Items sharing an ID with `rank` appear as a numbered list in the current order; move them with `M-↑` / `M-↓` or drag them by the ⇅ handle.  Line numbers keep their source values and are tinted when an item moved up or down.  To keep the initial order, click an item, press `Space`, or press `M-↑` on the first item or `M-↓` on the last.  Comments stay with their items as they move.  The answer exports the values in ranked order.
-- `--answers` presents Comment as **Confirm answers** and selects it by default, so a questionnaire round can return answers without suggesting approval of the whole design.  The verdict stays `comment`, and the setting lasts for the session until `--no-answers`.
-- Press `F` or click **Answers** to list every form field grouped by its Markdown section, with its answer or what remains.  Choose a row to go to it, or show only unanswered items.
+- **Design interviews**: use [critty-grill](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-grill/SKILL.md) to stress-test an idea or document with your agent.  Choose decision summaries, glossaries, ADRs, or a combination, and agree on their destinations and languages before saving.
+- **New attachment form widgets** let AI agents ask for your preferences and collect your answers in attached documents.  See [attachment forms](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/forms.md).
+  - **Select-all checkboxes**: select or clear related items together, such as every check in a section or every recommended answer.  Mixed selections are shown, and each affected item records the human answer.
+  - **Text and path inputs**: collect written answers and file or directory paths, on their own or alongside choices and checkboxes.  Path fields offer completion and optional defaults; require an existing path when needed.  Only selected inputs are exported.
+  - **Rankings**: reorder list items with the keyboard or drag handle, for example to decide task order or priorities.  Comments stay attached to their original items.
+- Review your selections and written answers before submitting with the new **Answers** list.  Fields are grouped by section; filter unanswered items or jump to a field to complete or revise it.  Exported history archives also include form answers and their images.
+- The CLI option `--answers` lets agents open questionnaires with **Confirm answers** selected in Submit.  Submitting that choice returns answers to the agent without approving the reviewed design; the JSON result records `"verdict": "comment"` and `"approved": false`.
+- Create private scratch directories for review documents and results with `critty tmp create`, including outside Git repositories.
 
 ### Changed
 
-- Dialog action buttons align to the right, with the primary action last.  Keyboard focus follows the displayed order, and buttons wrap with their shortcut hints in narrow terminals.  In Submit, the overall comment precedes the verdict choices, and progress counts precede the actions.  Start on the selected verdict; use `Shift-Tab` to write a comment and `C-s` to return to the verdict before pressing `Enter`.
+- Dialog actions align to the right, with the primary action last and shortcut hints kept with their buttons.  Submit places the overall comment before the verdict choices and keeps progress counts above the actions; save a comment to return to the selected verdict, then press Enter to submit.  See in-app Help for controls.
 
 ### Fixed
 
-- Markdown code spans, bold, italic, and inline links can continue across source lines within a paragraph in documents and diffs.  Formatting respects block boundaries, preserves source lines and comment locations, and stays literal when patch context is incomplete.
-- `critty doctor` recommends enabling Herdr image rendering only when local configuration explicitly disables it.  Unset settings use the current Herdr default of enabled.
+- Markdown code spans, bold, italic, and inline links now continue across source lines in documents and diffs.  Formatting is limited to a paragraph and stops at blank lines or other block boundaries to keep rendering responsive.  Source lines and comment locations are preserved; incomplete patch context stays literal.
+- `critty doctor` no longer treats an unset Herdr image setting as disabled; Herdr enables image rendering by default.
 
 ## 1.3.2
 
