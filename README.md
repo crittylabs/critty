@@ -17,7 +17,7 @@ When your agent needs your input, it prepares the request and opens a review in 
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-<video controls src="https://github.com/user-attachments/assets/9257b1f7-f5de-4a0b-848d-8d2637a0d251"></video>
+https://github.com/user-attachments/assets/9257b1f7-f5de-4a0b-848d-8d2637a0d251
 
 For example:
 
@@ -133,7 +133,7 @@ Critty opens in a tmux floating pane, a Herdr tab, or a new window of a supporte
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-<video controls src="https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac"></video>
+https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac
 
 For a manual review:
 
@@ -226,7 +226,7 @@ Videos and screenshots captured with the v1.4.0 candidate.
 
 ### Code review with inline comments
 
-<video controls src="https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac"></video>
+https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac
 
 ### Side-by-side code review
 
@@ -234,21 +234,21 @@ Videos and screenshots captured with the v1.4.0 candidate.
 
 ### Review round trips with Claude Code
 
-<video controls src="https://github.com/user-attachments/assets/4575f5c2-7417-4ef0-9e23-c280879a144d"></video>
+https://github.com/user-attachments/assets/4575f5c2-7417-4ef0-9e23-c280879a144d
 
 ### Review round trips with Codex
 
-<video controls src="https://github.com/user-attachments/assets/7e41be84-b528-4a92-8b16-93b83bc07be7"></video>
+https://github.com/user-attachments/assets/7e41be84-b528-4a92-8b16-93b83bc07be7
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-<video controls src="https://github.com/user-attachments/assets/a0b2341d-8970-4ae0-91ed-524f4a1f028e"></video>
+https://github.com/user-attachments/assets/a0b2341d-8970-4ae0-91ed-524f4a1f028e
 
 ### Reviewing a document
 
-<video controls src="https://github.com/user-attachments/assets/8b879462-5a18-4ecd-9116-1ed9e2134f52"></video>
+https://github.com/user-attachments/assets/8b879462-5a18-4ecd-9116-1ed9e2134f52
 
 ### Previewing an image while writing a comment
 
