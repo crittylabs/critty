@@ -444,9 +444,9 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 
 func (m AppModel) finishButtons(width, top int) (string, []modalMouseRegion) {
 	return layoutModalActions([]modalButtonSpec{
-		{rendered: m.renderModalButton("Submit", "enter", m.modalFocus == finishSubmit), action: modalMouseAction{focus: finishSubmit}},
+		{rendered: m.renderPrimaryModalButton("Submit", "enter", m.modalFocus == finishSubmit), action: modalMouseAction{focus: finishSubmit}},
 		{rendered: m.renderModalButton("Back", "esc", m.modalFocus == finishBack), action: modalMouseAction{focus: finishBack}},
-		{rendered: m.renderModalButton("Abort", "q", m.modalFocus == finishAbort), action: modalMouseAction{focus: finishAbort}},
+		{rendered: m.renderDangerModalButton("Abort", "q", m.modalFocus == finishAbort), action: modalMouseAction{focus: finishAbort}},
 	}, width, top)
 }
 
@@ -656,7 +656,9 @@ func (m AppModel) finishFormsContent(width int) (string, []modalMouseRegion) {
 		{rendered: m.renderModalButton("Review", "r", m.modalFocus == finishReviewForms), action: modalMouseAction{focus: finishReviewForms}},
 	}
 	if m.canSubmitWithForms() {
-		specs = append([]modalButtonSpec{{rendered: m.renderModalButton("Submit", "s", m.modalFocus == finishSubmitForms), action: modalMouseAction{focus: finishSubmitForms}}}, specs...)
+		specs = append([]modalButtonSpec{{rendered: m.renderPrimaryModalButton("Submit", "s", m.modalFocus == finishSubmitForms), action: modalMouseAction{focus: finishSubmitForms}}}, specs...)
+	} else {
+		specs[0].rendered = m.renderPrimaryModalButton("Review", "r", m.modalFocus == finishReviewForms)
 	}
 	specs = append(specs, modalButtonSpec{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == finishCancelForms), action: modalMouseAction{focus: finishCancelForms}})
 	buttons, regions := layoutModalActions(specs, width, strings.Count(prefix, "\n"))
@@ -750,7 +752,7 @@ func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
 	info := "Resolve all " + count + " before approving?"
 	prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", width, "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{
-		{rendered: m.renderModalButton("Resolve All", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+		{rendered: m.renderPrimaryModalButton("Resolve All", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
 	content := prefix + buttons + "\n"
@@ -765,7 +767,7 @@ func (m AppModel) finishAbortContent(width int) (string, []modalMouseRegion) {
 	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(finishColor(review.VerdictReject)).Render("Abort review?"), width)
 	prefix := lipgloss.Wrap(title+"\nExit without submitting?  Your comments and draft will be kept.\n\n", width, "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{
-		{rendered: m.renderModalButton("Abort", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+		{rendered: m.renderDangerModalButton("Abort", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Back", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
 	return prefix + buttons, append(regions, closeRegion)

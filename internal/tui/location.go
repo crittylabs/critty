@@ -247,7 +247,7 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 			action: modalMouseAction{lineInput: true},
 		}}
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
-			{rendered: m.renderModalButton("Go", "enter", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderPrimaryModalButton("Go", "enter", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, width, strings.Count(content, "\n"))
 		return content + buttons, append(append(regions, buttonRegions...), closeRegion)
@@ -260,7 +260,7 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 	prefix := lipgloss.Wrap(title+"\n"+
 		target+"\nThis location is not in the review.\n\n", max(1, width), "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{
-		{rendered: m.renderModalButton("Open", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+		{rendered: m.renderPrimaryModalButton("Open", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Cancel", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
 	return prefix + buttons, append(regions, closeRegion)

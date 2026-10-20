@@ -1232,7 +1232,7 @@ func TestAccessKeyUnderline(t *testing.T) {
 	}{
 		{"resolve", resolve, "R"},
 		{"resolved", resolved, "R"},
-		{"images", renderAccessKeyBarButton("Images: on"), "I"},
+		{"images", renderAccessKeyBarButton("Images: on"), ""},
 		{"edit dialog", renderResolution(true, "Resolved", false), ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

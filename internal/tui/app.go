@@ -4347,16 +4347,24 @@ func (m AppModel) renderModalButton(label, hint string, focused bool) string {
 	return renderButton(label, hint, modalBtnNormalLabel, modalBtnNormalKey)
 }
 
+func (m AppModel) renderPrimaryModalButton(label, hint string, focused bool) string {
+	if focused {
+		return renderButton(label, hint, modalBtnPrimaryFocusedLabel, modalBtnFocusedKey)
+	}
+	return renderButton(label, hint, modalBtnPrimaryLabel, modalBtnNormalKey)
+}
+
 // renderBarButton renders a button for the banner or footer.  Its label is
 // bold so it stands out from the surrounding key hints.
 func renderBarButton(label, hint string) string {
 	return renderButton(label, hint, modalBtnFocusedLabel.Bold(true), modalBtnFocusedKey)
 }
 
-// renderAccessKeyBarButton renders a bar button whose key is the first
-// letter of its label, underlining that letter instead of adding a hint.
+// renderAccessKeyBarButton highlights the first letter with the bar key style.
 func renderAccessKeyBarButton(label string) string {
-	return renderAccessKey(label+" ", modalBtnFocusedLabel.Bold(true))
+	_, size := utf8.DecodeRuneInString(label)
+	style := modalBtnFocusedLabel.Padding(0)
+	return style.Render(" ") + modalBtnFocusedKey.Render(label[:size]) + style.Render(label[size:]+" ")
 }
 
 // renderAccessKey underlines the first character of label to show that it
@@ -4497,19 +4505,11 @@ func modalTitle(text string, width int) (string, modalMouseRegion) {
 	return row + "\n", region
 }
 
-func (m AppModel) renderDeleteButton(label, hint string, focused bool) string {
-	if hint != "" {
-		keyStyle := modalBtnNormalKey
-		if focused {
-			keyStyle = modalBtnFocusedKey
-			return modalDeleteBtnFocused.PaddingRight(0).Render(label+" ") + keyStyle.Render(hint)
-		}
-		return modalBtnNormal.PaddingRight(0).Render(modalDeleteBtnLabel.Render(label+" ")) + keyStyle.Render(hint)
-	}
+func (m AppModel) renderDangerModalButton(label, hint string, focused bool) string {
 	if focused {
-		return modalDeleteBtnFocused.Render(label)
+		return renderButton(label, hint, modalDangerBtnFocused, modalBtnFocusedKey)
 	}
-	return modalBtnNormal.Render(modalDeleteBtnLabel.Render(label))
+	return renderButton(label, hint, modalDangerBtnLabel, modalBtnNormalKey)
 }
 
 func (m AppModel) renderContextPreview(side string, start, end, maxWidth, maxLines int) string {
@@ -4604,7 +4604,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		contextContent := m.renderContextPreview(side, start, end, innerWidth-4, 0)
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
@@ -4678,7 +4678,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
 		regions = append(regions, textareaRegion)
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
-			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
@@ -4739,7 +4739,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 		}
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
@@ -4776,7 +4776,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			for i, target := range m.modalDeleteTargets() {
 				content += "\n"
 				deleteRow, deleteRegions := layoutModalActions([]modalButtonSpec{{
-					rendered: m.renderDeleteButton(target.label, "", m.modalFocus == i+deleteStart),
+					rendered: m.renderDangerModalButton(target.label, "", m.modalFocus == i+deleteStart),
 					action:   modalMouseAction{focus: i + deleteStart, deleteIndex: i},
 				}}, innerWidth, buttonY)
 				content += deleteRow
@@ -4808,7 +4808,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		info := "Your unsaved comment changes will be lost."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
-			{rendered: m.renderModalButton("Discard", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+			{rendered: m.renderDangerModalButton("Discard", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 			{rendered: m.renderModalButton("Keep Editing", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 		}, innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
@@ -4824,7 +4824,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		info := "This cannot be undone."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
-			{rendered: m.renderDeleteButton("Delete", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+			{rendered: m.renderDangerModalButton("Delete", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 			{rendered: m.renderModalButton("Keep", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 		}, innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
