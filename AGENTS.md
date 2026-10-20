@@ -8,13 +8,21 @@ If `AGENTS.local.md` exists next to this file, read it before starting work and 
 
 ## How we work
 
-- Keep `README.md` focused on feature benefits, installation, basic workflows, and important limitations for human users.  Link to bundled skills under `internal/cli/skill/` and built-in help for details; update affected skills alongside CLI or workflow changes.
-- Keep bundled skills focused on agent workflows and CLI contracts.  Document human TUI controls in built-in help.  In bundled skills, refer to agents generically, naming specific tools only as examples, and mark local paths such as `.tmp/` as examples to adapt.
+- Create task scratch directories with `critty tmp create` and use the returned paths for temporary documents and results.
 - Write skills, tests, and other repository text in English regardless of the language used in development instructions.  Use other languages only where the content requires them, such as multilingual test cases.
 - Update `README.md` in the release preparation commit.  For major visual changes or headline features, propose recording new demos.
 - Upload screenshots, demo videos, and other binary files that will be replaced later to GitHub, such as issue or PR attachments and release assets, and reference their URLs instead of committing them.  Keep only stable brand assets such as logos under `assets/`.
 - Research [Crit](https://github.com/tomasz-tomczyk/crit)'s current implementation and documentation when changing the review format or workflow, and use the findings to inform specification and compatibility decisions.
 - In commit messages, put key names such as `R` or `ctrl+v` and command names in backquotes.  Never write a bare `@` in commit subjects; goreleaser copies them into release notes, where they become mentions.
+
+## User-facing documentation
+
+- Keep `README.md` focused on feature benefits, installation, basic workflows, and important limitations for human users.  Link to bundled skills under `internal/cli/skill/` and built-in help for details; update affected skills alongside CLI or workflow changes.
+- Keep bundled skills focused on agent workflows and CLI contracts.  Document human TUI controls in built-in help.  In bundled skills, refer to agents generically, naming specific tools only as examples, and use the returned scratch directory in path examples.
+- In README text and release notes, identify who uses the feature and what they can accomplish.  Lead with the user's goal, such as checking their answers before submitting, then explain the controls.  Use examples that make sense beyond this project's own workflow.
+- Distinguish human TUI features from commands used by AI agents and machine-readable results.  For an agent-facing option, name the actor, explain its visible effect, and clarify relevant returned values.  Keep detailed CLI and JSON contracts in the bundled skills.
+- Group related UI improvements, form elements, and other changes by the user purpose they serve; use child items when they clarify individual additions.  For forms, explain when an agent uses them to ask for the user's preferences or decisions.
+- Describe fixes through the incorrect behavior they remove, including defaults when they explain the failure.  State practical limits that affect use, such as formatting stopping at blank lines; give the tradeoff when it explains the limit.
 
 ## Changelog maintenance
 
@@ -27,10 +35,10 @@ Before every changelog update:
 3. Remove superseded behavior, duplicate explanations, and fixes for problems introduced and resolved after the baseline.  Retain fixes for problems present in a published release, including prereleases; verify publication history before removing them.
 4. Check the complete section against the release comparison.  Every entry must describe a remaining user-visible difference, and every such difference, including small fixes, must be covered.  Keep only the wording needed to explain those differences and their important constraints.
 
-- Write entries as release notes for users.  Lead with what a feature lets them do and its main use cases.  Name new commands, skills, and integrations and explain their roles; link to details instead of accumulating workflow steps.
+- Name new commands, skills, and integrations and explain their roles; link to details instead of accumulating workflow steps.
 - Move the consolidated section to a versioned section during release preparation.  Keep published sections unchanged unless correcting an error.
 - Keep implementation mechanics, detailed dialog layouts, and exhaustive key bindings in code or Help.  Include controls only when they explain the change or help users adapt established usage; point to updated Help for full instructions.
-- State compatibility requirements before listing supported implementations as examples.  Describe layered integrations in terms of their host requirements.  Restrict platforms only when the implementation requires it.
+- State concrete compatibility requirements when they affect adoption or existing workflows, before listing supported implementations as examples.  Describe layered integrations in terms of their host requirements.  Restrict platforms only when the implementation requires it.
 - A release's section becomes its GitHub Release notes, so use absolute URLs for links there.
 
 ## TUI design
