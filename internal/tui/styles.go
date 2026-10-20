@@ -313,6 +313,7 @@ var (
 			Padding(0, 1)
 
 	modalBtnFocusedLabel = lipgloss.NewStyle().
+				Bold(true).
 				Foreground(lipgloss.Black).
 				Background(lipgloss.White).
 				PaddingLeft(1)
@@ -331,16 +332,8 @@ var (
 				Foreground(lipgloss.Black).
 				Bold(true)
 
-	modalDeleteBtnLabel = lipgloss.NewStyle().
-				Bold(true).
-				Background(buttonBackground).
-				Foreground(lipgloss.Red)
-
-	modalDeleteBtnFocused = lipgloss.NewStyle().
-				Background(lipgloss.Red).
-				Foreground(lipgloss.BrightWhite).
-				Bold(true).
-				Padding(0, 1)
+	modalBtnPrimaryLabel, modalBtnPrimaryFocusedLabel = newModalPrimaryStyles(lipgloss.LightDark(true))
+	modalDangerBtnLabel, modalDangerBtnFocused        = newModalDangerStyles(lipgloss.LightDark(true))
 
 	// Tab bar styles — bordered tabs with open-bottom active tab
 	inactiveTabStyle = lipgloss.NewStyle().
@@ -442,7 +435,6 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	closeButtonStyle = closeButtonStyle.Background(buttonBackground)
 	commentNavButtonStyle = commentNavButtonStyle.Foreground(textColors.cyan).Background(buttonBackground)
 	modalBtnNormal = modalBtnNormal.Background(buttonBackground)
-	modalDeleteBtnLabel = modalDeleteBtnLabel.Background(buttonBackground)
 	commentStyle = commentStyle.Foreground(textSecondary)
 	footerDescStyle = footerDescStyle.Foreground(textSecondary)
 	helpDescriptionStyle = helpDescriptionStyle.Foreground(textPrimary)
@@ -480,9 +472,12 @@ func initAdaptiveStyles(hasDarkBG bool) {
 		Align(lipgloss.Right).
 		Render("↪")
 	modalBtnFocusedLabel = lipgloss.NewStyle().
+		Bold(true).
 		Foreground(ld(lipgloss.BrightWhite, lipgloss.Black)).
-		Background(ld(lipgloss.Black, lipgloss.White)).
+		Background(ld(lipgloss.Color("#505050"), lipgloss.White)).
 		PaddingLeft(1)
+	modalBtnPrimaryLabel, modalBtnPrimaryFocusedLabel = newModalPrimaryStyles(ld)
+	modalDangerBtnLabel, modalDangerBtnFocused = newModalDangerStyles(ld)
 
 	selectedLineBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#E8E0F8"), lipgloss.Color("#2D2B55")))
@@ -554,6 +549,17 @@ func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
 		requiredBadge: ld(lipgloss.Color("#E09494"), lipgloss.Red),
 		badgeSymbol:   ld(lipgloss.Color("#FFFFFF"), lipgloss.Black),
 	}
+}
+
+// Primary role colors remain visible independently of keyboard focus.
+func newModalPrimaryStyles(ld lipgloss.LightDarkFunc) (lipgloss.Style, lipgloss.Style) {
+	return modalBtnNormalLabel.Foreground(ld(lipgloss.Color("#2456A6"), lipgloss.Color("#78ADFF"))).Bold(true),
+		modalBtnFocusedLabel.Foreground(ld(lipgloss.Color("#D8E8FF"), lipgloss.Color("#173B74"))).Background(ld(lipgloss.Color("#405D82"), lipgloss.Color("#D8E8FF"))).Bold(true).Underline(true)
+}
+
+func newModalDangerStyles(ld lipgloss.LightDarkFunc) (lipgloss.Style, lipgloss.Style) {
+	return lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#B42318"), lipgloss.Color("#FF9B91"))).Background(buttonBackground).Bold(true).PaddingLeft(1),
+		lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#FCE2DE"), lipgloss.Color("#7B1E1A"))).Background(ld(lipgloss.Color("#8A4D47"), lipgloss.Color("#FCE2DE"))).Bold(true).Underline(true).PaddingLeft(1)
 }
 
 // textPalette holds foregrounds for text on the terminal background.  On
