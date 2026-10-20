@@ -12,13 +12,15 @@ import (
 	"github.com/gofrs/flock"
 )
 
-// Session binds a review folder on disk to its loaded CritJSON document.
+// Session holds review state with optional disk storage.
 type Session struct {
-	Key   string
-	Dir   string
-	CJ    CritJSON
-	Meta  SessionEntry
-	saved []byte
+	Key       string
+	Dir       string
+	CJ        CritJSON
+	Meta      SessionEntry
+	saved     []byte
+	memory    map[string][]byte
+	memoryDir string
 }
 
 // NormalizePath cleans a user-supplied file path into the forward-slash
@@ -75,6 +77,10 @@ func (s *Session) SetFileComments(path, status string, comments []Comment) {
 // Save merges local edits with updates since the last load or save, then
 // writes the result atomically under an advisory file lock.
 func (s *Session) Save() error {
+	if s.memory != nil {
+		s.CJ.Touch()
+		return nil
+	}
 	return s.withLock(func() error {
 		fresh, err := openSessionAt(s.Key, s.Dir)
 		if err != nil {
@@ -93,6 +99,12 @@ func (s *Session) Save() error {
 // advisory lock, then saves the result.  Keeping the full read-modify-write
 // cycle under one lock prevents concurrent CLI commands from losing updates.
 func (s *Session) Update(fn func(*Session) error) error {
+	if s.memory != nil {
+		if err := fn(s); err != nil {
+			return err
+		}
+		return s.Save()
+	}
 	return s.withLock(func() error {
 		fresh, err := openSessionAt(s.Key, s.Dir)
 		if err != nil {

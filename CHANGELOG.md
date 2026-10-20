@@ -15,6 +15,7 @@
 
 ### Changed
 
+- Use `critty view` to inspect changes, documents, patches, and attachments without starting or saving a review.  It replaces `--dry-run`; search and display controls remain available in the current terminal.
 - Dialog actions align to the right, with the primary action last and shortcut hints kept with their buttons.  Submit places the overall comment before the verdict choices and keeps progress counts above the actions; save a comment to return to the selected verdict, then press Enter to submit.  See in-app Help for controls.
 
 ### Fixed

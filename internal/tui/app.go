@@ -2741,7 +2741,9 @@ func (m AppModel) renderReviewBar() string {
 		text += reviewBarStyle.Render(headerLabel(m.topic) + " — ")
 	}
 	if m.readOnly {
-		text += reviewBarStyle.Bold(true).Render("Dry run · read-only · ")
+		text += reviewBarStyle.Bold(true).Render("View · read-only · ")
+	} else if m.session != nil && m.session.InMemory() {
+		text += reviewBarStyle.Bold(true).Render("Demo · not saved · ")
 	}
 	text += reviewBarStyle.Render("review the ")
 	if style, ok := scopeWordStyle(scope); ok {
@@ -4093,7 +4095,7 @@ const footerMinHeight = 22
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.height >= footerMinHeight {
-		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · Dry run: read-only · /: search · v: select · M-w: copy reference · q: close")
+		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · View: read-only · /: search · v: select · M-w: copy reference · q: close")
 	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
@@ -4229,7 +4231,7 @@ func renderHelpGroup(title string, items []helpItem, width int) string {
 
 func (m AppModel) renderHelp(innerWidth int) string {
 	if m.readOnly {
-		return renderHelpGroup("Dry run (read-only)", []helpItem{
+		return renderHelpGroup("View (read-only)", []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
 			{keys: "up/down,j/k · PgUp/PgDn", desc: "move / scroll"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},

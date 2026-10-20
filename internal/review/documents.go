@@ -104,7 +104,7 @@ func setDocumentNames(docs []AttachedDocument) {
 
 func (s *Session) LoadDocuments() (DocumentAttachments, error) {
 	var attachments DocumentAttachments
-	data, err := os.ReadFile(filepath.Join(s.Dir, "documents.json"))
+	data, err := s.readFile("documents.json")
 	if os.IsNotExist(err) {
 		return attachments, nil
 	}
@@ -154,29 +154,5 @@ func (s *Session) SetAnswerMode(on bool) error {
 }
 
 func (s *Session) saveDocuments(attachments DocumentAttachments) error {
-	data, err := json.MarshalIndent(attachments, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
-		return err
-	}
-	f, err := os.CreateTemp(s.Dir, "documents-*.tmp")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "critty: removing temporary document snapshot: %v\n", err)
-		}
-	}()
-	_, writeErr := f.Write(append(data, '\n'))
-	closeErr := f.Close()
-	if writeErr != nil {
-		return writeErr
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	return os.Rename(f.Name(), filepath.Join(s.Dir, "documents.json"))
+	return s.writeJSON("documents.json", attachments)
 }
