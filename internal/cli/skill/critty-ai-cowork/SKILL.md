@@ -15,13 +15,15 @@ A request such as `/critty-ai-cowork` with `Astra` selects a collaborator for th
 
 After collecting and verifying each AI result:
 
-1. Assess the findings against the requirements and evidence.  Exchange focused questions or counterexamples with the reviewer when needed; agreement alone is not evidence of correctness.
+1. Assess each finding against the requirements and evidence.  Reply in its thread with the accepted change or a reasoned disagreement.  Exchange focused questions or counterexamples until both sides agree on its disposition or identify a decision for the human; agreement alone is not evidence of correctness.
 2. Make authorized fixes and run the affected checks as the requester.  The other AI reads, posts findings, replies to its own threads, and resolves its own verified findings through the restricted Critty interface; it does not edit files or execute checks.
-3. Capture the revised target and request review of the affected scope, explicitly carrying forward unresolved findings and permitting the reviewer to resolve its own findings after verification.  Reuse valid results for unchanged content.  Keep each assignment tied to its own version and completion report.
+3. Capture the revised target and request review of the affected scope, carrying forward unresolved findings and the requester's replies.  Require the reviewer to verify each disposition and resolve its own finding once satisfied, including when an explanation or counterexample settles it without a code change.  Follow the shared skill's resolution and readback rules, preserving other reviewers' concerns.  Reuse valid results for unchanged content.  Keep each assignment tied to its own version and completion report.
 
 For a one-shot reviewer that has exited, continue an exchange by posting the requester's question or evidence as a reply, then launching a new assignment with a new request ID and references to that thread and the prior result.  A live transport may continue on its existing handle.  An exited process cannot receive another question merely by waiting on it.
 
-Continue without asking the human to approve each AI response.  Stop iterating when the acceptance checks pass and actionable findings are addressed, with a completed AI assessment of the final affected scope.  Preserve substantiated disagreements and limitations for final human review instead of editing merely to obtain AI agreement.
+Continue without asking the human to approve each AI response.  Complete the loop when acceptance checks pass, both sides agree on the findings' dispositions, and the reviewer has assessed the final affected scope.  An agreed escalation counts as a disposition and leaves the finding open for the human.  Verify that satisfied reviewer findings are saved as resolved, except where the shared resolution rules require keeping another reviewer's concern open.  Record the requester's agreement and any remaining concerns or limitations as a review-level comment under the requester's author, alongside the reviewer's completion report.  Use the shared skill's fallback for relayed resolution decisions; an unsaved decision leaves that step incomplete.
+
+Preserve substantiated disagreements for a human decision instead of editing merely to obtain AI agreement.  Identify them as unresolved; a completed AI assessment alone does not establish agreement or resolution.
 
 Ask for a human decision when progress requires one: a material scope change, repeated disagreement without new evidence, or a recurring failure that prevents verification.  Honor explicit round, time, and cost limits; reaching one ends the loop with a report of remaining work, not a claim of completion.
 
