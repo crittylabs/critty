@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Checklists in attached publication drafts and other Markdown documents remain display-only unless each interactive item has a `<!-- form: ... -->` annotation.  Agents must add an annotation to collect an answer, including for simple checkboxes.
+
+### Fixed
+
+- README demo videos use GitHub's native player so signed-in readers can play and seek them.
+
 ## 1.4.0
 
 ### Added

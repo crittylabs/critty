@@ -286,6 +286,24 @@ func TestFormLinksTakePriorityOverSelection(t *testing.T) {
 	}
 }
 
+func TestUnannotatedChecklistIsDisplayOnly(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] Pending\n- [x] Complete\n- [ ] Answer <!-- form: id=answer -->\n")
+	if len(app.contentLayout.formControls) != 1 || len(app.formReviewItems()) != 1 {
+		t.Fatal("ordinary checklist entered the form controls or answers")
+	}
+	for _, line := range []int{1, 2} {
+		if app.toggleForm(line) {
+			t.Fatalf("ordinary checklist line %d was interactive", line)
+		}
+	}
+	control := app.contentLayout.formControls[0]
+	left, top, _, _ := app.contentBounds()
+	app = clickMouse(app, left+control.rect.left, top+control.rect.top)
+	if app.forms.Documents[0].Answers["answer"].Value != true {
+		t.Fatal("annotated checkbox was not clickable")
+	}
+}
+
 func TestFormKeyboardMouseAndSourcePositions(t *testing.T) {
 	app, _ := formTestApp(t)
 	content := app.tab().doc.Content

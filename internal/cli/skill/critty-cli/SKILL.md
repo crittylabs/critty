@@ -68,7 +68,7 @@ Repeated `--attachment FILE` flags on `review`, `plan`, or the default command s
 
 ## Forms and exported results
 
-Task lists in attached `.md` or `.markdown` files are interactive forms: checkboxes, required confirmations, choices, consents, text answers, rankings, and select-all controls.  Read [attachment forms](references/forms.md) before writing a form or interpreting its answers; it lists each widget's annotation, answer value, and constraints.  `/critty-approval` defines when to use confirmations and consents and how to interpret permission.
+Task-list items annotated with `<!-- form: ... -->` in attached `.md` or `.markdown` files are interactive forms: checkboxes, required confirmations, choices, consents, text answers, rankings, and select-all controls.  Unannotated items remain display-only.  Read [attachment forms](references/forms.md) before writing a form or interpreting its answers; it lists each widget's annotation, answer value, and constraints.  `/critty-approval` defines when to use confirmations and consents and how to interpret permission.
 
 `--answers` labels Comment as **Confirm answers** and selects it by default, for rounds that collect form answers without approving the design; the verdict remains `comment`.  The setting persists across the session's rounds until `--no-answers`.
 

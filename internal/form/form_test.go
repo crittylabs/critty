@@ -13,7 +13,7 @@ func TestParseMarkdownForms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 5 {
+	if len(items) != 4 {
 		t.Fatalf("items: %+v", items)
 	}
 	for _, item := range items {
@@ -24,11 +24,11 @@ func TestParseMarkdownForms(t *testing.T) {
 			t.Fatalf("metadata in label: %+v", item)
 		}
 	}
-	if items[4].Value != "large size" || !strings.Contains(items[4].Label, "continued label") {
-		t.Fatalf("multiline/quoted value: %+v", items[4])
+	if items[3].Value != "large size" || !strings.Contains(items[3].Label, "continued label") {
+		t.Fatalf("multiline/quoted value: %+v", items[3])
 	}
 	defaults := Defaults(items)
-	if Selected(items[1], defaults["confirm"]) || Selected(items[2], defaults["publish"]) {
+	if Selected(items[0], defaults["confirm"]) || Selected(items[1], defaults["publish"]) {
 		t.Fatal("source defaults fulfilled confirmation or consent")
 	}
 }
@@ -52,6 +52,23 @@ func TestInvalidForms(t *testing.T) {
 				t.Fatal("accepted invalid definition")
 			}
 		})
+	}
+}
+
+func TestOnlyAnnotatedTaskItemsAreForms(t *testing.T) {
+	source := "- [ ] Pending\n- [x] Done <!-- ordinary comment -->\n" +
+		"- [ ] Literal `<!-- form: id=literal -->`\n" +
+		"- [ ] Parent\n  - [x] Child <!-- form: -->\n" +
+		"- [ ] Active <!-- form: id=active -->\n  - [ ] Inert child\n"
+	items, err := Parse(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].ID != "auto:5" || items[1].ID != "active" {
+		t.Fatalf("interactive items: %+v", items)
+	}
+	if !Selected(items[0], Defaults(items)["auto:5"]) {
+		t.Fatal("empty annotation lost the source default")
 	}
 }
 

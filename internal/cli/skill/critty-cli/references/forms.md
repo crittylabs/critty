@@ -1,12 +1,12 @@
 # Attachment forms
 
-Task-list items in attached `.md` or `.markdown` files are interactive.  Annotate an item with one `<!-- form: ... -->` comment of space-separated attributes; quote values containing spaces.  Items in quotations, code blocks, and escaped lists stay inert.  [`/critty-approval`](../../critty-approval/SKILL.md) defines when to use confirmations and consents and how to interpret permission.
+Add interactive widgets to attached `.md` or `.markdown` files by annotating task-list items with `<!-- form: ... -->`.  Use one annotation per item with space-separated attributes; quote values containing spaces.  Unannotated task lists remain display-only, including checklists in publication drafts.  Items in quotations, code blocks, and escaped lists stay inert.  [`/critty-approval`](../../critty-approval/SKILL.md) defines when to use confirmations and consents and how to interpret permission.
 
 ## Widgets
 
 | Widget | Annotation | Answer `value` | Constraints |
 | --- | --- | --- | --- |
-| Checkbox | optional `id=check` | `true` or `false` | A source `[x]` sets the initial value. |
+| Checkbox | `id=check` (or empty `<!-- form: -->`) | `true` or `false` | A source `[x]` sets the initial value. |
 | Confirmation | `id=check required` | `true` once checked | Approval requires a human check; a source `[x]` is ignored. |
 | Choice | `id=size value=small` on each option | the selected value, or `""` | Options share the ID with distinct values; `required` goes on every option. |
 | Consent | `id=publish consent` | `true` or `false` | Grants permission only through `consents` on approval. |

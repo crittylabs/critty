@@ -49,7 +49,7 @@ func TestFormExportFailurePreservesApprovalData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc := review.AttachedDocument{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] Test"}
+	doc := review.AttachedDocument{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] Test <!-- form: id=test -->"}
 	payload := &ipc.FinishPayload{Approved: true, Result: &review.FormResult{FormState: review.FormState{Version: 1, Revision: "exact", Documents: []review.FormDocument{{AttachedDocument: doc}}}, Approved: true}}
 	if err := printFinish(payload, sess); err == nil {
 		t.Fatal("failed export succeeded")

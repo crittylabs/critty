@@ -130,6 +130,9 @@ func Parse(source string) ([]Item, error) {
 		if err != nil {
 			return ast.WalkStop, err
 		}
+		if len(item.Metadata) == 0 {
+			return ast.WalkContinue, nil
+		}
 		item.Label = strings.TrimSpace(strings.TrimSpace(label.String())[3:])
 		var definition strings.Builder
 		if err := ast.Walk(block.Parent(), func(child ast.Node, enter bool) (ast.WalkStatus, error) {
