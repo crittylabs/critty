@@ -27,6 +27,8 @@ type FileTab struct {
 	path                  string
 	oldPath               string
 	status                string
+	textconv              gitpkg.Textconv
+	loadErr               error
 	doc                   *document.Document
 	state                 *fileReview
 	diff                  *gitpkg.DiffInfo // original diff, retained when whitespace is ignored

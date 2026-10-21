@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"time"
+
+	"github.com/crittylabs/critty/internal/git"
 )
 
 // The types in this file mirror the review.json ("CritJSON") format of
@@ -79,9 +81,10 @@ func (c *Comment) EndAt() int {
 
 // CritJSONFile is the per-file section in review files.
 type CritJSONFile struct {
-	Status   string    `json:"status"`
-	FileHash string    `json:"file_hash,omitempty"`
-	Comments []Comment `json:"comments"`
+	Textconv git.Textconv `json:"textconv,omitzero"`
+	Status   string       `json:"status"`
+	FileHash string       `json:"file_hash,omitempty"`
+	Comments []Comment    `json:"comments"`
 }
 
 // CritJSON is the top-level review.json document.

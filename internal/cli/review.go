@@ -56,6 +56,9 @@ var reviewCmd = &cobra.Command{
 	Long: `Open a review and block until the human finishes it.
 
 With no file argument, reviews the current git changes (multi-file mode).
+Git reviews apply diff.<driver>.textconv only for driver names or glob patterns
+enabled in Critty's textconv_drivers setting.  Review lines then refer to the
+converted UTF-8 text.
 With a file argument, reviews that document.
 With --diff[=FILE], reads a Git unified diff from a file or stdin (-), without
 requiring a repository.  A file argument after --diff is also accepted.

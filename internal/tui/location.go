@@ -81,8 +81,13 @@ func (m *AppModel) openSourceEditor(location sourceLocation) tea.Cmd {
 		return nil
 	}
 	for _, tab := range m.tabs {
-		if tab.path == location.path && tab.attachment != nil {
-			location.path = tab.attachment.Source
+		if tab.path == location.path {
+			if tab.attachment != nil {
+				location.path = tab.attachment.Source
+			}
+			if tab.textconv.Command != "" {
+				location.line = 0
+			}
 			break
 		}
 	}

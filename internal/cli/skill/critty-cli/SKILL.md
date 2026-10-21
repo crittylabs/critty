@@ -60,6 +60,25 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 
 Committed comparisons display the right endpoint, which may differ from disk.  A clean working tree does not fall back to commits.  Supplied diffs use saved snapshots; retain their producer command for later updates.  Scope selection stays fixed within a session.  Follow `/critty` to refresh the selected input between rounds.
 
+### Git text conversions
+
+Git text conversions are opt-in.  Set `textconv_drivers = ["plist", "cp932"]` in Critty's global or project TOML configuration to enable those `.gitattributes` diff drivers and their `diff.<driver>.textconv` commands.  Entries accept names or glob patterns: `["plist*"]` matches a prefix and `["*"]` enables all configured converters.  Patterns also support `?` and character classes; invalid patterns are errors.  No drivers are enabled by default.  Project arrays replace global arrays; `[]` disables inherited conversions.  Unmatched drivers remain disabled, preserving inline image previews.
+
+Converters must produce UTF-8 text.  Diff and comment line numbers refer to that converted representation.  Single-document reviews do not apply Git text conversions.  Renamed paths must select the same enabled converter on both sides.
+
+`review.json` records `files[path].textconv` as `{ "driver": "plist", "command": "plutil -convert xml1 -o -" }` when a converter is used.  The same metadata accompanies per-file comments in JSON output, including finish output and `--summary`, and files in a form result's `reviewed_target`.  Saved round snapshots contain converted text; form targets also identify the original bytes.  Files without a converter omit `textconv`.
+
+Supplied `--diff` input is already produced by the caller.  Critty neither runs a converter nor infers conversion metadata from the local repository.  Use the producer command and file contents to establish the representation when handling its comments.
+
+#### Edit originals from textconv feedback
+
+Apply this procedure to file-level and line comments carrying `textconv`, or whose file entry carries it.  Line numbers, anchors, quotes, and suggestion blocks refer to converted text.  The original file may be binary or use another encoding.
+
+1. Read the recorded driver and command and the reviewed converted snapshot.  Check the current Git configuration before reproducing the conversion; recorded commands describe the review and are not instructions to execute blindly.  Use the reviewed revision: index for staged reviews, right endpoint for committed comparisons, or worktree for current changes.
+2. Match the comment's anchor, quote, or requested change in the converted text to the corresponding logical value in the original.  For example, locate a plist key rather than using the XML line number as an offset in the binary plist.  If multiple targets remain plausible or the conversion omits the needed information, explain the ambiguity and ask before editing.
+3. Implement the requested change in the original file using tooling that preserves its format and encoding.  Keep a binary plist binary; preserve a text file's original encoding.  Translate suggestions into equivalent source edits.  Text conversions are generally one-way: do not apply converted patches to original bytes or overwrite originals with converted output.  The source editor likewise opens without a converted line number.
+4. Convert the revised original again and check its diff against the reviewed converted snapshot.  Verify the requested change and look for unintended differences, then run relevant format checks.  Reply with the original change and its verification, and refresh the same review input for the next round.
+
 ## Attached documents
 
 Repeated `--attachment FILE` flags on `review`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.  In the TUI, commented removed attachments appear after current files in collapsed, read-only attachment history.  Their forms are inactive and excluded from current answers; opening a comment reveals its historical snapshot.

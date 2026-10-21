@@ -106,7 +106,7 @@ func resolveFocus(mode *reviewMode) error {
 				}
 				data = []byte(file.Content)
 			case mode.source != nil:
-				data, err = mode.source.Content(path)
+				data, err = mode.source.TextContent(path, file.Textconv)
 			case mode.staged:
 				data, err = git.FileContentFromIndex(path)
 			default:

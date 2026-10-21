@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
 )
@@ -14,10 +15,11 @@ import (
 // ReviewSource describes both sides of a code review without treating refs as
 // command options or reading working-tree contents for committed comparisons.
 type ReviewSource struct {
-	Scope string
-	Range string
-	Base  string
-	Head  string
+	TextconvDrivers []string `json:"textconv_drivers,omitempty"`
+	Scope           string
+	Range           string
+	Base            string
+	Head            string
 }
 
 func ResolveRange(value string) (ReviewSource, error) {
@@ -104,15 +106,52 @@ func (s ReviewSource) Files() ([]FileChange, error) {
 			files = append(files, FileChange{Path: path, Status: StatusUntracked})
 		}
 	}
+	paths := make([]string, len(files))
+	for i, file := range files {
+		paths[i] = file.Path
+	}
+	conversions, err := textconvsForPaths(paths, s.TextconvDrivers)
+	if err != nil {
+		return nil, err
+	}
+	for i := range files {
+		conversion := conversions[files[i].Path]
+		files[i].Textconv = conversion
+		if conversion.Command != "" {
+			files[i].Binary = false
+		}
+	}
 	return files, nil
 }
 
 // Diff returns the diff of path.  oldPath is the file's previous path when it
 // was renamed, else "".
 func (s ReviewSource) Diff(path, oldPath string) (*DiffInfo, error) {
-	out, err := gitCommand(append(s.diffArgs(), diffPathspec(path, oldPath)...)...)
+	conversion, err := textconvForPath(path, s.TextconvDrivers)
 	if err != nil {
 		return nil, err
+	}
+	args := s.diffArgs()
+	if oldPath != "" && oldPath != path {
+		oldConversion, err := textconvForPath(oldPath, s.TextconvDrivers)
+		if err != nil {
+			return nil, err
+		}
+		if conversion != oldConversion {
+			return nil, fmt.Errorf("textconv drivers differ across rename from %s to %s", oldPath, path)
+		}
+	}
+	if conversion.Command != "" {
+		args = append(args, "--textconv")
+	}
+	out, err := gitCommand(append(args, diffPathspec(path, oldPath)...)...)
+	if err != nil {
+		return nil, err
+	}
+	if !utf8.ValidString(out) || strings.ContainsRune(out, '\x00') {
+		if conversion.Command != "" {
+			return nil, fmt.Errorf("textconv %s for %s did not produce UTF-8 text", conversion.Driver, path)
+		}
 	}
 	files, _, err := gitdiff.Parse(strings.NewReader(out))
 	if err != nil {
@@ -201,7 +240,8 @@ func readPreviewFile(path string, limit int64) (data []byte, err error) {
 // Snapshot records raw changes, including mode and binary changes, without
 // applying the display's whitespace filtering.
 func (s ReviewSource) Snapshot() (ReviewSource, string, error) {
-	out, err := gitCommand(append(s.diffArgs(), "--binary", "--full-index", "--")...)
+	args := append(s.diffArgs(), "--binary", "--full-index", "--")
+	out, err := gitCommand(args...)
 	if err != nil {
 		return s, "", err
 	}

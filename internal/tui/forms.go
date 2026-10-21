@@ -210,7 +210,7 @@ func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff stri
 			continue
 		}
 		file := review.ReviewedFile{SnapshotFile: files[tab.path], Status: tab.status, Binary: tab.isBinary, Diff: tab.diff}
-		if tab.isBinary && !tab.isDeleted && m.patch == nil {
+		if (tab.isBinary || tab.textconv.Command != "") && !tab.isDeleted && m.patch == nil {
 			source := gitpkg.ReviewSource{}
 			if m.source != nil {
 				source = *m.source

@@ -219,6 +219,12 @@ func TestOpenCurrentSourceAndModalIsolation(t *testing.T) {
 	if ready.err != nil || !strings.HasSuffix(strings.Join(ready.cmd.Args, "|"), "|+2|"+app.tab().path) {
 		t.Fatalf("editor command = %#v, %v", ready.cmd, ready.err)
 	}
+	app.tab().textconv = gitpkg.Textconv{Driver: "plist", Command: "plutil -convert xml1 -o -"}
+	cmd = app.openSourceEditor(sourceLocation{path: app.tab().path, line: 42})
+	ready = cmd().(sourceEditorReadyMsg)
+	if ready.err != nil || len(ready.cmd.Args) != 2 || ready.cmd.Args[1] != app.tab().path {
+		t.Fatalf("editor received converted coordinates: %#v, %v", ready.cmd, ready.err)
+	}
 	app.modal = commentModal
 	app.modalTextarea.SetValue("draft")
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'g', Mod: tea.ModAlt})

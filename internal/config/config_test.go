@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -29,6 +30,41 @@ func TestLauncherConfigPrecedence(t *testing.T) {
 				t.Fatalf("Launchers = %v, want %v", cfg.Launchers, tc.want)
 			}
 		})
+	}
+}
+
+func TestTextconvConfigPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name, global, project string
+		want                  []string
+	}{
+		{"default", "", "", nil},
+		{"inherit", `textconv_drivers = ["plist", "cp932"]`, "", []string{"plist", "cp932"}},
+		{"replace", `textconv_drivers = ["image"]`, `textconv_drivers = ["plist"]`, []string{"plist"}},
+		{"disable", `textconv_drivers = ["plist"]`, `textconv_drivers = []`, []string{}},
+		{"wildcards", `textconv_drivers = ["*"]`, `textconv_drivers = ["plist*", "cp93?"]`, []string{"plist*", "cp93?"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			project := t.TempDir()
+			writeConfig(t, GlobalPath(), tc.global)
+			writeConfig(t, ProjectPath(project), tc.project)
+			cfg, err := Load(project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(cfg.TextconvDrivers, tc.want) {
+				t.Fatalf("TextconvDrivers = %v, want %v", cfg.TextconvDrivers, tc.want)
+			}
+		})
+	}
+}
+
+func TestInvalidTextconvPattern(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	writeConfig(t, GlobalPath(), `textconv_drivers = ["["]`)
+	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "textconv_drivers") {
+		t.Fatalf("invalid pattern error = %v", err)
 	}
 }
 

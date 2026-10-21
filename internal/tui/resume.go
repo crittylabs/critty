@@ -26,18 +26,25 @@ func (m *AppModel) restoreRound() error {
 	}
 	files := make(map[string]review.SnapshotFile, len(m.tabs))
 	for _, tab := range m.tabs {
-		if tab.isBinary || tab.outsideChanges || tab.path == overallCommentsPath {
+		if tab.loadErr != nil {
+			return tab.loadErr
+		}
+		if tab.outsideChanges || tab.path == overallCommentsPath {
+			continue
+		}
+		if tab.isBinary {
+			files[tab.path] = review.SnapshotFile{Partial: true}
 			continue
 		}
 		if tab.isDeleted {
-			files[tab.path] = review.SnapshotFile{}
+			files[tab.path] = review.SnapshotFile{Textconv: tab.textconv}
 			continue
 		}
 		doc, err := m.loadDocument(tab.path)
 		if err != nil {
 			return err
 		}
-		files[tab.path] = review.SnapshotFile{Content: doc.Content, Partial: doc.Known != nil}
+		files[tab.path] = review.SnapshotFile{Content: doc.Content, Partial: doc.Known != nil, Textconv: tab.textconv}
 	}
 	rawDiff := ""
 	if m.patch != nil {

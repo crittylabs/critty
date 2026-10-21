@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -25,6 +26,7 @@ type Config struct {
 	Split            bool              `json:"split,omitempty"`
 	IgnorePatterns   []string          `json:"ignore_patterns,omitempty"`
 	Launchers        []string          `json:"launchers,omitempty"`
+	TextconvDrivers  []string          `json:"textconv_drivers,omitempty"`
 	Quiet            bool              `json:"quiet,omitempty"`
 	CleanupOnApprove bool              `json:"cleanup_on_approve,omitempty"`
 	DisableStats     bool              `json:"disable_stats,omitempty"`
@@ -44,6 +46,7 @@ type fileConfig struct {
 	Split            *bool             `toml:"split"`
 	IgnorePatterns   []string          `toml:"ignore_patterns"`
 	Launchers        []string          `toml:"launchers"`
+	TextconvDrivers  []string          `toml:"textconv_drivers"`
 	Quiet            *bool             `toml:"quiet"`
 	CleanupOnApprove *bool             `toml:"cleanup_on_approve"`
 	DisableStats     *bool             `toml:"disable_stats"`
@@ -83,6 +86,11 @@ func Load(projectRoot string) (*Config, error) {
 		apply(cfg, project)
 	}
 
+	for _, pattern := range cfg.TextconvDrivers {
+		if _, err := path.Match(pattern, ""); err != nil {
+			return nil, fmt.Errorf("invalid textconv_drivers pattern %q: %w", pattern, err)
+		}
+	}
 	cfg.History, err = cfg.History.Normalize()
 	if err != nil {
 		return nil, err
@@ -143,6 +151,9 @@ func apply(cfg *Config, fc *fileConfig) {
 	cfg.IgnorePatterns = appendUnique(cfg.IgnorePatterns, fc.IgnorePatterns)
 	if fc.Launchers != nil {
 		cfg.Launchers = slices.Clone(fc.Launchers)
+	}
+	if fc.TextconvDrivers != nil {
+		cfg.TextconvDrivers = slices.Clone(fc.TextconvDrivers)
 	}
 	if fc.Quiet != nil {
 		cfg.Quiet = *fc.Quiet

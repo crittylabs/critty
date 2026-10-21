@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/crittylabs/critty/internal/git"
 )
 
 // ListedComment is a comment flattened for CLI output, matching crit's
 // `comments` format.  It embeds Comment so new review.json fields flow
-// through automatically; Scope and Path are the only additions.
+// through automatically, alongside file identity and conversion metadata.
 type ListedComment struct {
-	Scope string  `json:"scope"`
-	Path  *string `json:"path,omitempty"`
+	Textconv git.Textconv `json:"textconv,omitzero"`
+	Scope    string       `json:"scope"`
+	Path     *string      `json:"path,omitempty"`
 	Comment
 }
 
@@ -60,10 +63,14 @@ func (cj *CritJSON) ListComments(unresolvedOnly bool) []ListedComment {
 			return lineLevel[i].StartLine < lineLevel[j].StartLine
 		})
 		for _, c := range fileLevel {
-			out = append(out, toListedComment("file", path, c))
+			entry := toListedComment("file", path, c)
+			entry.Textconv = cj.Files[path].Textconv
+			out = append(out, entry)
 		}
 		for _, c := range lineLevel {
-			out = append(out, toListedComment("line", path, c))
+			entry := toListedComment("line", path, c)
+			entry.Textconv = cj.Files[path].Textconv
+			out = append(out, entry)
 		}
 	}
 	return out

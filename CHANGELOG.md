@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Review binary plists and text in other encodings by listing Git diff driver names or glob patterns in Critty's `textconv_drivers` setting; `["*"]` enables all configured converters.  Conversions are disabled by default, preserving inline image previews.  Comments refer to the converted UTF-8 text; review and comment JSON records the driver and command so agents can locate and edit the original content.  See the [CLI reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#git-text-conversions).
+
 ### Changed
 
 - Checklists in attached publication drafts and other Markdown documents remain display-only unless each interactive item has a `<!-- form: ... -->` annotation.  Agents must add an annotation to collect an answer, including for simple checkboxes.

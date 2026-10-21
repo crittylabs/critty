@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/crittylabs/critty/internal/config"
 	"github.com/crittylabs/critty/internal/git"
 )
 
@@ -56,6 +57,10 @@ func resolveCodeScope() (*reviewMode, error) {
 }
 
 func resolveSource(scope string) (*git.ReviewSource, error) {
+	cfg, err := config.LoadCurrent()
+	if err != nil {
+		return nil, err
+	}
 	source := git.ReviewSource{Scope: scope, Base: "HEAD"}
 	if scope != "all" && scope != "staged" && scope != "unstaged" {
 		resolved, err := git.ResolveRange(scope)
@@ -64,5 +69,6 @@ func resolveSource(scope string) (*git.ReviewSource, error) {
 		}
 		source = resolved
 	}
+	source.TextconvDrivers = cfg.TextconvDrivers
 	return &source, nil
 }

@@ -340,21 +340,24 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	tabs := make([]FileTab, 0, len(files))
 	for _, f := range files {
 		var diff *gitpkg.DiffInfo
+		var diffErr error
 		if cfg.Patch != nil {
 			if pf := cfg.Patch.File(f.Path); pf != nil {
 				diff = pf.Diff
 			}
 		} else if !f.IsBinary() {
 			if cfg.Source != nil {
-				diff, _ = cfg.Source.Diff(f.Path, f.OldPath)
+				diff, diffErr = cfg.Source.Diff(f.Path, f.OldPath)
 			} else {
 				diff, _ = codeDiff(f.Path, f.OldPath, ref, cfg.Staged)
 			}
 		}
 		ft := newFileTab(f.Path, diff)
 		ft.oldPath = f.OldPath
+		ft.textconv = f.Textconv
+		ft.loadErr = diffErr
 		ft.status = f.Status.String()
-		ft.isBinary = f.IsBinary() || cfg.Patch == nil && imagePath(f.Path)
+		ft.isBinary = f.IsBinary() || cfg.Patch == nil && imagePath(f.Path) && f.Textconv.Command == ""
 		if f.Status == gitpkg.StatusBinary {
 			ft.status = "modified"
 		}
@@ -443,6 +446,9 @@ func (m AppModel) Init() tea.Cmd {
 func (m AppModel) loadDocuments() tea.Cmd {
 	return func() tea.Msg {
 		for _, tab := range m.tabs {
+			if tab.loadErr != nil {
+				return errMsg{tab.loadErr}
+			}
 			if tab.isBinary || tab.isDeleted || tab.outsideChanges {
 				continue
 			}
@@ -462,7 +468,14 @@ func (m AppModel) loadDocument(path string) (*document.Document, error) {
 		return document.FromContent(path, []byte(d.Content)), nil
 	}
 	if m.source != nil {
-		content, err := m.source.Content(path)
+		var conversion gitpkg.Textconv
+		for _, tab := range m.tabs {
+			if tab.path == path {
+				conversion = tab.textconv
+				break
+			}
+		}
+		content, err := m.source.TextContent(path, conversion)
 		if err != nil {
 			return nil, err
 		}

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+
+	"github.com/crittylabs/critty/internal/git"
 )
 
 // NewSession allocates independent storage even for identical review arguments.
@@ -31,8 +33,9 @@ func NewSession(dataRoot string, meta SessionEntry) (*Session, error) {
 
 // SnapshotFile preserves the text used to anchor comments across TUI restarts.
 type SnapshotFile struct {
-	Content string `json:"content"`
-	Partial bool   `json:"partial,omitempty"`
+	Textconv git.Textconv `json:"textconv,omitzero"`
+	Content  string       `json:"content"`
+	Partial  bool         `json:"partial,omitempty"`
 }
 
 // RoundState is Critty's saved runtime context, separate from CritJSON comments.
@@ -58,6 +61,7 @@ func (s *Session) BeginRound(files map[string]SnapshotFile, rawDiff string) erro
 		now := Now()
 		for path, next := range files {
 			file := current.CJ.Files[path]
+			file.Textconv = next.Textconv
 			prev, exists := previous.Files[path]
 			if exists && (previous.Finished || prev != next) {
 				if prev.Partial || next.Partial {

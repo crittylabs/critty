@@ -35,6 +35,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `split` | Boolean enabling side-by-side diffs initially; defaults to `false` (unified). |
 | `ignore_patterns` | Array of glob strings excluded from review input. |
 | `launchers` | Ordered array of launcher names or custom launcher specifications. |
+| `textconv_drivers` | Array of Git diff driver names or glob patterns enabled for text conversion; defaults to `[]`. |
 | `quiet` | Boolean controlling finish-output verbosity. |
 | `cleanup_on_approve` | Boolean enabling removal of eligible approved reviews. |
 | `disable_stats` | Boolean disabling review statistics. |
@@ -47,6 +48,7 @@ Global settings are applied first, followed by project settings.  Settings merge
 - An explicitly supplied project boolean overrides the global boolean, including `false`.  Omission inherits the global value.
 - Ignore patterns form a union, preserving first occurrence order.  An empty array adds no patterns and does not clear inherited patterns.
 - Project `launchers` replaces the global array.  `[]` clears that array; omission inherits it.  CLI launcher flags still take precedence, and the launcher resolver supplies its normal defaults.
+- Project `textconv_drivers` replaces the global array.  `[]` disables inherited conversions; omission inherits the global patterns.  For example, `["plist", "cp932"]` enables those Git diff drivers, `["plist*"]` matches names with that prefix, and `["*"]` enables all configured converters.  Patterns also support `?` and character classes such as `[12]`; invalid patterns are errors.  Unmatched drivers remain disabled, preserving inline image previews.
 - Prompt tables merge by key.  A project value replaces the corresponding global value and leaves other keys intact.
 
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.

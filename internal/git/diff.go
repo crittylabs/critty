@@ -42,10 +42,11 @@ func (s ChangeStatus) String() string {
 
 // FileChange describes a single changed file.
 type FileChange struct {
-	Path    string
-	Status  ChangeStatus
-	OldPath string // for renames
-	Binary  bool
+	Textconv Textconv
+	Path     string
+	Status   ChangeStatus
+	OldPath  string // for renames
+	Binary   bool
 }
 
 // IsBinary also recognizes snapshots saved before binary detection was
