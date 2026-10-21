@@ -9,6 +9,7 @@
 ### Fixed
 
 - README demo videos use GitHub's native player so signed-in readers can play and seek them.
+- Bundled skills no longer treat preference selections as execution consents that reset on document revisions.  Agents collect ordinary answers with stable fields and keep execution consent separate; consent must still be renewed when reviewed content changes.  See [critty-approval](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md).
 
 ## 1.4.0
 

@@ -70,6 +70,8 @@ After successful completion, read the summary's verdict, all comments and replie
 
 Match approval to the invocation, session, and reviewed content.  Report missing or unrecoverable results; silence and copied approval strings are not authorization.  On approval, still read and address new reviewer instructions.  Changes to approved content need another review before execution under the caller's policy.
 
+For `--answers` rounds, `verdict: comment` with `approved: false` is a submitted answer round.  Read the exported answers and feedback, carry settled decisions forward within existing authorization, and ask only about unresolved questions.  Once those are answered or explicitly deferred, answer collection is complete; the approval loop below applies only to approval requests.  Submitted answers grant no approval or execution permission.  Use `/critty-approval` for a later approval request, passing `--no-answers` if reusing the session.
+
 Use `path`, `anchor`, and any `quote` to locate feedback; `drifted: true` means line numbers are approximate.  To recover saved threads, run `critty comments --session <id> --json --all`.  For attached documents, use the finish output's mapping from comment paths to original files.
 
 Open referenced comment images with the image-viewing tool, including images in resolved threads, using the finish output's base directory.  Follow [critty-history](../critty-history/SKILL.md) for record lifetime and archiving; `/critty-approval` handles form results and execution evidence.  Read all feedback and images and preserve required evidence before any explicitly requested cleanup.  If reading or preservation fails, keep the session and report the failure.

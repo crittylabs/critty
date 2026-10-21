@@ -43,7 +43,20 @@ Attach every referenced payload; a path alone is not a reviewed snapshot.  Map o
 
 ## Forms and choices
 
-Use ordinary review approval when no separate answers or permissions are needed.  Otherwise add task lists with stable IDs: `required` establishes a prerequisite, `consent` gates an operation, and a choice selects a reviewed alternative:
+Use ordinary review approval when no separate answers or permissions are needed.  For preferences or scope selection, collect ordinary answers with `--answers --result <directory>/answers-round-1.json`, using the returned scratch directory.  For example:
+
+```markdown
+Which tools should move to mise, and which version policy should they use?
+
+- [ ] Move the formatter to mise. <!-- form: id=formatter -->
+- [ ] Move the cloud CLI to mise. <!-- form: id=cloud-cli -->
+- [ ] Follow the latest release. <!-- form: id=versions value=latest -->
+- [ ] Pin a version. <!-- form: id=versions value=pinned -->
+```
+
+These fields collect answers, including partial answers, without granting permission to change the environment.  Keep independent selections editable across rounds.  Read submitted answers even when `verdict: comment` and `approved: false`; use them for preparation already authorized by the caller.  Present concrete changes or operations for any separately required approval, and pass `--no-answers` when reusing the session for that review.
+
+For individual execution permissions, `consent` gates an operation and a choice selects a reviewed alternative.  Use `required` only when an answer or consent is a prerequisite to approval:
 
 ```markdown
 - [ ] Publish as a draft PR. <!-- form: id=mode value=draft required -->
@@ -51,6 +64,8 @@ Use ordinary review approval when no separate answers or permissions are needed.
 - [ ] Create the PR with the selected mode and attached payload. <!-- form: id=create-pr consent -->
 ```
 
-Use the same ID and distinct `value` attributes on all options of a single choice; mark every option `required` when a human selection is necessary.  Spell out how each choice maps to the operation (here, `draft` sets the PR's draft flag to true, `ready` sets it to false).  Attach all alternative payloads when their text differs.  Limit execution to the reviewed alternatives; a selection requiring newly drafted text needs a new review of that text.
+Use the same ID and distinct `value` attributes on all options of a single choice; mark every option `required` when selection is a prerequisite to approval.  Spell out how each choice maps to the operation (here, `draft` sets the PR's draft flag to true, `ready` sets it to false).  Attach all alternative payloads when their text differs.  Limit execution to the reviewed alternatives; a selection requiring newly drafted text needs a new review of that text.
 
 Give independently authorized operations separate consent IDs.  Add `required` only when permission is a prerequisite to approving the request; otherwise approval may decline that operation.  Leave confirmations and consents unchecked in the source.  Initial checkmarks, ordinary checkboxes, and choices do not authorize actions.
+
+Read [attachment forms](../../critty-cli/references/forms.md) for widget and answer-retention contracts before revising a form.  Keep field wording, definitions, and explicit IDs stable; add explanations in surrounding prose or comments.  Changed fields need new answers, and new candidates remain unanswered even after an earlier select-all.

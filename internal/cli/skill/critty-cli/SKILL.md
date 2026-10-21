@@ -83,7 +83,7 @@ Task-list items annotated with `<!-- form: ... -->` in attached `.md` or `.markd
 | `approved` | Human review outcome, including required-confirmation checks. |
 | `consents` | On approval, document ID → field ID → boolean for individual permissions. |
 
-Feedback answers are drafts; overall approval and initial checkmarks supply no individual consent.  Form review cleanup is deferred.  Preserve the result before running the printed cleanup command, and follow `/critty-approval` to match decisions to operations.
+Answers submitted with `verdict: comment`, including `--answers` rounds, can record preferences or requirements without granting approval or execution permission.  Overall approval and initial checkmarks supply no individual consent.  Form review cleanup is deferred.  Preserve the result before running the printed cleanup command, and follow `/critty-approval` to match decisions to operations.
 
 ## Task history
 
