@@ -5,11 +5,13 @@
 ### Changed
 
 - Checklists in attached publication drafts and other Markdown documents remain display-only unless each interactive item has a `<!-- form: ... -->` annotation.  Agents must add an annotation to collect an answer, including for simple checkboxes.
-- [critty-ai-review](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-review/SKILL.md) and [critty-ai-cowork](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-cowork/SKILL.md) keep reviewers focused on information gathering and static findings; your agent owns edits, tests, measurements, and reproductions.  Reviewers report denied reads and missing evidence to your agent while continuing available investigation.  Naming a reviewer in a human Critty request authorizes necessary review-material transmission and follow-up rounds; host permission checks remain separate.  Claude Code defaults to read/search tools with relayed findings, without a Python gate; `doctor` clarifies when Python is needed.  Cowork requires both agents to agree on each finding's disposition and the reviewer to resolve its own satisfied findings; disagreements remain open for a human decision.
+- [critty-ai-review](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-review/SKILL.md) and [critty-ai-cowork](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-cowork/SKILL.md) give reviewers a static role: gather permitted information and report findings or missing evidence.  Your agent owns edits, tests, measurements, and reproductions.
+  - Naming a reviewer in a human Critty request authorizes necessary review material and follow-up rounds.  Host permission checks remain separate.
+  - Claude Code defaults to read/search tools with relayed findings and needs no Python; `doctor` clarifies the optional posting gate's requirements.  The Codex guide covers requests from Claude, result collection, and follow-up rounds.
+  - Cowork requires agreement on each finding's disposition and reviewer resolution of satisfied findings.  Disagreements remain open for a human decision.
 
 ### Fixed
 
-- README demo videos use GitHub's native player so signed-in readers can play and seek them.
 - Bundled skills no longer treat preference selections as execution consents that reset on document revisions.  Agents collect ordinary answers with stable fields and keep execution consent separate; consent must still be renewed when reviewed content changes.  See [critty-approval](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md).
 
 ## 1.4.0

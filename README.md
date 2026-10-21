@@ -180,6 +180,8 @@ For a deployment, include the target environment and exact deployment actions al
 
 Required confirmations must be complete before approval.  Approving the review does not authorize operations whose permission checkboxes remain unchecked.  Critty records your decisions; the agent executes the authorized actions.
 
+Ordinary Markdown checklists keep their written checkmarks and are display-only.  Agents add a `<!-- form: ... -->` annotation to each item that should collect an answer.  Preference answers use separate fields from execution permissions.  Changed execution requests require renewed consent.
+
 ### Approvals and choices without a code diff
 
 The agent can also open a request document on its own, without a code diff.  Use the same `critty-approval` skill to choose an approach before implementation starts or approve an action that has no code changes to review:
@@ -212,7 +214,7 @@ Ask your agent to "Have Fable review this and finish it" to delegate revisions a
 
 You can make that request in a Critty comment, including a Comment submission.  It authorizes sending the current review's necessary diff, documents, and surrounding source to the chosen model's configured service, with results returned to the local session.  That scope carries through follow-up rounds; separate host permission checks can still require direct confirmation.
 
-Your agent owns edits, tests, measurements, and reproductions.  The reviewer gathers permitted information and makes static findings.  If it needs more evidence or a read is denied, it tells your agent what is missing and continues with the available material.  Your agent obtains the information or runs the necessary check.
+Your agent owns edits, tests, measurements, and reproductions.  Claude can request a Codex review, and Codex can request a Claude review; the requesting agent keeps those responsibilities.  The reviewer gathers permitted information and makes static findings.  If it needs more evidence or a read is denied, it tells your agent what is missing and continues with the available material.  Your agent obtains the information or runs the necessary check.
 
 AI review requires an existing Critty session and authorized access to the chosen reviewer.  Claude Code can review with only read and search tools, returning comments for your agent to post.  Direct posting through the Claude gate requires Python 3.10+; the restricted Codex MCP setup requires Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies.
 
