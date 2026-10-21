@@ -7,7 +7,7 @@ Codex's Bash hook input contains the command string, not every execution option.
 ## Prepare
 
 1. Use Python 3.11 or later and install `scripts/codex-review-requirements.txt` into a dedicated environment.  This pins the official MCP Python SDK.  `critty install` copies these resources but does not install Python packages or register an MCP server globally.
-2. Prepare the policy described in [restricted CLI review](restricted-cli.md).  Check each `read_commands` entry for read-only behavior, including Git's pager, external diff, text conversion, and filesystem monitor settings.  Entries are requester-controlled executable argument vectors, not reviewer input.  The server runs them with stdin closed and a fixed cwd.
+2. Prepare the policy described in [restricted CLI review](restricted-cli.md), starting with `read_commands: []`.  Add only necessary static read commands, such as Git history with pagers, external diff, text conversion, and filesystem monitors disabled.  Entries are requester-controlled executable argument vectors, not reviewer input.  The server runs them with stdin closed and a fixed cwd.  Tests, measurements, reproductions, and diagnostic probes remain with the reviewee, including when they would not write files.
 3. Run `<python> <skill-dir>/scripts/codex_review_server.py --describe <policy.json>` and include the result in the assignment.  This validates directories and policy without importing MCP or contacting a model.  Fix preparation errors before dispatch.
 4. Use a dedicated, empty launch directory.  Inspect its ancestors for project `.codex` configuration and hooks, and use a location without those layers.  Keep policy, server code, and source snapshots unchanged during review.  Supply the task's applicable instructions in the request rather than inheriting unrelated instructions from the launch directory.
 
@@ -51,13 +51,13 @@ Before trusting an installation, verify the resulting tool surface: no `exec_com
 
 - `capabilities`: current roots, exact read-command indices, comment paths, destination, and denial recovery.
 - `read_file`, `list_files`, `search`: bounded UTF-8 reads, paged directory listings, and literal-text search under authorized roots.  Directory traversal omits `.git` and does not follow directory symlinks; resolved file paths must stay within a permitted root.  Search reports skipped non-text, unreadable, or oversized files.  Use `read_command` for approved Git history queries.
-- `read_command`: execute one exact requester-approved argv by index.  It cannot add arguments, input, shell syntax, or a different cwd.
+- `read_command`: execute one exact requester-approved static read argv by index.  It cannot add arguments, input, shell syntax, or a different cwd.  This interface is not an empirical verification tool.
 - `post_finding`: supply a literal body and optional permitted path or source range.  Omit `location` for the overall completion comment required by the shared skill.  Session and author are fixed by policy.  Shell metacharacters in the body remain data.
 - `resolve_finding`: supply a policy-listed own comment ID, its exact path (empty for review-level comments), and a nonempty reason.  The server posts the reason as a reply and resolves that thread using the fixed session and author.  Read it back with `comments` to verify persistence.
 - `reply_finding`: supply the same ID, path, and reason to reply without changing resolution state.  Use this when your concern is satisfied but another reviewer has an unresolved or unanswered concern about the same issue.
 - `comments`: read comments with optional request-ID filtering and pagination.  Read back the intended bodies and IDs after posting.
 
-Follow pagination and report truncation or skipped evidence.  After a rejected optional operation, consult `capabilities`, use an available alternative, and continue.  Ask the requester only when missing evidence is essential.  A posting timeout has an uncertain outcome: check `comments` before retrying.
+Follow pagination and report truncation or skipped evidence.  After a rejected read, consult `capabilities`, use an available alternative, and continue.  Tell the reviewee what information is missing, which operation was denied, and how the gap affects the conclusion.  Request needed excerpts or scoped access; the reviewee owns permission changes and empirical verification.  A posting timeout has an uncertain outcome: check `comments` before retrying.
 
 The requester runs tests, checks source hashes before and after, verifies persistence, and collects the final completion report.  Starting the server and running its local tests do not start Codex or incur model usage.
 

@@ -210,9 +210,13 @@ For example:
 
 Ask your agent to "Have Fable review this and finish it" to delegate revisions and follow-up through `critty-ai-cowork`.  Say "I'd like Fable's opinion first" to receive findings through `critty-ai-review` before deciding what to change.  The same distinction applies to other reviewers and languages; explicitly naming a skill selects that workflow.
 
-AI review requires an existing Critty session and authorized access to the chosen reviewer.  The bundled restricted CLI setups support Claude Code with Python 3.10+, or Codex with Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies.
+You can make that request in a Critty comment, including a Comment submission.  It authorizes sending the current review's necessary diff, documents, and surrounding source to the chosen model's configured service, with results returned to the local session.  That scope carries through follow-up rounds; separate host permission checks can still require direct confirmation.
 
-Before your first AI review, run `critty doctor` to check Python and MCP prerequisites.  If the reviewer uses a dedicated Python environment, check that interpreter explicitly:
+Your agent owns edits, tests, measurements, and reproductions.  The reviewer gathers permitted information and makes static findings.  If it needs more evidence or a read is denied, it tells your agent what is missing and continues with the available material.  Your agent obtains the information or runs the necessary check.
+
+AI review requires an existing Critty session and authorized access to the chosen reviewer.  Claude Code can review with only read and search tools, returning comments for your agent to post.  Direct posting through the Claude gate requires Python 3.10+; the restricted Codex MCP setup requires Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies.
+
+For a Python gate or MCP setup, run `critty doctor` to check its prerequisites.  If it uses a dedicated Python environment, check that interpreter explicitly:
 
 ```bash
 critty doctor --python /absolute/path/to/venv/bin/python

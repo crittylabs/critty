@@ -339,7 +339,7 @@ func (r *doctorReport) checkAI(python string) {
 	}
 	bin, err := lookPath(python)
 	if err != nil {
-		r.add("ai/python", "warn", "Python executable not found", "Choose Python 3.11+ with `critty doctor --python /path/to/venv/bin/python` for Codex, or Python 3.10+ for Claude.")
+		r.add("ai/python", "warn", "Python executable not found", "Choose Python 3.11+ with `critty doctor --python /path/to/venv/bin/python` for the Codex MCP setup, or Python 3.10+ for the Claude posting gate. Static Claude reviews with relayed findings need no Python.")
 		return
 	}
 	const probe = `import json, sys
@@ -372,7 +372,7 @@ print(json.dumps({"major": sys.version_info.major, "minor": sys.version_info.min
 	if env.Major < 3 || env.Major == 3 && env.Minor < 10 {
 		status = "warn"
 	}
-	r.add("ai/claude-python", status, fmt.Sprintf("Python %d.%d: %s", env.Major, env.Minor, bin), "Restricted Claude reviews require Python 3.10+.")
+	r.add("ai/claude-python", status, fmt.Sprintf("Python %d.%d: %s", env.Major, env.Minor, bin), "The Claude posting gate requires Python 3.10+; static reviews with relayed findings need no Python.")
 	status = "ok"
 	if env.Major < 3 || env.Major == 3 && env.Minor < 11 {
 		status = "warn"

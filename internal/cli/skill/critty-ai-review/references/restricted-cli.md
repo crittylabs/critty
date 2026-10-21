@@ -1,10 +1,29 @@
 # Restricted CLI review
 
-The requester prepares inputs, runs tests, and launches the other AI.  The reviewer reads and posts findings; it never edits files or runs checks.  Host bookkeeping such as authentication and logs is separate from reviewer tool permissions.
+The reviewee (requester) prepares inputs, runs empirical checks, and launches the other AI.  The reviewer gathers information and makes static findings.  Read and search tools are appropriate; running code, tests, measurements, reproductions, or diagnostic probes belongs to the reviewee.  Host bookkeeping such as authentication and logs is separate from reviewer tool permissions.
 
 ## Claude Code
 
-Use an isolated launch with `--restricted`, an explicit built-in tool list, no external MCP tools, and the bundled `scripts/claude_review_gate.py` as a `PreToolUse` hook.  The gate requires Python 3.10 or later.  The gate admits `Read`, `Glob`, and `Grep` under authorized read roots.  Bash accepts exact requester-approved read-only commands and comment-list and comment-add commands for one session.  Other tools and commands are denied.
+### Static review with relayed findings
+
+Use this path by default.  Launch with `--restricted`, only `Read`, `Glob`, and `Grep`, and no MCP servers.  The reviewee supplies snapshots, instructions, existing comments, and any needed history excerpts.  The reviewer returns findings, replies, its own resolution decisions, and a completion report as bulk JSON; the reviewee posts them under the reviewer author and reads them back under the shared skill's relay contract.  This avoids granting shell or storage-write access to the reviewer and needs no Python gate.
+
+Check the installed CLI's options first.  Prepare an empty MCP file containing `{"mcpServers": {}}` and the request in the returned scratch directory.  Replace `<directory>` and `<selected-model>` below with their actual values:
+
+```sh
+claude --restricted --print --model '<selected-model>' \
+  --tools Read,Glob,Grep --allowedTools Read,Glob,Grep \
+  --permission-mode dontAsk --permission-prompts none \
+  --strict-mcp-config --mcp-config '<directory>/empty-mcp.json' \
+  --disable-slash-commands --no-session-persistence \
+  --output-format stream-json --verbose < '<directory>/request.txt'
+```
+
+Verify that startup reports only these three tools and no MCP servers.  `--restricted` confines reads to the working directories; launch from the authorized review workspace and check its symlinks before granting additional directories.  If an information source is inaccessible, the reviewer reports the missing information and affected conclusion to the reviewee and continues permitted investigation.  The reviewee can supply an excerpt or arrange appropriately scoped access; it does not enable test or probe execution for the reviewer.
+
+### Direct Critty posting
+
+When direct posting or additional static read commands are needed, use an isolated launch with `--restricted`, an explicit built-in tool list, no external MCP tools, and the bundled `scripts/claude_review_gate.py` as a `PreToolUse` hook.  The gate requires Python 3.10 or later.  It admits `Read`, `Glob`, and `Grep` under authorized read roots.  Bash accepts exact requester-approved static read commands and scoped Critty comment operations for one session.  Other tools and commands are denied.
 
 Before launch, the requester creates a policy JSON file containing:
 
@@ -15,13 +34,13 @@ Before launch, the requester creates a policy JSON file containing:
 - `resolvable_comments`: optional list of `{"id": "c_123abc", "path": "src/example.py"}` entries verified by the requester as this reviewer's own findings.  These threads permit replies with or without resolution.  Use an empty path for review-level IDs (`r_…`).  Match both ID and path to disambiguate file comment IDs.  Omission permits neither replies nor resolution.  Keep this list fixed during an assignment.
 - `locations`: bare permitted file paths from the frozen target, without numeric range suffixes.  The reviewer may append a positive line or ascending line range as `:line[-end]`; review-level comments need no location.
 - `read_roots`: resolved absolute directories authorized for investigation, normally the review workspace.  Read/search paths outside these roots are denied.  Supply CLI excerpts when the installed skill lies outside them.
-- `read_commands`: lists of exact argument vectors for read-only commands the requester has checked.  Use absolute executables and review their entire arguments; this is trusted permission configuration, not model input.  Include needed Git history and diff commands, with pagers, external diff drivers, text conversion, and filesystem monitors disabled.  Supply their canonical command strings to the reviewer.  Additional investigations can request another checked command; never add a blanket shell allowance.
+- `read_commands`: start with `[]`; add only exact argument vectors for necessary static reads, such as Git history or diffs.  Use absolute executables and review their entire arguments; this is trusted permission configuration, not model input.  Disable pagers, external diff drivers, text conversion, and filesystem monitors.  Exclude code execution, tests, benchmarks, reproductions, and diagnostic probes even if they appear read-only.  Supply canonical command strings to the reviewer; missing empirical evidence goes to the reviewee, never into this allowlist.
 
 Create a separate settings JSON file with a `PreToolUse` matcher of `*`.  Its single command hook invokes the gate with the policy path.  Use an absolute Python interpreter and gate path, quote with a shell-argument generator, set a short timeout, and set `onFailure` to `block`.  Give the reviewer neither write access to these files nor tools that can alter them.  Do not add Bash to `permissions.allow`: a missing hook must leave Bash denied by `dontAsk`.
 
 Run `python3 scripts/claude_review_gate.py --describe <policy.json>` from this skill's directory and include its JSON capability summary in the assignment.  It derives allowed roots, exact command strings, posting rules, and denial recovery from the same policy the hook enforces.  If this command fails, correct the policy before dispatch.  The hook returns this summary for denied operations under a valid policy; configuration or malformed-input failures return an error reason.  A denied optional investigation should leave the reviewer working within the available scope, with the limitation in its report.
 
-Choose read commands that cover the actual target: `git diff HEAD` includes staged and unstaged tracked changes; untracked snapshots still require direct reads.  Supply a checked hashing command over the target paths when independent digest verification is needed.  Otherwise, identify hashes as requester-verified and have the requester compare them before and after the review; the reviewer should not claim to have recomputed them.
+Choose static read commands that cover the actual target: `git diff HEAD` includes staged and unstaged tracked changes; untracked snapshots still require direct reads.  Have the reviewee check source hashes before and after review and identify them as reviewee-verified.  Reading existing checksums is permitted information gathering; it does not establish that the reviewer recomputed them.
 
 The `.tmp/` directory in the command example below is illustrative.  Replace it consistently with the scratch directory used in your environment, and prepare the referenced files there before launch.
 
@@ -65,4 +84,4 @@ Use the [restricted Codex launch](codex-cli.md) when Codex is the reviewer.  It 
 
 ## Other hosts
 
-Use equivalent tool restrictions only when the host exposes them and they have been verified.  A filesystem read-only sandbox alone does not prohibit running tests or arbitrary commands.  Use a verified tool allowlist or return findings for the requester to post; do not grant broad workspace-write access merely to reach Critty storage.
+Use equivalent tool restrictions only when the host exposes them and they have been verified.  A filesystem read-only sandbox alone does not prohibit running tests or arbitrary commands.  Use a verified tool allowlist or return findings for the requester to post; do not grant broad workspace-write access merely to reach Critty storage.  Permission denials are information for the reviewee: report the attempted read, missing evidence, and affected conclusion, continue available investigation, and let the reviewee arrange any additional access or empirical checks.
