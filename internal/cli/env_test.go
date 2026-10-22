@@ -19,7 +19,7 @@ func TestEnvCommandPrintsTMUXEnvironment(t *testing.T) {
 	t.Cleanup(func() { reviewOrigin = previousOrigin })
 	t.Setenv("TMUX", "/tmp/tmux-501/default,100,2")
 	t.Setenv("TMUX_PANE", "%7")
-	for _, key := range []string{"HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
+	for _, key := range []string{"HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(key, "")
 	}
 	origOutput, origInspect, origLook := commandOutput, inspectProcess, lookPath
@@ -190,7 +190,7 @@ func TestTerminalEnvironmentFallsBackToAncestorTTY(t *testing.T) {
 	}
 	previousOrigin := reviewOrigin
 	t.Cleanup(func() { reviewOrigin = previousOrigin })
-	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
+	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(key, "")
 	}
 	t.Setenv("SSH_TTY", "/dev/pts/9")

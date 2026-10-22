@@ -95,6 +95,8 @@ func TestLauncherSelection(t *testing.T) {
 	}{
 		{"mux", tmuxContext{pane: "%1"}, "tmux-floating"},
 		{"mux", herdrContext{pane: "p1"}, "herdr"},
+		{"mux", cmuxContext{workspace: "w1", surface: "s1"}, "cmux"},
+		{"cmux", cmuxContext{workspace: "w1", surface: "s1"}, "cmux"},
 		{"herdr", tmuxContext{pane: "%1"}, "tmux-floating"},
 		{"tmux", herdrContext{pane: "p1"}, "herdr"},
 		{"custom:/missing/launcher", tmuxContext{pane: "%1"}, "tmux-floating"},
@@ -267,6 +269,8 @@ func TestLauncherEnvironmentUsesDetectedContext(t *testing.T) {
 	t.Setenv("TMUX", "stale")
 	t.Setenv("TMUX_PANE", "%99")
 	t.Setenv("HERDR_TAB_ID", "stale")
+	t.Setenv("CMUX_WORKSPACE_ID", "stale")
+	t.Setenv("CMUX_SURFACE_ID", "stale")
 	t.Setenv("TTY", "stale")
 	got := launcherEnvironment([]envVar{{"TMUX", "socket,100,1"}, {"TMUX_PANE", "%1"}, {"TTY", "/dev/tty1"}})
 	for _, want := range []string{"TMUX=socket,100,1", "TMUX_PANE=%1", "TTY=/dev/tty1"} {

@@ -19,10 +19,11 @@ var envJSON bool
 var envCmd = &cobra.Command{
 	Use:   "env [--json] [all | tty | run <command> [args...]]",
 	Short: "Print the environment that identifies the review terminal, or run a command with it",
-	Long: `Locate the Herdr or tmux terminal the way review commands do, then print the
+	Long: `Locate the tmux, Herdr, or cmux terminal the way review commands do, then print the
 variables a process needs to address it: TMUX, TMUX_PANE, and TTY for tmux,
 or HERDR_ENV, HERDR_SOCKET_PATH, HERDR_WORKSPACE_ID, HERDR_TAB_ID, HERDR_PANE_ID,
-and TTY for Herdr.  CRITTY_TERMINAL_APP reports a known application and
+and TTY for Herdr; CMUX_SOCKET_PATH, CMUX_WORKSPACE_ID, and CMUX_SURFACE_ID for cmux.
+CRITTY_TERMINAL_APP reports a known application and
 CRITTY_SSH=1 reports positive SSH evidence.  By default, or with all, each variable is printed as
 NAME=value; --json prints one JSON object instead.  tty prints only the
 terminal device.  Flags go before the mode word.  run <command>, or -- <command>, replaces this process with
@@ -132,6 +133,8 @@ func environmentForTerminal(ctx reviewMultiplexerContext) ([]envVar, error) {
 	var err error
 	var vars []envVar
 	switch ctx := ctx.(type) {
+	case cmuxContext:
+		vars = []envVar{{"CMUX_SOCKET_PATH", ctx.socket}, {"CMUX_WORKSPACE_ID", ctx.workspace}, {"CMUX_SURFACE_ID", ctx.surface}}
 	case tmuxContext:
 		vars, err = tmuxEnvironment(ctx)
 	case herdrContext:

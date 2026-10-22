@@ -63,6 +63,8 @@ func desktopOrder(platform string, origin terminalbinding.Origin) []string {
 
 func terminalTarget(terminal reviewMultiplexerContext) terminalbinding.Target {
 	switch t := terminal.(type) {
+	case cmuxContext:
+		return t.target()
 	case tmuxContext:
 		socket := t.socket
 		if socket == "" {

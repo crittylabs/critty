@@ -98,7 +98,7 @@ for dir in $rest; do
 done
 exit 127
 `)
-	for _, key := range []string{"HERDR_ENV", "HERDR_SOCKET_PATH", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
+	for _, key := range []string{"HERDR_ENV", "HERDR_SOCKET_PATH", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(key, "")
 	}
 	t.Setenv("TMUX", "/test/socket,1,0")

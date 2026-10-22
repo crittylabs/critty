@@ -65,5 +65,8 @@ func reviewTerminalContext() (reviewMultiplexerContext, error) {
 	if target.Kind == "tmux" {
 		return tmuxContext{socket: target.Socket, pane: target.Pane}, nil
 	}
+	if target.Kind == "cmux" {
+		return cmuxContext{socket: target.Socket, workspace: target.Workspace, surface: target.Pane}, nil
+	}
 	return herdrContext{socket: target.Socket, workspace: target.Workspace, tab: target.Tab, pane: target.Pane}, nil
 }

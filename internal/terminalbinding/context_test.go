@@ -10,7 +10,7 @@ import (
 
 func clearTerminalEnv(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID"} {
+	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_SOCKET_PATH", "HERDR_CONFIG_PATH", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(key, "")
 	}
 }
@@ -36,7 +36,7 @@ func TestEnvironmentTargets(t *testing.T) {
 
 func TestSnapshotUsesVisiblePaneAndPinnedSocket(t *testing.T) {
 	dir := t.TempDir()
-	for _, kind := range []string{"tmux", "herdr"} {
+	for _, kind := range []string{"tmux", "herdr", "cmux"} {
 		t.Run(kind, func(t *testing.T) {
 			script := `#!/bin/sh
 printf '%s\n' "$@" > "$ARGS_FILE"
@@ -55,6 +55,10 @@ printf '%s' "$HERDR_SOCKET_PATH" > "$SOCKET_FILE"
 			if kind == "herdr" {
 				target = Target{Kind: "herdr", Socket: "/right/socket", Workspace: "w1", Tab: "w1:t1", Pane: "w1:p1"}
 				want = "pane\nread\nw1:p1\n--source\nvisible\n--format\ntext\n"
+			}
+			if kind == "cmux" {
+				target = Target{Kind: "cmux", Socket: "/right/socket", Workspace: "w1", Pane: "s1"}
+				want = "--socket\n/right/socket\nread-screen\n--workspace\nw1\n--surface\ns1\n"
 			}
 			text, err := Snapshot(context.Background(), target)
 			if err != nil || text != "CRITTY-visible" {

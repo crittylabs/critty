@@ -28,6 +28,7 @@ type multiplexerDetector interface {
 var supportedMultiplexerDetectors = []multiplexerDetector{
 	herdrDetector{},
 	tmuxDetector{},
+	cmuxDetector{},
 }
 
 func findMultiplexerContext() reviewMultiplexerContext {

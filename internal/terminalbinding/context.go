@@ -20,7 +20,7 @@ type Target struct {
 	Origin    Origin `json:"origin,omitempty"`
 	Kind      string `json:"kind"`
 	Socket    string `json:"socket"`
-	Pane      string `json:"pane"`
+	Pane      string `json:"pane"` // Surface ID for cmux.
 	Workspace string `json:"workspace,omitempty"`
 	Tab       string `json:"tab,omitempty"`
 }
@@ -47,16 +47,29 @@ func (t Target) Validate() error {
 		if t.Tab == "" || t.Workspace == "" || strings.HasPrefix(t.Pane, "-") {
 			return fmt.Errorf("incomplete Herdr target")
 		}
+	case "cmux":
+		if t.Workspace == "" || strings.HasPrefix(t.Pane, "-") || strings.HasPrefix(t.Workspace, "-") {
+			return fmt.Errorf("incomplete cmux target")
+		}
 	default:
 		return fmt.Errorf("unknown terminal kind %q", t.Kind)
 	}
 	return nil
 }
 
-// Command pins every Herdr request to the recorded server, regardless of daemon environment.
+// Command pins requests to the recorded server, regardless of daemon environment.
 func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
 	if t.Kind == "tmux" {
 		return exec.CommandContext(ctx, "tmux", append([]string{"-S", t.Socket}, args...)...)
+	}
+	if t.Kind == "cmux" {
+		cmd := exec.CommandContext(ctx, "cmux", append([]string{"--socket", t.Socket}, args...)...)
+		for _, e := range os.Environ() {
+			if !strings.HasPrefix(e, "CMUX_") || strings.HasPrefix(e, "CMUX_SOCKET_PASSWORD=") {
+				cmd.Env = append(cmd.Env, e)
+			}
+		}
+		return cmd
 	}
 	cmd := exec.CommandContext(ctx, "herdr", args...)
 	for _, e := range os.Environ() {
@@ -96,6 +109,9 @@ func FromEnvironment() (Target, error) {
 		}
 		targets = append(targets, Target{Kind: "herdr", Socket: socket, Workspace: w, Tab: tab, Pane: pane})
 	}
+	if workspace, surface := os.Getenv("CMUX_WORKSPACE_ID"), os.Getenv("CMUX_SURFACE_ID"); workspace != "" && surface != "" {
+		targets = append(targets, Target{Kind: "cmux", Socket: CMUXSocketPath(), Workspace: workspace, Pane: surface})
+	}
 	for _, t := range targets {
 		if err := t.Validate(); err != nil {
 			return Target{}, err
@@ -117,6 +133,17 @@ func FromEnvironment() (Target, error) {
 			if err == nil {
 				if pid, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 					owners[pid] = t
+				}
+			}
+		} else if t.Kind == "cmux" {
+			out, err := t.Command(ctx, "--json", "--id-format", "uuids", "top", "--all", "--processes").Output()
+			if err == nil {
+				for pid, owner := range CMUXProcessTargets(out, t.Socket) {
+					if owner.Workspace == t.Workspace && owner.Pane == t.Pane {
+						if _, exists := owners[pid]; !exists {
+							owners[pid] = t
+						}
+					}
 				}
 			}
 		} else {
@@ -141,7 +168,7 @@ func FromEnvironment() (Target, error) {
 		}
 		pid = p.PPID()
 	}
-	return Target{}, fmt.Errorf("cannot distinguish nested tmux and Herdr terminals")
+	return Target{}, fmt.Errorf("cannot distinguish nested multiplexer terminals")
 }
 
 func collectOwners(v any, target Target, owners map[int]Target) {
@@ -172,6 +199,10 @@ func Snapshot(ctx context.Context, t Target) (string, error) {
 	}
 	if t.Kind == "tmux" {
 		out, err := t.Command(ctx, "capture-pane", "-p", "-J", "-t", t.Pane).Output()
+		return string(out), err
+	}
+	if t.Kind == "cmux" {
+		out, err := t.Command(ctx, "read-screen", "--workspace", t.Workspace, "--surface", t.Pane).Output()
 		return string(out), err
 	}
 	out, err := t.Command(ctx, "pane", "read", t.Pane, "--source", "visible", "--format", "text").Output()
