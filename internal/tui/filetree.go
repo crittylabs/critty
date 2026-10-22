@@ -313,7 +313,16 @@ func (m *AppModel) renderFileTree() {
 				text = "…" + ansi.Cut(text, tree.hscroll+1, lipgloss.Width(text))
 			}
 		}
-		lines[i] = prefix + ansi.Truncate(text, width, "…")
+		line := prefix + ansi.Truncate(text, width, "…")
+		row := tree.rows[i]
+		if !row.isDir && row.tabIndex == m.activeTab {
+			padding := strings.Repeat(" ", max(0, tree.viewport.Width()-ansi.StringWidth(line)))
+			// Reversing equal colors keeps the gray fill while preventing
+			// background-color erase optimizations from dropping the padding.
+			line += lipgloss.NewStyle().Foreground(buttonBackground).Background(buttonBackground).Reverse(true).Render(padding)
+			line = inlineBackground(lipgloss.NewStyle().Background(buttonBackground), line)
+		}
+		lines[i] = line
 	}
 	tree.viewport.SetContent(strings.Join(lines, "\n"))
 }

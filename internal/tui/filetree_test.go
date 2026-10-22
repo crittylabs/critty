@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
@@ -220,6 +223,93 @@ func TestFileTreeRendersOneColumnIndentAndActiveFile(t *testing.T) {
 	active := strings.Split(app.fileTree.viewport.View(), "\n")[3]
 	if !strings.Contains(active, "\x1b[1") {
 		t.Fatalf("active file row = %q, want bold", active)
+	}
+}
+
+func TestFileTreeHighlightAcrossScrolling(t *testing.T) {
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	for _, theme := range []struct {
+		name string
+		dark bool
+	}{{"light", false}, {"dark", true}} {
+		t.Run(theme.name, func(t *testing.T) {
+			initAdaptiveStyles(theme.dark)
+			app := newFileTreeTestApp()
+			app.tabs[0].path = "a/sub/" + strings.Repeat("日本語-é-", 8) + "file.go"
+			app.tabs[0].changedLines = map[int]bool{1: true}
+			app.updateCommentSidebar()
+			for _, stage := range []string{"content", "files", "scrolled", "end", "directory"} {
+				t.Run(stage, func(t *testing.T) {
+					switch stage {
+					case "files":
+						app = pressKey(app, 's')
+					case "scrolled":
+						app = pressKey(app, tea.KeyRight)
+					case "end":
+						app.scrollTreeRow(app.maxTreeScroll())
+					case "directory":
+						app.setTreeCursor(app.fileTree.cursor - 1)
+					}
+					lines := strings.Split(app.fileTree.viewport.GetContent(), "\n")
+					for i, row := range app.fileTree.rows {
+						active := !row.isDir && row.tabIndex == app.activeTab
+						width := 0
+						for _, cells := range uv.NewStyledString(lines[i]).Lines(ansi.GraphemeWidth) {
+							for _, cell := range cells {
+								width += cell.Width
+								if sameColor(cell.Style.Bg, buttonBackground) != active {
+									t.Fatalf("row %d cell %q has wrong background: %+v", i, cell.Content, cell.Style)
+								}
+								if cell.Content == "+" && !sameColor(cell.Style.Fg, tabAddedCount.GetForeground()) {
+									t.Fatalf("change count lost its foreground: %+v", cell.Style)
+								}
+							}
+						}
+						if active && width != app.fileTree.viewport.Width() {
+							t.Fatalf("active row width=%d, want %d", width, app.fileTree.viewport.Width())
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestFileTreeHighlightPaintsPadding(t *testing.T) {
+	app := newFileTreeTestApp()
+	app.fileTree.viewport.SetWidth(60)
+	app.renderFileTree()
+	var row string
+	for i, entry := range app.fileTree.rows {
+		if !entry.isDir && entry.tabIndex == app.activeTab {
+			row = strings.Split(app.fileTree.viewport.GetContent(), "\n")[i]
+		}
+	}
+	if row == "" {
+		t.Fatal("active file row missing")
+	}
+	var output bytes.Buffer
+	renderer := uv.NewTerminalRenderer(&output, []string{"TERM=tmux-256color"})
+	renderer.SetColorProfile(colorprofile.TrueColor)
+	renderer.SetFullscreen(true)
+	screen := uv.NewScreenBuffer(62, 1)
+	for _, content := range []string{strings.Repeat(" ", 60), row} {
+		output.Reset()
+		uv.NewStyledString("│"+content+"│").Draw(screen, screen.Bounds())
+		renderer.Render(screen.RenderBuffer)
+		if err := renderer.Flush(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	parser := ansi.NewParser()
+	parser.SetHandler(ansi.Handler{HandleCsi: func(cmd ansi.Cmd, _ ansi.Params) {
+		if cmd == 'X' || cmd == 'K' {
+			t.Errorf("highlight padding uses background erase: %q", output.String())
+		}
+	}})
+	for _, b := range output.Bytes() {
+		parser.Advance(b)
 	}
 }
 
