@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -242,34 +243,36 @@ func readReloadInputs(source *gitpkg.ReviewSource, filePath string, frozen bool,
 	return &next, fingerprint, nil
 }
 
-func (m *AppModel) finishReload(msg reloadMsg) {
+func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 	if msg.request != m.reload.request {
-		return
+		return nil
 	}
 	m.reload.busy = false
 	if msg.automatic && (!m.reload.watch || msg.epoch != m.reload.epoch) {
-		return
+		return nil
 	}
 	if m.reloadBlocked() {
 		m.reload.pending = m.reload.pending || !msg.automatic
 		m.reload.dirty = m.reload.dirty || msg.automatic
-		return
+		return nil
 	}
 	if msg.err != nil {
 		m.reload.err = msg.err
-		return
+		return nil
 	}
 	if msg.model == nil {
 		m.reload.err = nil
-		return
+		return nil
 	}
 	m.persist()
 	if m.err != nil {
-		return
+		return nil
 	}
 	active, offset := "", m.contentViewport.YOffset()
+	var previous FileTab
 	if len(m.tabs) > 0 {
 		active = m.tab().path
+		previous = *m.tab()
 	}
 	old := make(map[string]FileTab, len(m.tabs))
 	for _, tab := range m.tabs {
@@ -325,11 +328,11 @@ func (m *AppModel) finishReload(msg reloadMsg) {
 		}
 		if err := m.session.ReplaceDocuments(docs); err != nil {
 			m.err = err
-			return
+			return nil
 		}
 		if err := m.restoreRound(); err != nil {
 			m.err = err
-			return
+			return nil
 		}
 	}
 	for i := range m.tabs {
@@ -357,6 +360,15 @@ func (m *AppModel) finishReload(msg reloadMsg) {
 		m.contentViewport.SetYOffset(offset)
 		m.scrollToCursor()
 	}
+	if active != "" {
+		if len(m.tabs) == 0 || m.tab().path != active {
+			return m.flashNotice("Review updated")
+		}
+		if tabContentChanged(previous, *m.tab()) {
+			return m.flashNotice("Updated: " + m.tab().displayPath())
+		}
+	}
+	return nil
 }
 
 func (m AppModel) watchIndicator() string {
@@ -371,4 +383,63 @@ func (m AppModel) renderReloadStatus() string {
 		return "Reload failed: " + headerLabel(m.reload.err.Error())
 	}
 	return ""
+}
+
+func tabContentChanged(before, after FileTab) bool {
+	content := func(tab FileTab) string {
+		if tab.doc == nil {
+			return ""
+		}
+		return tab.doc.Content
+	}
+	return content(before) != content(after) || !reflect.DeepEqual(before.diff, after.diff) ||
+		before.binaryRevision != after.binaryRevision || before.status != after.status || before.isBinary != after.isBinary || before.isDeleted != after.isDeleted ||
+		before.outsideChanges != after.outsideChanges || before.oldPath != after.oldPath || before.textconv != after.textconv
+}
+
+// Binary previews have no document text or line diff to compare.  Keep a cheap
+// source revision without reading their contents on each reload.
+func (m *AppModel) loadBinaryRevisions() {
+	var paths []string
+	for _, tab := range m.tabs {
+		if tab.isBinary && !tab.isDeleted && !tab.outsideChanges {
+			paths = append(paths, tab.path)
+		}
+	}
+	if len(paths) == 0 {
+		return
+	}
+	var revisions map[string]string
+	var err error
+	source := m.source
+	if source == nil && m.staged {
+		source = &gitpkg.ReviewSource{Scope: "staged"}
+	}
+	if source != nil && (source.Scope == "staged" || source.Scope == "range") {
+		revisions, err = source.ObjectIDs(paths)
+	} else {
+		revisions = make(map[string]string, len(paths))
+		for _, path := range paths {
+			info, statErr := os.Stat(path)
+			if os.IsNotExist(statErr) {
+				revisions[path] = "missing"
+				continue
+			}
+			if statErr != nil {
+				err = statErr
+				break
+			}
+			revisions[path] = fmt.Sprintf("%d:%d:%v", info.Size(), info.ModTime().UnixNano(), info.Mode())
+		}
+	}
+	for i := range m.tabs {
+		tab := &m.tabs[i]
+		if !tab.isBinary || tab.isDeleted || tab.outsideChanges {
+			continue
+		}
+		tab.binaryRevision = revisions[tab.path]
+		if err != nil && tab.loadErr == nil {
+			tab.loadErr = err
+		}
+	}
 }

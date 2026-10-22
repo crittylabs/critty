@@ -6,7 +6,11 @@ import (
 )
 
 func (m AppModel) renderEmptyReview() (string, []modalMouseRegion) {
-	body := m.renderReviewBar() + "\n\nNo changes remain in this review.\n\n" + m.renderReloadStatus()
+	status := m.renderReloadStatus()
+	if status == "" && m.notice.text != "" {
+		status = footerStyle.Foreground(warning).Render(m.notice.text)
+	}
+	body := m.renderReviewBar() + "\n\nNo changes remain in this review.\n\n" + status
 	body = lipgloss.NewStyle().Width(m.width).Height(m.height).Render(body)
 	if m.modal != noModal {
 		return m.renderWithModalLayout(body)

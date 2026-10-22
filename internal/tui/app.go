@@ -188,6 +188,7 @@ type AppModel struct {
 	lineInput            textinput.Model
 	pendingLocation      sourceLocation
 	locationError        string
+	notice               footerNotice
 	isearch              isearchState
 
 	err error
@@ -333,6 +334,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()
 	m.orderTabsByTree()
+	m.loadBinaryRevisions()
 	return m
 }
 
@@ -424,6 +426,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()
 	m.orderTabsByTree()
+	m.loadBinaryRevisions()
 	return m
 }
 
@@ -652,6 +655,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorImagesMsg:
 		m.finishEditorImagesDelay(msg)
 		return m, nil
+	case noticeExpiredMsg:
+		m.expireNotice(msg)
+		return m, nil
 	case externalOpenMsg:
 		m.locationError = msg.status
 		return m, nil
@@ -688,8 +694,8 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.reload.watcher.next(msg.epoch)
 	case reloadMsg:
-		m.finishReload(msg)
-		return m, nil
+		cmd := m.finishReload(msg)
+		return m, cmd
 	case tea.BackgroundColorMsg:
 		recolor := msg.IsDark() != terminalIsDark
 		initAdaptiveStyles(msg.IsDark())
@@ -971,8 +977,8 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.openGotoLine()
 	}
 	if msg.String() == "alt+w" {
-		m.copyReference()
-		return m, nil
+		cmd := m.copyReference()
+		return m, cmd
 	}
 	if msg.String() == "alt+o" && !t.selecting {
 		return m, m.openReferenceAtCursor()
@@ -4203,7 +4209,7 @@ func (m AppModel) renderFooter() string {
 	if m.reload.err != nil && !m.isearch.active {
 		return footerStyle.Width(m.width).Render("Reload failed: " + headerLabel(m.reload.err.Error()))
 	}
-	if m.readOnly && !m.isearch.active && m.locationError == "" && m.height >= footerMinHeight {
+	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
 		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · View: read-only · /: search · v: select · M-w: copy reference · q: close")
 	}
 	if m.isearch.active {
@@ -4212,6 +4218,9 @@ func (m AppModel) renderFooter() string {
 	}
 	if m.locationError != "" {
 		return footerStyle.Width(m.width).Render(m.locationError)
+	}
+	if m.notice.text != "" {
+		return footerNoticeStyle.Width(m.width).Render(ansi.Truncate(headerLabel(m.notice.text), max(0, m.width), "…"))
 	}
 	if m.height < footerMinHeight {
 		return ""

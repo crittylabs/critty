@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -19,12 +20,15 @@ var fileReferencePattern = regexp.MustCompile(`(^|[\s\p{Z}])@((?:[\p{L}\p{M}\p{N
 
 var commentReferencePattern = regexp.MustCompile(`\bc_[a-f0-9]{6,}\b`)
 
-func (m *AppModel) copyReference() {
+func (m *AppModel) copyReference() tea.Cmd {
 	text := m.selectedCommentID()
 	if text == "" {
+		if len(m.tabs) == 0 {
+			return nil
+		}
 		t := m.tab()
 		if m.focused != contentPane || t.path == "" || strings.ContainsAny(t.path, "\r\n") {
-			return
+			return nil
 		}
 		text = "@" + escapeReferencePath(t.path)
 		if t.cursorSide != "old" && t.doc != nil && t.doc.HasLine(t.cursorLine) {
@@ -34,7 +38,7 @@ func (m *AppModel) copyReference() {
 	m.killRing.interrupt()
 	m.killRing.add(text, false)
 	m.killRing.interrupt()
-	m.locationError = "Copied to kill ring: " + text
+	return m.flashNotice("Copied to kill ring: " + text)
 }
 
 func (m *AppModel) commentReferenceTab(id string) (int, bool) {

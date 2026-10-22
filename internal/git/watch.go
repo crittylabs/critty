@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -71,4 +72,31 @@ func AbsoluteWatchPath(root, path string) string {
 		return filepath.Clean(path)
 	}
 	return filepath.Join(root, path)
+}
+
+// ObjectIDs returns the selected immutable blob IDs in one Git invocation.
+func (s ReviewSource) ObjectIDs(paths []string) (map[string]string, error) {
+	refs := make([]string, len(paths))
+	for i, path := range paths {
+		refs[i] = ":" + path
+		if s.Scope == "range" {
+			refs[i] = s.Head + ":" + path
+		}
+	}
+	ids := make(map[string]string, len(paths))
+	if len(refs) == 0 {
+		return ids, nil
+	}
+	out, err := gitCommand(append([]string{"rev-parse", "--revs-only", "--end-of-options"}, refs...)...)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Fields(out)
+	if len(lines) != len(paths) {
+		return nil, errors.New("unexpected blob ID count")
+	}
+	for i, path := range paths {
+		ids[path] = lines[i]
+	}
+	return ids, nil
 }

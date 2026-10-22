@@ -29,6 +29,7 @@ type FileTab struct {
 	status                string
 	textconv              gitpkg.Textconv
 	loadErr               error
+	binaryRevision        string
 	doc                   *document.Document
 	state                 *fileReview
 	diff                  *gitpkg.DiffInfo // original diff, retained when whitespace is ignored
