@@ -38,6 +38,7 @@ For example:
 - **Design interviews** — work through questions with your agent using [critty-grill](internal/cli/skill/critty-grill/SKILL.md), then save an agreed decision summary, glossary, or ADR.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
 - **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.  Use `critty view` for a read-only inspection in the current terminal.
+- **Plists and other encodings** — review binary plists and encoded text through your configured Git text converters.  Enable the converters you need in Critty's configuration.
 - **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
@@ -150,6 +151,18 @@ critty --session <id>      # Resume a saved review
 
 Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
+Word-level highlights estimate corresponding lines even when a change also adds or removes lines.  Side-by-side view uses the same matches.  Very long lines and expensive searches keep full-line highlighting so reviews stay responsive.
+
+### Review plists and other encodings
+
+Review binary plists and text in other encodings as readable UTF-8 through your existing Git `textconv` drivers.  Enable their names in Critty's global or project TOML configuration, for example:
+
+```toml
+textconv_drivers = ["plist", "cp932"]
+```
+
+Conversions are disabled by default.  Comments on converted files refer to the converted text and its line numbers.  Agents receive the converter's name and command with the feedback to help locate the original content and preserve its format when editing.  See [configuration](docs/configuration.md) and [Git text conversions](internal/cli/skill/critty-cli/SKILL.md#git-text-conversions) for driver setup and limitations.
+
 ### Review changes outside Git
 
 Use Critty for personal notes, reports, configuration files, and other text files that are not in a repository.  Your agent can propose edits, create files, split a long document, or rename and remove files while keeping the originals unchanged until you approve.
@@ -215,6 +228,8 @@ Ask your agent to "Have Fable review this and finish it" to delegate revisions a
 You can make that request in a Critty comment, including a Comment submission.  It authorizes sending the current review's necessary diff, documents, and surrounding source to the chosen model's configured service, with results returned to the local session.  That scope carries through follow-up rounds; separate host permission checks can still require direct confirmation.
 
 Your agent owns edits, tests, measurements, and reproductions.  Claude can request a Codex review, and Codex can request a Claude review; the requesting agent keeps those responsibilities.  The reviewer gathers permitted information and makes static findings.  If it needs more evidence or a read is denied, it tells your agent what is missing and continues with the available material.  Your agent obtains the information or runs the necessary check.
+
+In cowork, both agents agree on how to address each finding, and the reviewer resolves satisfied findings after checking the response.  Remaining disagreements come to you for a decision.
 
 AI review requires an existing Critty session and authorized access to the chosen reviewer.  Claude Code can review with only read and search tools, returning comments for your agent to post.  Direct posting through the Claude gate requires Python 3.10+; the restricted Codex MCP setup requires Python 3.11+ and the MCP Python SDK.  See the linked skills for setup and dependencies.
 

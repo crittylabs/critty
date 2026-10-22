@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.0
+
 ### Added
 
 - Review binary plists and text in other encodings by listing Git diff driver names or glob patterns in Critty's `textconv_drivers` setting; `["*"]` enables all configured converters.  Conversions are disabled by default, preserving inline image previews.  Comments refer to the converted UTF-8 text; review and comment JSON records the driver and command so agents can locate and edit the original content.  See the [CLI reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#git-text-conversions).
@@ -9,15 +11,17 @@
 
 ### Changed
 
-- Checklists in attached publication drafts and other Markdown documents remain display-only unless each interactive item has a `<!-- form: ... -->` annotation.  Agents must add an annotation to collect an answer, including for simple checkboxes.
-- [critty-ai-review](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-review/SKILL.md) and [critty-ai-cowork](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-cowork/SKILL.md) give reviewers a static role: gather permitted information and report findings or missing evidence.  Your agent owns edits, tests, measurements, and reproductions.
+- **Agent skills and AI collaboration** clarify how agents act on your answers, permissions, and review feedback:
+  - [critty-ai-review](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-review/SKILL.md) and [critty-ai-cowork](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-ai-cowork/SKILL.md) keep reviewers focused on static findings and missing evidence.  Your agent owns edits, tests, measurements, and reproductions, including requests between Claude and Codex.
+  - Cowork requires both agents to agree on each finding's disposition and the reviewer to resolve satisfied findings.  Substantiated disagreements remain open for your decision.
   - Naming a reviewer in a human Critty request authorizes necessary review material and follow-up rounds.  Host permission checks remain separate.
-  - Claude Code defaults to read/search tools with relayed findings and needs no Python; `doctor` clarifies the optional posting gate's requirements.  The Codex guide covers requests from Claude, result collection, and follow-up rounds.
-  - Cowork requires agreement on each finding's disposition and reviewer resolution of satisfied findings.  Disagreements remain open for a human decision.
+  - Claude Code can return findings using read/search tools without Python.  `doctor` clarifies the optional posting gate's requirements; the Codex guide covers requests from Claude, result collection, and follow-up rounds.
+  - [critty-approval](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md) keeps preference answers in stable fields, separate from execution permissions.  Changed execution requests require renewed consent.
+  - Ordinary Markdown checklists remain display-only.  Agents add a `<!-- form: ... -->` annotation to each interactive item, including simple checkboxes, to collect your answer.  See [attachment forms](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/forms.md).
 
 ### Fixed
 
-- Bundled skills no longer treat preference selections as execution consents that reset on document revisions.  Agents collect ordinary answers with stable fields and keep execution consent separate; consent must still be renewed when reviewed content changes.  See [critty-approval](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md).
+- README videos now play for signed-in GitHub readers.
 
 ## 1.4.0
 
