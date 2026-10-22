@@ -100,7 +100,7 @@ In v1.3.0, user settings move to `~/.config/critty/config.toml` and project `.cr
 
 ### Terminals and multiplexers
 
-Floating panes require tmux 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use a supported multiplexer for agent reviews, or run Critty directly.
+In tmux, floating panes require version 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use a supported multiplexer for agent reviews, or run Critty directly.
 
 After setting up or switching your terminal or multiplexer, run `critty doctor` there to check review launchers and local image forwarding settings.  See the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for configuration and supported terminals.
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.5.1
+
 ### Added
 
 - cmux and Zellij users can open reviews beside their agent and return to the invoking terminal afterward.  cmux opens a terminal tab in the invoking pane; Zellij 0.45+ opens a floating pane in the invoking tab.  The default launcher detects both; agents can select `--launcher cmux` or `--launcher zellij`, reuse their context with `critty env`, and locate them through terminal markers.  Zellij detection requires its inherited session and pane variables.
