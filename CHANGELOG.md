@@ -4,12 +4,12 @@
 
 ### Added
 
-- Refresh Git changes, documents, and file-backed attachments during a review with Reload, or enable Watch to follow edits automatically.  Agents can start Watch with `--watch`; it defaults off and defers updates while editing or confirming submission.  Watch uses filesystem notifications, excludes ignored directories and unrelated worktree metadata, and does no polling while idle.  Supplied diffs, saved plan versions, and committed comparisons stay snapshots.  Updates to the visible tab flash a two-second notice.  `W` toggles Watch; use `w` for whitespace filtering.
+- Refresh Git changes, documents, and file-backed attachments during a review with Reload, or enable Watch to follow edits automatically.  Agents can start Watch with `--watch`; it defaults off and defers updates while editing or confirming submission.  Watch uses filesystem notifications, excludes ignored directories and unrelated worktree metadata, and does no polling while idle.  Supplied diffs, saved plan versions, and committed comparisons stay snapshots.  Updates to the visible tab flash a two-second notice; changed and added tabs show a dark yellow unread dot in their titles and Files entries until opened, without moving filenames.  `W` toggles Watch; use `w` for whitespace filtering.
 - Review one commit with `--scope=COMMIT`, using a SHA or revision such as `HEAD`.  The comparison uses its first parent, including for merge commits; root commits show all files as additions.  Available in both `critty review` and `critty view`.
 
 ### Changed
 
-- Copying a reference shows a yellow confirmation for two seconds, then restores the footer hints.
+- Copying a reference shows a muted cyan confirmation for two seconds, then restores the footer hints.
 - The Files tab highlights the current file across the full row with a soft gray background, including while scrolling long filenames or reading in the content pane.
 
 ## 1.5.1

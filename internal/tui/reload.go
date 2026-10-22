@@ -282,13 +282,17 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 	for i := range next.tabs {
 		tab := &next.tabs[i]
 		if previous, ok := old[tab.path]; ok {
+			tab.unread = previous.unread || tabContentChanged(previous, *tab)
 			tab.cursorLine, tab.cursorSide = previous.cursorLine, previous.cursorSide
 			tab.sidebarCursor = previous.sidebarCursor
 			delete(old, tab.path)
+		} else {
+			tab.unread = true
 		}
 	}
 	for _, tab := range m.tabs {
 		if _, ok := old[tab.path]; ok && tab.state != nil && len(tab.state.Comments) > 0 {
+			tab.unread = tab.unread || !tab.outsideChanges
 			tab.outsideChanges = true
 			next.tabs = append(next.tabs, tab)
 		}

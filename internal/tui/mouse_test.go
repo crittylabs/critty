@@ -33,7 +33,7 @@ func TestMouseClickSelectsVisibleOverflowTab(t *testing.T) {
 	fifth := app.tabs[1]
 	fifth.path = "fifth.go"
 	app.tabs = append(app.tabs, fourth, fifth)
-	app.width = 76 // a 50-column content pane beside the 26-column sidebar
+	app.width = 82 // a 56-column content pane beside the 26-column sidebar
 	app.activeTab = 2
 
 	labels := app.tabLabels()

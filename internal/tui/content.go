@@ -61,6 +61,7 @@ func (m *AppModel) rebuildContent() {
 		return
 	}
 	t := m.tab()
+	t.unread = false
 	if m.alternateDiff(t) {
 
 		m.rebuildDiffContent()

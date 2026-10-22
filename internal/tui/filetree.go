@@ -270,7 +270,10 @@ func (m *AppModel) treeRowText(i int) string {
 			style = style.Foreground(activeAttachmentColor)
 		}
 	}
-	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon+label)
+	if !row.isDir {
+		icon = m.tabs[row.tabIndex].unreadMarker()
+	}
+	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon) + style.Render(label)
 	if !row.isDir {
 		if counts := m.tabs[row.tabIndex].changeSummary(); counts != "" {
 			text += " " + counts

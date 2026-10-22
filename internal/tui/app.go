@@ -3108,6 +3108,7 @@ func (m *AppModel) tabLabels() []tabLabel {
 			filenameStyle = filenameStyle.Bold()
 		}
 		label = label[:start] + filenameStyle.String() + label[start:] + ansi.NewStyle().Normal().Underline(false).String()
+		label = t.unreadMarker() + label
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
 		}
@@ -4359,6 +4360,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "s/t", desc: "toggle sidebar / view"},
 			{keys: "w · S · I", desc: "whitespace / split / images"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
+			{keys: "●", desc: "updated tab; open to mark read"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "M-? · esc", desc: "help / close help"},
 		}, innerWidth)
@@ -4376,6 +4378,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
+		{keys: "●", desc: "updated; open to mark read"},
 		{keys: "alt+o", desc: "open image/link"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},

@@ -117,6 +117,7 @@ var (
 	footerStyle = lipgloss.NewStyle().
 			Foreground(subtle)
 	footerNoticeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#608786"))
+	unreadDotStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#AA8000"))
 
 	// Footer key hints sit on a gray background so they read as keycaps,
 	// unlike the yellow keys of clickable buttons.
@@ -414,6 +415,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	textPrimary = ld(lipgloss.Black, lipgloss.BrightWhite)
 	textSecondary = ld(lipgloss.BrightBlack, muted)
 	textColors = newTextPalette(ld)
+	unreadDotStyle = unreadDotStyle.Foreground(ld(lipgloss.Color("#9A7300"), lipgloss.Color("#AA8000")))
 	footerNoticeStyle = footerNoticeStyle.Foreground(ld(lipgloss.Color("#456766"), lipgloss.Color("#608786")))
 	success = textColors.green
 	warning = textColors.yellow
