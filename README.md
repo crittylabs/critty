@@ -15,6 +15,8 @@ You can review a diff, file, or document on its own.  Your agent can also attach
 
 When your agent needs your input, it prepares the request and opens a review in Critty.  Comment on individual lines, answer questions, confirm details, or authorize actions.  Your comments and answers go back to the agent.
 
+If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for the full list.
+
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
 https://github.com/user-attachments/assets/9257b1f7-f5de-4a0b-848d-8d2637a0d251
@@ -98,13 +100,9 @@ In v1.3.0, user settings move to `~/.config/critty/config.toml` and project `.cr
 
 ### Terminals and multiplexers
 
-Floating panes require tmux 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use tmux or Herdr for agent reviews, or run Critty directly.
+Floating panes require tmux 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use a supported multiplexer for agent reviews, or run Critty directly.
 
 After setting up or switching your terminal or multiplexer, run `critty doctor` there to check review launchers and local image forwarding settings.  See the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for configuration and supported terminals.
-
-In cmux, Critty opens reviews in a new terminal tab in the invoking pane and returns focus to the original tab when the review ends.  The default launcher detects cmux automatically; use `--launcher cmux` to prefer it explicitly.
-
-Rio users can open a separate review window with `--launcher rio-window` on macOS and Linux, or from WSL using Windows Rio.  The default desktop launcher prefers Rio when it identifies the client's terminal as Rio.  See the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for setup requirements.
 
 #### Image previews
 
@@ -116,9 +114,9 @@ PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed
 
 <a id="codex-with-a-background-server"></a>
 
-### Using Codex in tmux or Herdr
+### Using Codex in a multiplexer
 
-When using Codex in tmux or Herdr, start it through Critty so reviews can find the correct terminal:
+When using Codex in a supported multiplexer, start it through Critty so reviews can find the correct terminal:
 
 ```bash
 critty codex
@@ -134,7 +132,7 @@ Ask your agent to use the `critty` skill to review its changes, a plan, or a doc
 
 > Use critty to review these changes before committing.
 
-Critty opens in a tmux floating pane, a Herdr tab, or a new window of a supported terminal emulator when neither is running.  Read the diff or document, leave inline comments on the relevant lines, and submit Approve, Reject, or Comment.
+Critty opens a review pane or tab in the detected multiplexer, or a new window of a supported terminal emulator.  Read the diff or document, leave inline comments on the relevant lines, and submit Approve, Reject, or Comment.
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 

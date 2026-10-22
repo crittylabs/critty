@@ -445,7 +445,7 @@ func TestDoctorTerminalImageStatus(t *testing.T) {
 	oldLook := lookPath
 	t.Cleanup(func() { lookPath = oldLook })
 	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
-	for _, name := range []string{"TMUX", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
+	for _, name := range []string{"ZELLIJ", "ZELLIJ_SESSION_NAME", "ZELLIJ_PANE_ID", "ZELLIJ_SOCKET_DIR", "TMUX", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(name, "")
 	}
 	for _, tt := range []struct {

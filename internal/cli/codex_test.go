@@ -53,7 +53,7 @@ func TestCodexWrapperHint(t *testing.T) {
 	}
 
 	// Exercise the nonterminal review error with an isolated saved-state root.
-	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
+	for _, key := range []string{"ZELLIJ", "ZELLIJ_SESSION_NAME", "ZELLIJ_PANE_ID", "ZELLIJ_SOCKET_DIR", "TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(key, "")
 	}
 	for _, key := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"} {
@@ -67,7 +67,7 @@ func TestCodexWrapperHint(t *testing.T) {
 	cmd := exec.Command(self, doc)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
-	if err == nil || !strings.Contains(string(out), "no tmux, Herdr, or cmux terminal detected") || !strings.Contains(string(out), "hint:") {
+	if err == nil || !strings.Contains(string(out), "no supported multiplexer terminal detected") || !strings.Contains(string(out), "hint:") {
 		t.Fatalf("review error = %v, output: %s", err, out)
 	}
 
@@ -75,7 +75,7 @@ func TestCodexWrapperHint(t *testing.T) {
 	cmd = exec.Command(self, doc, "--launcher", "mux", "--launcher", "custom:"+failed)
 	cmd.Dir = dir
 	out, err = cmd.CombinedOutput()
-	if err == nil || !strings.Contains(string(out), "launcher mux: no tmux, Herdr, or cmux terminal detected") ||
+	if err == nil || !strings.Contains(string(out), "launcher mux: no supported multiplexer terminal detected") ||
 		!strings.Contains(string(out), "launcher custom:"+failed) || strings.Count(string(out), "custom unavailable") != 1 {
 		t.Fatalf("combined launcher failure = %v, output: %s", err, out)
 	}

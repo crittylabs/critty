@@ -26,6 +26,9 @@ type Target struct {
 }
 
 func (t Target) Validate() error {
+	if t.Kind == "zellij" {
+		return validateZellij(t)
+	}
 	if t.Kind == "terminal" {
 		if t.Socket != "" || t.Pane != "" || t.Workspace != "" || t.Tab != "" || t.Origin.PID < 2 || t.Origin.Started == "" {
 			return fmt.Errorf("invalid terminal origin")
@@ -59,6 +62,9 @@ func (t Target) Validate() error {
 
 // Command pins requests to the recorded server, regardless of daemon environment.
 func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
+	if t.Kind == "zellij" {
+		return t.zellijCommand(ctx, args...)
+	}
 	if t.Kind == "tmux" {
 		return exec.CommandContext(ctx, "tmux", append([]string{"-S", t.Socket}, args...)...)
 	}
@@ -84,6 +90,9 @@ func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
 // FromEnvironment is used in the real terminal, never to infer a daemon client's identity.
 func FromEnvironment() (Target, error) {
 	var targets []Target
+	if os.Getenv("ZELLIJ_SESSION_NAME") != "" || os.Getenv("ZELLIJ_PANE_ID") != "" {
+		targets = append(targets, ZellijEnvironment())
+	}
 	if raw, pane := os.Getenv("TMUX"), os.Getenv("TMUX_PANE"); raw != "" && pane != "" {
 		// TMUX ends in ,server-pid,session-id; the socket path itself may contain commas.
 		end := strings.LastIndexByte(raw, ',')
@@ -128,7 +137,11 @@ func FromEnvironment() (Target, error) {
 	defer cancel()
 	owners := make(map[int]Target)
 	for _, t := range targets {
-		if t.Kind == "tmux" {
+		if t.Kind == "zellij" {
+			for pid, owner := range ZellijOwners(t) {
+				owners[pid] = owner
+			}
+		} else if t.Kind == "tmux" {
 			out, err := t.Command(ctx, "display-message", "-p", "-t", t.Pane, "#{pane_pid}").Output()
 			if err == nil {
 				if pid, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
@@ -196,6 +209,10 @@ func Snapshot(ctx context.Context, t Target) (string, error) {
 	}
 	if t.Kind == "terminal" {
 		return "", fmt.Errorf("terminal origin requires a filter notification")
+	}
+	if t.Kind == "zellij" {
+		out, err := t.Command(ctx, "action", "dump-screen", "--pane-id", t.Pane).Output()
+		return string(out), err
 	}
 	if t.Kind == "tmux" {
 		out, err := t.Command(ctx, "capture-pane", "-p", "-J", "-t", t.Pane).Output()

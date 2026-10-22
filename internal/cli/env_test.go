@@ -190,7 +190,7 @@ func TestTerminalEnvironmentFallsBackToAncestorTTY(t *testing.T) {
 	}
 	previousOrigin := reviewOrigin
 	t.Cleanup(func() { reviewOrigin = previousOrigin })
-	for _, key := range []string{"TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
+	for _, key := range []string{"ZELLIJ", "ZELLIJ_SESSION_NAME", "ZELLIJ_PANE_ID", "ZELLIJ_SOCKET_DIR", "TMUX", "TMUX_PANE", "HERDR_ENV", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
 		t.Setenv(key, "")
 	}
 	t.Setenv("SSH_TTY", "/dev/pts/9")

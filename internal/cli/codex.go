@@ -57,7 +57,7 @@ func codexWrapperHint(self, path string) string {
 			if first == "" {
 				return ""
 			}
-			return fmt.Sprintf("Critty provides a Codex wrapper that registers the invoking terminal for marker lookup. If this review was launched from Codex, use that wrapper and the Critty skill to locate your tmux, Herdr, or cmux pane. Currently %q precedes the wrapper %q in PATH; move the wrapper directory earlier. With mise, place github:crittylabs/critty before the Codex tool in [tools] and reactivate the shell. Then resume Codex from the intended terminal (or run `critty codex resume`).", first, candidate)
+			return fmt.Sprintf("Critty provides a Codex wrapper that registers the invoking terminal for marker lookup. If this review was launched from Codex, use that wrapper and the Critty skill to locate your review terminal. Currently %q precedes the wrapper %q in PATH; move the wrapper directory earlier. With mise, place github:crittylabs/critty before the Codex tool in [tools] and reactivate the shell. Then resume Codex from the intended terminal (or run `critty codex resume`).", first, candidate)
 		}
 		if first == "" {
 			first = candidate

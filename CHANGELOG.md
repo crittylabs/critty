@@ -4,11 +4,12 @@
 
 ### Added
 
-- cmux users can open reviews in a new terminal tab in the invoking pane, with focus returned to the original tab afterward.  The default launcher detects cmux; agents can also select `--launcher cmux`, reuse its terminal context with `critty env`, and locate it through terminal markers.
+- cmux and Zellij users can open reviews beside their agent and return to the invoking terminal afterward.  cmux opens a terminal tab in the invoking pane; Zellij 0.45+ opens a floating pane in the invoking tab.  The default launcher detects both; agents can select `--launcher cmux` or `--launcher zellij`, reuse their context with `critty env`, and locate them through terminal markers.  Zellij detection requires its inherited session and pane variables.
 - Rio users can open reviews in a dedicated window with `--launcher rio-window` on macOS and Linux, or from Critty running in WSL using Windows Rio.  The default desktop launcher prefers Rio when client terminal hints identify it; `doctor` checks its availability.  See the [launcher reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers) for requirements.
 
 ### Changed
 
+- Review setup guidance shares common multiplexer behavior and keeps terminal-specific requirements in the launcher reference.
 - Focused dialog actions stand out more clearly, with stronger blue backgrounds in both color schemes and a clearer red in light terminals.
 
 ## 1.5.0

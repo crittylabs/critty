@@ -130,6 +130,8 @@ func TestNearestMultiplexerContextChoosesClosest(t *testing.T) {
 		{"Herdr inside tmux", herdr, tmux},
 		{"tmux inside Herdr", tmux, herdr},
 		{"tmux inside cmux", tmux, cmuxContext{workspace: "w1", surface: "s1"}},
+		{"tmux inside Zellij", tmux, zellijContext{session: "review", pane: "0"}},
+		{"Zellij inside tmux", zellijContext{session: "review", pane: "0"}, tmux},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got := walkAncestorContexts([]multiplexerDetector{

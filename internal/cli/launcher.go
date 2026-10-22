@@ -19,7 +19,7 @@ var reviewLauncherNames []string
 var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, cmux, desktop-terminal, xdg-terminal, ghostty-window, iterm-window, terminal-app-window, rio-window, windows-terminal-wsl, or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, cmux, zellij, desktop-terminal, xdg-terminal, ghostty-window, iterm-window, terminal-app-window, rio-window, windows-terminal-wsl, or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
@@ -45,7 +45,7 @@ func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mod
 	for i, candidates := range groups {
 		if names[i] == "mux" && terminal == nil {
 			if !checked["mux"] {
-				unavailable = append(unavailable, errors.New("launcher mux: no tmux, Herdr, or cmux terminal detected"))
+				unavailable = append(unavailable, errors.New("launcher mux: no supported multiplexer terminal detected"))
 				checked["mux"] = true
 			}
 		}
@@ -104,6 +104,28 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 		}, open: func(mode *reviewMode) (reviewLaunch, error) {
 			return spawnTMUXPane(mode, ctx, floating)
 		}}}, nil
+	case "zellij":
+		ctx, ok := launcherTerminal(name, terminal).(zellijContext)
+		return []reviewLauncher{{name: name, check: func() error {
+			if !ok {
+				return fmt.Errorf("no Zellij terminal")
+			}
+			bin, err := lookPath("zellij")
+			if err != nil {
+				return err
+			}
+			out, err := commandOutput(exec.Command(bin, "--version"))
+			if err != nil {
+				return err
+			}
+			var major, minor, patch int
+			if n, _ := fmt.Sscanf(string(out), "zellij %d.%d.%d", &major, &minor, &patch); n != 3 || major == 0 && minor < 45 {
+				return fmt.Errorf("Zellij 0.45+ required")
+			}
+			return nil
+		}, open: func(mode *reviewMode) (reviewLaunch, error) {
+			return spawnTUIZellijPane(mode, ctx)
+		}}}, nil
 	case "cmux":
 		ctx, ok := launcherTerminal(name, terminal).(cmuxContext)
 		return []reviewLauncher{{name: name, check: func() error {
@@ -129,7 +151,7 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 	default:
 		file, custom := strings.CutPrefix(name, "custom:")
 		if !custom || file == "" {
-			return nil, fmt.Errorf("unknown launcher %q; use mux, tmux, tmux-floating, tmux-split, herdr, cmux, desktop-terminal, a named desktop launcher, or custom:EXECUTABLE", name)
+			return nil, fmt.Errorf("unknown launcher %q; see critty --help for supported launcher names", name)
 		}
 		launcher, err := newCustomLauncher(file, terminal, mode)
 		if err != nil {
@@ -151,6 +173,9 @@ func launcherTerminal(kind string, terminal reviewMultiplexerContext) reviewMult
 	var detector multiplexerDetector = tmuxDetector{}
 	if kind == "herdr" {
 		detector = herdrDetector{}
+	}
+	if kind == "zellij" {
+		detector = zellijDetector{}
 	}
 	if kind == "cmux" {
 		detector = cmuxDetector{}
@@ -222,7 +247,7 @@ func launcherEnvironment(vars []envVar) []string {
 	var environment []string
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
-		if key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || key == "CRITTY_SSH" || key == "CRITTY_TERMINAL_APP" || strings.HasPrefix(key, "HERDR_") || strings.HasPrefix(key, "CMUX_") && key != "CMUX_SOCKET_PASSWORD" {
+		if strings.HasPrefix(key, "ZELLIJ") || key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || key == "CRITTY_SSH" || key == "CRITTY_TERMINAL_APP" || strings.HasPrefix(key, "HERDR_") || strings.HasPrefix(key, "CMUX_") && key != "CMUX_SOCKET_PASSWORD" {
 			continue
 		}
 		environment = append(environment, value)

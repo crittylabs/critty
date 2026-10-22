@@ -65,8 +65,7 @@ requiring a repository.  A file argument after --diff is also accepted.
 With --null, reviews only attachments without requiring a repository.
 Use critty view for a read-only view without saving.
 
-Inside Herdr the TUI opens in a dedicated tab; inside tmux it opens in a
-nonmodal floating pane on capable servers, with a split on older servers.
+Inside a supported multiplexer the TUI opens in a dedicated pane or tab.
 Outside a multiplexer it opens a new desktop terminal window when one is
 available, and otherwise runs in the current terminal. Use --launcher to
 change the order or select another launcher, such as mux or
@@ -275,7 +274,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 		return nil
 	}
 
-	return withCodexWrapperHint(fmt.Errorf("%w; no terminal to open the TUI in; run inside tmux or Herdr, or have the reviewer run `critty%s` in a terminal", err, reviewArgSuffix(mode)))
+	return withCodexWrapperHint(fmt.Errorf("%w; no terminal to open the TUI in; run inside a supported multiplexer, or have the reviewer run `critty%s` in a terminal", err, reviewArgSuffix(mode)))
 }
 
 func reviewArgSuffix(mode *reviewMode) string {
