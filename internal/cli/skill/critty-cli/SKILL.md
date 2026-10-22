@@ -51,6 +51,7 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 | Current Git changes | `critty review` or `critty review --scope=all`: HEAD versus working tree, including untracked files. |
 | Staged changes | `critty review --staged` or `critty review --scope=staged`: HEAD versus index. |
 | Unstaged changes | `critty review --unstaged` or `critty review --scope=unstaged`: index versus working tree, including untracked files. |
+| Single commit | `critty review --scope=COMMIT` accepts a full or abbreviated SHA, tag, branch, or revision such as `HEAD~1`.  It compares the commit with its first parent (including merges), or the empty tree for a root commit.  Working-tree and index changes are excluded. |
 | Committed comparison | `critty review --scope=A..B` compares snapshots; `A...B` compares the merge base with B.  An omitted endpoint means HEAD. |
 | Document | `critty review <file>` reads one current file. |
 | Versioned plan | `critty plan <file>` saves numbered versions.  `critty plan --session <id> <file>` supplies a revision; reusing a name alone starts another review. |

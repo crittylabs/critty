@@ -3,8 +3,81 @@ package git
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestResolveCommit(t *testing.T) {
+	dir := newRepo(t)
+	writeFile(t, dir, "file.txt", []byte("root\n"))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-qm", "root")
+	runGit(t, dir, "tag", "root")
+	runGit(t, dir, "checkout", "-qb", "side")
+	writeFile(t, dir, "side.txt", []byte("side\n"))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-qm", "side")
+	runGit(t, dir, "checkout", "-qb", "mainline", "root")
+	writeFile(t, dir, "file.txt", []byte("next\n"))
+	runGit(t, dir, "commit", "-qam", "next")
+	runGit(t, dir, "tag", "next")
+	runGit(t, dir, "merge", "--no-ff", "-qm", "merge", "side")
+	sha, err := resolveCommit("next")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, dir, "file.txt", []byte("working\n"))
+	writeFile(t, dir, "untracked.txt", []byte("untracked\n"))
+	for _, tc := range []struct {
+		ref, path, before, after string
+		status                   ChangeStatus
+	}{
+		{"root", "file.txt", "", "root\n", StatusAdded},
+		{"next", "file.txt", "root\n", "next\n", StatusModified},
+		{sha, "file.txt", "root\n", "next\n", StatusModified},
+		{sha[:10], "file.txt", "root\n", "next\n", StatusModified},
+		{"HEAD~1", "file.txt", "root\n", "next\n", StatusModified},
+		{"HEAD", "side.txt", "", "side\n", StatusAdded},
+	} {
+		t.Run(tc.ref, func(t *testing.T) {
+			s, err := ResolveCommit(tc.ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files, err := s.Files()
+			if err != nil || len(files) != 1 || files[0].Path != tc.path || files[0].Status != tc.status {
+				t.Fatalf("files=%+v err=%v", files, err)
+			}
+			content, err := s.Content(tc.path)
+			if err != nil || string(content) != tc.after {
+				t.Fatalf("content=%q err=%v", content, err)
+			}
+			preview, err := s.PreviewContent(tc.path, false, 1024)
+			if err != nil || string(preview) != tc.after {
+				t.Fatalf("preview=%q err=%v", preview, err)
+			}
+			if tc.before != "" {
+				preview, err = s.PreviewContent(tc.path, true, 1024)
+				if err != nil || string(preview) != tc.before {
+					t.Fatalf("before=%q err=%v", preview, err)
+				}
+			}
+			diff, err := s.Diff(tc.path, "")
+			if err != nil || diff == nil || !diff.ChangedLines[1] {
+				t.Fatalf("diff=%v err=%v", diff, err)
+			}
+			snapshot, patch, err := s.Snapshot()
+			if err != nil || !reflect.DeepEqual(snapshot, s) || !strings.Contains(patch, "+"+strings.TrimSpace(tc.after)) {
+				t.Fatalf("snapshot=%+v patch=%q err=%v", snapshot, patch, err)
+			}
+		})
+	}
+	for _, ref := range []string{"missing", "--output=bad", "HEAD..HEAD", "HEAD: file.txt", ""} {
+		if _, err := ResolveCommit(ref); err == nil {
+			t.Errorf("accepted invalid commit %q", ref)
+		}
+	}
+}
 
 func TestReviewSources(t *testing.T) {
 	dir := newRepo(t)

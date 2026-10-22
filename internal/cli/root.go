@@ -104,7 +104,7 @@ func runStartupMigration() error {
 
 func init() {
 	rootCmd.PreRunE = validateScopeFlags
-	rootCmd.Flags().StringVar(&reviewScope, "scope", "", "review scope: all (default), staged, unstaged, A..B, or A...B (omitted B means HEAD)")
+	rootCmd.Flags().StringVar(&reviewScope, "scope", "", "review scope: all (default), staged, unstaged, COMMIT, A..B, or A...B (omitted B means HEAD; COMMIT compares with its first parent)")
 	rootCmd.Flags().StringVar(&rootSession, "session", "", "resume a saved review session by ID")
 	rootCmd.Flags().BoolVar(&reviewStaged, "staged", false, "review only changes staged in the index (alias for --scope=staged)")
 	rootCmd.Flags().BoolVar(&reviewUnstaged, "unstaged", false, "review unstaged and untracked changes (alias for --scope=unstaged)")

@@ -25,6 +25,7 @@ Pass explicit arguments through.  Otherwise use the current request's subject: a
 critty review $ARGUMENTS                  # explicit review arguments, or current Git changes
 critty review --staged                    # index only
 critty review --scope=main...             # committed comparison
+critty review --scope=HEAD                # single commit
 critty plan <file>                        # versioned plan
 critty review --diff=changes.diff         # supplied diff
 critty review --null --attachment note.md # attachments only

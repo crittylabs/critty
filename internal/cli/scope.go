@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -63,7 +64,11 @@ func resolveSource(scope string) (*git.ReviewSource, error) {
 	}
 	source := git.ReviewSource{Scope: scope, Base: "HEAD"}
 	if scope != "all" && scope != "staged" && scope != "unstaged" {
-		resolved, err := git.ResolveRange(scope)
+		resolve := git.ResolveCommit
+		if strings.Contains(scope, "..") {
+			resolve = git.ResolveRange
+		}
+		resolved, err := resolve(scope)
 		if err != nil {
 			return nil, err
 		}

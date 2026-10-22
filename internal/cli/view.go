@@ -90,7 +90,7 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 
 func init() {
 	rootCmd.AddCommand(viewCmd)
-	viewCmd.Flags().StringVar(&reviewScope, "scope", "", "scope: all, staged, unstaged, A..B, or A...B")
+	viewCmd.Flags().StringVar(&reviewScope, "scope", "", "scope: all, staged, unstaged, COMMIT, A..B, or A...B (COMMIT compares with its first parent)")
 	viewCmd.Flags().BoolVar(&reviewStaged, "staged", false, "view only changes staged in the index")
 	viewCmd.Flags().BoolVar(&reviewUnstaged, "unstaged", false, "view unstaged and untracked changes")
 	addDiffFlag(viewCmd)

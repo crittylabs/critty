@@ -22,6 +22,36 @@ type ReviewSource struct {
 	Head            string
 }
 
+func resolveCommit(ref string) (string, error) {
+	out, err := gitCommand("rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
+	return strings.TrimSpace(out), err
+}
+
+// ResolveCommit compares a commit with its first parent, or the empty tree
+// for a root commit.  It uses the same snapshot representation as a range.
+func ResolveCommit(value string) (ReviewSource, error) {
+	head, err := resolveCommit(value)
+	if err != nil {
+		return ReviewSource{}, err
+	}
+	out, err := gitCommand("rev-list", "--parents", "-n", "1", head)
+	if err != nil {
+		return ReviewSource{}, err
+	}
+	parents := strings.Fields(out)
+	var base string
+	if len(parents) > 1 {
+		base = parents[1]
+	} else {
+		out, err := gitCommand("mktree")
+		if err != nil {
+			return ReviewSource{}, err
+		}
+		base = strings.TrimSpace(out)
+	}
+	return ReviewSource{Scope: "range", Range: value, Base: base, Head: head}, nil
+}
+
 func ResolveRange(value string) (ReviewSource, error) {
 	separator := ".."
 	if strings.Contains(value, "...") {
@@ -37,15 +67,11 @@ func ResolveRange(value string) (ReviewSource, error) {
 	if right == "" {
 		right = "HEAD"
 	}
-	resolve := func(ref string) (string, error) {
-		out, err := gitCommand("rev-parse", "--verify", "--end-of-options", ref+"^{commit}")
-		return strings.TrimSpace(out), err
-	}
-	base, err := resolve(left)
+	base, err := resolveCommit(left)
 	if err != nil {
 		return ReviewSource{}, err
 	}
-	head, err := resolve(right)
+	head, err := resolveCommit(right)
 	if err != nil {
 		return ReviewSource{}, err
 	}

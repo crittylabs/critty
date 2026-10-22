@@ -536,7 +536,7 @@ func shellEscape(s string) string {
 
 func init() {
 	reviewCmd.PreRunE = validateScopeFlags
-	reviewCmd.Flags().StringVar(&reviewScope, "scope", "", "review scope: all (default), staged, unstaged, A..B, or A...B (omitted B means HEAD)")
+	reviewCmd.Flags().StringVar(&reviewScope, "scope", "", "review scope: all (default), staged, unstaged, COMMIT, A..B, or A...B (omitted B means HEAD; COMMIT compares with its first parent)")
 	rootCmd.AddCommand(reviewCmd)
 	reviewCmd.Flags().BoolVar(&reviewCode, "code", false, "review code changes (default when no file argument is given)")
 	addDiffFlag(reviewCmd)

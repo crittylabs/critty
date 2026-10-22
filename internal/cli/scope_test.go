@@ -16,6 +16,7 @@ func TestResolveExplicitScopes(t *testing.T) {
 	t.Chdir(dir)
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	for _, args := range [][]string{{"init", "-q"}, {"config", "user.name", "Test"}, {"config", "user.email", "test@example.com"}, {"commit", "--allow-empty", "-qm", "base"}} {
 		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 			t.Fatalf("%s: %v", out, err)
@@ -61,10 +62,30 @@ func TestResolveExplicitScopes(t *testing.T) {
 		}
 	}
 	reviewStaged, reviewUnstaged = false, false
-	reviewScope = "HEAD~1.."
-	mode, err := resolveReviewMode(nil)
-	if err != nil || mode.source.Scope != "range" {
-		t.Fatalf("range mode=%+v err=%v", mode, err)
+	for _, scope := range []string{"HEAD~1..", "HEAD"} {
+		reviewScope = scope
+		mode, err := resolveReviewMode(nil)
+		if err != nil || mode.source.Scope != "range" || len(mode.files) != 1 {
+			t.Fatalf("%s: mode=%+v err=%v", scope, mode, err)
+		}
+		if got := mode.persistedCLIArgs(); len(got) != 2 || got[1] != scope {
+			t.Fatalf("persisted args=%v", got)
+		}
+		sess, err := openReviewSession(&config.Config{Output: t.TempDir()}, mode)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sess.CJ.ReviewComments = []review.Comment{{ID: "r_commit", Body: "keep this comment"}}
+		if err := sess.Save(); err != nil {
+			t.Fatal(err)
+		}
+		loaded, restored, err := loadReviewSession(sess.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if restored.source.Range != scope || restored.source.Base != mode.source.Base || restored.source.Head != mode.source.Head || len(restored.files) != 1 || len(loaded.CJ.ReviewComments) != 1 || loaded.CJ.ReviewComments[0].Body != "keep this comment" {
+			t.Fatalf("restored mode=%+v comments=%v", restored, loaded.CJ.ReviewComments)
+		}
 	}
 	reviewScope = "HEAD..HEAD"
 	if _, err := resolveReviewMode(nil); err == nil {
@@ -76,7 +97,7 @@ func TestResolveExplicitScopes(t *testing.T) {
 		unstaged bool
 		args     []string
 	}{
-		{scope: "bad"}, {scope: "HEAD"},
+		{scope: "bad"},
 		{scope: "all", staged: true}, {scope: "HEAD..HEAD", staged: true},
 		{scope: "staged", args: []string{"README.md"}},
 		{staged: true, unstaged: true},
@@ -105,7 +126,7 @@ func TestResolveExplicitScopes(t *testing.T) {
 	oldAttachments := attachmentPaths
 	t.Cleanup(func() { attachmentPaths = oldAttachments })
 	attachmentPaths = []string{"notice.md"}
-	mode, err = resolveReviewMode(nil)
+	mode, err := resolveReviewMode(nil)
 	if err != nil || len(mode.files) != 0 || mode.source == nil {
 		t.Fatalf("clean scope with attachment: %+v, %v", mode, err)
 	}

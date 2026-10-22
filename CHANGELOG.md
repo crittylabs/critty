@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Review one commit with `--scope=COMMIT`, using a SHA or revision such as `HEAD`.  The comparison uses its first parent, including for merge commits; root commits show all files as additions.  Available in both `critty review` and `critty view`.
+
 ## 1.5.1
 
 ### Added
