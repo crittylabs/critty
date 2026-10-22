@@ -50,6 +50,12 @@ var resolveExec = func() (string, error) {
 	return resolveExecutable()
 }
 
+var reviewWatch bool
+
+func addWatchFlag(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&reviewWatch, "watch", false, "watch review sources for changes (default off)")
+}
+
 var reviewCmd = &cobra.Command{
 	Use:   "review [file[:LINE]]",
 	Short: "Review git changes (default) or a single document",
@@ -166,6 +172,9 @@ func runReviewInput(args []string, viewOnly bool) error {
 	if err := mode.validateTarget(); err != nil {
 		return err
 	}
+	if err := validateWatchMode(mode); err != nil {
+		return err
+	}
 
 	if reviewDemo || viewOnly {
 		return runTransientReview(cfg, mode)
@@ -179,12 +188,27 @@ func runReviewInput(args []string, viewOnly bool) error {
 	return runReviewFlow(cfg, sess, mode)
 }
 
+func validateWatchMode(mode *reviewMode) error {
+	if !reviewWatch || mode.patch == nil && !mode.plan() && (mode.source == nil || mode.source.Scope != "range") {
+		return nil
+	}
+	for _, d := range mode.documents {
+		if !d.Removed && d.Source != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("--watch requires a live document, Git scope, or file-backed attachment")
+}
+
 // runReviewFlow opens one round in the caller's multiplexer or terminal.
 func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (result error) {
 	if err := prepareDocuments(mode); err != nil {
 		return err
 	}
 	if err := mode.validateTarget(); err != nil {
+		return err
+	}
+	if err := validateWatchMode(mode); err != nil {
 		return err
 	}
 	if err := validateResultPath(mode, sess); err != nil {
@@ -510,6 +534,9 @@ func buildTUICommand(mode *reviewMode, host string) (string, error) {
 		return "", fmt.Errorf("missing review session ID")
 	}
 	command := fmt.Sprintf("%s %s _tui --session %s", envPrefix, shellEscape(crittyBin), shellEscape(mode.sessionKey))
+	if reviewWatch {
+		command += " --watch"
+	}
 	if mode.focusPath != "" {
 		focus := mode.focusPath
 		if mode.focusLine > 0 {
@@ -541,6 +568,7 @@ func init() {
 	reviewCmd.Flags().BoolVar(&reviewCode, "code", false, "review code changes (default when no file argument is given)")
 	addDiffFlag(reviewCmd)
 	addFocusFlag(reviewCmd)
+	addWatchFlag(reviewCmd)
 	addHeaderFlags(reviewCmd)
 	addAttachmentFlags(reviewCmd)
 	reviewCmd.Flags().BoolVar(&reviewStaged, "staged", false, "review only changes staged in the index (alias for --scope=staged)")

@@ -16,7 +16,7 @@ func (m AppModel) whitespaceButton() string {
 		state = "WS  "
 	}
 	style := modalBtnFocusedLabel.Bold(true).Padding(0)
-	return style.Render("Ignore: "+state+" ") + modalBtnFocusedKey.Render("W")
+	return style.Render("Ignore: "+state+" ") + modalBtnFocusedKey.Render("w")
 }
 
 func (m *AppModel) toggleWhitespace() {

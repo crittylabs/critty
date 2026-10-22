@@ -40,9 +40,13 @@ func (m *AppModel) restoreRound() error {
 			files[tab.path] = review.SnapshotFile{Textconv: tab.textconv}
 			continue
 		}
-		doc, err := m.loadDocument(tab.path)
-		if err != nil {
-			return err
+		doc := tab.doc
+		if doc == nil {
+			var err error
+			doc, err = m.loadDocument(tab.path)
+			if err != nil {
+				return err
+			}
 		}
 		files[tab.path] = review.SnapshotFile{Content: doc.Content, Partial: doc.Known != nil, Textconv: tab.textconv}
 	}

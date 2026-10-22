@@ -68,10 +68,10 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 	for _, width := range []int{20, 60, 100} {
 		app.width = width
 		bar := app.renderReviewBar()
-		if lipgloss.Width(bar) != width || lipgloss.Height(bar) != 1 {
-			t.Fatalf("width %d: bar does not fit on one line: %q", width, bar)
+		if lipgloss.Width(bar) != width {
+			t.Fatalf("width %d: bar does not fit the terminal: %q", width, bar)
 		}
-		if !strings.HasSuffix(ansi.Strip(bar), " Submit q ") {
+		if !strings.HasSuffix(strings.TrimRight(ansi.Strip(bar), " "), " Submit q") {
 			t.Fatalf("width %d: Submit button was truncated: %q", width, bar)
 		}
 	}
@@ -206,7 +206,7 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 
 			header := app.renderHeader()
 			plainHeader := ansi.Strip(header)
-			if got := lipgloss.Height(header); got != 2 {
+			if got := lipgloss.Height(header); got != lipgloss.Height(app.renderReviewBar())+1 {
 				t.Errorf("header height = %d, want bar and file line: %q", got, plainHeader)
 			}
 			if !strings.Contains(plainHeader, "…") {
@@ -535,8 +535,14 @@ func TestHelpModalScrollsToBottom(t *testing.T) {
 			break
 		}
 	}
+	for range 200 {
+		if strings.Contains(ansi.Strip(app.View().Content), "M-s i/c/w/r/m") {
+			break
+		}
+		app = pressKey(app, tea.KeyDown)
+	}
 	if !strings.Contains(ansi.Strip(app.View().Content), "M-s i/c/w/r/m") {
-		t.Fatal("Down button did not reveal search mode shortcuts")
+		t.Fatal("scrolling did not reveal search mode shortcuts")
 	}
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 40})
 	view := app.View()
@@ -1068,10 +1074,10 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 	app.recalculateLayout()
 
 	rows := strings.Split(app.renderHeader(), "\n")
-	if len(rows) != 2 {
+	if len(rows) != lipgloss.Height(app.renderReviewBar())+1 {
 		t.Fatalf("header has %d rows, want bar and file line", len(rows))
 	}
-	bar := rows[0]
+	bar := app.renderReviewBar()
 	if got := lipgloss.Width(bar); got != app.width {
 		t.Fatalf("bar width = %d, want %d", got, app.width)
 	}
@@ -1129,7 +1135,7 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 	}
 
 	rect, ok := app.finishButtonRect()
-	if !ok || rect.top != 0 {
+	if !ok || rect.top >= lipgloss.Height(app.renderReviewBar()) {
 		t.Fatalf("submit button rect = %+v, %t; want it on the bar row", rect, ok)
 	}
 	assertRegionContainsRenderedText(t, app, rect, "Submit q")
@@ -1144,8 +1150,8 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 	app.width = 45
 	app.recalculateLayout()
 	rows = strings.Split(app.renderHeader(), "\n")
-	plain = ansi.Strip(rows[0])
-	if lipgloss.Width(rows[0]) != app.width || !strings.Contains(plain, "Ignore: WS") || !strings.Contains(plain, "…") || !strings.HasSuffix(plain, " Submit q ") {
+	plain = ansi.Strip(app.renderReviewBar())
+	if lipgloss.Width(app.renderReviewBar()) != app.width || !strings.Contains(plain, "Ignore: WS") || !strings.Contains(plain, "Submit q") {
 		t.Fatalf("narrow bar = %q, want the text truncated ahead of the button", plain)
 	}
 }

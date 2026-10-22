@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,8 +34,12 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	finishCh := make(chan tui.FinishEvent, 4)
 	appCfg := tui.AppConfig{
+		Context:   ctx,
+		Watch:     reviewWatch,
 		Documents: documents.Documents,
 		Answers:   documents.Answers,
 		Project:   reviewProjectLabel(cfg.ProjectRoot, sess),
@@ -56,6 +61,9 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		model = tui.NewCodeReviewApp(mode.files, mode.ref, appCfg)
 	} else {
 		model = tui.NewApp(mode.docPath, appCfg)
+	}
+	if reviewWatch && !model.CanWatch() {
+		return nil, fmt.Errorf("--watch requires a live document, Git scope, or file-backed attachment")
 	}
 	var options []tea.ProgramOption
 	if mode.patch != nil && !serving {
@@ -114,6 +122,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	go func() {
 		defer close(done)
 		for ev := range finishCh {
+			srv.mode.files = ev.Files
 			srv.handleFinish(ev.Approved, ev.Result)
 		}
 	}()

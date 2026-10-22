@@ -63,9 +63,9 @@ func TestWhitespaceControlKeepsHeaderPositions(t *testing.T) {
 	if before.whitespaceButton != after.whitespaceButton || before.splitButton != after.splitButton || !reflect.DeepEqual(before.isearchRegions, after.isearchRegions) {
 		t.Fatal("toggling whitespace moved header controls")
 	}
-	m = pressKey(m, 'W')
+	m = pressKey(m, 'w')
 	if m.ignoreWhitespace {
-		t.Fatal("uppercase W did not toggle whitespace")
+		t.Fatal("w did not restore whitespace")
 	}
 }
 

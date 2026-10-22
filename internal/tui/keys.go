@@ -44,6 +44,8 @@ type keyMap struct {
 	PrevUnresolved   key.Binding
 	HideComments     key.Binding
 	FoldResolved     key.Binding
+	Reload           key.Binding
+	Watch            key.Binding
 	IgnoreWhitespace key.Binding
 	Split            key.Binding
 	Images           key.Binding
@@ -78,7 +80,9 @@ var keys = keyMap{
 	ResolveNext:      key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resolve and go to next")),
 	HideComments:     key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide/show comments")),
 	FoldResolved:     key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "fold resolved comments")),
-	IgnoreWhitespace: key.NewBinding(key.WithKeys("w", "W"), key.WithHelp("w/W", "ignore whitespace")),
+	Reload:           key.NewBinding(key.WithKeys("f5", "alt+r"), key.WithHelp("F5/M-r", "reload")),
+	Watch:            key.NewBinding(key.WithKeys("W", "shift+w", "shift+W", "shift+f5", "alt+R", "alt+shift+r", "alt+shift+R"), key.WithHelp("W/S-F5/M-R", "watch")),
+	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),
 	Split:            key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "toggle split diff")),
 	Images:           key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "show/hide images or recheck support")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),

@@ -4,6 +4,7 @@
 
 ### Added
 
+- Refresh Git changes, documents, and file-backed attachments during a review with Reload, or enable Watch to follow edits automatically.  Agents can start Watch with `--watch`; it defaults off and defers updates while editing or confirming submission.  Watch uses filesystem notifications, excludes ignored directories and unrelated worktree metadata, and does no polling while idle.  Supplied diffs, saved plan versions, and committed comparisons stay snapshots.  `W` toggles Watch; use `w` for whitespace filtering.
 - Review one commit with `--scope=COMMIT`, using a SHA or revision such as `HEAD`.  The comparison uses its first parent, including for merge commits; root commits show all files as additions.  Available in both `critty review` and `critty view`.
 
 ### Changed

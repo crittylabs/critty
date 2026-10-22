@@ -163,6 +163,14 @@ critty comment --session <id> --json --file replies.json --author 'Claude Code'
 
 To resume a stopped session, run `critty --session <id>` from its original directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  To replace that input, use `critty plan --session <id> <file>` or `critty --session <id> --diff=<file>`.  The `/critty` skill covers the interactive review loop.
 
+## Live sources
+
+Agents can add `--watch` to `review`, `view`, `plan`, or a resumed session to start with Watch enabled.  It defaults off and applies only to that invocation.  Reload and Watch refresh the complete live input: the selected Git scope, a standalone document, and active file-backed attachments.  Comments and compatible answer drafts carry forward; changed review content resets required confirmations and consents.  Updates wait during editing, selection, search, and submission dialogs.  Human controls are listed in built-in Help.
+
+Watch uses filesystem notifications rather than periodic scans.  It excludes ignored directories and watches the selected worktree's resolved index, HEAD, and relevant refs instead of shared object storage or other worktrees.  Idle watches run no Git commands.  Notifications may be unavailable on network or virtual filesystems; errors remain visible, and manual Reload is available.
+
+Supplied diffs and saved plan versions remain snapshots.  Committed comparisons stay pinned to the resolved commits during the open round.  These inputs support Watch only when an active attachment has a source file; use the existing replacement-input commands for new snapshots.  Without Reload or Watch, attachment snapshots remain unchanged until explicitly replaced on resume.  Finish output and form results describe the final displayed snapshots, not the originals from launch.
+
 ## Display options
 
 ### Project and topic labels

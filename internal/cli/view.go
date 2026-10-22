@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -44,11 +45,15 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 	if err := resolveFocus(mode); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	project := reviewProject(cfg.ProjectRoot)
 	if headerFlagSpecified("project") {
 		project = reviewProjectName
 	}
 	appCfg := tui.AppConfig{
+		Context:   ctx,
+		Watch:     reviewWatch,
 		Documents: mode.documents,
 		Project:   project,
 		Topic:     reviewTopic,
@@ -78,6 +83,9 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 	} else {
 		model = tui.NewApp(mode.docPath, appCfg)
 	}
+	if reviewWatch && !model.CanWatch() {
+		return fmt.Errorf("--watch requires a live document, Git scope, or file-backed attachment")
+	}
 	// Stdin may contain a patch.  Always read interaction from the foreground TTY.
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
@@ -95,6 +103,7 @@ func init() {
 	viewCmd.Flags().BoolVar(&reviewUnstaged, "unstaged", false, "view unstaged and untracked changes")
 	addDiffFlag(viewCmd)
 	addFocusFlag(viewCmd)
+	addWatchFlag(viewCmd)
 	addHeaderFlags(viewCmd)
 	viewCmd.Flags().StringArrayVar(&attachmentPaths, "attachment", nil, "Attach a document (repeatable)")
 	reviewCmd.Flags().BoolVar(&reviewDemo, "demo", false, "try a review in the current terminal without saving")
