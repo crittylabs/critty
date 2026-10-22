@@ -8,11 +8,59 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestEditorMetaAnglesMoveToInputEnds(t *testing.T) {
+	for _, constructor := range []struct {
+		name   string
+		newApp func() AppModel
+	}{
+		{"document", func() AppModel { return NewApp("test.md", AppConfig{}) }},
+		{"code", func() AppModel { return NewCodeReviewApp(nil, "", AppConfig{}) }},
+	} {
+		for _, tc := range []struct{ name, begin, end string }{
+			{"legacy", "\x1b<", "\x1b>"},
+			{"CSI-u", "\x1b[44;4u", "\x1b[46;4u"},
+			{"alternate codes", "\x1b[44:60;4u", "\x1b[46:62;4u"},
+			{"shifted codes", "\x1b[60;4u", "\x1b[62;4u"},
+			{"control home/end", "\x1b[1;5H", "\x1b[1;5F"},
+		} {
+			t.Run(constructor.name+"/"+tc.name, func(t *testing.T) {
+				app := constructor.newApp()
+				app.modal = fileCommentModal
+				app.modalTextarea.SetWidth(40)
+				app.modalTextarea.SetHeight(6)
+				app.modalTextarea.SetValue("first\nsecond\nthird")
+				app.modalTextarea.Focus()
+				app.modalTextarea.MoveToBegin()
+				app.modalTextarea.CursorDown()
+				app.modalTextarea.SetCursorColumn(2)
+				for _, step := range []struct {
+					sequence    string
+					row, column int
+				}{
+					{tc.begin, 0, 0}, {tc.end, 2, 5},
+				} {
+					var decoder uv.EventDecoder
+					n, event := decoder.Decode([]byte(step.sequence))
+					key, ok := event.(uv.KeyPressEvent)
+					if !ok || n != len(step.sequence) {
+						t.Fatalf("decode %q: %v", step.sequence, event)
+					}
+					editorMessage(&app, tea.KeyPressMsg(key))
+					if app.modalTextarea.Line() != step.row || app.modalTextarea.Column() != step.column {
+						t.Fatalf("%s: cursor = %d:%d, want %d:%d", key.String(), app.modalTextarea.Line(), app.modalTextarea.Column(), step.row, step.column)
+					}
+				}
+			})
+		}
+	}
+}
 
 func TestSaveTextModalWithoutFeedback(t *testing.T) {
 	for _, mode := range []modalType{commentModal, fileCommentModal, replyModal, editModal} {

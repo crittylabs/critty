@@ -430,6 +430,27 @@ func TestReviewFrameFitsTerminalWithSidebar(t *testing.T) {
 	}
 }
 
+func TestMetaQuestionMarkOpensAndClosesHelp(t *testing.T) {
+	for _, msg := range []tea.KeyPressMsg{
+		{Code: '?', Mod: tea.ModAlt},
+		{Code: '/', Mod: tea.ModAlt | tea.ModShift},
+		{Code: '/', ShiftedCode: '?', Mod: tea.ModAlt | tea.ModShift},
+		{Code: '?', Mod: tea.ModAlt | tea.ModShift},
+	} {
+		t.Run(fmt.Sprintf("%s/shifted=%d", msg.String(), msg.ShiftedCode), func(t *testing.T) {
+			app := setupAppWithDoc(t, "first\nsecond\n")
+			app, _ = updateApp(app, msg)
+			if app.modal != helpModal {
+				t.Fatalf("%s opened modal %v, want help modal", msg.String(), app.modal)
+			}
+			app, _ = updateApp(app, msg)
+			if app.modal != noModal {
+				t.Fatalf("%s left modal %v open", msg.String(), app.modal)
+			}
+		})
+	}
+}
+
 func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.width = 80

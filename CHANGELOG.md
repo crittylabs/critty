@@ -12,6 +12,10 @@
 - Review setup guidance shares common multiplexer behavior and keeps terminal-specific requirements in the launcher reference.
 - Focused dialog actions stand out more clearly, with stronger blue backgrounds in both color schemes and a clearer red in light terminals.
 
+### Fixed
+
+- Shortcuts using Alt with shifted punctuation work in terminals that report Shift separately: `M-?` opens and closes Help, and `M-<` / `M->` move to the beginning or end of comment and answer text.
+
 ## 1.5.0
 
 ### Added

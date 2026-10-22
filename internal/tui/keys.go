@@ -4,7 +4,15 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
 )
+
+func modalTextareaKeyMap() textarea.KeyMap {
+	bindings := textarea.DefaultKeyMap()
+	bindings.InputBegin.SetKeys(append(bindings.InputBegin.Keys(), "alt+shift+,", "alt+shift+<")...)
+	bindings.InputEnd.SetKeys(append(bindings.InputEnd.Keys(), "alt+shift+.", "alt+shift+>")...)
+	return bindings
+}
 
 // keyHintNames formats static shortcut hints without changing event names.
 var keyHintNames = strings.NewReplacer(
@@ -76,6 +84,6 @@ var keys = keyMap{
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),
 	FormList:         key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "answer list")),
-	Help:             key.NewBinding(key.WithKeys("alt+?"), key.WithHelp("M-?", "help")),
+	Help:             key.NewBinding(key.WithKeys("alt+?", "alt+shift+/", "alt+shift+?"), key.WithHelp("M-?", "help")),
 	FileTree:         key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "switch sidebar view")),
 }

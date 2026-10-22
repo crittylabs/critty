@@ -290,6 +290,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		cfg.Session = nil
 	}
 	ta := textarea.New()
+	ta.KeyMap = modalTextareaKeyMap()
 	ta.SetVirtualCursor(false)
 	ta.Placeholder = "Type your comment..."
 	ta.ShowLineNumbers = false
@@ -333,6 +334,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		cfg.Session = nil
 	}
 	ta := textarea.New()
+	ta.KeyMap = modalTextareaKeyMap()
 	ta.SetVirtualCursor(false)
 	ta.Placeholder = "Type your comment..."
 	ta.ShowLineNumbers = false
