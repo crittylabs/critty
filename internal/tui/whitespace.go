@@ -36,6 +36,7 @@ func (m *AppModel) toggleWhitespace() {
 		}
 		t.changedLines, t.inlineChanges, t.deletedAfter = info.ChangedLines, info.InlineChanges, info.DeletedAfter
 		t.commonLines = info.CommonLines
+		t.pairedLines = info.PairedLines
 		t.chromaLines = nil
 		t.deletedLineCache = nil
 		t.ensureHighlightCache()

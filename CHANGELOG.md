@@ -5,6 +5,7 @@
 ### Added
 
 - Review binary plists and text in other encodings by listing Git diff driver names or glob patterns in Critty's `textconv_drivers` setting; `["*"]` enables all configured converters.  Conversions are disabled by default, preserving inline image previews.  Comments refer to the converted UTF-8 text; review and comment JSON records the driver and command so agents can locate and edit the original content.  See the [CLI reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#git-text-conversions).
+- Word-level highlights now estimate line alignment when changes increase or decrease the line count.  Side-by-side diffs use the same matches, leaving unmatched additions and deletions on their own side.  Very long lines and expensive searches retain full-line highlighting to keep review startup responsive.
 
 ### Changed
 

@@ -65,6 +65,9 @@ func (f FileChange) ReviewStatus() string {
 
 // DiffInfo contains parsed diff information for a single file.
 type DiffInfo struct {
+	// PairedLines maps added source lines to similar deleted lines.  Zero marks
+	// an unpaired addition; missing entries retain legacy positional alignment.
+	PairedLines   map[int]int             `json:",omitempty"`
 	CommonLines   map[int]int             `json:",omitempty"` // new-to-old coordinates supplied by the patch
 	ChangedLines  map[int]bool            // added/modified line numbers (1-based) in new file
 	InlineChanges map[int][]InlineSegment // inline changes keyed by new-file line number
@@ -171,14 +174,24 @@ func diffInfo(files []*gitdiff.File) *DiffInfo {
 					oldLine++
 				}
 			}
-			annotateInlineChanges(info, frag)
+		}
+	}
+	deletedByLine := make(map[int]*DeletedLine)
+	for _, lines := range info.DeletedAfter {
+		for i := range lines {
+			deletedByLine[lines[i].OldLineNum] = &lines[i]
+		}
+	}
+	for _, f := range files {
+		for _, frag := range f.TextFragments {
+			annotateInlineChanges(info, frag, deletedByLine)
 		}
 	}
 
 	return info
 }
 
-func annotateInlineChanges(info *DiffInfo, frag *gitdiff.TextFragment) {
+func annotateInlineChanges(info *DiffInfo, frag *gitdiff.TextFragment, deletedByLine map[int]*DeletedLine) {
 	oldLine := int(frag.OldPosition)
 	newLine := int(frag.NewPosition)
 	for i := 0; i < len(frag.Lines); {
@@ -194,46 +207,31 @@ func annotateInlineChanges(info *DiffInfo, frag *gitdiff.TextFragment) {
 			continue
 		}
 
-		var deleted []struct {
-			line    int
-			content string
-		}
+		var deleted []*DeletedLine
 		for i < len(frag.Lines) && frag.Lines[i].Op == gitdiff.OpDelete {
-			deleted = append(deleted, struct {
-				line    int
-				content string
-			}{oldLine, strings.TrimSuffix(frag.Lines[i].Line, "\n")})
+			deleted = append(deleted, deletedByLine[oldLine])
 			oldLine++
 			i++
 		}
 
-		var added []struct {
-			line    int
-			content string
-		}
+		var added []replacementLine
 		for i < len(frag.Lines) && frag.Lines[i].Op == gitdiff.OpAdd {
-			added = append(added, struct {
-				line    int
-				content string
-			}{newLine, strings.TrimSuffix(frag.Lines[i].Line, "\n")})
+			added = append(added, replacementLine{newLine, strings.TrimSuffix(frag.Lines[i].Line, "\n")})
 			newLine++
 			i++
 		}
 
-		if len(deleted) != len(added) {
-			continue
-		}
-		for j := range deleted {
-			oldSegments, newSegments := inlineDiff(deleted[j].content, added[j].content)
-			info.InlineChanges[added[j].line] = newSegments
-			setDeletedInline(info, deleted[j].line, oldSegments)
-		}
+		info.annotateReplacement(deleted, added, false)
 	}
 }
 
 func inlineDiff(before, after string) ([]InlineSegment, []InlineSegment) {
 	beforeTokens := splitInlineTokens(before)
 	afterTokens := splitInlineTokens(after)
+	return inlineDiffTokens(beforeTokens, afterTokens)
+}
+
+func inlineDiffTokens(beforeTokens, afterTokens []string) ([]InlineSegment, []InlineSegment) {
 	diffs := lcs.DiffLines(beforeTokens, afterTokens)
 	if len(diffs) == 0 {
 		return nil, nil
@@ -286,17 +284,6 @@ func appendInlineSegment(segments []InlineSegment, content string, changed bool)
 		return segments
 	}
 	return append(segments, InlineSegment{Content: content, Changed: changed})
-}
-
-func setDeletedInline(info *DiffInfo, oldLine int, segments []InlineSegment) {
-	for anchor := range info.DeletedAfter {
-		for i := range info.DeletedAfter[anchor] {
-			if info.DeletedAfter[anchor][i].OldLineNum == oldLine {
-				info.DeletedAfter[anchor][i].Inline = segments
-				return
-			}
-		}
-	}
 }
 
 // parseNameStatusZ parses NUL-separated `git diff --name-status -z` output:

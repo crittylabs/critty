@@ -17,6 +17,7 @@ func (info *DiffInfo) IgnoreWhitespace(newLines []string) *DiffInfo {
 	}
 	filtered := &DiffInfo{
 		CommonLines:  maps.Clone(info.CommonLines),
+		PairedLines:  maps.Clone(info.PairedLines),
 		ChangedLines: make(map[int]bool), InlineChanges: make(map[int][]InlineSegment),
 		DeletedAfter: make(map[int][]DeletedLine),
 	}
@@ -43,10 +44,12 @@ func (info *DiffInfo) IgnoreWhitespace(newLines []string) *DiffInfo {
 			newKeys[i] = withoutWhitespace(line)
 			delete(filtered.ChangedLines, anchor+i+1)
 			delete(filtered.InlineChanges, anchor+i+1)
+			delete(filtered.PairedLines, anchor+i+1)
 		}
 		changes := lcs.DiffLines(oldKeys, newKeys)
 		for _, change := range changes {
 			after := anchor + change.ReplStart
+			start := len(filtered.DeletedAfter[after])
 			for i := change.Start; i < change.End; i++ {
 				line := deleted[i]
 				line.Inline = nil
@@ -55,13 +58,15 @@ func (info *DiffInfo) IgnoreWhitespace(newLines []string) *DiffInfo {
 			for i := change.ReplStart; i < change.ReplEnd; i++ {
 				filtered.ChangedLines[anchor+i+1] = true
 			}
-			if change.End-change.Start == change.ReplEnd-change.ReplStart {
-				for i := 0; i < change.End-change.Start; i++ {
-					oldSegments, newSegments := whitespaceInlineDiff(deleted[change.Start+i].Content, added[change.ReplStart+i])
-					filtered.DeletedAfter[after][i].Inline = oldSegments
-					filtered.InlineChanges[after+i+1] = newSegments
-				}
+			var old []*DeletedLine
+			for i := start; i < len(filtered.DeletedAfter[after]); i++ {
+				old = append(old, &filtered.DeletedAfter[after][i])
 			}
+			var next []replacementLine
+			for i := change.ReplStart; i < change.ReplEnd; i++ {
+				next = append(next, replacementLine{anchor + i + 1, added[i]})
+			}
+			filtered.annotateReplacement(old, next, true)
 		}
 		// Equal lines still need their original coordinates after filtering.
 		old, next := 0, 0

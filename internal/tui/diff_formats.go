@@ -317,16 +317,7 @@ func diffHunks(t *FileTab) []diffHunk {
 					i++
 				}
 
-				for j := 0; j < max(len(before), len(after)); j++ {
-					var row diffRow
-					if j < len(before) {
-						row.before = before[j]
-					}
-					if j < len(after) {
-						row.after = after[j]
-					}
-					hunk = append(hunk, row)
-				}
+				hunk = append(hunk, alignDiffRows(before, after, t.pairedLines)...)
 			} else {
 				row := diffRow{after: line}
 				if !line.changed {
@@ -342,6 +333,53 @@ func diffHunks(t *FileTab) []diffHunk {
 		hunks = append(hunks, hunk)
 	}
 	return hunks
+}
+
+func alignDiffRows(before, after []*diffLine, pairs map[int]int) []diffRow {
+	known := false
+	for _, line := range after {
+		if _, ok := pairs[line.ref.line]; ok {
+			known = true
+			break
+		}
+	}
+	var rows []diffRow
+	if !known {
+		// Older saved diffs have no explicit alignment.
+		for j := 0; j < max(len(before), len(after)); j++ {
+			var row diffRow
+			if j < len(before) {
+				row.before = before[j]
+			}
+			if j < len(after) {
+				row.after = after[j]
+			}
+			rows = append(rows, row)
+		}
+		return rows
+	}
+	old := 0
+	for _, line := range after {
+		target := pairs[line.ref.line]
+		if target == 0 {
+			rows = append(rows, diffRow{after: line})
+			continue
+		}
+		for old < len(before) && before[old].ref.line < target {
+			rows = append(rows, diffRow{before: before[old]})
+			old++
+		}
+		row := diffRow{after: line}
+		if old < len(before) && before[old].ref.line == target {
+			row.before = before[old]
+			old++
+		}
+		rows = append(rows, row)
+	}
+	for ; old < len(before); old++ {
+		rows = append(rows, diffRow{before: before[old]})
+	}
+	return rows
 }
 
 func (m *AppModel) rebuildDiffContent() {

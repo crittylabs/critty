@@ -34,6 +34,7 @@ type FileTab struct {
 	diff                  *gitpkg.DiffInfo // original diff, retained when whitespace is ignored
 	changedLines          map[int]bool     // line numbers that are added/modified
 	commonLines           map[int]int
+	pairedLines           map[int]int
 	inlineChanges         map[int][]gitpkg.InlineSegment
 	deletedAfter          map[int][]gitpkg.DeletedLine // deleted lines keyed by new-file line they appear after
 	changeChunks          []changeChunk                // contiguous groups of changed lines
@@ -84,6 +85,7 @@ func newFileTab(path string, diff *gitpkg.DiffInfo) FileTab {
 	}
 	if diff != nil {
 		ft.commonLines = diff.CommonLines
+		ft.pairedLines = diff.PairedLines
 		ft.changedLines = diff.ChangedLines
 		ft.inlineChanges = diff.InlineChanges
 		ft.deletedAfter = diff.DeletedAfter

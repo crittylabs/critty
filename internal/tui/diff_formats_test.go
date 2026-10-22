@@ -17,6 +17,41 @@ const formatsPatch = "diff --git a/missing.go b/missing.go\n--- a/missing.go\n++
 	"@@ -10,4 +20,3 @@\n before\n-old one\n-old two\n+new one\n after\n" +
 	"@@ -40 +50 @@\n-tail\n+final\n"
 
+func TestSplitDiffReplacementAlignment(t *testing.T) {
+	patch := "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,3 @@\n-removed heading\n-alpha old beta\n+fresh introduction\n+alpha new beta\n+added footer\n"
+	m := patchApp(t, patch)
+	source := m.tab().doc.Content
+	m.split = true
+	m.rebuildContent()
+	old := m.contentLayout.oldRanges[2].start
+	if old != m.contentLayout.lineRanges[2].start {
+		t.Fatal("similar replacement lines are not paired")
+	}
+	for _, line := range []int{1, 3} {
+		row := m.contentLayout.lineRanges[line].start
+		columns := m.contentLayout.columns[row]
+		if _, ok := m.contentMouseTargetAt(0, row); ok {
+			t.Fatalf("unpaired addition %d has an old-side target", line)
+		}
+		ref, ok := m.contentMouseTargetAt(columns.split+3, row)
+		if !ok || ref.side != "" || ref.line != line {
+			t.Fatalf("addition %d has the wrong source target: %+v", line, ref)
+		}
+	}
+	if m.tab().doc.Content != source {
+		t.Fatal("alignment modified source text")
+	}
+	for range 2 {
+		m.toggleWhitespace()
+		if m.tab().pairedLines[2] != 2 || m.contentLayout.oldRanges[2].start != m.contentLayout.lineRanges[2].start {
+			t.Fatal("whitespace toggle lost replacement alignment")
+		}
+		if m.tab().doc.Content != source {
+			t.Fatal("whitespace toggle modified source text")
+		}
+	}
+}
+
 func TestDiffFormatsPartialPatch(t *testing.T) {
 	m := patchApp(t, formatsPatch)
 	source := m.tab().doc.Content
