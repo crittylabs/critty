@@ -4,6 +4,7 @@
 
 ### Added
 
+- Copy text from documents and code diffs by dragging across the content and pressing `M-w` or clicking Copy text.  Copies the source text to the kill ring and system clipboard, excluding line numbers and annotations; wrapped rows stay joined.  Markdown retains its syntax and link targets, including for partial link labels.  Selections that include an opening modifier or code fence close it at the selection end.  Without a text selection, `M-w` still copies a reference.  System clipboard access requires terminal OSC 52 support.
 - Review one commit with `--scope=COMMIT`, using a SHA or revision such as `HEAD`.  The comparison uses its first parent, including for merge commits; root commits show all files as additions.  Available in both `critty review` and `critty view`.
 
 ### Changed
