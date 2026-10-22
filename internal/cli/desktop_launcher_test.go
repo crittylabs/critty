@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/base64"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -27,8 +28,11 @@ func TestDesktopLauncherOrder(t *testing.T) {
 	}{
 		{"darwin", "ghostty", "", []string{"ghostty-window", "terminal-app-window"}},
 		{"darwin", "iterm", "", []string{"iterm-window", "terminal-app-window"}},
+		{"darwin", "rio", "", []string{"rio-window", "terminal-app-window"}},
 		{"darwin", "", "", []string{"terminal-app-window"}},
 		{"linux", "", "", []string{"xdg-terminal"}},
+		{"linux", "rio", "", []string{"rio-window", "xdg-terminal"}},
+		{"linux", "rio", "Ubuntu", []string{"rio-window", "windows-terminal-wsl"}},
 		{"linux", "windows-terminal", "Ubuntu", []string{"windows-terminal-wsl"}},
 	} {
 		got := desktopOrder(tc.platform, terminalbinding.Origin{Terminal: tc.terminal, WSLDistribution: tc.wsl})
@@ -103,5 +107,46 @@ func TestGhosttyRequiresWindowActivation(t *testing.T) {
 		if got := ghosttyScriptingAvailable(dictionary); got != tc.want {
 			t.Fatalf("window activation support=%v, want %v", got, tc.want)
 		}
+	}
+}
+
+func TestRioCommandPreservesArguments(t *testing.T) {
+	originalLook := lookPath
+	t.Cleanup(func() { lookPath = originalLook })
+	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
+	value := "path with spaces;日本語 and 'quotes' $(not-a-command)"
+	command := "printf '%s' " + shellEscape(value)
+	cwd := "/path with spaces;日本語"
+	for _, distribution := range []string{"", "Ubuntu"} {
+		t.Run("wsl="+distribution, func(t *testing.T) {
+			launch := desktopLaunch{name: "rio-window", origin: terminalbinding.Origin{WSLDistribution: distribution}}
+			cmd, err := launch.rioCommand(command, cwd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if distribution == "" {
+				want := []string{"/bin/rio", "--working-dir", cwd, "--title-placeholder", "Critty", "-e", "/bin/sh", "-c", command}
+				if !slices.Equal(cmd.Args, want) {
+					t.Fatalf("args = %q", cmd.Args)
+				}
+			} else {
+				if cmd.Path != "/bin/rio.exe" || !slices.Contains(cmd.Args, distribution) || slices.Contains(cmd.Args, cwd) {
+					t.Fatalf("WSL args = %q", cmd.Args)
+				}
+				payload := cmd.Args[len(cmd.Args)-1]
+				decoded, err := base64.StdEncoding.DecodeString(payload)
+				if err != nil || string(decoded) != command {
+					t.Fatalf("payload = %q, %v", decoded, err)
+				}
+				shellIndex := slices.Index(cmd.Args, "-c")
+				out, err := exec.Command("/bin/sh", "-c", cmd.Args[shellIndex+1], "critty", payload).Output()
+				if err != nil || string(out) != value {
+					t.Fatalf("nested command = %q, %v", out, err)
+				}
+			}
+			if err := launch.close(); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

@@ -5,6 +5,7 @@
 ### Added
 
 - cmux users can open reviews in a new terminal tab in the invoking pane, with focus returned to the original tab afterward.  The default launcher detects cmux; agents can also select `--launcher cmux`, reuse its terminal context with `critty env`, and locate it through terminal markers.
+- Rio users can open reviews in a dedicated window with `--launcher rio-window` on macOS and Linux, or from Critty running in WSL using Windows Rio.  The default desktop launcher prefers Rio when client terminal hints identify it; `doctor` checks its availability.  See the [launcher reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers) for requirements.
 
 ### Changed
 

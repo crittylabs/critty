@@ -491,9 +491,9 @@ func TestDoctorDesktopLaunchers(t *testing.T) {
 		name, platform, wsl string
 		want                []string
 	}{
-		{"macOS", "darwin", "", []string{"ghostty-window", "iterm-window", "terminal-app-window"}},
-		{"Linux", "linux", "", []string{"xdg-terminal"}},
-		{"WSL", "linux", "Ubuntu", []string{"xdg-terminal", "windows-terminal-wsl"}},
+		{"macOS", "darwin", "", []string{"ghostty-window", "iterm-window", "terminal-app-window", "rio-window"}},
+		{"Linux", "linux", "", []string{"xdg-terminal", "rio-window"}},
+		{"WSL", "linux", "Ubuntu", []string{"xdg-terminal", "rio-window", "windows-terminal-wsl"}},
 		{"unsupported", "freebsd", "", nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

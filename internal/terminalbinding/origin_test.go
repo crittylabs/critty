@@ -43,6 +43,8 @@ func TestTerminalHints(t *testing.T) {
 		want string
 	}{
 		{map[string]string{"TERMINAL_APP": "Ghostty"}, "ghostty"},
+		{map[string]string{"TERM_PROGRAM": "rio"}, "rio"},
+		{map[string]string{"TERMINAL_APP": "Rio"}, "rio"},
 		{map[string]string{"TERM_PROGRAM": "iTerm.app"}, "iterm"},
 		{map[string]string{"TERM_PROGRAM": "Apple_Terminal"}, "terminal-app"},
 		{map[string]string{"WT_SESSION": "fixture"}, "windows-terminal"},

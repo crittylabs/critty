@@ -32,6 +32,8 @@ func CaptureOrigin(pid int) Origin {
 func terminalApplication(getenv func(string) string) string {
 	for _, key := range []string{"TERMINAL_APP", "TERM_PROGRAM"} {
 		switch strings.ToLower(getenv(key)) {
+		case "rio", "rioterm":
+			return "rio"
 		case "ghostty":
 			return "ghostty"
 		case "iterm", "iterm2", "iterm.app":

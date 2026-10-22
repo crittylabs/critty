@@ -104,6 +104,8 @@ After setting up or switching your terminal or multiplexer, run `critty doctor` 
 
 In cmux, Critty opens reviews in a new terminal tab in the invoking pane and returns focus to the original tab when the review ends.  The default launcher detects cmux automatically; use `--launcher cmux` to prefer it explicitly.
 
+Rio users can open a separate review window with `--launcher rio-window` on macOS and Linux, or from WSL using Windows Rio.  The default desktop launcher prefers Rio when it identifies the client's terminal as Rio.  See the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for setup requirements.
+
 #### Image previews
 
 Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, or iTerm2.  Through tmux or Herdr, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.

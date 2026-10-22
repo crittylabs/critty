@@ -523,9 +523,9 @@ func (r *doctorReport) checkDesktopLaunchers(platform string, origin terminalbin
 	var names []string
 	switch platform {
 	case "darwin":
-		names = []string{"ghostty-window", "iterm-window", "terminal-app-window"}
+		names = []string{"ghostty-window", "iterm-window", "terminal-app-window", "rio-window"}
 	case "linux":
-		names = []string{"xdg-terminal"}
+		names = []string{"xdg-terminal", "rio-window"}
 		if origin.WSLDistribution != "" {
 			names = append(names, "windows-terminal-wsl")
 		}
@@ -541,6 +541,8 @@ func (r *doctorReport) checkDesktopLaunchers(platform string, origin terminalbin
 				advice = "Install xdg-terminal-exec and configure a supported terminal desktop entry."
 			case "windows-terminal-wsl":
 				advice = "Install Windows Terminal and make wt.exe and wsl.exe available on the WSL PATH."
+			case "rio-window":
+				advice = "Install Rio and make its CLI available on PATH; WSL needs rio.exe and wsl.exe."
 			}
 			r.add("launchers/"+name, "warn", err.Error(), advice)
 			continue
