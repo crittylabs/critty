@@ -6,6 +6,10 @@
 
 - cmux users can open reviews in a new terminal tab in the invoking pane, with focus returned to the original tab afterward.  The default launcher detects cmux; agents can also select `--launcher cmux`, reuse its terminal context with `critty env`, and locate it through terminal markers.
 
+### Changed
+
+- Focused dialog actions stand out more clearly, with stronger blue backgrounds in both color schemes and a clearer red in light terminals.
+
 ## 1.5.0
 
 ### Added

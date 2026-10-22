@@ -554,12 +554,12 @@ func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
 // Primary role colors remain visible independently of keyboard focus.
 func newModalPrimaryStyles(ld lipgloss.LightDarkFunc) (lipgloss.Style, lipgloss.Style) {
 	return modalBtnNormalLabel.Foreground(ld(lipgloss.Color("#2456A6"), lipgloss.Color("#78ADFF"))).Bold(true),
-		modalBtnFocusedLabel.Foreground(ld(lipgloss.Color("#D8E8FF"), lipgloss.Color("#173B74"))).Background(ld(lipgloss.Color("#405D82"), lipgloss.Color("#D8E8FF"))).Bold(true).Underline(true)
+		modalBtnFocusedLabel.Foreground(ld(lipgloss.Color("#F3F7FF"), lipgloss.Color("#12325F"))).Background(ld(lipgloss.Color("#285BA5"), lipgloss.Color("#90B8F0"))).Bold(true).Underline(true)
 }
 
 func newModalDangerStyles(ld lipgloss.LightDarkFunc) (lipgloss.Style, lipgloss.Style) {
 	return lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#B42318"), lipgloss.Color("#FF9B91"))).Background(buttonBackground).Bold(true).PaddingLeft(1),
-		lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#FCE2DE"), lipgloss.Color("#7B1E1A"))).Background(ld(lipgloss.Color("#8A4D47"), lipgloss.Color("#FCE2DE"))).Bold(true).Underline(true).PaddingLeft(1)
+		lipgloss.NewStyle().Foreground(ld(lipgloss.Color("#FFF3F1"), lipgloss.Color("#7B1E1A"))).Background(ld(lipgloss.Color("#A63D36"), lipgloss.Color("#FCE2DE"))).Bold(true).Underline(true).PaddingLeft(1)
 }
 
 // textPalette holds foregrounds for text on the terminal background.  On
