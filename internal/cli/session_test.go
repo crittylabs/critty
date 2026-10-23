@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,84 @@ import (
 	"github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestResumeUsesSavedDirectoryAndCallerPaths(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+	savedDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("a.md", []byte("saved document\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sess, err := openReviewSession(&config.Config{}, &reviewMode{docPath: "a.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	caller, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("note.md", []byte("caller attachment\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	oldDiff, oldSummary, oldResult, oldAttachments := reviewDiff, summaryPath, resultPath, attachmentPaths
+	oldLaunchers := reviewLauncherNames
+	t.Cleanup(func() {
+		reviewDiff, summaryPath, resultPath, attachmentPaths = oldDiff, oldSummary, oldResult, oldAttachments
+		reviewLauncherNames = oldLaunchers
+	})
+	sentinel := errors.New("finished action")
+	for _, diff := range []string{"updated.diff", "-"} {
+		t.Run(diff, func(t *testing.T) {
+			reviewDiff, summaryPath, resultPath, attachmentPaths = diff, "summary.json", "result.json", []string{"note.md"}
+			reviewLauncherNames = []string{"custom:./launch script", "mux"}
+			err := withSessionDirectory(sess.Key, []string{"plan.md"}, func(args []string) error {
+				cwd, err := os.Getwd()
+				if err != nil || cwd != savedDirectory {
+					t.Fatalf("saved directory not restored: %q, %v", cwd, err)
+				}
+				_, mode, err := loadReviewSession(sess.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := prepareDocuments(mode); err != nil {
+					t.Fatal(err)
+				}
+				if mode.documents[0].Content != "caller attachment\n" || args[0] != filepath.Join(caller, "plan.md") {
+					t.Fatal("relative input was resolved against the saved worktree")
+				}
+				wantDiff := diff
+				if diff != "-" {
+					wantDiff = filepath.Join(caller, diff)
+				}
+				if reviewDiff != wantDiff || summaryPath != filepath.Join(caller, "summary.json") || resultPath != filepath.Join(caller, "result.json") {
+					t.Fatal("relative diff or output path was resolved against the saved worktree")
+				}
+				if reviewLauncherNames[0] != "custom:"+filepath.Join(caller, "launch script") {
+					t.Fatal("relative custom launcher was resolved against the saved worktree")
+				}
+				return sentinel
+			})
+			if !errors.Is(err, sentinel) {
+				t.Fatalf("action result was lost: %v", err)
+			}
+			if cwd, err := os.Getwd(); err != nil || cwd != caller {
+				t.Fatalf("caller directory not restored: %q, %v", cwd, err)
+			}
+			if reviewDiff != diff || summaryPath != "summary.json" || resultPath != "result.json" || attachmentPaths[0] != "note.md" {
+				t.Fatal("caller options changed after resuming")
+			}
+			if reviewLauncherNames[0] != "custom:./launch script" {
+				t.Fatal("caller launcher option changed after resuming")
+			}
+		})
+	}
+}
 
 func TestRestoreSavedDocumentAndDiffWithoutProcess(t *testing.T) {
 	t.Chdir(t.TempDir())

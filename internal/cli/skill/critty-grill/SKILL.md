@@ -115,7 +115,7 @@ For selected glossary and ADR outputs, record newly settled terms and accepted A
 Replace the question attachment with the next round, keeping settled decisions visible in a compact record.  Resume the same session with the complete ordered attachment list and fresh output paths:
 
 ```sh
-critty --session <id> --attachment '<directory>/QUESTIONS.md' --result '<directory>/result-2.json' --summary '<directory>/summary-2.json'
+critty sessions resume <id> --attachment '<directory>/QUESTIONS.md' --result '<directory>/result-2.json' --summary '<directory>/summary-2.json'
 ```
 
 Follow `/critty`'s launch and wait procedure for every round.  Its approval condition ends review of one round; remaining unanswered questions or consequences needing a decision require another.  Preserve those questions across interruptions.  If research is the only remaining prerequisite, complete that research before opening another round.

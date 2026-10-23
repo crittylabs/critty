@@ -57,7 +57,7 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 | Versioned plan | `critty plan <file>` saves numbered versions.  `critty plan --session <id> <file>` supplies a revision; reusing a name alone starts another review. |
 | Supplied diff | `critty review --diff=changes.diff` or `critty review --diff changes.diff`; bare `--diff` or `--diff=-` reads stdin.  Works outside Git. |
 
-`critty review` is the explicit form of the default command.  Prefer it for new reviews in agent workflows.  Resume with `critty --session <id>` before other flags: `review` does not accept `--session`.  These forms match the `/critty` skill's tool grants; shorter forms remain valid for new reviews.  Conflicting scope flags are rejected; `--scope` cannot accompany a document or supplied diff.  `--diff` cannot accompany `--scope`, `--code`, `--staged`, or `--unstaged`.  Relative and absolute input paths are accepted.
+`critty review` is the explicit form of the default command.  Prefer it for new reviews in agent workflows.  Resume with `critty sessions resume <id>`; the legacy `critty --session <id>` remains supported.  `review` does not accept `--session`.  These forms match the `/critty` skill's tool grants; shorter forms remain valid for new reviews.  Conflicting scope flags are rejected; `--scope` cannot accompany a document or supplied diff.  `--diff` cannot accompany `--scope`, `--code`, `--staged`, or `--unstaged`.  Relative and absolute input paths are accepted.
 
 Committed comparisons display the right endpoint, which may differ from disk.  A clean working tree does not fall back to commits.  Supplied diffs use saved snapshots; retain their producer command for later updates.  Scope selection stays fixed within a session.  Follow `/critty` to refresh the selected input between rounds.
 
@@ -82,9 +82,9 @@ Apply this procedure to file-level and line comments carrying `textconv`, or who
 
 ## Attached documents
 
-Repeated `--attachment FILE` flags on `review`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.  In the TUI, commented removed attachments appear after current files in collapsed, read-only attachment history.  Their forms are inactive and excluded from current answers; opening a comment reveals its historical snapshot.
+Repeated `--attachment FILE` flags on `review`, `resume`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.  In the TUI, commented removed attachments appear after current files in collapsed, read-only attachment history.  Their forms are inactive and excluded from current answers; opening a comment reveals its historical snapshot.
 
-`critty review --null --attachment FILE` reviews only attachments without requiring Git.  Empty diff input, including `--diff=/dev/null`, also supports attachment-only reviews.  At least one active attachment is required.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty --session <id>`, optionally replacing the complete attachment list.  Removing all attachments from an empty review is rejected.
+`critty review --null --attachment FILE` reviews only attachments without requiring Git.  Empty diff input, including `--diff=/dev/null`, also supports attachment-only reviews.  At least one active attachment is required.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty sessions resume <id>`, optionally replacing the complete attachment list.  Removing all attachments from an empty review is rejected.
 
 ## Forms and exported results
 
@@ -115,7 +115,7 @@ Use [critty-history](../critty-history/SKILL.md) before the first review and aft
 
 On submission, stdout contains the finish prompt, threads, and attached document snapshots; stderr contains `verdict: approve|reject|comment`, `approved: true|false`, and diagnostics.  Capture both streams and the exit status.  Only `approve` sets `approved: true`; `reject` requests changes and `comment` sends feedback.  Exit 0 can mean any of these submissions, so inspect the verdict and all threads.  A nonzero exit does not grant approval.  Export or output failures retain session data; a pre-existing result file may be from an earlier round.  Correlate any recovered result with its invocation before using it.
 
-`--summary FILE` on `critty`, `review`, or `plan` saves a compact JSON index before printing approval.  It works with or without forms and custom finish prompts.  Version 1 contains `session`, `round`, `cwd`, `verdict`, `approved`, optional `review_comment`, all `comments` with resolved threads and replies, ordered `attachments` with `path`, `source`, `revision` (content hash), and optional `removed`, `image_base` for comment images, and optional `next_command`.  Empty comment and attachment lists are arrays.  Attachment bodies remain in complete stdout rather than the summary.
+`--summary FILE` on `critty`, `review`, `resume`, or `plan` saves a compact JSON index before printing approval.  It works with or without forms and custom finish prompts.  Version 1 contains `session`, `round`, `cwd`, `verdict`, `approved`, optional `review_comment`, all `comments` with resolved threads and replies, ordered `attachments` with `path`, `source`, `revision` (content hash), and optional `removed`, `image_base` for comment images, and optional `next_command`.  Empty comment and attachment lists are arrays.  Attachment bodies remain in complete stdout rather than the summary.
 
 Use a fresh path for each invocation and verify exit 0, session, round, and the reviewed inputs before acting.  The parent directory must exist; the file must be outside the session directory and must not overwrite reviewed input or the `--result` file.  Summary export failure returns nonzero without printing approval or cleaning up the review.  Keep full finish output for additional instructions and evidence; a summary does not contain form answers or individual consents.  Use `--result` and `/critty-approval` for those decisions.
 
@@ -150,6 +150,8 @@ The finish prompt contains all comments and replies, including resolved threads 
 
 ## Targeting a session or plan
 
+`critty sessions list` (or `critty sessions`) lists saved reviews for the current project.  Git worktrees sharing a common Git directory belong to one project; outside Git, the directory identifies the project.  New sessions save this identity; listings also retain identities detected for older entries without changing review data, start times, or registry modification times.  Git registration can identify a removed legacy worktree until pruning removes that information.  `--directory DIR` selects the project containing DIR, resolving relative paths and symbolic links.  `--all` includes every project and cannot be combined with `--directory`.  The default `--sort project` groups sessions by project, with running sessions first and then newest starts first.  `--sort time` sorts all selected sessions by start time, newest first, without prioritizing projects or running reviews.  Both orders apply to the table and JSON.  The table shows local start times and UTC offsets in `STARTED`, using `-` for missing or invalid times, which sort after valid times at the same priority.  Worktree paths are omitted from the table.  `--json` retains `cwd` and adds stable `project_id`, canonical `project_name`, optional `git_common_dir`, `status`, `round`, `verdict` for finished rounds, and `error` when review data cannot be read.  Status values are `running`, `stopped`, `approved`, `changes-requested`, `feedback`, `submitted` (legacy finished rounds without a verdict), and `unavailable`.  A saved verdict does not authorize new actions.  The legacy `critty status` stays scoped to its current directory with the same JSON fields.
+
 Each new review invocation creates independent storage.  Always use the session ID printed at startup or in the finish prompt, including for plans and bulk replies.  Commands without an ID refuse to guess when multiple saved reviews match.
 
 ```bash
@@ -161,7 +163,7 @@ critty comment --session <id> --json --file replies.json --author 'Claude Code'
 
 `--scope` stays fixed for a session.  Identical scope arguments, document paths, or plan names can have independent session IDs.  `--plan <slug>` selects a plan only when its name is unambiguous; prefer the ID.
 
-To resume a stopped session, run `critty --session <id>` from its original directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  To replace that input, use `critty plan --session <id> <file>` or `critty --session <id> --diff=<file>`.  The `/critty` skill covers the interactive review loop.
+To resume a stopped session, run `critty sessions resume <id>` from any directory.  Critty automatically opens the saved working directory; keep its `cwd` when assigning AI reviewers or other tools that need source context.  Relative attachment, diff, plan-revision, result, summary, and explicit custom-launcher paths use the caller's directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  If the saved working directory no longer exists, resuming reports the error and keeps the review data.  To replace that input, use `critty plan --session <id> <file>` or `critty sessions resume <id> --diff=<file>`.  The `/critty` skill covers the interactive review loop.
 
 ## Live sources
 
@@ -179,7 +181,7 @@ Supplied diffs and saved plan versions remain snapshots.  Committed comparisons 
 
 ```bash
 critty review --staged --project 'Critty' --topic 'Header display'
-critty --session <id> --topic 'Revised header'
+critty sessions resume <id> --topic 'Revised header'
 critty review --topic ''                   # hide the topic label
 ```
 
@@ -315,19 +317,19 @@ Line and file comment IDs are unique within one file, so the same ID can exist i
 ## Stopping and deleting reviews
 
 ```bash
-critty stop --session <id>       # close the TUI, retaining saved state
-critty --session <id>            # resume from the original directory
-critty clear --session <id>      # delete one stopped review
+critty sessions stop <id>        # close the TUI, retaining saved state
+critty sessions resume <id>      # resume by ID from any directory
+critty sessions remove <id>      # delete one stopped review
 critty clear --all               # delete every saved review for this directory
 ```
 
 Each round closes its TUI and dedicated pane or tab.  On cancellation or a task switch, stop the specific review and collect the blocking command's result; neither cancellation nor a connection error is approval.  A stopped review keeps comments, replies, resolution status, and round context, but unsaved editor text is not retained.  Stop is also safe when that session is already stopped.
 
-Use `clear` when deletion is requested, or when explicitly enabled approval cleanup directs it after its images have been read.  Preserve saved reviews for retrospectives, archiving, and later continuation by default; approval or task completion alone does not authorize clearing them.  `stop` preserves data; `clear` deletes the session and its attachments and refuses active reviews or task members.  For a task member, use `history finish <task-id> --action delete`, or explicitly detach the selected review before clearing it.  `status` reports `task`, `ungrouped`, or `history_error` so membership does not require storage inspection.  Use the history workflow for maintenance under its global policy or selected IDs; `clear --all` is not a substitute for that decision.  Legacy `clear --code`, `clear <file>`, and `comment --clear` select saved reviews through their existing targeting rules; use an explicit session ID when several match.
+Use `clear` when deletion is requested, or when explicitly enabled approval cleanup directs it after its images have been read.  Preserve saved reviews for retrospectives, archiving, and later continuation by default; approval or task completion alone does not authorize clearing them.  `sessions stop` preserves data; `sessions remove` deletes the session and its attachments and refuses active reviews or task members.  For a task member, use `history finish <task-id> --action delete`, or explicitly detach the selected review before clearing it.  `status` reports `task`, `ungrouped`, or `history_error` so membership does not require storage inspection.  Use the history workflow for maintenance under its global policy or selected IDs; `clear --all` is not a substitute for that decision.  The legacy `stop --session <id>` and `clear --session <id>` remain supported.  Legacy `clear --code`, `clear <file>`, and `comment --clear` select saved reviews through their existing targeting rules; use an explicit session ID when several match.
 
 ## Terminal marker requests
 
-For Codex review launches, the interactive `critty` skill prepares and displays a fresh marker for each round.  `critty terminal prepare` returns JSON with `id`, `marker`, and `expires_at`; pass its ID as `--terminal-request <id>` on `critty`, `critty review`, or `critty plan`.  Requests expire after two minutes and are consumed at destination selection.  Review session IDs and terminal request IDs are separate.
+For Codex review launches, the interactive `critty` skill prepares and displays a fresh marker for each round.  `critty terminal prepare` returns JSON with `id`, `marker`, and `expires_at`; pass its ID as `--terminal-request <id>` on `critty review`, `critty sessions resume`, `critty plan`, or the default command.  Requests expire after two minutes and are consumed at destination selection.  Review session IDs and terminal request IDs are separate.
 
 `critty terminal notify <id>` is a terminal-filter callback, not an agent-side workaround.  It reads the filter's original terminal environment and records the destination and client hints, including without a multiplexer before or during review startup.  Duplicate notifications from one pane are accepted; different panes are ambiguous.  Expired or consumed requests fail.  Without a notification, Critty reads only the visible text in live registered panes.  It never broadens a failed search to all panes or scrollback.
 

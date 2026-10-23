@@ -245,6 +245,13 @@ func init() {
 		if cmd.Flags().Lookup("task") == nil || reviewTask == "" {
 			return nil
 		}
+		if key := resumingSessionID(cmd, args); key != "" {
+			entry, err := resumeEntry(key)
+			if err != nil {
+				return err
+			}
+			return history.New(entry.CWD).Validate(reviewTask)
+		}
 		store, _, err := historyContext()
 		if err != nil {
 			return err
@@ -252,7 +259,7 @@ func init() {
 		return store.Validate(reviewTask)
 	}
 	rootCmd.AddCommand(newHistoryCommand())
-	for _, command := range []*cobra.Command{rootCmd, reviewCmd, planCmd} {
+	for _, command := range []*cobra.Command{rootCmd, reviewCmd, resumeCmd, planCmd} {
 		command.Flags().StringVar(&reviewTask, "task", "", "associate this review with a history task ID")
 	}
 }

@@ -25,7 +25,11 @@ func loadReviewSession(key string) (*review.Session, *reviewMode, error) {
 		return nil, nil, err
 	}
 	if cwd != entry.CWD {
-		return nil, nil, fmt.Errorf("session belongs to %s; resume from that directory", entry.CWD)
+		savedInfo, savedErr := os.Stat(entry.CWD)
+		currentInfo, currentErr := os.Stat(".")
+		if savedErr != nil || currentErr != nil || !os.SameFile(savedInfo, currentInfo) {
+			return nil, nil, fmt.Errorf("session belongs to %s; resume from that directory", entry.CWD)
+		}
 	}
 	sess, err := review.OpenSessionFromEntry(*entry)
 	if err != nil {

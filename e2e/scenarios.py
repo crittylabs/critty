@@ -49,11 +49,16 @@ def environment() -> dict[str, str]:
     return env
 
 
-def run(args: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
+def run(
+    args: list[str], check: bool = True, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    env = environment()
+    if cwd is not None:
+        env["PWD"] = str(cwd)
     return subprocess.run(
         args,
-        cwd=WORK,
-        env=environment(),
+        cwd=cwd or WORK,
+        env=env,
         text=True,
         capture_output=True,
         check=check,
@@ -65,8 +70,10 @@ def tmux(*args: str) -> str:
     return run([str(TMUX), "-L", SERVER, *args]).stdout.strip()
 
 
-def cli(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    return run([str(BINARY), *args], check=check)
+def cli(
+    *args: str, check: bool = True, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    return run([str(BINARY), *args], check=check, cwd=cwd)
 
 
 def wait_until(
@@ -82,7 +89,7 @@ def wait_until(
 
 
 class Round:
-    def __init__(self, name: str, args: list[str]) -> None:
+    def __init__(self, name: str, args: list[str], cwd: Path | None = None) -> None:
         self.name = name
         self.summary = ROOT / f"{name}.summary.json"
         args = [*args, "--summary", str(self.summary)]
@@ -95,6 +102,7 @@ class Round:
                     "root": str(ROOT),
                     "binary": str(BINARY),
                     "tmux": str(TMUX),
+                    "cwd": str(cwd or WORK),
                 }
             )
         )
@@ -240,6 +248,8 @@ def child(path: str) -> None:
     configure(Path(job["root"]), Path(job["binary"]), Path(job["tmux"]))
     name = job["name"]
     env = environment()
+    directory = Path(job.get("cwd", WORK))
+    env["PWD"] = str(directory)
     env["TMUX"] = os.environ["TMUX"]
     env["TMUX_PANE"] = os.environ["TMUX_PANE"]
     with (
@@ -248,7 +258,7 @@ def child(path: str) -> None:
     ):
         result = subprocess.run(
             [str(BINARY), *job["args"]],
-            cwd=WORK,
+            cwd=directory,
             env=env,
             stdout=out,
             stderr=err,
@@ -259,6 +269,72 @@ def child(path: str) -> None:
 
 def report(message: str) -> None:
     print(f"PASS {message}", flush=True)
+
+
+def project_sessions() -> None:
+    project, worktree = WORK / "project", WORK / "project-worktree"
+    project.mkdir()
+    for args in [
+        ["init", "-q"],
+        [
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "base",
+        ],
+        ["worktree", "add", "--detach", str(worktree)],
+    ]:
+        run(["git", "-C", str(project), *args])
+    (worktree / "plan.md").write_text("# Project plan\n\nSaved worktree content.\n")
+    task = json.loads(
+        cli(
+            "history", "start", "Project review", "--project", "project", cwd=worktree
+        ).stdout
+    )["task"]["id"]
+    first = Round("project-plan", ["plan", "plan.md", "--task", task], cwd=worktree)
+    first.comment("Retain feedback while moving between worktrees.")
+    cli("sessions", "stop", first.session)
+    first.completed(None)
+    listing = json.loads(cli("sessions", "--directory", str(project), "--json").stdout)
+    assert len(listing) == 1 and listing[0]["key"] == first.session, listing
+    assert listing[0]["project_name"] == "project" and listing[0]["git_common_dir"]
+    table = cli("sessions", "--directory", str(project)).stdout
+    assert str(worktree) not in table and "PROJECT" in table, table
+    resumed = Round(
+        "project-resumed",
+        ["sessions", "resume", first.session, "--task", task],
+        cwd=project,
+    )
+    resumed.wait_screen(
+        "Saved worktree content", "saved worktree restored automatically"
+    )
+    assert (
+        resumed.comments()[0]["body"]
+        == "Retain feedback while moving between worktrees."
+    )
+    resumed.keys("q", "c", "Enter")
+    resumed.completed(False)
+    summary = json.loads(resumed.summary.read_text())
+    assert summary["cwd"] == str(worktree.resolve())
+    assert shlex.split(summary["next_command"])[-1] == str(worktree / "plan.md")
+    (project / "updated.md").write_text("# Project plan\n\nCaller revision content.\n")
+    updated = Round(
+        "project-plan-revision",
+        ["plan", "--session", first.session, "updated.md", "--task", task],
+        cwd=project,
+    )
+    updated.wait_screen("Caller revision content", "plan revision read from caller")
+    assert updated.session == first.session
+    updated.keys("q", "c", "Enter")
+    updated.completed(False)
+    cli("history", "finish", task, cwd=worktree)
+    report(
+        "project sessions span worktrees; resume restores its directory and plan revisions use caller paths"
+    )
 
 
 def transient_views() -> None:
@@ -513,6 +589,7 @@ def scenarios() -> None:
     )
     try:
         transient_views()
+        project_sessions()
         (WORK / "copy-text.md").write_text(
             'Before `sample` after.\nLink: [long label](https://example.org/a_(b) "title")\n'
         )
@@ -673,7 +750,24 @@ def scenarios() -> None:
         assert formats.comments() == saved
         assert not (WORK / "standalone.go").exists()
         formats.finish(False)
-        report("standalone patch format switching preserves old-side comments")
+        patch.write_text(patch.read_text().replace("+new call", "+updated call"))
+        continued = Round(
+            "diff-resumed", ["sessions", "resume", formats.session, f"--diff={patch}"]
+        )
+        assert continued.session == formats.session
+        continued.wait_screen(
+            "updated call", "replacement diff restored in same session"
+        )
+        restored = continued.comments()
+        assert len(restored) == len(saved)
+        for original, current in zip(saved, restored, strict=True):
+            for key in ["id", "body", "path", "side", "start_line", "end_line"]:
+                assert current.get(key) == original.get(key), (key, original, current)
+        continued.keys("q", "c", "Enter")
+        continued.completed(False)
+        report(
+            "standalone patch format switching and resume with replacement diff preserve old-side comments"
+        )
 
         history_task = json.loads(
             cli(
@@ -756,7 +850,7 @@ def scenarios() -> None:
             if session["key"] in task_sessions
         )
         assert cli(
-            "clear", "--session", default_approval.session, check=False
+            "sessions", "remove", default_approval.session, check=False
         ).returncode
         deferred = json.loads(cli("history", "defer", history_task).stdout)
         assert deferred["deferred_until"] and deferred["deferred_update"]
@@ -857,7 +951,7 @@ def scenarios() -> None:
             "radio selections require Submit and send overall feedback with distinct verdicts"
         )
 
-        overall = Round("overall-resumed", ["--session", submission.session])
+        overall = Round("overall-resumed", ["sessions", "resume", submission.session])
         overall.keys("}")
         wait_until(
             lambda: "Overall comments" in overall.screen(),
@@ -888,7 +982,7 @@ def scenarios() -> None:
         draft.keys("q", "y")
         draft.completed(None)
         assert draft.comments() == [], "draft became submitted feedback"
-        resumed_draft = Round("draft-resumed", ["--session", draft.session])
+        resumed_draft = Round("draft-resumed", ["sessions", "resume", draft.session])
         resumed_draft.keys("q")
         wait_until(
             lambda: "Saved draft" in resumed_draft.screen(), "restored overall draft"
@@ -898,7 +992,9 @@ def scenarios() -> None:
         resumed_draft.wait_screen("Updated draft", "updated overall draft")
         cli("stop", "--session", draft.session)
         resumed_draft.completed(None)
-        externally_resumed = Round("draft-after-stop", ["--session", draft.session])
+        externally_resumed = Round(
+            "draft-after-stop", ["sessions", "resume", draft.session]
+        )
         externally_resumed.keys("q")
         wait_until(
             lambda: "Updated draft" in externally_resumed.screen(),
@@ -910,6 +1006,10 @@ def scenarios() -> None:
         report("overall comment draft survives Back, stop, and same-session resume")
 
         first = Round("round1", ["plan.md"])
+        listed = json.loads(cli("sessions", "--json").stdout)
+        active = next(item for item in listed if item["key"] == first.session)
+        assert active["running"] and active["status"] == "running", active
+        assert cli("sessions", "remove", first.session, check=False).returncode
         first.comment("Add rollback instructions.")
         comment = first.comments()[0]
         with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -948,7 +1048,7 @@ def scenarios() -> None:
         (WORK / "plan.md").write_text(
             "# Release plan\n\nDeploy the application.\nConfirm deployment.\n\nRollback to the previous release if deployment fails.\n"
         )
-        second = Round("round2", ["--session", first.session])
+        second = Round("round2", ["sessions", "resume", first.session])
         assert second.session == first.session
         assert "Rollback" in second.screen(), second.screen()
         second.finish(True)
@@ -960,12 +1060,15 @@ def scenarios() -> None:
 
         stopped = Round("stop", ["plan.md"])
         stopped.comment("Preserve this unfinished review.")
-        cli("stop", "--session", stopped.session)
+        cli("sessions", "stop", stopped.session)
         stopped.completed(None)
+        listed = json.loads(cli("sessions", "--json").stdout)
+        inactive = next(item for item in listed if item["key"] == stopped.session)
+        assert not inactive["running"] and inactive["status"] == "stopped", inactive
         assert (
             stopped.result.exists() and "approved: true" not in stopped.err.read_text()
         )
-        resumed = Round("resume", ["--session", stopped.session])
+        resumed = Round("resume", ["sessions", "resume", stopped.session])
         assert resumed.comments()[0]["body"] == "Preserve this unfinished review."
         resumed.keys("]", "R", "y")
         resumed.completed(True)
@@ -1221,7 +1324,7 @@ def scenarios() -> None:
         temporary.finish(False)
         temporary = Round(
             "temporary-tree-approved",
-            ["--session", temporary.session, "--result", frozen["result"]],
+            ["sessions", "resume", temporary.session, "--result", frozen["result"]],
         )
         temporary.finish(True)
         wrong_root = cli(
@@ -1291,7 +1394,7 @@ def scenarios() -> None:
             and "approved: true" not in summary_failure.err.read_text()
         )
         assert directory.exists(), "summary failure cleaned up the review"
-        retry = Round("summary-retry", ["--session", summary_failure.session])
+        retry = Round("summary-retry", ["sessions", "resume", summary_failure.session])
         retry.keys("q", "Enter")
         retry.completed(True)
         assert json.loads(retry.summary.read_text())["round"] == 2

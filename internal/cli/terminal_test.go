@@ -56,8 +56,8 @@ func TestTerminalNotificationRoutesReview(t *testing.T) {
 	if _, err := reviewTerminalContext(); err == nil || !strings.Contains(err.Error(), "unavailable") {
 		t.Fatalf("consumed request fell back to stale daemon context: %v", err)
 	}
-	for _, cmd := range []string{"review", "plan"} {
-		command, _, err := rootCmd.Find([]string{cmd})
+	for _, cmd := range []string{"review", "sessions resume", "plan"} {
+		command, _, err := rootCmd.Find(strings.Fields(cmd))
 		if err != nil || command.Flags().Lookup("terminal-request") == nil {
 			t.Fatalf("%s does not accept terminal request: %v", cmd, err)
 		}

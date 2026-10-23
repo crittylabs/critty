@@ -36,7 +36,7 @@ func prepareDocuments(mode *reviewMode) error {
 		return fmt.Errorf("--answers cannot be combined with --no-answers")
 	}
 	if clearAttachments && mode.sessionKey == "" {
-		return fmt.Errorf("--clear-attachments requires --session")
+		return fmt.Errorf("--clear-attachments requires a saved review session")
 	}
 	if len(attachmentPaths) == 0 && !clearAttachments {
 		mode.documentsPrepared = true
