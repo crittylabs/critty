@@ -57,6 +57,7 @@ func documentDisplayLine(t *FileTab, index int, fallback string) string {
 // line numbers, and bordered inline annotations.
 func (m *AppModel) rebuildContent() {
 	if len(m.tabs) == 0 {
+		m.textSelection = contentTextSelection{}
 		m.contentViewport.SetContent("")
 		return
 	}
@@ -190,7 +191,7 @@ func (m *AppModel) rebuildContent() {
 			layout.appendBlock(&b, "\n  Added file removed — no longer part of the changes.", contentMouseTarget{})
 		}
 		m.contentLayout = layout
-		m.contentViewport.SetContent(m.decorateDrifted(b.String(), &m.contentLayout, groups))
+		m.contentViewport.SetContent(m.decorateTextSelection(m.decorateDrifted(b.String(), &m.contentLayout, groups)))
 		return
 	}
 	renderDeleted := func(afterLine int) {
@@ -247,9 +248,9 @@ func (m *AppModel) rebuildContent() {
 					content = inlineBackground(sidebarHighlightBg, ansi.Strip(content))
 				}
 				if wi == 0 {
-					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, num, content), target)
+					layout.appendSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, num, content), target)
 				} else {
-					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, content), target)
+					layout.appendSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, content), target)
 				}
 			}
 			if images := m.renderMarkdownImages(del.OldLineNum, true); images != "" {
@@ -341,9 +342,9 @@ func (m *AppModel) rebuildContent() {
 			}
 			for wi, styledLine := range rows {
 				if wi == 0 {
-					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, styledLine), lineTarget)
+					layout.appendSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, styledLine), lineTarget)
 				} else {
-					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, styledLine), lineTarget)
+					layout.appendSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, styledLine), lineTarget)
 				}
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
@@ -366,9 +367,9 @@ func (m *AppModel) rebuildContent() {
 			wrappedLines := strings.Split(lipgloss.Wrap(highlight(displaySourceText(styledLine)), textWidth, ""), "\n")
 			for wi, wrappedLine := range wrappedLines {
 				if wi == 0 {
-					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
+					layout.appendLiteralSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
 				} else {
-					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wrappedLine), lineTarget)
+					layout.appendLiteralSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wrappedLine), lineTarget)
 				}
 			}
 		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
@@ -422,9 +423,9 @@ func (m *AppModel) rebuildContent() {
 			wrappedLines := strings.Split(wrapped, "\n")
 			for wi, wl := range wrappedLines {
 				if wi == 0 {
-					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wl), lineTarget)
+					layout.appendSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wl), lineTarget)
 				} else {
-					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wl), lineTarget)
+					layout.appendSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wl), lineTarget)
 				}
 			}
 		}
@@ -451,7 +452,7 @@ func (m *AppModel) rebuildContent() {
 	}
 
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateDrifted(b.String(), &m.contentLayout, groups))
+	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateDrifted(b.String(), &m.contentLayout, groups)))
 }
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.

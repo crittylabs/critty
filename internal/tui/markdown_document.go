@@ -38,6 +38,7 @@ type markdownToken struct {
 	text       string
 	style      markdownStyle
 	uri        string
+	sourceEnd  int
 }
 
 type markdownLine struct {
@@ -55,12 +56,19 @@ type markdownEdit struct {
 }
 
 type markdownSource struct {
-	lines []markdownLine
+	lines   []markdownLine
+	source  string
+	offsets []int
+	markup  []markdownMarkup
+	fences  []markdownFence
 }
 
 func parseMarkdownSource(lines []string, known map[int]bool) *markdownSource {
-	result := &markdownSource{lines: make([]markdownLine, len(lines))}
+	result := &markdownSource{lines: make([]markdownLine, len(lines)), source: strings.Join(lines, "\n"), offsets: make([]int, len(lines))}
 	for i, line := range lines {
+		if i > 0 {
+			result.offsets[i] = result.offsets[i-1] + len(lines[i-1]) + 1
+		}
 		result.lines[i] = markdownLine{source: line, literal: true,
 			tokens: []markdownToken{{end: len(line), text: line}}}
 	}
@@ -111,7 +119,12 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			}
 			m.parseBlock(data, segments, offsets, start, edits, lineAt)
 			return
-		case *ast.CodeBlock, *ast.HTMLBlock:
+		case *ast.CodeBlock:
+			if block := n.(*ast.CodeBlock); block.CodeBlockKind == ast.CodeBlockKindFenced && (!incomplete || start == 0 || lineAt(block.Pos()) > 0) {
+				m.addCodeFence(block, data, m.offsets[start])
+			}
+			return
+		case *ast.HTMLBlock:
 			return
 		case *ast.ThematicBreak:
 			for _, seg := range n.(ast.BlockNode).Source() {
@@ -151,8 +164,8 @@ func paragraphParser() parser.Parser {
 	return parser.New(parser.WithDefaultParsers(false),
 		parser.WithBlockParsers(util.Prioritized(parser.NewParagraphParser(), 1000)),
 		parser.WithInlineParsers(
-			util.Prioritized(parser.NewCodeSpanParser(), 100),
-			util.Prioritized(parser.NewLinkParser(), 200),
+			util.Prioritized[parser.InlineParser](sourceInlineParser{parser.NewCodeSpanParser()}, 100),
+			util.Prioritized[parser.InlineParser](sourceInlineParser{parser.NewLinkParser()}, 200),
 			util.Prioritized(parser.NewAutoLinkParser(), 300),
 			util.Prioritized(parser.NewRawHTMLParser(), 400),
 			util.Prioritized(parser.NewEmphasisParser(), 500)),
@@ -186,7 +199,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			}
 			part = strings.TrimSuffix(part, "\n")
 			if part != "" {
-				output[line] = append(output[line], markdownToken{column, column + len(part), part, style, uri})
+				output[line] = append(output[line], markdownToken{start: column, end: column + len(part), text: part, style: style, uri: uri, sourceEnd: min(column+stop-from, len(m.lines[base+line].source))})
 			}
 			if value != "" && len(value) >= stop-from {
 				value = value[stop-from:]
@@ -243,7 +256,21 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			render(child, style, uri)
 		}
 	}
-	render(markdownInlineParser.Parse(input), 0, "")
+	ranges := make(map[ast.Node]markdownMarkup)
+	context := parser.NewContext()
+	context.Set(markdownSourceRanges, ranges)
+	root := markdownInlineParser.Parse(input, parser.WithContext(context))
+	collectMarkdownMarkup(root, input, ranges)
+	project := func(offset int) int {
+		pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > offset })-1)
+		p := projections[pi]
+		return m.offsets[base] + p.source + offset - p.local
+	}
+	for _, r := range ranges {
+		r.start, r.contentStart, r.contentEnd, r.end = project(r.start), project(r.contentStart), project(r.contentEnd), project(r.end)
+		m.markup = append(m.markup, r)
+	}
+	render(root, 0, "")
 	for _, seg := range segments {
 		line := lineAt(seg.Start)
 		from := seg.Start - offsets[line]

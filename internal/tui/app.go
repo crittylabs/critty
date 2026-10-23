@@ -95,6 +95,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	textSelection contentTextSelection
 	readOnly      bool
 	reload        reloadState
 	images        imageDisplay
@@ -211,6 +212,7 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
+	textSpans    []contentTextSpan
 	columns      []diffMouseRow
 	formControls []formControl
 	rows         []contentMouseTarget
@@ -240,6 +242,8 @@ func (r *commentHeaderRegion) translate(x, y int) {
 type renderedScreenLayout struct {
 	watchIndicator      mouseRect
 	hasWatchIndicator   bool
+	copyTextButton      mouseRect
+	hasCopyTextButton   bool
 	whitespaceButton    mouseRect
 	hasWhitespaceButton bool
 	splitButton         mouseRect
@@ -949,6 +953,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	t := m.tab()
+	if m.textSelection.active && msg.String() != "alt+w" && !key.Matches(msg, keys.Cancel) {
+		m.clearTextSelection()
+	}
 	if m.isearch.active && m.handleISearchKey(msg) {
 		return m, nil
 	}
@@ -977,6 +984,9 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.openGotoLine()
 	}
 	if msg.String() == "alt+w" {
+		if m.focused == contentPane && m.hasTextSelection() {
+			return m, m.copySelectedText()
+		}
 		cmd := m.copyReference()
 		return m, cmd
 	}
@@ -1016,6 +1026,10 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Cancel):
 		// Esc cancels selection
+		if m.textSelection.active {
+			m.clearTextSelection()
+			return m, nil
+		}
 		if t.selecting {
 			t.selecting = false
 			m.rebuildContent()
@@ -3059,6 +3073,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if !t.selecting {
 		layout.finishButton, layout.hasFinishButton = buttonRect(header, 0, m.submitButton())
 	}
+	layout.copyTextButton, layout.hasCopyTextButton = buttonRect(footer, footerTop, m.copyTextButton())
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
 	if button := m.formListButton(); button != "" {
@@ -3272,6 +3287,15 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	}
 	m.hoveredGutterLine = 0
 	m.hoveredGutterSide = ""
+	if m.modal == noModal && m.hasTextSelection() {
+		_, layout := m.renderReviewScreen()
+		if layout.hasCopyTextButton && layout.copyTextButton.contains(mouse) {
+			return m, m.copySelectedText()
+		}
+	}
+	if m.modal == noModal && m.textSelection.active {
+		m.clearTextSelection()
+	}
 	if m.modal != noModal && m.clickedModalDismiss(mouse) {
 		return m.handleKeyPress(tea.KeyPressMsg{Code: tea.KeyEscape})
 	}
@@ -3320,19 +3344,18 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal != noModal {
 		return m, nil
 	}
+	pendingTextLink := ""
 	if !m.tab().selecting {
 		uri := m.referenceAt(mouse.X, mouse.Y)
-		if m.navigateCommentReference(uri) {
-			return m, nil
-		}
-		if location, ok := sourceLink(uri); ok && regularFile(m.sourcePath(location.path)) {
-			return m, m.navigateSource(location)
-		}
-		if cmd, ok := m.openImageLink(uri); ok {
-			return m, cmd
-		}
-		if cmd := m.openLink(uri, false); uri != "" && cmd != nil {
-			return m, cmd
+		if uri != "" {
+			if !strings.HasPrefix(uri, "critty://image?") {
+				m.startTextSelection(mouse)
+			}
+			if m.textSelection.dragging {
+				pendingTextLink = uri
+			} else if cmd, ok := m.activateReference(uri); ok {
+				return m, cmd
+			}
 		}
 	}
 	if rect, ok := m.finishButtonRect(); ok && rect.contains(mouse) {
@@ -3438,10 +3461,20 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 				}
 			}
 		}
+		previousFocus := m.focused
 		wasFocused := m.focused == contentPane
 		m.focused = contentPane
 		if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok {
 			t := m.tab()
+			if !target.annotation && !m.isContentGutter(mouse.X-left) {
+				m.startTextSelection(mouse)
+				if m.textSelection.dragging {
+					m.textSelection.target = target
+					m.textSelection.link = pendingTextLink
+					m.focused = previousFocus
+					return m, nil
+				}
+			}
 			if m.isContentGutter(mouse.X-left) && !target.annotation && t.selecting {
 				start, end := m.selectionRange()
 				if start < end && target.side == t.selectSide && target.line == end {
@@ -3681,6 +3714,10 @@ func (m *AppModel) handleDeleteConfirmModalMouse(mouse tea.Mouse) (tea.Model, te
 }
 
 func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	if m.modal == noModal && m.textSelection.dragging && msg.Mouse().Button == tea.MouseLeft {
+		m.updateTextSelection(msg.Mouse(), true)
+		return m, nil
+	}
 	if len(m.tabs) == 0 {
 		return m, nil
 	}
@@ -3720,6 +3757,27 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 }
 
 func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	if m.modal == noModal && m.textSelection.dragging && msg.Mouse().Button == tea.MouseLeft {
+		m.updateTextSelection(msg.Mouse(), false)
+		m.textSelection.dragging = false
+		if !m.textSelection.active {
+			return m, nil
+		}
+		target := m.textSelection.target
+		t := m.tab()
+		t.cursorLine, t.cursorSide, t.cursorAnnoIdx = target.line, target.side, 0
+		t.cursorOnAnnotation, t.cursorOnForm = false, false
+		m.focused = contentPane
+		m.updateCommentSidebar()
+		m.rebuildContent()
+		if !m.hasTextSelection() && m.textSelection.link != "" {
+			uri := m.textSelection.link
+			m.clearTextSelection()
+			cmd, _ := m.activateReference(uri)
+			return m, cmd
+		}
+		return m, nil
+	}
 	if len(m.tabs) == 0 {
 		return m, nil
 	}
@@ -4210,6 +4268,9 @@ func (m AppModel) renderFooter() string {
 	if m.reload.err != nil && !m.isearch.active {
 		return footerStyle.Width(m.width).Render("Reload failed: " + headerLabel(m.reload.err.Error()))
 	}
+	if m.modal == noModal && m.hasTextSelection() {
+		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
+	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
 		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · View: read-only · /: search · v: select · M-w: copy reference · q: close")
 	}
@@ -4356,7 +4417,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
-			{keys: "M-w", desc: "copy reference"},
+			{keys: "M-w", desc: "copy selected text or reference"},
 			{keys: "s/t", desc: "toggle sidebar / view"},
 			{keys: "w · S · I", desc: "whitespace / split / images"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
@@ -4396,7 +4457,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "{/}", desc: "unresolved"},
 		{keys: "/ ?", desc: "search text"},
 		{keys: "M-e/g", desc: "editor/line"},
-		{keys: "M-w", desc: "copy ref"},
+		{keys: "M-w", desc: "copy text/ref"},
 		{keys: "M-p", desc: "open file"},
 		{keys: "tab/shift+tab", desc: "next/prev file"},
 		{keys: "alt+}/alt+{", desc: "next/prev file"},
@@ -4409,6 +4470,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, general, "  ", navigation, "  ", codeReview)
 	contexts := renderHelpGroup("Selection and dialogs", []helpItem{
+		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
+		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},

@@ -386,6 +386,7 @@ var (
 	// updated at runtime via tea.BackgroundColorMsg.
 	selectedLineBg = lipgloss.NewStyle().
 			Faint(true)
+	textSelectionBg = lipgloss.NewStyle().Background(lipgloss.Color("#608786"))
 
 	sidebarHighlightBg = lipgloss.NewStyle().
 				Reverse(true)
@@ -485,6 +486,8 @@ func initAdaptiveStyles(hasDarkBG bool) {
 
 	selectedLineBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#E8E0F8"), lipgloss.Color("#2D2B55")))
+	textSelectionBg = lipgloss.NewStyle().
+		Background(ld(lipgloss.Color("#CADEDD"), lipgloss.Color("#608786")))
 
 	sidebarHighlightBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#D8E8F8"), lipgloss.Color("#1E3A5F"))).

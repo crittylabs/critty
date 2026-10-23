@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,6 +110,37 @@ func TestReloadDeferralAndFailure(t *testing.T) {
 	}
 	if !strings.Contains(ansi.Strip(app.renderFooter()), "Reload failed:") {
 		t.Fatal("reload error is not visible")
+	}
+}
+
+func TestReloadDefersTextSelection(t *testing.T) {
+	for _, dragging := range []bool{true, false} {
+		t.Run(fmt.Sprintf("dragging=%t", dragging), func(t *testing.T) {
+			app := setupAppWithDoc(t, "original\n")
+			app.width, app.height = 100, 30
+			app.recalculateLayout()
+			app.rebuildContent()
+			left, top, _, _ := app.contentBounds()
+			app = pressMouse(app, left+gutterWidth, top)
+			if !dragging {
+				app = releaseMouse(app, left+gutterWidth+3, top)
+			}
+			if err := os.WriteFile(app.filePath, []byte("updated\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if cmd := app.requestReload(true); cmd != nil || !app.reload.pending {
+				t.Fatal("text selection did not defer reload")
+			}
+			app.clearTextSelection()
+			cmd := app.resumeReload()
+			if cmd == nil {
+				t.Fatal("clearing text selection did not resume reload")
+			}
+			app.finishReload(cmd().(reloadMsg))
+			if app.tab().doc.Content != "updated\n" {
+				t.Fatal("deferred reload did not load the new text")
+			}
+		})
 	}
 }
 

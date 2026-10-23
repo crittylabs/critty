@@ -513,6 +513,58 @@ def scenarios() -> None:
     )
     try:
         transient_views()
+        (WORK / "copy-text.md").write_text(
+            'Before `sample` after.\nLink: [long label](https://example.org/a_(b) "title")\n'
+        )
+        copying = Round("copy-text", ["copy-text.md"])
+        copying.wait_screen("sample", "inline code rendered for copying")
+        y, row = next(
+            (y, row)
+            for y, row in enumerate(copying.screen().splitlines(), 1)
+            if "Before  sample  after." in row
+        )
+        x = row.index("sample") + 1
+        copying.text(f"\x1b[<0;{x};{y}M\x1b[<32;{x + 6};{y}M\x1b[<0;{x + 6};{y}m")
+        copying.wait_screen("Copy text", "drag selected inline code")
+        copying.keys("M-w")
+        copying.wait_screen("Copied text", "selected text copied")
+        copying.keys("f")
+        copying.wait_screen("Add File Comment", "comment editor for copied text")
+        copying.keys("C-y", "C-s")
+        wait_until(lambda: copying.comments(), "copied text saved as comment")
+        assert copying.comments()[0]["body"] == "`sample`", copying.comments()
+        wait_until(
+            lambda: "Add File Comment" not in copying.screen(),
+            "comment editor closed after save",
+        )
+        y, row = next(
+            (y, row)
+            for y, row in enumerate(copying.screen().splitlines(), 1)
+            if "Link: long label" in row
+        )
+        x = row.index("long") + 1
+        copying.text(f"\x1b[<0;{x};{y}M\x1b[<32;{x + 4};{y}M\x1b[<0;{x + 4};{y}m")
+        try:
+            copying.wait_screen("Copy text", "drag selected part of link label")
+        except AssertionError:
+            print(copying.screen(), flush=True)
+            raise
+        copying.keys("M-w")
+        copying.wait_screen("Copied text", "partial link copied")
+        copying.keys("Enter")
+        copying.wait_screen("Add Comment (line 2)", "comment editor for partial link")
+        copying.keys("C-y", "C-s")
+        wait_until(
+            lambda: any(
+                c["body"] == '[long](https://example.org/a_(b) "title")'
+                for c in copying.comments()
+            ),
+            "partial link source saved as comment",
+        )
+        copying.finish(False)
+        report(
+            "dragging code and partial links copies Markdown source, retaining delimiters and link targets"
+        )
         paragraph_source = "**日本語 é first\nsecond**\n\n`code\ncontinued`\n"
         (WORK / "paragraph.md").write_text(paragraph_source)
         paragraph = Round("paragraph-markdown", ["paragraph.md"])

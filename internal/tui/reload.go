@@ -67,7 +67,8 @@ func (m AppModel) CanWatch() bool {
 }
 
 func (m AppModel) reloadBlocked() bool {
-	return m.modal != noModal || m.isearch.active || len(m.tabs) > 0 && (m.tab().state == nil || m.tab().selecting)
+	return m.modal != noModal || m.isearch.active || m.textSelection.dragging || m.hasTextSelection() ||
+		len(m.tabs) > 0 && (m.tab().state == nil || m.tab().selecting)
 }
 
 func (m *AppModel) toggleWatch() tea.Cmd {

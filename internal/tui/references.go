@@ -234,3 +234,18 @@ func (m *AppModel) referenceAt(x, y int) string {
 	}
 	return cell.Link.URL
 }
+
+// Content links activate on release so dragging their labels can select text.
+func (m *AppModel) activateReference(uri string) (tea.Cmd, bool) {
+	if m.navigateCommentReference(uri) {
+		return nil, true
+	}
+	if location, ok := sourceLink(uri); ok && regularFile(m.sourcePath(location.path)) {
+		return m.navigateSource(location), true
+	}
+	if cmd, ok := m.openImageLink(uri); ok {
+		return cmd, true
+	}
+	cmd := m.openLink(uri, false)
+	return cmd, uri != "" && cmd != nil
+}

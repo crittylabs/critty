@@ -444,6 +444,15 @@ func (m *AppModel) rebuildDiffContent() {
 				if row.after == nil {
 					target = lt
 				}
+				sourceTarget := lt
+				if lt.passive {
+					sourceTarget.side, sourceTarget.line = "old", row.before.oldLine
+				}
+				layout.addTextSpan(start, 0, 0, l, sourceTarget)
+				if l != "" {
+					layout.textSpans[len(layout.textSpans)-1].source = row.before.text
+				}
+				layout.addTextSpan(start, leftWidth+3, 1, r, rt)
 				layout.appendBlock(&b, fitDiffCell(l, leftWidth)+" │ "+fitDiffCell(r, rightWidth), target)
 				for len(layout.columns) <= start {
 					layout.columns = append(layout.columns, diffMouseRow{})
@@ -463,7 +472,7 @@ func (m *AppModel) rebuildDiffContent() {
 		layout.appendBlock(&b, "       ⋯ remaining context not included in diff", contentMouseTarget{})
 	}
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateDrifted(b.String(), &m.contentLayout, groups))
+	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateDrifted(b.String(), &m.contentLayout, groups)))
 }
 
 func updateDiffRange(ranges map[int]renderedRange, line, row int) {
