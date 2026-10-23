@@ -19,7 +19,7 @@ If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or c
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/9257b1f7-f5de-4a0b-848d-8d2637a0d251
+https://github.com/user-attachments/assets/a3796b5e-390d-436a-a1cd-5dce17034d7e
 
 For example:
 
@@ -139,7 +139,7 @@ Critty opens a review pane or tab in the detected multiplexer, or a new window o
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac
+https://github.com/user-attachments/assets/b4fc6097-f19c-440f-9636-f35fa02faa31
 
 For a manual review:
 
@@ -277,67 +277,73 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos and screenshots captured with the v1.4.0 candidate.
+Videos and screenshots captured with the v1.6.0 candidate.
 
 ### Code review with inline comments
 
-https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac
+https://github.com/user-attachments/assets/b4fc6097-f19c-440f-9636-f35fa02faa31
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/f829cd70-a84a-4542-bbec-4d20faeaff55)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/a0919b83-31b4-4386-87e8-8706323e8ff6)
 
 ### Review round trips with Claude Code
 
-https://github.com/user-attachments/assets/4575f5c2-7417-4ef0-9e23-c280879a144d
+https://github.com/user-attachments/assets/b836c364-386e-48fa-825b-0cfea1f4b44e
 
 ### Review round trips with Codex
 
-https://github.com/user-attachments/assets/7e41be84-b528-4a92-8b16-93b83bc07be7
+https://github.com/user-attachments/assets/7c2ec35e-fb92-4484-9f0e-e8c4469baa47
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-https://github.com/user-attachments/assets/a0b2341d-8970-4ae0-91ed-524f4a1f028e
+https://github.com/user-attachments/assets/dfa164d6-7ee4-4876-98a4-5acc6b1bce38
+
+### Following live review updates
+
+Watch follows file edits and marks changed background tabs.  Follow a file reference from an attachment to inspect the updated source.
+
+https://github.com/user-attachments/assets/91a4697d-9a8f-42a4-8776-24a3ea7e24db
 
 ### Reviewing a document
 
-https://github.com/user-attachments/assets/8b879462-5a18-4ecd-9116-1ed9e2134f52
+https://github.com/user-attachments/assets/43236155-8be4-49ee-8a7b-a70aaa03c498
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/c1ca1ae0-3787-4680-92a8-1f5164235c13)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/25f0bbe9-ec36-44ab-806d-91db27465820)
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/e2867076-6b8b-487d-a5bb-996db9171c0f)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/2ee47a75-7d4f-428d-ae7d-edee44130ff7)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/29cb0420-c57c-402d-abc0-5b921d71bd05)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/cc8685c9-b7e0-4a9c-8586-20f651c09ebc)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/45d94f32-80a4-40df-b1c4-c4fa15cf9495)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/d6182096-354f-469d-bf6f-7e7523cf7004)
 
 ### Answering a questionnaire with form widgets
 
 See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/312e3afd-b628-4590-a0af-ad5d86947819)
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/7a17417c-8797-4fe4-8857-abce85568939)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/35d5c52b-4054-40f8-a9fa-b294c7c32f1d)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/9039e25d-0fb5-45ef-9773-ce7ad7ae6c6c)
 
 ### Approval checks for unfinished items
 
-![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/92354ab0-8cd6-4a30-9acf-0ce2d393bbba)
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/78ef680e-3f6b-406c-acf8-d2cb536f0717)
 
 ### Incremental search
 
-![Incremental search highlights matches while an inline image remains visible](https://github.com/user-attachments/assets/10957eee-d215-4d9c-9009-6c641a192f7e)
+![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/798da846-6f3a-4867-9b9d-70e3f8e01550)
 
 ## Contributing
 
