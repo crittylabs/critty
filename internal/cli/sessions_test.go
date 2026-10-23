@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 
@@ -14,6 +16,9 @@ import (
 )
 
 func TestSessionsListsStatesAndDirectoryScope(t *testing.T) {
+	previousLocal := time.Local
+	time.Local = time.FixedZone("JST", 9*60*60)
+	t.Cleanup(func() { time.Local = previousLocal })
 	t.Chdir(t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	cwd, err := os.Getwd()
@@ -21,12 +26,15 @@ func TestSessionsListsStatesAndDirectoryScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	var sessions []*review.Session
-	for _, verdict := range []review.Verdict{"", review.VerdictApprove, review.VerdictComment, review.VerdictReject} {
+	for i, verdict := range []review.Verdict{"", review.VerdictApprove, review.VerdictComment, review.VerdictReject} {
 		file := "a.md"
 		if verdict == review.VerdictApprove {
 			file = "レビュー.md"
 		}
-		sess, err := review.NewSession("", review.SessionEntry{CWD: cwd, Mode: "files", Args: []string{file}})
+		sess, err := review.NewSession("", review.SessionEntry{
+			CWD: cwd, Mode: "files", Args: []string{file},
+			StartedAt: time.Date(2026, 10, 23, 0, i, 0, 0, time.UTC).Format(time.RFC3339),
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -43,7 +51,7 @@ func TestSessionsListsStatesAndDirectoryScope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := review.NewSession("", review.SessionEntry{CWD: otherDirectory, Mode: "git"})
+	other, err := review.NewSession("", review.SessionEntry{CWD: otherDirectory, Mode: "git", StartedAt: "2027-01-01T00:00:00Z"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,6 +94,12 @@ func TestSessionsListsStatesAndDirectoryScope(t *testing.T) {
 	if err := json.Unmarshal([]byte(run("--json", "--all")), &items); err != nil || len(items) != 5 {
 		t.Fatalf("all sessions: %d, %v", len(items), err)
 	}
+	if err := json.Unmarshal([]byte(run("list", "--json", "--all", "--sort", "time")), &items); err != nil || len(items) != 5 {
+		t.Fatalf("chronological sessions: %d, %v", len(items), err)
+	}
+	if items[0].Key != other.Key || items[1].Key != sessions[3].Key || items[4].Key != sessions[0].Key {
+		t.Fatalf("chronological listing has the wrong order: %+v", items)
+	}
 	if err := os.Symlink(otherDirectory, "linked directory"); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +117,7 @@ func TestSessionsListsStatesAndDirectoryScope(t *testing.T) {
 		t.Fatalf("listing changed directory: %q, %v", got, err)
 	}
 	table := run()
-	for _, want := range []string{"PROJECT", "ID", "STATUS", "a.md", "approved"} {
+	for _, want := range []string{"PROJECT", "ID", "STATUS", "STARTED", "2026-10-23T09:00:00+09:00", "a.md", "approved"} {
 		if !strings.Contains(table, want) {
 			t.Errorf("table omits %q", want)
 		}
@@ -189,6 +203,7 @@ func TestSessionsRejectsInvalidDirectoryFilters(t *testing.T) {
 		{"--directory="},
 		{"--directory", "missing"},
 		{"--directory", "file"},
+		{"--sort", "invalid"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			cmd := newSessionsCommand()
@@ -198,6 +213,41 @@ func TestSessionsRejectsInvalidDirectoryFilters(t *testing.T) {
 			cmd.SetArgs(args)
 			if err := cmd.Execute(); err == nil {
 				t.Fatal("invalid directory filter succeeded")
+			}
+		})
+	}
+}
+
+func TestSessionsSortOrder(t *testing.T) {
+	item := func(key, project, started string, running bool) sessionStatus {
+		return sessionStatus{
+			savedSession: savedSession{SessionEntry: review.SessionEntry{Key: key, StartedAt: started}, Running: running},
+			ProjectID:    project, ProjectName: project,
+		}
+	}
+	items := []sessionStatus{
+		item("beta-new", "beta", "2026-10-23T00:30:00Z", false),
+		item("alpha-new", "alpha", "2026-10-23T10:00:00+09:00", false),
+		item("alpha-running", "alpha", "2026-10-23T00:00:00Z", true),
+		item("beta-unknown", "beta", "invalid", false),
+		item("alpha-fraction", "alpha", "2026-10-23T01:00:00.5Z", false),
+	}
+	for _, tc := range []struct {
+		order string
+		want  []string
+	}{
+		{"project", []string{"alpha-running", "alpha-fraction", "alpha-new", "beta-new", "beta-unknown"}},
+		{"time", []string{"alpha-fraction", "alpha-new", "beta-new", "alpha-running", "beta-unknown"}},
+	} {
+		t.Run(tc.order, func(t *testing.T) {
+			sorted := slices.Clone(items)
+			sortSessionStatuses(sorted, tc.order)
+			var got []string
+			for _, item := range sorted {
+				got = append(got, item.Key)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("session order = %v, want %v", got, tc.want)
 			}
 		})
 	}
