@@ -241,7 +241,25 @@ func inlineDiffTokens(beforeTokens, afterTokens []string) ([]InlineSegment, []In
 	oldSegments := make([]InlineSegment, 0, len(diffs)*2+1)
 	newSegments := make([]InlineSegment, 0, len(diffs)*2+1)
 	lastEnd := 0
-	for _, diff := range diffs {
+	for i := 0; i < len(diffs); i++ {
+		diff := diffs[i]
+		// Keep a changed phrase together, including its internal whitespace.
+		for i+1 < len(diffs) && strings.TrimSpace(strings.Join(beforeTokens[diff.End:diffs[i+1].Start], "")) == "" {
+			i++
+			diff.End = diffs[i].End
+			diff.ReplEnd = diffs[i].ReplEnd
+		}
+		// Merging can expose matching whitespace at a phrase boundary.
+		for diff.Start < diff.End && diff.ReplStart < diff.ReplEnd &&
+			beforeTokens[diff.Start] == afterTokens[diff.ReplStart] && strings.TrimSpace(beforeTokens[diff.Start]) == "" {
+			diff.Start++
+			diff.ReplStart++
+		}
+		for diff.Start < diff.End && diff.ReplStart < diff.ReplEnd &&
+			beforeTokens[diff.End-1] == afterTokens[diff.ReplEnd-1] && strings.TrimSpace(beforeTokens[diff.End-1]) == "" {
+			diff.End--
+			diff.ReplEnd--
+		}
 		common := strings.Join(beforeTokens[lastEnd:diff.Start], "")
 		oldSegments = appendInlineSegment(oldSegments, common, false)
 		newSegments = appendInlineSegment(newSegments, common, false)
@@ -255,8 +273,8 @@ func inlineDiffTokens(beforeTokens, afterTokens []string) ([]InlineSegment, []In
 	return oldSegments, newSegments
 }
 
-// splitInlineTokens preserves each whitespace run with the word before it, so
-// word-level matching can reconstruct the original line exactly.
+// splitInlineTokens separates words and whitespace runs so shared whitespace
+// can match independently while preserving the original line exactly.
 func splitInlineTokens(text string) []string {
 	if text == "" {
 		return nil
@@ -267,7 +285,7 @@ func splitInlineTokens(text string) []string {
 	previousWasSpace := false
 	for i, r := range text {
 		isSpace := unicode.IsSpace(r)
-		if !isSpace && previousWasSpace {
+		if i > 0 && isSpace != previousWasSpace {
 			tokens = append(tokens, text[start:i])
 			start = i
 		}

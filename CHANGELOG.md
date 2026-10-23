@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- Word-level highlights exclude matching spaces and tabs around changed words or phrases, while keeping each changed phrase continuous.  Changes to whitespace itself remain highlighted.
 - Keyboard Help hides its scroll controls when all shortcuts fit the window, including the shorter list in `critty view`.
 
 ## 1.5.1

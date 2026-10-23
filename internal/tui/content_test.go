@@ -144,8 +144,8 @@ func TestDeletedMarkdownLinesWrap(t *testing.T) {
 
 func TestInlineDiffDisplayLinesPreserveTextAndBackgrounds(t *testing.T) {
 	initAdaptiveStyles(true)
-	before := "Review code with your coding agent."
-	after := "Review documents with your agent."
+	before := "Review code files with your coding agent."
+	after := "Review more pages with your coding agent."
 	patch, err := gitpkg.ParsePatch(strings.NewReader("diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-" + before + "\n+" + after + "\n"))
 	if err != nil {
 		t.Fatal(err)
@@ -175,6 +175,19 @@ func TestInlineDiffDisplayLinesPreserveTextAndBackgrounds(t *testing.T) {
 			}
 			if !strings.Contains(got, commonBackground) || !strings.Contains(got, changedBackground) {
 				t.Errorf("rendered line does not contain both backgrounds: %q", got)
+			}
+			runes, styles := renderedCells(got)
+			for i, r := range runes {
+				if r != ' ' {
+					continue
+				}
+				want := diffCommonTextBg.GetBackground()
+				if i == len("Review code") {
+					want = tc.changed.GetBackground()
+				}
+				if !sameColor(styles[i].Bg, want) {
+					t.Errorf("space at %d has the wrong background", i)
+				}
 			}
 		})
 	}

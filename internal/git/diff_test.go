@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -237,8 +238,8 @@ func TestInlineDiff(t *testing.T) {
 
 	oldChanged := assertSegments("old", before, oldSegments)
 	newChanged := assertSegments("new", after, newSegments)
-	if oldChanged != "maintains " {
-		t.Errorf("old changed text = %q, want %q", oldChanged, "maintains ")
+	if oldChanged != "maintains" {
+		t.Errorf("old changed text = %q, want %q", oldChanged, "maintains")
 	}
 	if strings.Contains(newChanged, "screen model") || strings.Contains(newChanged, "Hovering") {
 		t.Errorf("new changed text contains common words: %q", newChanged)
@@ -247,6 +248,64 @@ func TestInlineDiff(t *testing.T) {
 		if !strings.Contains(newChanged, want) {
 			t.Errorf("new changed text %q does not contain %q", newChanged, want)
 		}
+	}
+}
+
+func TestInlineDiffWhitespace(t *testing.T) {
+	for _, tc := range []struct {
+		name, before, after string
+		old, new            []InlineSegment
+	}{
+		{
+			name:   "changed phrase",
+			before: "foo bar quux", after: "foo baz quuz",
+			old: []InlineSegment{{"foo ", false}, {"bar quux", true}},
+			new: []InlineSegment{{"foo ", false}, {"baz quuz", true}},
+		},
+		{
+			name:   "shared space after a replacement",
+			before: "foo bar quux", after: "foo baz quux",
+			old: []InlineSegment{{"foo ", false}, {"bar", true}, {" quux", false}},
+			new: []InlineSegment{{"foo ", false}, {"baz", true}, {" quux", false}},
+		},
+		{
+			name:   "phrases separated by a shared word",
+			before: "a old words middle old phrase z", after: "a new text middle new wording z",
+			old: []InlineSegment{{"a ", false}, {"old words", true}, {" middle ", false}, {"old phrase", true}, {" z", false}},
+			new: []InlineSegment{{"a ", false}, {"new text", true}, {" middle ", false}, {"new wording", true}, {" z", false}},
+		},
+		{
+			name:   "different word counts around shared words",
+			before: "// splitInlineTokens preserves each whitespace run with the word before it, so",
+			after:  "// splitInlineTokens separates words and whitespace runs so shared whitespace",
+			old:    []InlineSegment{{"// splitInlineTokens ", false}, {"preserves each", true}, {" whitespace ", false}, {"run with the word before it, so", true}},
+			new:    []InlineSegment{{"// splitInlineTokens ", false}, {"separates words and", true}, {" whitespace ", false}, {"runs so shared whitespace", true}},
+		},
+		{
+			name:   "shared unicode whitespace",
+			before: "前	古い\u3000末尾  ", after: "前	新しい\u3000末尾  ",
+			old: []InlineSegment{{"前	", false}, {"古い", true}, {"\u3000末尾  ", false}},
+			new: []InlineSegment{{"前	", false}, {"新しい", true}, {"\u3000末尾  ", false}},
+		},
+		{
+			name:   "changed whitespace",
+			before: "foo bar", after: "foo	bar",
+			old: []InlineSegment{{"foo", false}, {" ", true}, {"bar", false}},
+			new: []InlineSegment{{"foo", false}, {"	", true}, {"bar", false}},
+		},
+		{
+			name:   "inserted word and space",
+			before: "foo bar", after: "foo baz bar",
+			old: []InlineSegment{{"foo bar", false}},
+			new: []InlineSegment{{"foo", false}, {" baz", true}, {" bar", false}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			old, new := inlineDiff(tc.before, tc.after)
+			if !reflect.DeepEqual(old, tc.old) || !reflect.DeepEqual(new, tc.new) {
+				t.Fatalf("inlineDiff = %#v, %#v; want %#v, %#v", old, new, tc.old, tc.new)
+			}
+		})
 	}
 }
 
