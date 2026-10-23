@@ -138,7 +138,13 @@ func (m *AppModel) rebuildContent() {
 	if t.doc != nil {
 		sourceLines = t.doc.Lines
 	}
-	tableBlocks := detectTableBlocks(sourceLines)
+	var tableBlocks []tableBlock
+	if isMarkdown {
+		t.ensureMarkdownCache()
+		if t.markdown != nil {
+			tableBlocks = detectTableBlocks(t.markdown.after.lines, func(line int) []string { return t.markdownTableCells(line, nil) })
+		}
+	}
 	tableBlockMap := make(map[int]*tableBlock)
 	for i := range tableBlocks {
 		tb := &tableBlocks[i]
@@ -354,17 +360,11 @@ func (m *AppModel) rebuildContent() {
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
 			var styledLine string
-			if reTableSep.MatchString(line) {
+			if t.markdown.after.lines[lineNum-1].tableSep {
 				styledLine = formatTableSep(tb.colWidths)
 			} else {
 				isHeader := lineNum == tb.startLine
-				if t.attachment != nil {
-					styledLine = formatTableRowWith(line, tb.colWidths, isHeader, func(cell string) string {
-						return m.linkFileReferences(displaySourceText(cell))
-					})
-				} else {
-					styledLine = formatTableRow(displaySourceText(line), tb.colWidths, isHeader)
-				}
+				styledLine = formatTableRow(t.markdownTableCells(lineNum, m.documentLinkSpans(lineNum, false)), tb.colWidths, isHeader)
 			}
 
 			if isSelected {
@@ -810,13 +810,14 @@ type tableBlock struct {
 	colWidths []int
 }
 
-func detectTableBlocks(lines []string) []tableBlock {
+func detectTableBlocks(lines []markdownLine, renderedCells func(int) []string) []tableBlock {
 	var blocks []tableBlock
 	inTable := false
 	var current tableBlock
 
 	for i, line := range lines {
-		isTable := reTableRow.MatchString(line) || reTableSep.MatchString(line)
+		cells := renderedCells(i + 1)
+		isTable := len(cells) > 0 || line.tableSep
 		if isTable {
 			if !inTable {
 				inTable = true
@@ -824,14 +825,13 @@ func detectTableBlocks(lines []string) []tableBlock {
 			}
 			current.endLine = i + 1
 
-			if !reTableSep.MatchString(line) {
-				cells := parseTableCells(line)
+			if !line.tableSep {
 				for len(current.colWidths) < len(cells) {
 					current.colWidths = append(current.colWidths, 0)
 				}
 				for ci, cell := range cells {
-					if len(cell) > current.colWidths[ci] {
-						current.colWidths[ci] = len(cell)
+					if width := lipgloss.Width(cell); width > current.colWidths[ci] {
+						current.colWidths[ci] = width
 					}
 				}
 			}
@@ -848,23 +848,7 @@ func detectTableBlocks(lines []string) []tableBlock {
 	return blocks
 }
 
-func parseTableCells(line string) []string {
-	line = strings.TrimSpace(line)
-	line = strings.Trim(line, "|")
-	parts := strings.Split(line, "|")
-	cells := make([]string, len(parts))
-	for i, p := range parts {
-		cells[i] = strings.TrimSpace(p)
-	}
-	return cells
-}
-
-func formatTableRow(line string, colWidths []int, isHeader bool) string {
-	return formatTableRowWith(line, colWidths, isHeader, func(cell string) string { return cell })
-}
-
-func formatTableRowWith(line string, colWidths []int, isHeader bool, display func(string) string) string {
-	cells := parseTableCells(line)
+func formatTableRow(cells []string, colWidths []int, isHeader bool) string {
 	pipe := mdTablePipe.Render("│")
 
 	var parts []string
@@ -874,7 +858,7 @@ func formatTableRowWith(line string, colWidths []int, isHeader bool, display fun
 		if ci < len(cells) {
 			cell = cells[ci]
 		}
-		padded := lipgloss.NewStyle().Width(w).Render(display(cell))
+		padded := lipgloss.NewStyle().Width(w).Render(cell)
 		if isHeader {
 			parts = append(parts, mdTableHeaderStyle.Render(" "+padded+" "))
 		} else {

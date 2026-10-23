@@ -16,6 +16,7 @@ type contentTextSpan struct {
 	text              string
 	offset            int
 	source            string
+	tableSource       string
 	literal           bool
 }
 
@@ -157,8 +158,8 @@ func (m *AppModel) selectedText() string {
 			end = span.offset + b.offset
 		}
 		if span.literal {
-			start = span.offset + tableSourceOffset(span.source[span.offset:], span.text, start-span.offset, false)
-			end = span.offset + tableSourceOffset(span.source[span.offset:], span.text, end-span.offset, true)
+			start = span.offset + tableSourceOffset(span.tableSource[span.offset:], span.text, start-span.offset, false)
+			end = span.offset + tableSourceOffset(span.tableSource[span.offset:], span.text, end-span.offset, true)
 		}
 		if len(ranges) > 0 {
 			last := &ranges[len(ranges)-1]
@@ -182,12 +183,8 @@ func (m *AppModel) selectedText() string {
 			}
 			if source != nil && r.first.ref.line > 0 && r.last.ref.line <= len(source.lines) {
 				start, end := r.start, r.end
-				if !r.first.literal {
-					start = source.lines[r.first.ref.line-1].sourceOffset(start, false)
-				}
-				if !r.last.literal {
-					end = source.lines[r.last.ref.line-1].sourceOffset(end, true)
-				}
+				start = source.lines[r.first.ref.line-1].sourceOffset(start, false)
+				end = source.lines[r.last.ref.line-1].sourceOffset(end, true)
 				result.WriteString(source.copySourceRange(source.offsets[r.first.ref.line-1]+start, source.offsets[r.last.ref.line-1]+end))
 				continue
 			}
@@ -272,7 +269,7 @@ func (m *AppModel) prepareTextSpans() {
 				}
 			}
 			raw := value
-			if t.isMarkdown && !span.literal {
+			if t.isMarkdown {
 				value = ansi.Strip(t.markdownDisplayLine(span.ref.line, span.ref.side == "old", value, nil, nil))
 			} else {
 				value = displaySourceText(value)
@@ -282,7 +279,8 @@ func (m *AppModel) prepareTextSpans() {
 		}
 		if span.literal {
 			span.offset = f.offset
-			f.offset += tableSourceOffset(f.source[f.offset:], span.text, len(span.text), true)
+			span.tableSource = f.text
+			f.offset += tableSourceOffset(f.text[f.offset:], span.text, len(span.text), true)
 		} else if offset := strings.Index(f.text[f.offset:], span.text); offset >= 0 {
 			span.offset = f.offset + offset
 			f.offset += offset + len(span.text)

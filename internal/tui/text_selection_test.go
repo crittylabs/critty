@@ -200,6 +200,48 @@ func TestTextSelectionTableSource(t *testing.T) {
 	}
 }
 
+func TestTextSelectionMarkdownTableSource(t *testing.T) {
+	const content = "| PR | Notes |\n| --- | --- |\n| [avail #54](https://github.com/knu/avail/pull/54) | **bold** and `code` tail |"
+	for _, width := range []int{45, 100} {
+		for _, selected := range []string{"avail #54", "bold", "code", "tail"} {
+			if width == 45 && selected == "avail #54" {
+				selected = "#54"
+			}
+			t.Run(fmt.Sprintf("width=%d/%s", width, selected), func(t *testing.T) {
+				app := setupAppWithDoc(t, content)
+				app.width, app.height = width, 30
+				app.recalculateLayout()
+				app.rebuildContent()
+				for _, span := range app.contentLayout.textSpans {
+					start := strings.Index(span.text, selected)
+					if start < 0 {
+						continue
+					}
+					left, top, _, _ := app.contentBounds()
+					app = pressMouse(app, left+span.left+ansi.StringWidth(span.text[:start]), top+span.row)
+					app = releaseMouse(app, left+span.left+ansi.StringWidth(span.text[:start+len(selected)]), top+span.row)
+					want := selected
+					switch selected {
+					case "avail #54":
+						want = "[avail #54](https://github.com/knu/avail/pull/54)"
+					case "#54":
+						want = "[#54](https://github.com/knu/avail/pull/54)"
+					case "bold":
+						want = "**bold**"
+					case "code":
+						want = "`code`"
+					}
+					if got := app.selectedText(); got != want {
+						t.Fatalf("copied = %q, want %q", got, want)
+					}
+					return
+				}
+				t.Fatalf("text %q not found", selected)
+			})
+		}
+	}
+}
+
 func TestTextSelectionSplitUsesBeforeMarkdownContext(t *testing.T) {
 	patch := "diff --git a/f.md b/f.md\n--- a/f.md\n+++ b/f.md\n@@ -1,5 +1,5 @@\n-```\n+text\n `code`\n-```\n+text\n \n tail\n"
 	app := patchApp(t, patch)

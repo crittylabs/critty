@@ -44,6 +44,8 @@ type markdownToken struct {
 type markdownLine struct {
 	source       string
 	tokens       []markdownToken
+	cells        [][2]int
+	tableSep     bool
 	literal      bool
 	rendered     string
 	renderedDark bool
@@ -116,6 +118,12 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			// Do not invent an opening/closing context outside the supplied text.
 			if incomplete && (first == 0 && start > 0 || last == len(offsets)-1) {
 				return
+			}
+			if _, cell := n.(*extast.TableCell); cell {
+				m.lines[start+first].cells = append(m.lines[start+first].cells, [2]int{segments[0].Start - offsets[first], segments[len(segments)-1].Stop - offsets[first]})
+				if _, header := n.Parent().(*extast.TableHeader); header && first+1 < len(offsets) {
+					m.lines[start+first+1].tableSep = true
+				}
 			}
 			m.parseBlock(data, segments, offsets, start, edits, lineAt)
 			return
@@ -351,6 +359,29 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		line.rendered, line.renderedDark, line.renderedSet = result, terminalIsDark, true
 	}
 	return result
+}
+
+func (t *FileTab) markdownTableCells(line int, links []linkSpan) []string {
+	t.ensureMarkdownCache()
+	parsed := &t.markdown.after.lines[line-1]
+	var cells []string
+	for _, span := range parsed.cells {
+		cell := markdownLine{literal: true}
+		for _, token := range parsed.tokens {
+			from, to := max(span[0], token.start), min(span[1], token.end)
+			if from >= to {
+				continue
+			}
+			part := token
+			if len(token.text) == token.end-token.start {
+				part.text = token.text[from-token.start : to-token.start]
+			}
+			part.start, part.end = from, to
+			cell.tokens = append(cell.tokens, part)
+		}
+		cells = append(cells, cell.render(nil, diffCommonTextBg, diffAddedTextBg, links))
+	}
+	return cells
 }
 
 // Split unchanged source tokens at link boundaries before applying styles.

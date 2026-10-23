@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Markdown tables render links, emphasis, and inline code in documents and attachments instead of showing their markup.  Columns use the displayed text width, and copying selections preserves Markdown formatting and link targets.
+
 ## 1.6.0
 
 ### Added
