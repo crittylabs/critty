@@ -39,12 +39,15 @@ For example:
 - **Approvals and questionnaires** — confirm details, allow actions, choose alternatives, write answers, select paths, and rank options in attached documents.  These requests can accompany a code review or stand on their own.
 - **Design interviews** — work through questions with your agent using [critty-grill](internal/cli/skill/critty-grill/SKILL.md), then save an agreed decision summary, glossary, or ADR.
 - **Round trips with your agent** — send feedback and answers, let the agent act on them, and return for the next round.  Integrations support Claude Code, Codex, OpenCode, and Antigravity CLI; legacy Gemini CLI is also available.
-- **Flexible review inputs** — review Git changes, commit ranges, supplied diffs, or versioned plans.  Use `critty view` for a read-only inspection in the current terminal.
+- **Flexible review inputs** — review Git changes, a single commit, commit ranges, supplied diffs, or versioned plans.  Use `critty view` for a read-only inspection in the current terminal.
+- **Live Review Updates** — refresh an open review with Reload, or enable Watch to follow edits.  Unread dots mark files that changed while you were reading elsewhere.
+- **Per-project Session Management** — find saved reviews across a project's worktrees and continue from another checkout, even after the original worktree is removed.
 - **Plists and other encodings** — review binary plists and encoded text through your configured Git text converters.  Enable the converters you need in Critty's configuration.
 - **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
 - **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
-- **Navigation and editing** — browse files, search as you type, reply to comments, and edit in your preferred editor.
+- **Navigation and editing** — search across files as you type, follow file and comment references, and open source in your preferred editor.
+- **Text Selection and Copying** — select text from documents and diffs to reuse it, preserving Markdown formatting and link targets.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
 - **Scriptable and Crit-compatible** — automate comments with a [Crit](https://crit.md/)-compatible review format and resume saved sessions.
 
@@ -141,12 +144,11 @@ https://github.com/user-attachments/assets/8637dfb0-22f1-43a5-b378-96afe3f1f5ac
 For a manual review:
 
 ```bash
-critty                    # Current Git changes
-critty --staged            # Staged changes
-critty notes.md            # A document
-critty plan design.md      # A versioned plan
-critty status              # Saved reviews
-critty --session <id>      # Resume a saved review
+critty review                 # Current Git changes
+critty review --staged        # Staged changes
+critty review --scope=HEAD    # One commit
+critty review notes.md        # A document
+critty plan design.md         # A versioned plan
 ```
 
 <a id="review-navigation"></a>
@@ -154,6 +156,34 @@ critty --session <id>      # Resume a saved review
 Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
 Word-level highlights estimate corresponding lines even when a change also adds or removes lines.  Side-by-side view uses the same matches.  Very long lines and expensive searches keep full-line highlighting so reviews stay responsive.
+
+### Per-project Session Management
+
+Find a saved review and continue where you left off:
+
+```bash
+critty sessions                  # Reviews for this project, across worktrees
+critty sessions --all            # Reviews from every project
+critty sessions resume <id>      # Continue a saved review
+```
+
+The list shows each review's status and local start time.  Resume from any checkout of the same Git project, even after deleting the original worktree.  Git reviews use the current checkout, while comments, replies, attachments, and answers carry forward.  Changed inputs require fresh confirmations and consents.
+
+Saved text remains available when an original document is missing or a file is outside the current changes.  Plans and supplied diffs keep their saved snapshots; unavailable binary data cannot be restored.  Older sessions need the original checkout or its Git registration to identify the project.  See `critty sessions --help` for sorting, stopping, and removing sessions, and the [session reference](internal/cli/skill/critty-cli/SKILL.md#targeting-a-session-or-plan) for details.
+
+### Live Review Updates
+
+Keep a review open while files change.  Click **Reload** to refresh the current Git scope, document, and file-backed attachments, or turn on **Watch** to follow edits automatically.  Watch starts off; agents can enable it with `--watch`.  Updates wait while you edit, select text, search, or use a dialog.  Updated background tabs show an unread dot until opened.
+
+Saved plans, supplied diffs, and committed comparisons keep their snapshots.  File-backed attachments can still update.  Changed review inputs require fresh confirmations and consents.  See the [live source reference](internal/cli/skill/critty-cli/SKILL.md#live-sources) for limits.
+
+### Text Selection and Copying
+
+Drag across text in a document or diff, then press `M-w` or click **Copy text**.  Copies contain the source text, with wrapped rows joined and gutters and annotations left out.  Markdown retains its formatting and link targets, even when selecting part of a link label.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.
+
+Without a text selection, `M-w` copies a file reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, `M-o` follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
+
+Search covers all review files by default.  Use the **Files** button or `M-s m` during search to restrict it to the current file.  Selecting lines keeps search in that file.
 
 ### Review plists and other encodings
 
@@ -194,6 +224,8 @@ For example:
 For a deployment, include the target environment and exact deployment actions alongside the changes.  Review the code and proposed operations together, leave feedback where needed, and approve the operations you want the agent to carry out.
 
 Required confirmations must be complete before approval.  Approving the review does not authorize operations whose permission checkboxes remain unchecked.  Critty records your decisions; the agent executes the authorized actions.
+
+You can send Comment or Reject with unfinished form items or unresolved threads without extra confirmation.  Completion checks apply when approving.
 
 Ordinary Markdown checklists keep their written checkmarks and are display-only.  Agents add a `<!-- form: ... -->` annotation to each item that should collect an answer.  Preference answers use separate fields from execution permissions.  Changed execution requests require renewed consent.
 
@@ -299,9 +331,9 @@ See the [questionnaire walkthrough above](#critty) for select-all controls, writ
 
 ![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/35d5c52b-4054-40f8-a9fa-b294c7c32f1d)
 
-### Submitting with unfinished items
+### Approval checks for unfinished items
 
-![Submit dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/92354ab0-8cd6-4a30-9acf-0ce2d393bbba)
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/92354ab0-8cd6-4a30-9acf-0ce2d393bbba)
 
 ### Incremental search
 

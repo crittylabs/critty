@@ -2,21 +2,26 @@
 
 ## Unreleased
 
+## 1.6.0
+
 ### Added
 
-- Follow file references such as `@src/main.go L64` and comment IDs in attached documents by clicking them or pressing `M-o` on their line.  File references select an existing review tab or offer to open the file in an editor; comment references select the thread, including resolved comments.
-- Humans and agents can manage saved reviews with `critty sessions` (`list` is the default).  Git worktrees appear together as one project; `--directory DIR` selects another project, `--all` includes every project, and `--json` provides structured output.  The list shows local start times and UTC offsets; `--sort time` orders sessions by newest start across projects and states.  `critty sessions resume <id>` continues in the current checkout of the same project, even after the original worktree is removed.  Comments, answers, and saved plan/diff inputs remain available; Git reviews use that checkout's selected scope.  Missing documents and files outside the current changes can display saved text snapshots.  Relative input and output paths still use the caller's directory.  Stop a review while retaining its data with `sessions stop <id>`, or delete a stopped review with `sessions remove <id>`.  The existing top-level `--session`, `stop`, and `clear` forms remain supported.  Use `critty plan --session <id> <file>` to add a new plan version.
-- Refresh Git changes, documents, and file-backed attachments during a review with Reload, or enable Watch to follow edits automatically.  Agents can start Watch with `--watch`; it defaults off and defers updates while editing or confirming submission.  Watch uses filesystem notifications, excludes ignored directories and unrelated worktree metadata, and does no polling while idle.  Supplied diffs, saved plan versions, and committed comparisons stay snapshots.  Updates to the visible tab flash a two-second notice; changed and added tabs show a dark yellow unread dot in their titles and Files entries until opened, without moving filenames.  `W` toggles Watch; use `w` for whitespace filtering.
-- Copy text from documents and code diffs by dragging across the content and pressing `M-w` or clicking Copy text.  Copies the source text to the kill ring and system clipboard, excluding line numbers and annotations; wrapped rows stay joined.  Markdown retains its syntax and link targets, including for partial link labels.  Selections that include an opening modifier or code fence close it at the selection end.  Without a text selection, `M-w` still copies a reference.  System clipboard access requires terminal OSC 52 support.
-- Review one commit with `--scope=COMMIT`, using a SHA or revision such as `HEAD`.  The comparison uses its first parent, including for merge commits; root commits show all files as additions.  Available in both `critty review` and `critty view`.
-- Herdr, Zellij, and cmux users can find default host shortcuts in Keyboard Help to enlarge the review and move between panes or tabs.  Host controls also appear in read-only views when the host is known.
+- **Per-project Session Management**: find and continue saved reviews with `critty sessions`.  Reviews from linked Git worktrees appear together, with status and local start time.  Humans and agents can list, resume, stop, or remove sessions through the same command group.
+  - Resume from another checkout of the same project, even after the original worktree is removed.  Git reviews use the current checkout; comments, replies, attachments, and answers carry forward.  Changed inputs require fresh confirmations and consents.
+  - Saved text remains readable when a document is missing or a file is outside the current changes.  Saved plans and supplied diffs retain their snapshots; unavailable binary data cannot be reconstructed.  Older sessions need the original checkout or its Git registration to identify the project.  Existing `--session`, `stop`, and `clear` forms remain supported.  See the [session reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#targeting-a-session-or-plan).
+- **Live Review Updates**: use Reload to refresh Git changes, documents, and file-backed attachments without reopening the review, or enable Watch to follow edits automatically.  Updated background tabs show an unread dot until opened; updates to the visible tab briefly show a notice.
+  - Watch defaults off, and agents can enable it with `--watch`.  Updates wait during editing, selection, search, and dialogs.  Supplied diffs, saved plans, and committed comparisons keep their snapshots; file-backed attachments can still refresh.  See the [live source reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#live-sources).
+- **Text Selection and Copying**: drag across a document or code diff, then press `M-w` or click Copy text to reuse the source text.  Copies exclude gutters and annotations, join wrapped rows, and preserve Markdown formatting and link targets, including partial link labels.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.  Without a selection, `M-w` still copies a reference.
+- **Clickable References in Attachments**: follow file references such as `@src/main.go L64` and comment IDs by clicking them or pressing `M-o` on their line, including in form labels.  File references select an existing review tab or offer to open the file in an editor; comment references select the thread, including resolved comments.
+- Review a single commit with `--scope=COMMIT`, such as `--scope=HEAD`, in `critty review` or `critty view`.  Merge commits compare against their first parent; root commits show all files as additions.
+- Herdr, Zellij, and cmux users can find their host's default pane and tab controls in Keyboard Help, including in read-only views.
 
 ### Changed
 
 - Incremental search covers all review files by default.  Use `M-s m` or the Files button to search only the current file; the choice lasts for the current run.  Selecting lines confines search to their file.
-- Send comments or reject a review without warnings or extra confirmation for unanswered form items and unresolved threads.  Progress counters remain visible; approval keeps its completion checks and confirmations.
-- Copying a reference shows a muted cyan confirmation for two seconds, then restores the footer hints.
-- The Files tab highlights the current file across the full row with a soft gray background, including while scrolling long filenames or reading in the content pane.
+- Send comments or reject a review without warnings or extra confirmation for unanswered form items and unresolved threads.  Approval retains its completion checks and confirmations.
+- The Files tab highlights the current file across the full row, including when scrolling long filenames or reading in the content pane.
+- Copying a reference shows a brief confirmation before restoring the footer hints.
 
 ### Fixed
 
