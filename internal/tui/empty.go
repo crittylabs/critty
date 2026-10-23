@@ -6,7 +6,11 @@ import (
 )
 
 func (m AppModel) renderEmptyReview() (string, []modalMouseRegion) {
-	body := "Critty: [" + m.reviewScopeLabel() + "]\n\nNo changes remain in this review.\n\nq: finish review"
+	status := m.renderReloadStatus()
+	if status == "" && m.notice.text != "" {
+		status = footerStyle.Foreground(warning).Render(m.notice.text)
+	}
+	body := m.renderReviewBar() + "\n\nNo changes remain in this review.\n\n" + status
 	body = lipgloss.NewStyle().Width(m.width).Height(m.height).Render(body)
 	if m.modal != noModal {
 		return m.renderWithModalLayout(body)
@@ -20,6 +24,20 @@ func (m *AppModel) handleEmptyReviewClick(msg tea.MouseClickMsg) (tea.Model, tea
 	}
 	if m.modal == finishModal {
 		return m.handleFinishModalMouse(msg.Mouse())
+	}
+	if m.modal == noModal {
+		bar := m.renderReviewBar()
+		if indicator := m.watchIndicator(); indicator != "" {
+			if rect, ok := buttonRect(bar, 0, indicator); ok && rect.contains(msg.Mouse()) {
+				return m, m.toggleWatch()
+			}
+		}
+		if rect, ok := buttonRect(bar, 0, m.submitButton()); ok && rect.contains(msg.Mouse()) {
+			if m.readOnly {
+				return m, tea.Quit
+			}
+			m.openFinishModal()
+		}
 	}
 	return m, nil
 }

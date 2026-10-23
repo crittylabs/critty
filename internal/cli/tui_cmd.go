@@ -32,5 +32,6 @@ var tuiCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(tuiCmd)
 	addFocusFlag(tuiCmd)
+	addWatchFlag(tuiCmd)
 	tuiCmd.Flags().StringVar(&tuiSession, "session", "", "saved review session")
 }

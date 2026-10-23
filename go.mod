@@ -13,6 +13,7 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
 	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gofrs/flock v0.13.1
 	github.com/mattn/go-runewidth v0.0.31
 	github.com/mattn/go-shellwords v1.0.16

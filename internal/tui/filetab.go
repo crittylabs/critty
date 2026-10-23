@@ -29,6 +29,8 @@ type FileTab struct {
 	status                string
 	textconv              gitpkg.Textconv
 	loadErr               error
+	binaryRevision        string
+	unread                bool // changed or added since this tab was last displayed
 	doc                   *document.Document
 	state                 *fileReview
 	diff                  *gitpkg.DiffInfo // original diff, retained when whitespace is ignored
@@ -123,6 +125,13 @@ func (ft *FileTab) ensureHighlightCache() {
 		}
 		ft.deletedLineCache[afterLine] = highlighted
 	}
+}
+
+func (t *FileTab) unreadMarker() string {
+	if t.unread {
+		return unreadDotStyle.Render("●") + " "
+	}
+	return "  "
 }
 
 func (t *FileTab) displayPath() string {

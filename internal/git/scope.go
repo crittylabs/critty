@@ -1,6 +1,8 @@
 package git
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +22,45 @@ type ReviewSource struct {
 	Range           string
 	Base            string
 	Head            string
+}
+
+// Fingerprint detects source changes without loading file contents or running
+// text conversions.  Working files contribute their size, mode, and mtime;
+// committed and index contents contribute Git object IDs.
+func (s ReviewSource) Fingerprint(files []FileChange) (string, error) {
+	out, err := gitCommand(append(s.diffArgs(), "--raw", "--no-abbrev", "-z", "--")...)
+	if err != nil {
+		return "", err
+	}
+	hash := sha256.New()
+	encoder := json.NewEncoder(hash)
+	if err := encoder.Encode(struct {
+		Source ReviewSource
+		Files  []FileChange
+		Raw    string
+	}{s, files, out}); err != nil {
+		return "", err
+	}
+	if s.Scope == "all" || s.Scope == "unstaged" {
+		for _, file := range files {
+			if file.Status == StatusDeleted {
+				continue
+			}
+			info, err := os.Stat(file.Path)
+			if err != nil {
+				return "", err
+			}
+			if err := encoder.Encode(struct {
+				Path     string
+				Size     int64
+				Modified int64
+				Mode     os.FileMode
+			}{file.Path, info.Size(), info.ModTime().UnixNano(), info.Mode()}); err != nil {
+				return "", err
+			}
+		}
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func resolveCommit(ref string) (string, error) {

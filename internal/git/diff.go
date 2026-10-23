@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"unicode"
@@ -379,6 +380,8 @@ func untrackedFiles() ([]string, error) {
 // gitCommand runs a git command and returns stdout.
 func gitCommand(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
+	// Reading diffs must not refresh the index and wake our own watcher.
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {

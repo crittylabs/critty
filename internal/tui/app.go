@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"image/color"
 	"os"
@@ -62,10 +63,12 @@ const (
 type FinishEvent struct {
 	Approved bool
 	Result   *review.FormResult
+	Files    []gitpkg.FileChange
 }
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
+	Context   context.Context
 	ReadOnly  bool
 	Documents []review.AttachedDocument
 	Project   string
@@ -74,6 +77,7 @@ type AppConfig struct {
 	Session   *review.Session
 	Author    string
 	Split     bool
+	Watch     bool
 	// Staged reads code-review files and diffs from the Git index.
 	Staged    bool
 	Patch     *gitpkg.Patch
@@ -92,6 +96,7 @@ const displayTabWidth = 4
 
 type AppModel struct {
 	readOnly      bool
+	reload        reloadState
 	images        imageDisplay
 	commentImages map[commentImageKey]*previewSide
 	imageBodies   map[string][]markdownImageRef
@@ -183,6 +188,7 @@ type AppModel struct {
 	lineInput            textinput.Model
 	pendingLocation      sourceLocation
 	locationError        string
+	notice               footerNotice
 	isearch              isearchState
 
 	err error
@@ -232,6 +238,8 @@ func (r *commentHeaderRegion) translate(x, y int) {
 }
 
 type renderedScreenLayout struct {
+	watchIndicator      mouseRect
+	hasWatchIndicator   bool
 	whitespaceButton    mouseRect
 	hasWhitespaceButton bool
 	splitButton         mouseRect
@@ -303,6 +311,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 
 	m := AppModel{
 		readOnly:        cfg.ReadOnly,
+		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
@@ -325,6 +334,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()
 	m.orderTabsByTree()
+	m.loadBinaryRevisions()
 	return m
 }
 
@@ -388,6 +398,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 
 	m := AppModel{
 		readOnly:        cfg.ReadOnly,
+		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
 		project:         cfg.Project,
 		topic:           cfg.Topic,
@@ -415,6 +426,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()
 	m.orderTabsByTree()
+	m.loadBinaryRevisions()
 	return m
 }
 
@@ -442,7 +454,11 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 }
 
 func (m AppModel) Init() tea.Cmd {
-	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor)
+	var tick tea.Cmd
+	if m.reload.watch && m.CanWatch() {
+		tick = m.startWatch()
+	}
+	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, tick)
 }
 
 func (m AppModel) loadDocuments() tea.Cmd {
@@ -518,14 +534,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
+		reloadCmd := app.resumeReload()
+		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
 			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
 		app.refreshCompletion()
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
-		return app, tea.Batch(cmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
+		reloadCmd := app.resumeReload()
+		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
 			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	}
 	return model, cmd
@@ -637,9 +655,47 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorImagesMsg:
 		m.finishEditorImagesDelay(msg)
 		return m, nil
+	case noticeExpiredMsg:
+		m.expireNotice(msg)
+		return m, nil
 	case externalOpenMsg:
 		m.locationError = msg.status
 		return m, nil
+	case watchReadyMsg:
+		if msg.epoch != m.reload.epoch || !m.reload.watch {
+			if msg.watcher != nil {
+				msg.watcher.Close()
+			}
+			return m, nil
+		}
+		if msg.err != nil {
+			m.reload.watch, m.reload.err = false, msg.err
+			return m, nil
+		}
+		m.reload.watcher = msg.watcher
+		m.reload.dirty = true
+		return m, msg.watcher.next(msg.epoch)
+	case watchChangedMsg:
+		if !m.reload.watch || msg.epoch != m.reload.epoch {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.reload.watch, m.reload.err = false, msg.err
+			m.reload.watcher.Close()
+			return m, nil
+		}
+		if msg.changed {
+			m.reload.dirty = true
+		}
+		if msg.refresh {
+			m.reload.watcher.Close()
+			m.reload.watcher = nil
+			return m, m.startWatch()
+		}
+		return m, m.reload.watcher.next(msg.epoch)
+	case reloadMsg:
+		cmd := m.finishReload(msg)
+		return m, cmd
 	case tea.BackgroundColorMsg:
 		recolor := msg.IsDark() != terminalIsDark
 		initAdaptiveStyles(msg.IsDark())
@@ -874,6 +930,14 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleFinishFormsKey(msg)
 	}
 
+	if m.modal == noModal && !m.isearch.active {
+		switch {
+		case key.Matches(msg, keys.Reload):
+			return m, m.requestReload(true)
+		case key.Matches(msg, keys.Watch):
+			return m, m.toggleWatch()
+		}
+	}
 	if len(m.tabs) == 0 {
 		if key.Matches(msg, keys.Quit) {
 			if m.readOnly {
@@ -913,8 +977,8 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.openGotoLine()
 	}
 	if msg.String() == "alt+w" {
-		m.copyReference()
-		return m, nil
+		cmd := m.copyReference()
+		return m, cmd
 	}
 	if msg.String() == "alt+o" && !t.selecting {
 		return m, m.openReferenceAtCursor()
@@ -2130,7 +2194,13 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 		result = &value
 	}
 	if m.finishCh != nil {
-		m.finishCh <- FinishEvent{Approved: approved, Result: result}
+		files := make([]gitpkg.FileChange, 0, len(m.tabs))
+		for _, tab := range m.tabs {
+			if tab.attachment == nil && tab.path != overallCommentsPath && !tab.outsideChanges {
+				files = append(files, gitpkg.FileChange{Path: tab.path})
+			}
+		}
+		m.finishCh <- FinishEvent{Approved: approved, Result: result, Files: files}
 	}
 	m.modal = noModal
 	return m, tea.Quit
@@ -2641,6 +2711,9 @@ func (m AppModel) renderHeader() string {
 }
 
 func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
+	if len(m.tabs) == 0 {
+		return m.renderReviewBar(), nil
+	}
 	t := m.tab()
 	displayPath := t.displayPath()
 	if t.attachment != nil {
@@ -2765,29 +2838,47 @@ func (m AppModel) renderReviewBar() string {
 		text += style.Render(scope) + reviewBarStyle.Render(" ")
 	}
 	text += reviewBarStyle.Render(subject)
-	button := m.submitButton()
-	right := button + reviewBarStyle.Render(" ")
-	if search := m.searchButton(); search != "" {
-		right = search + reviewBarStyle.Render(" ") + right
+	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.searchButton(), m.submitButton()}
+	var rows []string
+	row := ""
+	for _, button := range buttons {
+		if button == "" {
+			continue
+		}
+		if row != "" && m.width > 0 && lipgloss.Width(row)+1+lipgloss.Width(button) > m.width {
+			rows = append(rows, row)
+			row = ""
+		}
+		if row != "" {
+			row += reviewBarStyle.Render(" ")
+		}
+		row += button
 	}
-	if button := m.whitespaceButton(); button != "" {
-		right = button + reviewBarStyle.Render(" ") + right
+	rows = append(rows, row)
+	for i := range rows {
+		if m.width > 0 {
+			rows[i] += reviewBarStyle.Render(strings.Repeat(" ", max(0, m.width-lipgloss.Width(rows[i]))))
+		}
 	}
-	if button := m.splitButton(); button != "" {
-		right = button + reviewBarStyle.Render(" ") + right
+	right := row
+	if m.width <= 0 || lipgloss.Width(right) < m.width {
+		right += reviewBarStyle.Render(" ")
+	}
+	if len(rows) > 1 {
+		return strings.Join(rows, "\n")
 	}
 	if m.width <= 0 {
 		return text + reviewBarStyle.Render(" ") + right
 	}
 	available := m.width - lipgloss.Width(right) - 1
-	if available < 0 {
-		return ansi.Truncate(right, m.width, "")
+	if m.width >= 60 && lipgloss.Width(text) > available {
+		return reviewBarStyle.Width(m.width).Render(ansi.Truncate(text, m.width, "…")) + "\n" + reviewBarStyle.Width(m.width).Render(right)
+	}
+	if available < 1 {
+		return right
 	}
 	if lipgloss.Width(text) > available {
-		text = ansi.Truncate(text, max(0, available-1), "")
-		if available > 0 {
-			text += reviewBarStyle.Render("…")
-		}
+		text = ansi.Truncate(text, max(0, available-1), "") + reviewBarStyle.Render("…")
 	}
 	gap := m.width - lipgloss.Width(text) - lipgloss.Width(right)
 	return text + reviewBarStyle.Render(strings.Repeat(" ", gap)) + right
@@ -2944,6 +3035,9 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		sections = append(sections, footer)
 	}
 	layout := renderedScreenLayout{progressRegions: progressRegions}
+	if button := m.watchIndicator(); button != "" {
+		layout.watchIndicator, layout.hasWatchIndicator = buttonRect(header, 0, button)
+	}
 	if button := m.whitespaceButton(); button != "" {
 		layout.whitespaceButton, layout.hasWhitespaceButton = buttonRect(header, 0, button)
 	}
@@ -3014,6 +3108,7 @@ func (m *AppModel) tabLabels() []tabLabel {
 			filenameStyle = filenameStyle.Bold()
 		}
 		label = label[:start] + filenameStyle.String() + label[start:] + ansi.NewStyle().Normal().Underline(false).String()
+		label = t.unreadMarker() + label
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
 		}
@@ -3253,6 +3348,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	_, imageLayout := m.renderReviewScreen()
+	if imageLayout.hasWatchIndicator && imageLayout.watchIndicator.contains(mouse) {
+		return m, m.toggleWatch()
+	}
 	if imageLayout.hasWhitespaceButton && imageLayout.whitespaceButton.contains(mouse) {
 		m.toggleWhitespace()
 		return m, nil
@@ -4109,7 +4207,10 @@ const footerMinHeight = 22
 // renderFooter renders the key hints and the Help button, or "" when the
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
-	if m.readOnly && !m.isearch.active && m.locationError == "" && m.height >= footerMinHeight {
+	if m.reload.err != nil && !m.isearch.active {
+		return footerStyle.Width(m.width).Render("Reload failed: " + headerLabel(m.reload.err.Error()))
+	}
+	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
 		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · View: read-only · /: search · v: select · M-w: copy reference · q: close")
 	}
 	if m.isearch.active {
@@ -4118,6 +4219,9 @@ func (m AppModel) renderFooter() string {
 	}
 	if m.locationError != "" {
 		return footerStyle.Width(m.width).Render(m.locationError)
+	}
+	if m.notice.text != "" {
+		return footerNoticeStyle.Width(m.width).Render(ansi.Truncate(headerLabel(m.notice.text), max(0, m.width), "…"))
 	}
 	if m.height < footerMinHeight {
 		return ""
@@ -4254,7 +4358,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "v · esc", desc: "select lines / cancel"},
 			{keys: "M-w", desc: "copy reference"},
 			{keys: "s/t", desc: "toggle sidebar / view"},
-			{keys: "w/W · S · I", desc: "whitespace / split / images"},
+			{keys: "w · S · I", desc: "whitespace / split / images"},
+			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
+			{keys: "●", desc: "updated tab; open to mark read"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "M-? · esc", desc: "help / close help"},
 		}, innerWidth)
@@ -4269,7 +4375,10 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
 		{keys: "h/H", desc: "fold/hide"},
-		{keys: "w/W · I", desc: "WS changes · images"},
+		{keys: "w · I", desc: "WS changes · images"},
+		{keys: "F5/M-r", desc: "reload sources"},
+		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
+		{keys: "●", desc: "updated; open to mark read"},
 		{keys: "alt+o", desc: "open image/link"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
