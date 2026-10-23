@@ -79,6 +79,8 @@ func resolveFocus(mode *reviewMode) error {
 		if line > 0 {
 			if mode.planContent != nil {
 				data = mode.planContent
+			} else if mode.documentSnapshot != nil {
+				data = []byte(mode.documentSnapshot.Content)
 			} else {
 				data, err = os.ReadFile(path)
 			}
@@ -113,6 +115,14 @@ func resolveFocus(mode *reviewMode) error {
 				data, err = os.ReadFile(path)
 			}
 			break
+		}
+		if !found {
+			for candidate, snapshot := range mode.historyFiles {
+				if match(candidate) && (!snapshot.Partial || line == 0) {
+					found, path, data = true, candidate, []byte(snapshot.Content)
+					break
+				}
+			}
 		}
 		if !found {
 			return fmt.Errorf("focus file is not in the review: %s", path)

@@ -17,8 +17,10 @@ var resumeCmd = &cobra.Command{
 	Use:   "resume <id>",
 	Short: "Resume a saved review session",
 	Long: `Resume a saved Git, document, diff, or plan review by ID.
-Critty automatically uses its original working directory and restores input,
-comments, replies, attachments, and form answers.  Relative attachment, diff,
+Within the same Git project, Critty uses your current working directory,
+even when the original worktree has been removed.  Otherwise it restores the
+last workspace.  Comments, replies, attachments, and form answers are retained.
+Relative attachment, diff,
 and output paths are resolved from the directory where you run this command.
 
 Use --attachment repeatedly to replace the complete attachment list, or
@@ -61,8 +63,12 @@ func withSessionDirectory(key string, args []string, run func([]string) error) (
 	if err != nil {
 		return err
 	}
-	if cwd == entry.CWD {
+	directory := entry.WorkingDirectory()
+	if sameSessionDirectory(cwd, directory) || sameSessionProject(*entry, cwd) {
 		return run(args)
+	}
+	if _, err := os.Stat(directory); os.IsNotExist(err) && entry.Workdir != "" {
+		directory = entry.CWD
 	}
 	oldDiff, oldResult, oldSummary, oldAttachments := reviewDiff, resultPath, summaryPath, attachmentPaths
 	oldLaunchers := reviewLauncherNames
@@ -103,8 +109,8 @@ func withSessionDirectory(key string, args []string, run func([]string) error) (
 			reviewLauncherNames[i] = "custom:" + absolute
 		}
 	}
-	if err := os.Chdir(entry.CWD); err != nil {
-		return fmt.Errorf("opening saved review directory: %w", err)
+	if err := os.Chdir(directory); err != nil {
+		return fmt.Errorf("opening saved review directory: %w; resume from another checkout of the same Git project", err)
 	}
 	defer func() {
 		if restoreErr := os.Chdir(cwd); restoreErr != nil {
@@ -112,6 +118,35 @@ func withSessionDirectory(key string, args []string, run func([]string) error) (
 		}
 	}()
 	return run(args)
+}
+
+func sameSessionDirectory(a, b string) bool {
+	if a == b {
+		return true
+	}
+	aInfo, aErr := os.Stat(a)
+	bInfo, bErr := os.Stat(b)
+	return aErr == nil && bErr == nil && os.SameFile(aInfo, bInfo)
+}
+
+func sameSessionProject(entry review.SessionEntry, directory string) bool {
+	common := entry.GitCommonDir
+	if common == "" {
+		common = reviewGitCommonDir(entry.WorkingDirectory())
+	}
+	return common != "" && common == reviewGitCommonDir(directory)
+}
+
+// Only paths inside the previous workspace move.  External inputs stay external.
+func rebaseSessionPath(path, from, to string) string {
+	if !filepath.IsAbs(path) {
+		return path
+	}
+	rel, err := filepath.Rel(canonicalProjectDirectory(from), canonicalProjectDirectory(path))
+	if err != nil || !filepath.IsLocal(rel) {
+		return path
+	}
+	return filepath.Join(to, rel)
 }
 
 func resumingSessionID(cmd *cobra.Command, args []string) string {

@@ -851,7 +851,7 @@ func TestStagedRoundUsesIndexDocument(t *testing.T) {
 	}
 }
 
-func TestRevertedAdditionShowsPlaceholderAndKeepsComments(t *testing.T) {
+func TestRevertedAdditionShowsSnapshotAndKeepsComments(t *testing.T) {
 	dir := newGitRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("keep\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -893,11 +893,8 @@ func TestRevertedAdditionShowsPlaceholderAndKeepsComments(t *testing.T) {
 		t.Fatalf("active tab = %q (outside changes: %t), want added.go kept outside the changes", app.tab().path, app.tab().outsideChanges)
 	}
 	content := ansi.Strip(app.contentViewport.View())
-	if !strings.Contains(content, "no longer part of the changes") || !strings.Contains(content, "Original text:") {
-		t.Fatalf("content = %q, want placeholder and original comment context", content)
-	}
-	if !strings.Contains(content, "💬") {
-		t.Fatalf("content = %q, want a marker for the kept comment", content)
+	if !strings.Contains(content, "Saved snapshot: outside current changes") || !strings.Contains(content, "var x = 1") || !strings.Contains(content, "why one?") {
+		t.Fatalf("content = %q, want saved source and original comment context", content)
 	}
 	app.jumpToComment(1, true)
 	if got := ansi.Strip(app.contentViewport.View()); !strings.Contains(got, "why one?") || !strings.Contains(got, "var x = 1") {

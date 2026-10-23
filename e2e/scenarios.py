@@ -274,8 +274,10 @@ def report(message: str) -> None:
 def project_sessions() -> None:
     project, worktree = WORK / "project", WORK / "project-worktree"
     project.mkdir()
+    (project / "code.txt").write_text("prefix\nBase marker\ntail\n")
     for args in [
-        ["init", "-q"],
+        ["init", "-qb", "main"],
+        ["add", "code.txt"],
         [
             "-c",
             "user.name=Test",
@@ -299,18 +301,44 @@ def project_sessions() -> None:
     first.comment("Retain feedback while moving between worktrees.")
     cli("sessions", "stop", first.session)
     first.completed(None)
+
+    (worktree / "code.txt").write_text("prefix\nOriginal marker\ntail\n")
+    code = Round(
+        "project-code",
+        ["--unstaged", "--focus", "code.txt:2", "--task", task],
+        cwd=worktree,
+    )
+    code.keys("Enter")
+    code.text("Retain this anchor across workspaces.")
+    code.keys("C-s")
+    wait_until(
+        lambda: any(c.get("anchor") == "Original marker" for c in code.comments()),
+        "focused anchor saved",
+    )
+    cli("sessions", "stop", code.session)
+    code.completed(None)
+    (worktree / "note.md").write_text("# Saved standalone document\n")
+    document = Round("project-document", ["note.md", "--task", task], cwd=worktree)
+    document.comment("Retain document feedback.")
+    cli("sessions", "stop", document.session)
+    document.completed(None)
+
     listing = json.loads(cli("sessions", "--directory", str(project), "--json").stdout)
-    assert len(listing) == 1 and listing[0]["key"] == first.session, listing
+    assert len(listing) == 3 and first.session in {s["key"] for s in listing}, listing
     assert listing[0]["project_name"] == "project" and listing[0]["git_common_dir"]
     table = cli("sessions", "--directory", str(project)).stdout
     assert str(worktree) not in table and "PROJECT" in table, table
+    cli("history", "finish", task, "--action", "keep", cwd=worktree)
+    run(["git", "-C", str(project), "worktree", "remove", "--force", str(worktree)])
+    assert not worktree.exists()
+
     resumed = Round(
         "project-resumed",
-        ["sessions", "resume", first.session, "--task", task],
+        ["sessions", "resume", first.session],
         cwd=project,
     )
     resumed.wait_screen(
-        "Saved worktree content", "saved worktree restored automatically"
+        "Saved worktree content", "saved plan restored after source removal"
     )
     assert (
         resumed.comments()[0]["body"]
@@ -320,20 +348,71 @@ def project_sessions() -> None:
     resumed.completed(False)
     summary = json.loads(resumed.summary.read_text())
     assert summary["cwd"] == str(worktree.resolve())
-    assert shlex.split(summary["next_command"])[-1] == str(worktree / "plan.md")
+    assert summary["workdir"] == str(project.resolve())
+    assert shlex.split(summary["next_command"])[-1] == str(project / "plan.md")
+
+    (project / "code.txt").write_text(
+        "prefix\ninserted\nCompletely unrelated replacement\ntail\n"
+    )
+    resumed_code = Round(
+        "project-code-resumed",
+        ["sessions", "resume", code.session, "--focus", "code.txt"],
+        cwd=project,
+    )
+    resumed_code.wait_screen(
+        "Completely unrelated replacement", "Git review reads current checkout"
+    )
+    comments = resumed_code.comments()
+    assert any(
+        c["body"] == "Retain this anchor across workspaces." and c.get("drifted")
+        for c in comments
+    ), comments
+    resumed_code.keys("q", "c", "Enter")
+    resumed_code.completed(False)
+
+    resumed_doc = Round(
+        "project-document-resumed",
+        ["sessions", "resume", document.session],
+        cwd=project,
+    )
+    resumed_doc.wait_screen(
+        "Saved standalone document", "missing document uses saved source"
+    )
+    resumed_doc.wait_screen("source file unavailable", "saved source is labeled")
+    (project / "note.md").write_text("# Recreated standalone document\n")
+    resumed_doc.keys("F5")
+    resumed_doc.wait_screen(
+        "Recreated standalone document", "Reload switches to the current file"
+    )
+    resumed_doc.keys("q", "c", "Enter")
+    resumed_doc.completed(False)
+
     (project / "updated.md").write_text("# Project plan\n\nCaller revision content.\n")
     updated = Round(
         "project-plan-revision",
-        ["plan", "--session", first.session, "updated.md", "--task", task],
+        ["plan", "--session", first.session, "updated.md"],
         cwd=project,
     )
     updated.wait_screen("Caller revision content", "plan revision read from caller")
     assert updated.session == first.session
     updated.keys("q", "c", "Enter")
     updated.completed(False)
-    cli("history", "finish", task, cwd=worktree)
+    another = WORK / "project-another-worktree"
+    run(["git", "-C", str(project), "worktree", "add", "--detach", str(another)])
+    relocated = Round(
+        "project-plan-another", ["sessions", "resume", first.session], cwd=another
+    )
+    relocated.wait_screen(
+        "Caller revision content", "another worktree reuses the saved plan"
+    )
+    relocated.keys("q", "c", "Enter")
+    relocated.completed(False)
+    listing = json.loads(cli("sessions", "--directory", str(project), "--json").stdout)
+    saved = next(s for s in listing if s["key"] == first.session)
+    assert saved["task"] == task and saved["cwd"] == str(worktree.resolve())
+    assert saved["workdir"] == str(another.resolve())
     report(
-        "project sessions span worktrees; resume restores its directory and plan revisions use caller paths"
+        "removed worktrees retain plan/document snapshots, current Git inputs, drifted comments, task identity, and further workspace resumes"
     )
 
 

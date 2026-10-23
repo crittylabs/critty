@@ -154,7 +154,7 @@ func (m AppModel) linkArgument(destination string, editor bool) (string, bool) {
 		if editor {
 			base = "comment.md"
 			if m.session != nil {
-				base = filepath.Join(m.session.Meta.CWD, "comment.md")
+				base = filepath.Join(m.session.Meta.WorkingDirectory(), "comment.md")
 				if strings.HasPrefix(u.Path, "attachments/") {
 					base = filepath.Join(m.session.Dir, "comment.md")
 				}

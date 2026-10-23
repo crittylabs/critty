@@ -150,6 +150,11 @@ func (m *AppModel) rebuildContent() {
 	var b strings.Builder
 	b.Grow(len(sourceLines) * 200) // pre-allocate to reduce allocations
 	layout := newRenderedContentLayout()
+	if t.outsideChanges && t.doc != nil {
+		layout.appendBlock(&b, ansi.Wrap("Saved snapshot: outside current changes.\n", max(1, contentWidth), ""), contentMouseTarget{})
+	} else if m.documentSnapshot != nil && t.path == m.filePath {
+		layout.appendBlock(&b, ansi.Wrap("Saved snapshot: source file unavailable in this workspace.\n", max(1, contentWidth), ""), contentMouseTarget{})
+	}
 	if t.attachment != nil && t.attachment.Removed {
 		notice := "History (read-only): this attachment is not part of this review.\n" +
 			"Checkboxes are inactive because this attachment was removed or replaced.\n" +

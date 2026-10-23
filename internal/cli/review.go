@@ -89,7 +89,11 @@ type reviewMode struct {
 	documents         []review.AttachedDocument
 	replaceDocuments  bool
 	documentsPrepared bool
-	docPath           string // non-empty for single-document and plan modes
+	docPath           string               // non-empty for single-document and plan modes
+	documentSnapshot  *review.SnapshotFile // fallback when the live document is unavailable
+	historyFiles      map[string]review.SnapshotFile
+	expectedBranch    string
+	workspaceChanged  bool
 	ref               string // diff base for code mode
 	files             []git.FileChange
 	staged            bool
@@ -402,6 +406,9 @@ func openReviewSession(cfg *config.Config, mode *reviewMode) (*review.Session, e
 }
 
 func saveReviewMode(sess *review.Session, mode *reviewMode) error {
+	if mode.source != nil && mode.source.Scope == "range" {
+		sess.Meta.HeadRef = mode.source.Head
+	}
 	if sess.Meta.GitCommonDir == "" {
 		sess.Meta.GitCommonDir = reviewGitCommonDir(sess.Meta.CWD)
 	}
@@ -429,6 +436,16 @@ func saveReviewMode(sess *review.Session, mode *reviewMode) error {
 		}
 	}
 	return sess.Update(func(s *review.Session) error {
+		if mode.source != nil && (mode.workspaceChanged && mode.source.Scope != "range" || s.CJ.BaseRef != "" && mode.ref != s.CJ.BaseRef) {
+			for path, file := range s.CJ.Files {
+				for i := range file.Comments {
+					if file.Comments[i].Side == "old" {
+						file.Comments[i].Drifted = true
+					}
+				}
+				s.CJ.Files[path] = file
+			}
+		}
 		s.CJ.BaseRef = mode.ref
 		s.CJ.CliArgs = s.Meta.Args
 		s.CJ.Branch = s.Meta.Branch

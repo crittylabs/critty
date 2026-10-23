@@ -145,7 +145,7 @@ func readReloadInputs(source *gitpkg.ReviewSource, filePath string, frozen bool,
 	encoder := json.NewEncoder(hash)
 	var files []gitpkg.FileChange
 	if source != nil {
-		if branch != "" {
+		if branch != "" && source.Scope != "range" {
 			current, err := gitpkg.CurrentBranch()
 			if err != nil {
 				return nil, "", err
@@ -280,6 +280,12 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 		old[tab.path] = tab
 	}
 	next := msg.model
+	hasCurrentChanges := false
+	for _, tab := range next.tabs {
+		if tab.attachment == nil && tab.path != overallCommentsPath && !tab.outsideChanges {
+			hasCurrentChanges = true
+		}
+	}
 	for i := range next.tabs {
 		tab := &next.tabs[i]
 		if previous, ok := old[tab.path]; ok {
@@ -292,7 +298,8 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 		}
 	}
 	for _, tab := range m.tabs {
-		if _, ok := old[tab.path]; ok && tab.state != nil && len(tab.state.Comments) > 0 {
+		keepSnapshot := !hasCurrentChanges && tab.outsideChanges && tab.doc != nil
+		if _, ok := old[tab.path]; ok && tab.state != nil && (len(tab.state.Comments) > 0 || keepSnapshot) {
 			tab.unread = tab.unread || !tab.outsideChanges
 			tab.outsideChanges = true
 			next.tabs = append(next.tabs, tab)
@@ -316,6 +323,7 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 		}
 	}
 	m.tabs, m.source, m.baseRef = next.tabs, next.source, next.baseRef
+	m.documentSnapshot = next.documentSnapshot
 	m.attachments = next.attachments
 	m.orderTabsByTree()
 	m.activeTab = 0

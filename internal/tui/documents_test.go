@@ -6,12 +6,67 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestResumedDocumentSnapshotReloadsFromWorkspace(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	sess, err := review.NewSession("", review.SessionEntry{CWD: "/removed-worktree", Mode: "files"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.UseWorkspace(cwd, "main")
+	snapshot := review.SnapshotFile{Content: "Original snapshot\n"}
+	app := NewApp("missing.md", AppConfig{Session: sess, DocumentSnapshot: &snapshot})
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 25})
+	app, _ = updateApp(app, app.loadDocuments()())
+	if app.err != nil || !strings.Contains(ansi.Strip(app.contentViewport.GetContent()), "source file unavailable") || app.tab().doc.Content != snapshot.Content {
+		t.Fatalf("saved document unavailable: %v, %s", app.err, app.contentViewport.GetContent())
+	}
+	if err := os.WriteFile("missing.md", []byte("Current workspace document\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reloadApp(t, &app)
+	if app.documentSnapshot != nil || app.tab().doc.Content != "Current workspace document\n" || app.sourcePath("missing.md") != filepath.Join(cwd, "missing.md") {
+		t.Fatal("reload did not leave the saved snapshot for the current workspace")
+	}
+}
+
+func TestResumedCodeShowsSnapshotOutsideCurrentChanges(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	sess, err := review.NewSession("", review.SessionEntry{CWD: t.TempDir(), Mode: "git"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.SetFileComments("old.go", "modified", []review.Comment{{ID: "c_old", Scope: "file", Body: "Keep original discussion"}})
+	sess.SetFileComments("plain.go", "modified", nil)
+	sess.CJ.RoundState.Files = map[string]review.SnapshotFile{
+		"old.go": {Content: "Saved source content\n"}, "plain.go": {Content: "Snapshot without comments\n"},
+	}
+	if err := sess.Save(); err != nil {
+		t.Fatal(err)
+	}
+	app := NewCodeReviewApp(nil, "HEAD", AppConfig{Session: sess})
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: 25})
+	app, _ = updateApp(app, app.loadDocuments()())
+	content := ansi.Strip(app.contentViewport.GetContent())
+	if app.err != nil || !strings.Contains(content, "outside current changes") || !strings.Contains(content, "Saved source content") || !strings.Contains(content, "Keep original discussion") {
+		t.Fatalf("old review context unavailable: %v, %s", app.err, content)
+	}
+	if len(app.tabs) != 2 || app.tabs[1].doc.Content != "Snapshot without comments\n" {
+		t.Fatal("empty current scope lost unannotated saved source")
+	}
+}
 
 func TestReplacedAttachmentHistory(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

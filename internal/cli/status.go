@@ -93,6 +93,8 @@ func listReviewSessions() error {
 	}
 	for i := range result {
 		result[i].GitCommonDir = ""
+		result[i].Workdir = ""
+		result[i].HeadRef = ""
 	}
 	return printJSON(os.Stdout, result)
 }

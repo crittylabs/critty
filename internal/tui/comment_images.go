@@ -23,8 +23,8 @@ func (m AppModel) commentImagePath(destination string) (string, bool) {
 		return "", false
 	}
 	if m.session != nil {
-		if m.session.Meta.CWD != "" {
-			cwd = m.session.Meta.CWD
+		if m.session.Meta.WorkingDirectory() != "" {
+			cwd = m.session.Meta.WorkingDirectory()
 		}
 		u, err := url.Parse(destination)
 		if err == nil && strings.HasPrefix(u.Path, "attachments/") {
