@@ -13,6 +13,10 @@
 - Copying a reference shows a muted cyan confirmation for two seconds, then restores the footer hints.
 - The Files tab highlights the current file across the full row with a soft gray background, including while scrolling long filenames or reading in the content pane.
 
+### Fixed
+
+- Keyboard Help hides its scroll controls when all shortcuts fit the window, including the shorter list in `critty view`.
+
 ## 1.5.1
 
 ### Added
