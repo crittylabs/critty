@@ -283,7 +283,7 @@ func findNonEmpty(re *regexp.Regexp, s string) [][]int {
 // cannot leave its file, so selecting confines the search to the origin.
 func (m *AppModel) isearchAllFiles() bool {
 	s := &m.isearch
-	return s.allFiles && !m.tabs[s.originTab].selecting
+	return s.allFiles && len(m.tabs) > 1 && !m.tabs[s.originTab].selecting
 }
 
 // isearchMatches lists every match in display order: in the origin tab, or

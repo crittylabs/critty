@@ -363,7 +363,7 @@ func TestISearchMouseControls(t *testing.T) {
 		app = typeSearch(app, "alpha")
 		app = clickISearchAction(t, app, isearchCaseFold)
 		app = clickISearchAction(t, app, isearchFiles)
-		if !app.isearch.caseFold || !app.isearch.allFiles {
+		if !app.isearch.caseFold || app.isearch.allFiles {
 			t.Fatal("search option buttons did not toggle their modes")
 		}
 		app = pressAltKey(app, 's')
@@ -490,8 +490,6 @@ func TestISearchAcrossFiles(t *testing.T) {
 	prompt := func() string { return ansi.Strip(app.renderFooter()) }
 
 	app = ctrlKey(app, 's')
-	app = pressAltKey(app, 's')
-	app = typeSearch(app, "m")
 	app = typeSearch(app, "three")
 	assertTabCursor(t, app, 0, 3)
 	if p := prompt(); !strings.HasPrefix(p, "Regexp multi-file I-search: three") || !strings.Contains(p, "(1/3, file 1/3)") {
@@ -541,7 +539,6 @@ func TestISearchAcrossFiles(t *testing.T) {
 
 func TestISearchAcrossFilesStartsInLaterFile(t *testing.T) {
 	app := newCommentNavigationTestApp()
-	app.isearch.allFiles = true
 	app.tab().cursorLine = 4
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "two")
@@ -555,7 +552,6 @@ func TestISearchAcrossFilesStartsInLaterFile(t *testing.T) {
 func TestISearchSelectionStaysInFile(t *testing.T) {
 	app := newCommentNavigationTestApp()
 	app.width = 120
-	app.isearch.allFiles = true
 	app = pressKey(app, 'v')
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "four")

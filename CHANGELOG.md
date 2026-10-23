@@ -13,6 +13,7 @@
 
 ### Changed
 
+- Incremental search covers all review files by default.  Use `M-s m` or the Files button to search only the current file; the choice lasts for the current run.  Selecting lines confines search to their file.
 - Send comments or reject a review without warnings or extra confirmation for unanswered form items and unresolved threads.  Progress counters remain visible; approval keeps its completion checks and confirmations.
 - Copying a reference shows a muted cyan confirmation for two seconds, then restores the footer hints.
 - The Files tab highlights the current file across the full row with a soft gray background, including while scrolling long filenames or reading in the content pane.

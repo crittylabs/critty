@@ -317,6 +317,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 
 	m := AppModel{
 		readOnly:         cfg.ReadOnly,
+		isearch:          isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
 		project:          cfg.Project,
@@ -410,6 +411,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 
 	m := AppModel{
 		readOnly:        cfg.ReadOnly,
+		isearch:         isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
 		project:         cfg.Project,
