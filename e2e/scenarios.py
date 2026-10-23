@@ -337,6 +337,7 @@ def project_sessions() -> None:
         ["sessions", "resume", first.session],
         cwd=project,
     )
+    tmux("resize-pane", "-t", resumed.pane, "-x", "100")
     resumed.wait_screen(
         "Saved worktree content", "saved plan restored after source removal"
     )
@@ -359,6 +360,7 @@ def project_sessions() -> None:
         ["sessions", "resume", code.session, "--focus", "code.txt"],
         cwd=project,
     )
+    tmux("resize-pane", "-t", resumed_code.pane, "-x", "100")
     resumed_code.wait_screen(
         "Completely unrelated replacement", "Git review reads current checkout"
     )
@@ -375,6 +377,7 @@ def project_sessions() -> None:
         ["sessions", "resume", document.session],
         cwd=project,
     )
+    tmux("resize-pane", "-t", resumed_doc.pane, "-x", "100")
     resumed_doc.wait_screen(
         "Saved standalone document", "missing document uses saved source"
     )
@@ -393,6 +396,7 @@ def project_sessions() -> None:
         ["plan", "--session", first.session, "updated.md"],
         cwd=project,
     )
+    tmux("resize-pane", "-t", updated.pane, "-x", "100")
     updated.wait_screen("Caller revision content", "plan revision read from caller")
     assert updated.session == first.session
     updated.keys("q", "c", "Enter")
@@ -402,6 +406,7 @@ def project_sessions() -> None:
     relocated = Round(
         "project-plan-another", ["sessions", "resume", first.session], cwd=another
     )
+    tmux("resize-pane", "-t", relocated.pane, "-x", "100")
     relocated.wait_screen(
         "Caller revision content", "another worktree reuses the saved plan"
     )
@@ -673,7 +678,10 @@ def scenarios() -> None:
             'Before `sample` after.\nLink: [long label](https://example.org/a_(b) "title")\n'
         )
         copying = Round("copy-text", ["copy-text.md"])
-        copying.wait_screen("sample", "inline code rendered for copying")
+        tmux("resize-pane", "-t", copying.pane, "-x", "100")
+        copying.wait_screen(
+            "Before  sample  after.", "inline code rendered for copying"
+        )
         y, row = next(
             (y, row)
             for y, row in enumerate(copying.screen().splitlines(), 1)
@@ -834,6 +842,7 @@ def scenarios() -> None:
             "diff-resumed", ["sessions", "resume", formats.session, f"--diff={patch}"]
         )
         assert continued.session == formats.session
+        tmux("resize-pane", "-t", continued.pane, "-x", "100")
         continued.wait_screen(
             "updated call", "replacement diff restored in same session"
         )
