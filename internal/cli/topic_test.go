@@ -110,7 +110,7 @@ func TestHeaderLabelsSurviveSessionReload(t *testing.T) {
 }
 
 func TestApplyHeaderFlags(t *testing.T) {
-	for _, cmd := range []*cobra.Command{rootCmd, reviewCmd, planCmd} {
+	for _, cmd := range []*cobra.Command{rootCmd, reviewCmd, resumeCmd, planCmd} {
 		for _, value := range []string{"Display name", ""} {
 			t.Run(cmd.Name()+"/"+value, func(t *testing.T) {
 				oldProject, oldTopic := reviewProjectName, reviewTopic

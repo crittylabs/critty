@@ -1,7 +1,7 @@
 ---
 name: critty
 description: Review code changes or a document with Critty's terminal UI and address the reviewer's inline comments round by round. Use when the user or an approval workflow selects Critty; a generic review request does not count.
-allowed-tools: Bash(critty review *), Bash(critty plan *), Bash(critty --session *), Bash(critty stop --session *), Bash(critty comment *), Bash(critty comments *), Bash(critty status *), Bash(critty terminal prepare), Read, Grep, Glob
+allowed-tools: Bash(critty review *), Bash(critty plan *), Bash(critty sessions resume *), Bash(critty sessions stop *), Bash(critty comment *), Bash(critty comments *), Bash(critty status *), Bash(critty terminal prepare), Read, Grep, Glob
 argument-hint: "[file]"
 ---
 
@@ -31,7 +31,7 @@ critty review --diff=changes.diff         # supplied diff
 critty review --null --attachment note.md # attachments only
 ```
 
-Start reviews with `critty review`; resume with `critty --session <id>` before any other flags.  The `review` subcommand does not accept `--session`.  Keep dedicated subcommands such as `plan` and `stop`.  These forms match this skill's narrow tool grants; preparation, application, installation, and history maintenance use the host's normal permissions.
+Start reviews with `critty review`; resume with `critty sessions resume <id>`.  The `review` subcommand does not accept `--session`.  Use `critty sessions stop <id>` to stop a review while retaining its saved state.  These forms match this skill's narrow tool grants; preparation, application, installation, and history maintenance use the host's normal permissions.
 
 Use `/critty-cli` for review input syntax, scope restrictions, attachment snapshots, focus and labels, or image support.  Use `/critty-approval` to prepare approval documents, publication drafts, and form decisions.  Retain the selected scope and input paths or diff producer for later rounds.
 
@@ -56,7 +56,7 @@ Critty opens a dedicated pane or tab in the detected multiplexer, falling back t
 - **Automatic resumption:** if a background command's completion notification re-invokes the agent and preserves its output, end the turn after launch.  Collect the original command's result when notified.  A notification that only alerts the user does not qualify.
 - **Bounded waits:** otherwise record one deadline, 10 minutes from the start of the wait by default.  Use the longest blocking wait allowed by the remaining deadline and host responsiveness rules, returning as soon as the command finishes.  Reuse the same handle across yields; collect a yielded outer orchestration call before waiting on the inner handle again.  At the deadline, retain the handle and output and end the turn.  Tell the user to send `hey` after submitting, then collect the original result on their next message.
 
-Collect the original command's result before launching another review.  Wait on command completion, not a fixed sleep or `critty status`: saved sessions remain listed after submission.  Keep waiting inside tools instead of short polls or repeated reasoning.  While waiting, keep reviewed files unchanged, perform no other work, and repeat waiting notices only when required by the host.  Elapsed time is neither cancellation nor approval.  On task cancellation or replacement, stop the specific session with `critty stop --session <id>` and collect its result; preserve saved state.
+Collect the original command's result before launching another review.  Wait on command completion, not a fixed sleep or `critty status`: saved sessions remain listed after submission.  Keep waiting inside tools instead of short polls or repeated reasoning.  While waiting, keep reviewed files unchanged, perform no other work, and repeat waiting notices only when required by the host.  Elapsed time is neither cancellation nor approval.  On task cancellation or replacement, stop the specific session with `critty sessions stop <id>` and collect its result; preserve saved state.
 
 ## Step 3: Handle the result
 
@@ -108,13 +108,13 @@ Refresh the input selected by the session and verify that it includes the reques
 
 | Review input | Refresh and continuation |
 | --- | --- |
-| Working tree or single document | Save revised files, then use `critty --session <id>`. |
+| Working tree or single document | Save revised files, then use `critty sessions resume <id>`. |
 | Staged changes | Stage only revised changes belonging to this review, preserving unrelated edits.  Inspect the staged diff, then resume the session. |
 | Committed comparison | Arrange needed commits or ref updates through the caller's authorized workflow and check the comparison before resuming.  Working-tree edits alone do not update it. |
 | Versioned plan | Use `critty plan --session <id> <file>` (stdin also works). |
-| Supplied diff | Regenerate with the original producer, then use `critty --session <id> --diff=changes.diff` or pipe to `critty --session <id> --diff`. |
+| Supplied diff | Regenerate with the original producer, then use `critty sessions resume <id> --diff=changes.diff` or pipe to `critty sessions resume <id> --diff`. |
 | Attached documents | Add the complete ordered `--attachment` list again to replace saved snapshots; retain any form result option required by `/critty-approval`. |
 
-`critty --session <id>` reuses saved plans, diffs, and attachments.  Retain the ID: omitting it creates another review.  Reopen from the original directory after submitted feedback, or after explicit chat instructions to resume an interruption.  For supplied diffs with incomplete context, check drifted comments against their anchors.
+`critty sessions resume <id>` reuses saved plans, diffs, and attachments.  Retain the ID to continue the same review.  Reopen from the original directory after submitted feedback, or after explicit chat instructions to resume an interruption.  For supplied diffs with incomplete context, check drifted comments against their anchors.
 
 Repeat Step 2, including a fresh Codex marker, then handle the next result.  Continue until approved or the user cancels or replaces the task.

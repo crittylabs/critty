@@ -252,7 +252,7 @@ func init() {
 		return store.Validate(reviewTask)
 	}
 	rootCmd.AddCommand(newHistoryCommand())
-	for _, command := range []*cobra.Command{rootCmd, reviewCmd, planCmd} {
+	for _, command := range []*cobra.Command{rootCmd, reviewCmd, resumeCmd, planCmd} {
 		command.Flags().StringVar(&reviewTask, "task", "", "associate this review with a history task ID")
 	}
 }

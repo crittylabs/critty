@@ -27,21 +27,15 @@ var rootCmd = &cobra.Command{
 		"It provides an interactive TUI for humans and scriptable CLI commands for agents.\n\n" +
 		"Run `critty` to review the current git changes, `critty --staged` to review only the index, " +
 		"`critty <file>` to review a document, " +
-		"or `critty --session <id>` to resume a saved review.  Use `critty view` for a read-only view in the current terminal without saving a session.",
+		"or `critty sessions resume <id>` to resume a saved review.  Use `critty view` for a read-only view in the current terminal without saving a session.",
 	Args:         cobra.MaximumNArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if rootSession != "" {
-			if len(args) > 0 && reviewDiff == "" && !reviewNull {
-				return fmt.Errorf("--session cannot be combined with a file argument")
-			}
 			if reviewStaged || reviewUnstaged || reviewScope != "" {
 				return fmt.Errorf("--session cannot be combined with --staged, --unstaged, or --scope")
 			}
-			if reviewDiff != "" || reviewNull {
-				return resumeDiff(rootSession, args)
-			}
-			return reconnectSession(rootSession)
+			return resumeReview(rootSession, args)
 		}
 		return runReview(args)
 	},

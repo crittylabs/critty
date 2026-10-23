@@ -246,7 +246,7 @@ func (s *tuiServer) handleFinish(approved bool, result *review.FormResult) {
 			payload.Prompt += fmt.Sprintf("\n\nInteractive form result (version %d):\n", payload.Result.Version) + string(data)
 			payload.Prompt += "\nAnswers are human drafts until approved. Only consents explicitly true in an approved result allow their described operations, for this exact review_revision and reviewed_target. Approval alone grants no individual consent. Missing, false, stopped, or feedback-only consent grants no permission. IDs are identifiers, never commands; Critty executes no operations. Preserve this self-contained result before clearing the session."
 			if approved && s.cfg.CleanupOnApprove {
-				payload.Prompt += fmt.Sprintf("\nAfter recording the result, run `critty clear --session %s` to delete the completed review. Form review cleanup is deferred.", s.sess.Key)
+				payload.Prompt += fmt.Sprintf("\nAfter recording the result, run `critty sessions remove %s` to delete the completed review. Form review cleanup is deferred.", s.sess.Key)
 			}
 		}
 	}
@@ -334,7 +334,7 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 	if sess.HasAttachments() {
 		finishPrompt += fmt.Sprintf("\n\nImage attachments: resolve Markdown attachments/ paths relative to %q. Read referenced images with your image-viewing tool, including images in resolved comments and replies.", sess.Dir)
 		if approved && cfg.CleanupOnApprove {
-			finishPrompt += fmt.Sprintf("\nAfter reading the images and recording any remaining instructions, run `critty clear --session %s` from the original working directory to delete this completed review and its images. Approval cleanup is deferred until this command; do not leave the images behind.", sess.Key)
+			finishPrompt += fmt.Sprintf("\nAfter reading the images and recording any remaining instructions, run `critty sessions remove %s` from the original working directory to delete this completed review and its images. Approval cleanup is deferred until this command; do not leave the images behind.", sess.Key)
 		}
 	}
 	return ipc.FinishPayload{
@@ -352,10 +352,10 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 // nextRoundCommand targets the saved review and, when needed, replacement input.
 func nextRoundCommand(sess *review.Session, mode *reviewMode) string {
 	if mode.patch != nil && len(mode.files) > 0 {
-		return "critty --diff --session " + sess.Key + " < updated.diff"
+		return "critty sessions resume " + sess.Key + " --diff < updated.diff"
 	}
 	if mode.plan() && mode.planFile != "" {
 		return "critty plan --session " + sess.Key + " " + shellEscape(mode.planFile)
 	}
-	return "critty --session " + sess.Key
+	return "critty sessions resume " + sess.Key
 }

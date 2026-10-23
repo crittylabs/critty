@@ -13,7 +13,7 @@ import (
 func TestWatchFlagAndLauncher(t *testing.T) {
 	oldWatch, oldExec := reviewWatch, resolveExec
 	t.Cleanup(func() { reviewWatch, resolveExec = oldWatch, oldExec })
-	for _, cmd := range []*cobra.Command{rootCmd, reviewCmd, viewCmd, planCmd, tuiCmd} {
+	for _, cmd := range []*cobra.Command{rootCmd, reviewCmd, resumeCmd, viewCmd, planCmd, tuiCmd} {
 		flag := cmd.Flags().Lookup("watch")
 		if flag == nil || flag.DefValue != "false" {
 			t.Fatalf("%s: missing default-off --watch", cmd.Name())

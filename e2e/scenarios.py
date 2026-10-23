@@ -673,7 +673,24 @@ def scenarios() -> None:
         assert formats.comments() == saved
         assert not (WORK / "standalone.go").exists()
         formats.finish(False)
-        report("standalone patch format switching preserves old-side comments")
+        patch.write_text(patch.read_text().replace("+new call", "+updated call"))
+        continued = Round(
+            "diff-resumed", ["sessions", "resume", formats.session, f"--diff={patch}"]
+        )
+        assert continued.session == formats.session
+        continued.wait_screen(
+            "updated call", "replacement diff restored in same session"
+        )
+        restored = continued.comments()
+        assert len(restored) == len(saved)
+        for original, current in zip(saved, restored, strict=True):
+            for key in ["id", "body", "path", "side", "start_line", "end_line"]:
+                assert current.get(key) == original.get(key), (key, original, current)
+        continued.keys("q", "c", "Enter")
+        continued.completed(False)
+        report(
+            "standalone patch format switching and resume with replacement diff preserve old-side comments"
+        )
 
         history_task = json.loads(
             cli(
@@ -756,7 +773,7 @@ def scenarios() -> None:
             if session["key"] in task_sessions
         )
         assert cli(
-            "clear", "--session", default_approval.session, check=False
+            "sessions", "remove", default_approval.session, check=False
         ).returncode
         deferred = json.loads(cli("history", "defer", history_task).stdout)
         assert deferred["deferred_until"] and deferred["deferred_update"]
@@ -857,7 +874,7 @@ def scenarios() -> None:
             "radio selections require Submit and send overall feedback with distinct verdicts"
         )
 
-        overall = Round("overall-resumed", ["--session", submission.session])
+        overall = Round("overall-resumed", ["sessions", "resume", submission.session])
         overall.keys("}")
         wait_until(
             lambda: "Overall comments" in overall.screen(),
@@ -888,7 +905,7 @@ def scenarios() -> None:
         draft.keys("q", "y")
         draft.completed(None)
         assert draft.comments() == [], "draft became submitted feedback"
-        resumed_draft = Round("draft-resumed", ["--session", draft.session])
+        resumed_draft = Round("draft-resumed", ["sessions", "resume", draft.session])
         resumed_draft.keys("q")
         wait_until(
             lambda: "Saved draft" in resumed_draft.screen(), "restored overall draft"
@@ -898,7 +915,9 @@ def scenarios() -> None:
         resumed_draft.wait_screen("Updated draft", "updated overall draft")
         cli("stop", "--session", draft.session)
         resumed_draft.completed(None)
-        externally_resumed = Round("draft-after-stop", ["--session", draft.session])
+        externally_resumed = Round(
+            "draft-after-stop", ["sessions", "resume", draft.session]
+        )
         externally_resumed.keys("q")
         wait_until(
             lambda: "Updated draft" in externally_resumed.screen(),
@@ -910,6 +929,10 @@ def scenarios() -> None:
         report("overall comment draft survives Back, stop, and same-session resume")
 
         first = Round("round1", ["plan.md"])
+        listed = json.loads(cli("sessions", "--json").stdout)
+        active = next(item for item in listed if item["key"] == first.session)
+        assert active["running"] and active["status"] == "running", active
+        assert cli("sessions", "remove", first.session, check=False).returncode
         first.comment("Add rollback instructions.")
         comment = first.comments()[0]
         with concurrent.futures.ThreadPoolExecutor() as pool:
@@ -948,7 +971,7 @@ def scenarios() -> None:
         (WORK / "plan.md").write_text(
             "# Release plan\n\nDeploy the application.\nConfirm deployment.\n\nRollback to the previous release if deployment fails.\n"
         )
-        second = Round("round2", ["--session", first.session])
+        second = Round("round2", ["sessions", "resume", first.session])
         assert second.session == first.session
         assert "Rollback" in second.screen(), second.screen()
         second.finish(True)
@@ -960,12 +983,15 @@ def scenarios() -> None:
 
         stopped = Round("stop", ["plan.md"])
         stopped.comment("Preserve this unfinished review.")
-        cli("stop", "--session", stopped.session)
+        cli("sessions", "stop", stopped.session)
         stopped.completed(None)
+        listed = json.loads(cli("sessions", "--json").stdout)
+        inactive = next(item for item in listed if item["key"] == stopped.session)
+        assert not inactive["running"] and inactive["status"] == "stopped", inactive
         assert (
             stopped.result.exists() and "approved: true" not in stopped.err.read_text()
         )
-        resumed = Round("resume", ["--session", stopped.session])
+        resumed = Round("resume", ["sessions", "resume", stopped.session])
         assert resumed.comments()[0]["body"] == "Preserve this unfinished review."
         resumed.keys("]", "R", "y")
         resumed.completed(True)
@@ -1221,7 +1247,7 @@ def scenarios() -> None:
         temporary.finish(False)
         temporary = Round(
             "temporary-tree-approved",
-            ["--session", temporary.session, "--result", frozen["result"]],
+            ["sessions", "resume", temporary.session, "--result", frozen["result"]],
         )
         temporary.finish(True)
         wrong_root = cli(
@@ -1291,7 +1317,7 @@ def scenarios() -> None:
             and "approved: true" not in summary_failure.err.read_text()
         )
         assert directory.exists(), "summary failure cleaned up the review"
-        retry = Round("summary-retry", ["--session", summary_failure.session])
+        retry = Round("summary-retry", ["sessions", "resume", summary_failure.session])
         retry.keys("q", "Enter")
         retry.completed(True)
         assert json.loads(retry.summary.read_text())["round"] == 2

@@ -224,7 +224,7 @@ func TestBuildFinishPayloadUnresolved(t *testing.T) {
 	if len(payload.Comments) != 2 {
 		t.Errorf("expected all comments, got %+v", payload.Comments)
 	}
-	if want := "critty --session " + sess.Key; payload.NextCommand != want {
+	if want := "critty sessions resume " + sess.Key; payload.NextCommand != want {
 		t.Errorf("NextCommand = %q, want %q", payload.NextCommand, want)
 	}
 	for _, want := range []string{

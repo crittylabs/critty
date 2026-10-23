@@ -81,7 +81,7 @@ func TestAttachmentOnlyReview(t *testing.T) {
 				t.Fatal("accepted removed attachments as review targets")
 			}
 			resumed.documents[0].Removed = false
-			if got := nextRoundCommand(sess, resumed); got != "critty --session "+sess.Key {
+			if got := nextRoundCommand(sess, resumed); got != "critty sessions resume "+sess.Key {
 				t.Fatalf("continuation = %q", got)
 			}
 			clearAttachments = true

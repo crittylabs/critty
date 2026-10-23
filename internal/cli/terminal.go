@@ -41,7 +41,7 @@ func init() {
 		},
 	})
 	rootCmd.AddCommand(terminal)
-	for _, cmd := range []*cobra.Command{rootCmd, reviewCmd, planCmd, envCmd} {
+	for _, cmd := range []*cobra.Command{rootCmd, reviewCmd, resumeCmd, planCmd, envCmd} {
 		cmd.Flags().StringVar(&terminalRequest, "terminal-request", "", "locate this review using a prepared terminal marker request")
 	}
 }

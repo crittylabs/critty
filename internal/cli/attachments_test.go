@@ -39,7 +39,7 @@ func TestAttachmentApprovalCleanup(t *testing.T) {
 		if !strings.Contains(payload.Prompt, sess.Dir) || !strings.Contains(payload.Prompt, path) {
 			t.Fatal("missing image context in finish output")
 		}
-		if strings.Contains(payload.Prompt, "critty clear --session "+sess.Key) != approved {
+		if strings.Contains(payload.Prompt, "critty sessions remove "+sess.Key) != approved {
 			t.Fatal("incorrect cleanup instruction")
 		}
 	}
