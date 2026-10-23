@@ -416,7 +416,7 @@ func (w *archiveWriter) session(main *strings.Builder, session *review.Session) 
 		}
 		source := path
 		if !filepath.IsAbs(source) {
-			source = filepath.Join(session.Meta.CWD, source)
+			source = filepath.Join(session.Meta.WorkingDirectory(), source)
 		}
 		if _, attached := w.links[source]; !attached {
 			w.links[source] = snapshotTarget(session.Key, path)
@@ -506,7 +506,7 @@ func (w *archiveWriter) session(main *strings.Builder, session *review.Session) 
 		if ext := strings.ToLower(filepath.Ext(path)); ext == ".md" || ext == ".markdown" {
 			base := filepath.Dir(path)
 			if !filepath.IsAbs(base) {
-				base = filepath.Join(session.Meta.CWD, base)
+				base = filepath.Join(session.Meta.WorkingDirectory(), base)
 			}
 			body, err = w.markdown(body, base, filepath.Dir(target))
 			if err != nil {
@@ -581,7 +581,7 @@ func (w *archiveWriter) answers(main *strings.Builder, session *review.Session, 
 		}
 		main.WriteString("\n")
 		if note != "" {
-			body, err := w.rewriteMarkdown(note, session.Meta.CWD, ".", session.Dir)
+			body, err := w.rewriteMarkdown(note, session.Meta.WorkingDirectory(), ".", session.Dir)
 			if err != nil {
 				return err
 			}
@@ -607,7 +607,7 @@ func (w *archiveWriter) thread(main *strings.Builder, session *review.Session, p
 		main.WriteString(fenced(comment.Anchor))
 	}
 	write := func(body string) error {
-		body, err := w.rewriteMarkdown(body, session.Meta.CWD, ".", session.Dir)
+		body, err := w.rewriteMarkdown(body, session.Meta.WorkingDirectory(), ".", session.Dir)
 		if err != nil {
 			return err
 		}

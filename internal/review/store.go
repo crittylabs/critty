@@ -14,13 +14,24 @@ import (
 
 // Session holds review state with optional disk storage.
 type Session struct {
-	Key       string
-	Dir       string
-	CJ        CritJSON
-	Meta      SessionEntry
-	saved     []byte
-	memory    map[string][]byte
-	memoryDir string
+	Key              string
+	Dir              string
+	CJ               CritJSON
+	Meta             SessionEntry
+	saved            []byte
+	memory           map[string][]byte
+	memoryDir        string
+	workspaceChanged bool
+}
+
+// UseWorkspace explicitly retargets a review while preserving its historical CWD.
+func (s *Session) UseWorkspace(directory, branch string) {
+	s.Meta.Workdir = directory
+	if directory == s.Meta.CWD {
+		s.Meta.Workdir = ""
+	}
+	s.Meta.Branch = branch
+	s.workspaceChanged = true
 }
 
 // NormalizePath cleans a user-supplied file path into the forward-slash
@@ -160,6 +171,15 @@ func (s *Session) saveLocked() error {
 	s.saved = data
 
 	if s.Meta.Key != "" {
+		if !s.workspaceChanged {
+			if fresh, err := ReadSessionEntry(s.Key); err == nil && fresh.CWD == s.Meta.CWD {
+				if fresh.Workdir != s.Meta.Workdir {
+					s.Meta.Args = fresh.Args
+				}
+				s.Meta.Workdir, s.Meta.Branch = fresh.Workdir, fresh.Branch
+				s.Meta.HeadRef = fresh.HeadRef
+			}
+		}
 		if s.Meta.StartedAt == "" {
 			s.Meta.StartedAt = Now()
 		}
@@ -167,6 +187,7 @@ func (s *Session) saveLocked() error {
 		if err := writeSessionEntry(s.Meta); err != nil {
 			return fmt.Errorf("recording session: %w", err)
 		}
+		s.workspaceChanged = false
 	}
 	return nil
 }

@@ -68,16 +68,17 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
-	Context   context.Context
-	ReadOnly  bool
-	Documents []review.AttachedDocument
-	Project   string
-	Topic     string
-	Version   string
-	Session   *review.Session
-	Author    string
-	Split     bool
-	Watch     bool
+	Context          context.Context
+	ReadOnly         bool
+	Documents        []review.AttachedDocument
+	DocumentSnapshot *review.SnapshotFile
+	Project          string
+	Topic            string
+	Version          string
+	Session          *review.Session
+	Author           string
+	Split            bool
+	Watch            bool
 	// Staged reads code-review files and diffs from the Git index.
 	Staged    bool
 	Patch     *gitpkg.Patch
@@ -125,7 +126,8 @@ type AppModel struct {
 	fileSelect fileSelectState
 
 	// Single-file mode (legacy)
-	filePath string
+	filePath         string
+	documentSnapshot *review.SnapshotFile
 
 	// Review session backing all tabs, and the author stamped on new comments.
 	session          *review.Session
@@ -314,26 +316,27 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	}
 
 	m := AppModel{
-		readOnly:        cfg.ReadOnly,
-		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
-		images:          newImageDisplay(),
-		project:         cfg.Project,
-		topic:           cfg.Topic,
-		version:         cfg.Version,
-		filePath:        filePath,
-		tabs:            []FileTab{tab},
-		activeTab:       0,
-		session:         cfg.Session,
-		author:          cfg.Author,
-		answerMode:      cfg.Answers,
-		authorColors:    make(map[string]int),
-		finishCh:        cfg.FinishCh,
-		host:            reviewHost(),
-		initialFocus:    startupLocation(cfg),
-		contentViewport: viewport.New(),
-		commentViewport: viewport.New(),
-		fileTree:        newFileTree(),
-		modalTextarea:   ta,
+		readOnly:         cfg.ReadOnly,
+		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
+		images:           newImageDisplay(),
+		project:          cfg.Project,
+		topic:            cfg.Topic,
+		version:          cfg.Version,
+		filePath:         filePath,
+		documentSnapshot: cfg.DocumentSnapshot,
+		tabs:             []FileTab{tab},
+		activeTab:        0,
+		session:          cfg.Session,
+		author:           cfg.Author,
+		answerMode:       cfg.Answers,
+		authorColors:     make(map[string]int),
+		finishCh:         cfg.FinishCh,
+		host:             reviewHost(),
+		initialFocus:     startupLocation(cfg),
+		contentViewport:  viewport.New(),
+		commentViewport:  viewport.New(),
+		fileTree:         newFileTree(),
+		modalTextarea:    ta,
 	}
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()
@@ -392,9 +395,14 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			present[doc.Path()] = true
 		}
 		for path, file := range cfg.Session.CJ.Files {
-			if !present[path] && len(file.Comments) > 0 {
+			snapshot, hasSnapshot := cfg.Session.CJ.RoundState.Files[path]
+			if !present[path] && (len(file.Comments) > 0 || len(files) == 0 && hasSnapshot && !snapshot.Partial) {
 				tab := newFileTab(path, nil)
 				tab.outsideChanges = true
+				if hasSnapshot && !snapshot.Partial {
+					tab.doc = document.FromContent(path, []byte(snapshot.Content))
+					tab.ensureHighlightCache()
+				}
 				tabs = append(tabs, tab)
 			}
 		}
@@ -483,6 +491,9 @@ func (m AppModel) loadDocuments() tea.Cmd {
 }
 
 func (m AppModel) loadDocument(path string) (*document.Document, error) {
+	if path == m.filePath && m.documentSnapshot != nil {
+		return document.FromContent(path, []byte(m.documentSnapshot.Content)), nil
+	}
 	if path == overallCommentsPath {
 		return overallCommentsDocument(), nil
 	}

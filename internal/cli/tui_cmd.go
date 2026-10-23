@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"github.com/crittylabs/critty/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,9 @@ var tuiCmd = &cobra.Command{
 		sess, mode, err := loadReviewSession(tuiSession)
 		if err != nil {
 			return err
+		}
+		if mode.source != nil && mode.source.Scope != "range" && mode.expectedBranch != "" && mode.expectedBranch != sess.Meta.Branch {
+			return fmt.Errorf("review branch changed during launch; resume again")
 		}
 		if err := resolveFocus(mode); err != nil {
 			return err

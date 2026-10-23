@@ -60,3 +60,43 @@ func TestRecordSessionProjectPreservesReviewAndMetadata(t *testing.T) {
 		t.Fatalf("later save erased project identity: %+v, %v", entry, err)
 	}
 }
+
+func TestConcurrentCommentSaveKeepsActiveWorkspace(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	sess, err := NewSession("", SessionEntry{CWD: t.TempDir(), Branch: "old"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sess.Save(); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := ReadSessionEntry(sess.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commenter, err := OpenSessionFromEntry(*entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := t.TempDir()
+	sess.UseWorkspace(workspace, "main")
+	if err := sess.Save(); err != nil {
+		t.Fatal(err)
+	}
+	commenter.CJ.ReviewComments = []Comment{{ID: "r_new", Body: "Retain concurrent feedback"}}
+	if err := commenter.Save(); err != nil {
+		t.Fatal(err)
+	}
+	entry, err = ReadSessionEntry(sess.Key)
+	if err != nil || entry.CWD != sess.Meta.CWD || entry.Workdir != workspace || entry.Branch != "main" {
+		t.Fatalf("stale commenter reset workspace: %+v, %v", entry, err)
+	}
+	sess.UseWorkspace(sess.Meta.CWD, "old")
+	if err := sess.Save(); err != nil {
+		t.Fatal(err)
+	}
+	entry, err = ReadSessionEntry(sess.Key)
+	if err != nil || entry.Workdir != "" || entry.Branch != "old" || len(sess.CJ.ReviewComments) != 1 {
+		t.Fatalf("return to the original workspace lost state: %+v, %v", entry, err)
+	}
+}

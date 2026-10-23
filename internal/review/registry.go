@@ -21,12 +21,22 @@ type SessionEntry struct {
 	PlanSlug     string   `json:"plan_slug,omitempty"`
 	Key          string   `json:"key"`
 	CWD          string   `json:"cwd"`
+	Workdir      string   `json:"workdir,omitempty"`
+	HeadRef      string   `json:"head_ref,omitempty"`
 	Args         []string `json:"args,omitempty"`
 	Branch       string   `json:"branch,omitempty"`
 	ReviewPath   string   `json:"review_path"`
 	StartedAt    string   `json:"started_at"`
 	PID          int      `json:"pid,omitempty"`
 	SocketPath   string   `json:"socket_path,omitempty"`
+}
+
+// WorkingDirectory is the active workspace; CWD remains the historical owner.
+func (e SessionEntry) WorkingDirectory() string {
+	if e.Workdir != "" {
+		return e.Workdir
+	}
+	return e.CWD
 }
 
 // SocketPathFor returns the Unix socket path for a session key.

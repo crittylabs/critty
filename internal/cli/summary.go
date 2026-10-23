@@ -20,6 +20,7 @@ type finishSummary struct {
 	Session       string                 `json:"session"`
 	Round         int                    `json:"round"`
 	CWD           string                 `json:"cwd"`
+	Workdir       string                 `json:"workdir,omitempty"`
 	ImageBase     string                 `json:"image_base"`
 	Verdict       review.Verdict         `json:"verdict"`
 	Approved      bool                   `json:"approved"`
@@ -74,7 +75,7 @@ func writeFinishSummary(payload *ipc.FinishPayload, sess *review.Session) error 
 	}
 	return review.WriteJSON(summaryPath, finishSummary{
 		Version: 1, Session: sess.Key, Round: payload.Round,
-		CWD: sess.Meta.CWD, ImageBase: sess.Dir,
+		CWD: sess.Meta.CWD, Workdir: sess.Meta.Workdir, ImageBase: sess.Dir,
 		Verdict: payload.Verdict, Approved: payload.Approved,
 		ReviewComment: payload.ReviewComment, Comments: comments,
 		Attachments: attachments, NextCommand: payload.NextCommand,

@@ -61,7 +61,7 @@ func (m *AppModel) focusStartupLocation() {
 
 func (m *AppModel) sourcePath(path string) string {
 	if !filepath.IsAbs(path) && m.session != nil {
-		path = filepath.Join(m.session.Meta.CWD, path)
+		path = filepath.Join(m.session.Meta.WorkingDirectory(), path)
 	}
 	abs, err := filepath.Abs(path)
 	if err != nil {

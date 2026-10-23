@@ -23,7 +23,8 @@ func TestCommentImagesPathsAndReplies(t *testing.T) {
 	app := setupAppWithDoc(t, "source\n")
 	app.images.enabled = true
 	app.session = &review.Session{Dir: sessionDir}
-	app.session.Meta.CWD = cwd
+	app.session.Meta.CWD = filepath.Join(t.TempDir(), "removed-worktree")
+	app.session.Meta.Workdir = cwd
 	attachment, err := app.session.SaveAttachment(previewPNG(t, 4, 8))
 	if err != nil {
 		t.Fatal(err)

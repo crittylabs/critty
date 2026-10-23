@@ -104,7 +104,7 @@ func (m *AppModel) refreshPathInfo() {
 		return
 	}
 	value := m.modalTextarea.Value()
-	cwd := m.session.Meta.CWD
+	cwd := m.session.Meta.WorkingDirectory()
 	if m.pathInfo.checked && m.pathInfo.value == value && m.pathInfo.cwd == cwd {
 		return
 	}

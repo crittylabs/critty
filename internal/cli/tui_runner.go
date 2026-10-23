@@ -38,22 +38,23 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	defer cancel()
 	finishCh := make(chan tui.FinishEvent, 4)
 	appCfg := tui.AppConfig{
-		Context:   ctx,
-		Watch:     reviewWatch,
-		Documents: documents.Documents,
-		Answers:   documents.Answers,
-		Project:   reviewProjectLabel(cfg.ProjectRoot, sess),
-		Topic:     reviewTopicLabel(sess, mode),
-		Version:   versionString(),
-		Session:   sess,
-		Author:    cfg.Author,
-		Split:     cfg.Split,
-		Staged:    mode.staged,
-		Source:    mode.source,
-		FinishCh:  finishCh,
-		Patch:     mode.patch,
-		FocusPath: mode.focusPath,
-		FocusLine: mode.focusLine,
+		Context:          ctx,
+		Watch:            reviewWatch,
+		Documents:        documents.Documents,
+		DocumentSnapshot: mode.documentSnapshot,
+		Answers:          documents.Answers,
+		Project:          reviewProjectLabel(cfg.ProjectRoot, sess),
+		Topic:            reviewTopicLabel(sess, mode),
+		Version:          versionString(),
+		Session:          sess,
+		Author:           cfg.Author,
+		Split:            cfg.Split,
+		Staged:           mode.staged,
+		Source:           mode.source,
+		FinishCh:         finishCh,
+		Patch:            mode.patch,
+		FocusPath:        mode.focusPath,
+		FocusLine:        mode.focusLine,
 	}
 
 	var model tui.AppModel
@@ -357,7 +358,7 @@ func nextRoundCommand(sess *review.Session, mode *reviewMode) string {
 	if mode.plan() && mode.planFile != "" {
 		path := mode.planFile
 		if !filepath.IsAbs(path) {
-			path = filepath.Join(sess.Meta.CWD, path)
+			path = filepath.Join(sess.Meta.WorkingDirectory(), path)
 		}
 		return "critty plan --session " + sess.Key + " " + shellEscape(path)
 	}

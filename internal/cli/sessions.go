@@ -36,8 +36,8 @@ or --json for structured output.  Sessions are grouped by project, with running
 reviews first in each group, then newest first.  Use --sort time for newest-first
 order across projects, without prioritizing running reviews.  STARTED shows the
 session's start time in your local timezone, including its UTC offset.
-Resume with critty sessions resume <id>; Critty
-automatically uses the session's saved working directory.`,
+Resume with critty sessions resume <id>.  Within the same Git project, Critty
+uses your current checkout, even if the original worktree has been removed.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if sortOrder != "project" && sortOrder != "time" {

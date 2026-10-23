@@ -60,7 +60,7 @@ Collect the original command's result before launching another review.  Wait on 
 
 ## Step 3: Handle the result
 
-After successful completion, read the summary's verdict, all comments and replies, attachment identities, and image base, and any additional instructions in the saved finish output.  Verify its session and round against the invocation.  For attachments, reuse a previously read body only when its full contents remain verbatim in the current context and its content hash matches the current summary's revision.  Read it again if the hash is missing or changed, the body is no longer available, or feedback requires it.
+After successful completion, read the summary's verdict, all comments and replies, attachment identities, and image base, and any additional instructions in the saved finish output.  Verify its session and round against the invocation.  The active source directory is `workdir` when present, otherwise `cwd`; `cwd` retains the creation directory for history.  For attachments, reuse a previously read body only when its full contents remain verbatim in the current context and its content hash matches the current summary's revision.  Read it again if the hash is missing or changed, the body is no longer available, or feedback requires it.
 
 | Outcome | Action |
 | --- | --- |
@@ -115,6 +115,6 @@ Refresh the input selected by the session and verify that it includes the reques
 | Supplied diff | Regenerate with the original producer, then use `critty sessions resume <id> --diff=changes.diff` or pipe to `critty sessions resume <id> --diff`. |
 | Attached documents | Add the complete ordered `--attachment` list again to replace saved snapshots; retain any form result option required by `/critty-approval`. |
 
-`critty sessions resume <id>` reuses saved plans, diffs, and attachments.  Retain the ID to continue the same review.  Resume by ID after submitted feedback, or after explicit chat instructions to resume an interruption.  Critty restores the saved working directory automatically.  For supplied diffs with incomplete context, check drifted comments against their anchors.
+`critty sessions resume <id>` reuses saved plans, diffs, and attachments.  Retain the ID to continue the same review.  Resume by ID after submitted feedback, or after explicit chat instructions to resume an interruption.  From a checkout of the same Git project, Critty uses that checkout even after the original worktree is removed.  Git reviews read its selected scope and remap saved comments; missing documents use labeled saved text until Reload can read a replacement.  Outside that project, Critty restores an available saved workspace.  For supplied diffs with incomplete context, check drifted comments against their anchors.
 
 Repeat Step 2, including a fresh Codex marker, then handle the next result.  Continue until approved or the user cancels or replaces the task.
