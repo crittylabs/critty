@@ -356,6 +356,9 @@ func (m AppModel) finishAttentionColor() color.Color {
 }
 
 func (m AppModel) finishNotices(width int) string {
+	if m.finishVerdict != review.VerdictApprove {
+		return ""
+	}
 	var notices []string
 	if m.unresolvedTotal() > 0 {
 		notices = append(notices, "Unresolved threads remain.")

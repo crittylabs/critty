@@ -60,3 +60,5 @@ Until the reviewer moves an item or confirms the order, the answer stays `null`.
 Changed field definitions, including an item's visible wording, reset their answers.  Put clarifications in surrounding prose or comment replies to preserve the field.  Changed target snapshots or attachment contents, order, or membership reset every `required` or `consent` field, including required choices and text fields.  Ordinary explicit-ID answers survive unchanged definitions in the same attachment, whose identity comes from its absolute source path; renaming or moving that file loses its answers.  A previous select-all does not select newly added candidates; leave their source checkboxes unchecked.
 
 An answer is human only when `human` is `true`; initial values carry no human provenance.
+
+Pending-item warnings and confirmation for unviewed unanswered fields apply only to approval.  Comment and reject submissions return feedback and any answers immediately, even with required fields unanswered or threads unresolved.  Progress counters remain visible for every verdict; these submissions grant no consent.

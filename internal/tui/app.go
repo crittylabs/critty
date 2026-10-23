@@ -2134,7 +2134,7 @@ func (m *AppModel) doFinish() (tea.Model, tea.Cmd) {
 		}
 	}
 	m.finishVerdict = verdict
-	if len(m.unviewedForms()) > 0 {
+	if verdict == review.VerdictApprove && len(m.unviewedForms()) > 0 {
 		m.modal, m.modalFocus = finishFormsModal, finishReviewForms
 		m.modalTextarea.Blur()
 		return m, nil

@@ -46,7 +46,11 @@ func TestSubmitAttentionColorsAndNotices(t *testing.T) {
 				if color.RGBAModel.Convert(app.finishAttentionColor()) != color.RGBAModel.Convert(finishColor(verdict)) {
 					t.Fatalf("%s: %s border depends on pending items", state, verdict)
 				}
+				if notice := app.finishNotices(70); notice != "" {
+					t.Fatalf("%s: %s shows pending-item notices: %s", state, verdict, notice)
+				}
 			}
+			app.finishVerdict = review.VerdictApprove
 			notice := ansi.Strip(app.finishNotices(70))
 			if strings.Contains(notice, "Required items") != (state == "required") || strings.Contains(notice, "Unresolved threads") != (state == "threads" || state == "optional-and-threads") || strings.Contains(notice, "Optional items") != (state == "required" || state == "optional" || state == "optional-and-threads") {
 				t.Fatalf("%s: unexpected notices: %s", state, notice)
@@ -168,16 +172,37 @@ func TestFinishFormsReviewAndCancelPreserveDraft(t *testing.T) {
 	}
 }
 
-func TestFinishConfirmsUnviewedOptionalForms(t *testing.T) {
+func TestFinishUnviewedFormsByVerdict(t *testing.T) {
 	content := "# Form\n" + strings.Repeat("filler\n", 40) + "- [ ] Extra <!-- form: id=extra -->\n"
-	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictReject} {
-		for _, action := range []rune{'s', 'r'} {
+	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictComment, review.VerdictReject} {
+		actions := []rune{'s', 'r'}
+		if verdict != review.VerdictApprove {
+			actions = []rune{'s'}
+		}
+		for _, action := range actions {
 			t.Run(fmt.Sprintf("%s/%c", verdict, action), func(t *testing.T) {
-				app, ch := formTestAppWithContent(t, content)
+				document := content
+				if verdict != review.VerdictApprove {
+					document += "- [ ] Confirm <!-- form: id=confirm required -->\n"
+				}
+				app, ch := formTestAppWithContent(t, document)
+				if verdict != review.VerdictApprove {
+					app.tab().state.Comments = []review.Comment{testComment()}
+				}
 				app.openFinishModal()
 				app.modalTextarea.SetValue("Keep this overall comment.")
 				app.finishVerdict = verdict
 				_, cmd := app.doFinish()
+				if verdict != review.VerdictApprove {
+					if !isQuit(cmd) {
+						t.Fatalf("feedback submission asked for confirmation: modal %v, err %v", app.modal, app.err)
+					}
+					event := takeEvent(t, ch)
+					if event.Approved || event.Result.Verdict != verdict || len(event.Result.Consents) != 0 || app.session.CJ.RoundState.ReviewCommentDraft != "Keep this overall comment." {
+						t.Fatalf("unexpected feedback submission: %+v", event)
+					}
+					return
+				}
 				if isQuit(cmd) || app.modal != finishFormsModal || !strings.Contains(ansi.Strip(app.View().Content), "not been viewed") {
 					t.Fatal("unviewed optional item did not ask for confirmation")
 				}
