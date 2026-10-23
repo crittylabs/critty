@@ -9,8 +9,114 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestAttachmentReferences(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("target.md", []byte("one\ntwo\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, body string
+		plain      bool
+	}{
+		{name: "wrapped prose", body: strings.Repeat("日本語 é ", 4) + "@target.md L2 and c_abcdef"},
+		{name: "inline code", body: "See `@target.md L2` and `c_abcdef`"},
+		{name: "explicit link", body: "[c_abcdef](https://example.org) @target.md L2 and c_abcdef"},
+		{name: "table", body: "| File | Comment |\n| --- | --- |\n| @target.md L2 | c_abcdef |"},
+		{name: "form", body: "- [ ] Check @target.md L2 and `c_abcdef` <!-- form: id=check -->"},
+		{name: "plain text", body: "See @target.md L2 and c_abcdef", plain: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, tc.body+"\n")
+			app.tab().isMarkdown = !tc.plain
+			app.tabs[1].doc = document.FromContent("target.md", []byte("one\ntwo\n"))
+			app.tabs[1].state.Comments = []review.Comment{{ID: "c_abcdef", StartLine: 2, EndLine: 2, Body: "target", Resolved: true}}
+			app.width, app.height = 65, 35
+			app.recalculateLayout()
+			app.rebuildContent()
+			attachment := app.activeTab
+			for _, uri := range []string{"critty://source?line=2&path=target.md", "critty://comment?id=c_abcdef"} {
+				app.activeTab = attachment
+				app.focused = contentPane
+				app.rebuildContent()
+				cells, _ := linkCells(app.contentViewport.GetContent(), uri)
+				if len(cells) == 0 {
+					t.Fatalf("no link cells for %s: %q", uri, app.contentViewport.GetContent())
+				}
+				left, top, _, _ := app.contentBounds()
+				point := cells[len(cells)-1]
+				app = clickMouse(app, left+point.X, top+point.Y)
+				if app.activeTab != 1 || app.tab().cursorLine != 2 {
+					t.Fatalf("did not navigate from %s: tab=%d line=%d modal=%v path=%s actual=%q", uri, app.activeTab, app.tab().cursorLine, app.modal, app.sourcePath("target.md"), app.referenceAt(left+point.X, top+point.Y))
+				}
+				if strings.Contains(uri, "comment") && app.selectedCommentID() != "c_abcdef" {
+					t.Fatal("comment reference did not select the resolved thread")
+				}
+			}
+			app.activeTab = attachment
+			app.tab().cursorLine = 1
+			if tc.name == "table" {
+				app.tab().cursorLine = 3
+			}
+			app.focused = contentPane
+			app.rebuildContent()
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+			if app.activeTab != 1 || app.tab().cursorLine != 2 {
+				t.Fatal("M-o did not follow the first reference on the line")
+			}
+		})
+	}
+}
+
+func TestAttachmentReferenceOutsideReview(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("other.go", []byte("one\ntwo\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app, _ := formTestAppWithContent(t, "@other.go L2\n")
+	app.openReferenceAtCursor()
+	if app.modal != openSourceModal || app.pendingLocation.path != "other.go" || app.pendingLocation.line != 2 {
+		t.Fatal("reference outside the review did not offer the source editor")
+	}
+}
+
+func TestAttachmentReferenceSourceRanges(t *testing.T) {
+	t.Chdir(t.TempDir())
+	path := "日本 file_(x).go"
+	if err := os.WriteFile(path, []byte("source\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ref := "@" + escapeReferencePath(path) + " L1"
+	app, _ := formTestAppWithContent(t, "before `"+ref+"` after @missing.go c_000000\n")
+	spans := app.documentLinkSpans(1, false)
+	if len(spans) != 1 {
+		t.Fatalf("spans=%+v", spans)
+	}
+	location, ok := sourceLink(spans[0].uri)
+	if !ok || location.path != path || location.line != 1 {
+		t.Fatalf("location=%+v", location)
+	}
+	canvas := lipgloss.NewCanvas(100, 10)
+	canvas.Compose(lipgloss.NewLayer(app.contentViewport.GetContent()))
+	var label strings.Builder
+	for y := range 10 {
+		for x := range 100 {
+			cell := canvas.CellAt(x, y)
+			if cell != nil && cell.Link.URL != "" {
+				if cell.Link.URL != spans[0].uri {
+					t.Fatalf("unexpected link: %s", cell.Link.URL)
+				}
+				label.WriteString(cell.Content)
+			}
+		}
+	}
+	if label.String() != ref {
+		t.Fatalf("linked text=%q, want %q", label.String(), ref)
+	}
+}
 
 func TestCopyReferenceAndYank(t *testing.T) {
 	app := setupAppWithDoc(t, "one\ntwo\n")

@@ -280,14 +280,14 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	}
 }
 
-func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, images []linkSpan) string {
-	cacheable := len(inline) == 0 && len(images) == 0
+func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
+	cacheable := len(inline) == 0 && len(links) == 0
 	if cacheable && line.renderedSet && line.renderedDark == terminalIsDark {
 		return line.rendered
 	}
 	var b strings.Builder
 	segmentIndex, segmentStart := 0, 0
-	for _, token := range line.tokens {
+	for _, token := range linkedMarkdownTokens(line.tokens, links) {
 		if token.text == "" {
 			continue
 		}
@@ -305,11 +305,6 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			style = mdCodeStyle.Inherit(style)
 		}
 		uri := token.uri
-		for _, image := range images {
-			if token.start < image.end && token.end > image.start {
-				uri = image.uri
-			}
-		}
 		write := func(value string, background lipgloss.Style) {
 			tokenStyle := style
 			if len(inline) > 0 {
@@ -354,6 +349,48 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 	}
 	if cacheable {
 		line.rendered, line.renderedDark, line.renderedSet = result, terminalIsDark, true
+	}
+	return result
+}
+
+// Split unchanged source tokens at link boundaries before applying styles.
+// Parser replacements (entities and escapes) retain their source range.
+func linkedMarkdownTokens(tokens []markdownToken, links []linkSpan) []markdownToken {
+	if len(links) == 0 {
+		return tokens
+	}
+	var result []markdownToken
+	for _, token := range tokens {
+		cuts := []int{token.start, token.end}
+		if len(token.text) == token.end-token.start {
+			for _, link := range links {
+				for _, boundary := range []int{link.start, link.end} {
+					if boundary > token.start && boundary < token.end {
+						cuts = append(cuts, boundary)
+					}
+				}
+			}
+		}
+		slices.Sort(cuts)
+		cuts = slices.Compact(cuts)
+		for i := 1; i < len(cuts); i++ {
+			part := token
+			part.start, part.end = cuts[i-1], cuts[i]
+			if len(token.text) == token.end-token.start {
+				part.text = token.text[part.start-token.start : part.end-token.start]
+			}
+			for _, link := range links {
+				if part.start >= link.start && part.end <= link.end {
+					// Keep explicit Markdown destinations; image previews still
+					// replace their outer link as before.
+					if part.uri == "" || strings.HasPrefix(link.uri, "critty://image?") {
+						part.uri = link.uri
+						part.style |= markdownLink
+					}
+				}
+			}
+			result = append(result, part)
+		}
 	}
 	return result
 }

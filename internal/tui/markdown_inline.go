@@ -10,6 +10,10 @@ import (
 )
 
 func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) string {
+	return highlightInlineReferences(line, linkStyle, codeStyle, nil)
+}
+
+func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style, references func(string) string) string {
 	if strings.TrimSpace(line) == "" {
 		return line
 	}
@@ -22,6 +26,13 @@ func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) strin
 	source := []byte(prefix + content)
 	root := parser.New(parser.WithExtensions(extension.LinkifyParser)).Parse(source)
 	var render func(ast.Node, lipgloss.Style) string
+	linkDepth := 0
+	decorate := func(text string) string {
+		if references != nil && linkDepth == 0 {
+			return references(text)
+		}
+		return text
+	}
 	children := func(n ast.Node, style lipgloss.Style) string {
 		var b strings.Builder
 		for child := n.FirstChild(); child != nil; child = child.NextSibling() {
@@ -36,15 +47,18 @@ func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) strin
 			if n.SoftLineBreak() || n.HardLineBreak() {
 				text += "\n"
 			}
-			return style.Render(text)
+			return style.Render(decorate(text))
 		case *ast.CodeSpan:
-			return codeStyle.Inherit(style).Render(" " + n.Value.Str(source) + " ")
+			return codeStyle.Inherit(style).Render(" " + decorate(n.Value.Str(source)) + " ")
 		case *ast.Strong:
 			return children(n, mdBoldStyle.Inherit(style))
 		case *ast.Emphasis:
 			return children(n, mdItalicStyle.Inherit(style))
 		case *ast.Link:
-			return linkedText(n.Destination.Str(source), children(n, linkStyle.Inherit(style)))
+			linkDepth++
+			label := children(n, linkStyle.Inherit(style))
+			linkDepth--
+			return linkedText(n.Destination.Str(source), label)
 		case *ast.AutoLink:
 			return linkedText(n.Destination.Str(source), linkStyle.Inherit(style).Render(n.Label.Str(source)))
 		case *ast.Image:

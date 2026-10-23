@@ -193,6 +193,8 @@ Overrides persist in the session until replaced; an empty value hides the label.
 
 ### Startup focus
 
+Attached documents can refer to review files with `@path L64` (the line is optional) and to comments with their `c_` ID.  File paths resolve from the review's working directory; escape spaces and punctuation with a backslash, as in `@docs/review\ notes.md L64`.  Existing review tabs are selected when they contain the requested line; other existing files offer to open in an editor.  Only unambiguous comment IDs link to threads, including resolved comments.  These references also work in form labels.
+
 `critty review FILE:LINE` starts a document at a line; `--focus PATH[:LINE]` selects an initial file in any review, including resumed sessions.  Paths may be relative or absolute and must belong to the review; plans also accept their original path.  Lines are positive, 1-indexed new-side source coordinates.  Missing files and unavailable lines are rejected; omit the line for binary or deleted files.
 
 Explicit focus applies only to that invocation.  `--focus` wins over a document's line suffix; otherwise later rounds focus the first visible thread, in file and display order, with a new reply from another author.  Scope and tab order remain unchanged.

@@ -3,6 +3,7 @@ package tui
 import (
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -10,13 +11,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 // Match crit's bare @path syntax, also allowing extensionless files and
 // unescaped letters, marks and digits from any script. Only the optional
 // Ldigits suffix has no trailing boundary, so L40に and L40-45 work.
-var fileReferencePattern = regexp.MustCompile(`(^|[\s\p{Z}])@((?:[\p{L}\p{M}\p{N}._/-]|\\[^\r\n])+)(?: +L([0-9]+))?`)
+var fileReferencePattern = regexp.MustCompile(`(^|[\s\p{Z}\x60])@((?:[\p{L}\p{M}\p{N}._/-]|\\[^\r\n])+)(?: +L([0-9]+))?`)
 
 var commentReferencePattern = regexp.MustCompile(`\bc_[a-f0-9]{6,}\b`)
 
@@ -57,16 +57,6 @@ func (m *AppModel) commentReferenceTab(id string) (int, bool) {
 		}
 	}
 	return index, index >= 0
-}
-
-func (m *AppModel) linkCommentReferences(body string) string {
-	return commentReferencePattern.ReplaceAllStringFunc(body, func(id string) string {
-		if _, ok := m.commentReferenceTab(id); !ok {
-			return id
-		}
-		uri := url.URL{Scheme: "critty", Host: "comment", RawQuery: url.Values{"id": {id}}.Encode()}
-		return ansi.SetHyperlink(uri.String()) + "\x1b[4m" + id + "\x1b[24m" + ansi.ResetHyperlink()
-	})
 }
 
 func (m *AppModel) navigateCommentReference(uri string) bool {
@@ -174,6 +164,17 @@ func unescapeReferencePath(path string) string {
 func (m *AppModel) linkFileReferences(body string) string {
 	var out strings.Builder
 	end := 0
+	for _, span := range m.referenceSpans(body) {
+		out.WriteString(body[end:span.start])
+		out.WriteString(linkedText(span.uri, "\x1b[4m"+body[span.start:span.end]+"\x1b[24m"))
+		end = span.end
+	}
+	out.WriteString(body[end:])
+	return out.String()
+}
+
+func (m *AppModel) referenceSpans(body string) []linkSpan {
+	var spans []linkSpan
 	for _, match := range fileReferencePattern.FindAllStringSubmatchIndex(body, -1) {
 		if match[1] < len(body) && body[match[1]] == '\\' {
 			continue // incomplete escape, not a reference to the shorter prefix
@@ -194,19 +195,65 @@ func (m *AppModel) linkFileReferences(body string) string {
 			}
 		}
 		start := match[4] - 1 // include @, preserve the preceding whitespace
-		out.WriteString(m.linkCommentReferences(body[end:start]))
 		uri := url.URL{Scheme: "critty", Host: "source", RawQuery: url.Values{
 			"path": {path}, "line": {strconv.Itoa(line)},
 		}.Encode()}
-		out.WriteString(ansi.SetHyperlink(uri.String()))
-		out.WriteString("\x1b[4m")
-		out.WriteString(body[start:match[1]])
-		out.WriteString("\x1b[24m")
-		out.WriteString(ansi.ResetHyperlink())
-		end = match[1]
+		spans = append(spans, linkSpan{start: start, end: match[1], uri: uri.String()})
 	}
-	out.WriteString(m.linkCommentReferences(body[end:]))
-	return out.String()
+	for _, match := range commentReferencePattern.FindAllStringIndex(body, -1) {
+		id := body[match[0]:match[1]]
+		if _, ok := m.commentReferenceTab(id); !ok {
+			continue
+		}
+		uri := url.URL{Scheme: "critty", Host: "comment", RawQuery: url.Values{"id": {id}}.Encode()}
+		spans = append(spans, linkSpan{start: match[0], end: match[1], uri: uri.String()})
+	}
+	sort.SliceStable(spans, func(i, j int) bool {
+		if spans[i].start == spans[j].start {
+			return spans[i].end > spans[j].end
+		}
+		return spans[i].start < spans[j].start
+	})
+	end := 0
+	result := spans[:0]
+	for _, span := range spans {
+		if span.start >= end {
+			result = append(result, span)
+			end = span.end
+		}
+	}
+	return result
+}
+
+func (m *AppModel) documentLinkSpans(line int, before bool) []linkSpan {
+	spans := m.imageSpans(line, before)
+	t := m.tab()
+	if t.attachment == nil || before || t.doc == nil || !t.doc.HasLine(line) {
+		return spans
+	}
+	for _, ref := range m.referenceSpans(t.doc.Lines[line-1]) {
+		overlaps := false
+		if t.isMarkdown {
+			t.ensureMarkdownCache()
+			for _, token := range t.markdown.after.lines[line-1].tokens {
+				if token.uri != "" && ref.start < token.end && ref.end > token.start {
+					overlaps = true
+					break
+				}
+			}
+		}
+		for _, span := range spans {
+			if ref.start < span.end && ref.end > span.start {
+				overlaps = true
+				break
+			}
+		}
+		if !overlaps {
+			spans = append(spans, ref)
+		}
+	}
+	sort.SliceStable(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
+	return spans
 }
 
 func sourceLink(uri string) (sourceLocation, bool) {
@@ -240,7 +287,7 @@ func (m *AppModel) activateReference(uri string) (tea.Cmd, bool) {
 	if m.navigateCommentReference(uri) {
 		return nil, true
 	}
-	if location, ok := sourceLink(uri); ok && regularFile(m.sourcePath(location.path)) {
+	if location, ok := sourceLink(uri); ok && m.referencePathExists(location.path) {
 		return m.navigateSource(location), true
 	}
 	if cmd, ok := m.openImageLink(uri); ok {

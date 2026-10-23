@@ -341,7 +341,7 @@ func (m *AppModel) rebuildContent() {
 		if len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight {
 			var rows []string
 			if isMarkdown {
-				rows = markdownDisplayRows(t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.imageSpans(lineNum, false)), textWidth, decorate)
+				rows = markdownDisplayRows(t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false)), textWidth, decorate)
 			} else {
 				rows = inlineDiffDisplayLines(inlineChanges, false, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
 			}
@@ -358,7 +358,13 @@ func (m *AppModel) rebuildContent() {
 				styledLine = formatTableSep(tb.colWidths)
 			} else {
 				isHeader := lineNum == tb.startLine
-				styledLine = formatTableRow(line, tb.colWidths, isHeader)
+				if t.attachment != nil {
+					styledLine = formatTableRowWith(line, tb.colWidths, isHeader, func(cell string) string {
+						return m.linkFileReferences(displaySourceText(cell))
+					})
+				} else {
+					styledLine = formatTableRow(displaySourceText(line), tb.colWidths, isHeader)
+				}
 			}
 
 			if isSelected {
@@ -369,7 +375,7 @@ func (m *AppModel) rebuildContent() {
 				styledLine = inlineBackground(diffChangedLineBg, styledLine)
 			}
 
-			wrappedLines := strings.Split(lipgloss.Wrap(highlight(displaySourceText(styledLine)), textWidth, ""), "\n")
+			wrappedLines := strings.Split(lipgloss.Wrap(highlight(styledLine), textWidth, ""), "\n")
 			for wi, wrappedLine := range wrappedLines {
 				if wi == 0 {
 					layout.appendLiteralSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
@@ -413,7 +419,9 @@ func (m *AppModel) rebuildContent() {
 			displayLine := documentDisplayLine(t, i, line)
 
 			if isMarkdown {
-				displayLine = t.markdownDisplayLine(lineNum, false, line, nil, m.imageSpans(lineNum, false))
+				displayLine = t.markdownDisplayLine(lineNum, false, line, nil, m.documentLinkSpans(lineNum, false))
+			} else if t.attachment != nil {
+				displayLine = linkedDisplayLine(line, m.documentLinkSpans(lineNum, false), displaySourceText)
 			}
 			displayLine = highlight(displayLine)
 			if isSelected {
@@ -852,6 +860,10 @@ func parseTableCells(line string) []string {
 }
 
 func formatTableRow(line string, colWidths []int, isHeader bool) string {
+	return formatTableRowWith(line, colWidths, isHeader, func(cell string) string { return cell })
+}
+
+func formatTableRowWith(line string, colWidths []int, isHeader bool, display func(string) string) string {
 	cells := parseTableCells(line)
 	pipe := mdTablePipe.Render("│")
 
@@ -862,7 +874,7 @@ func formatTableRow(line string, colWidths []int, isHeader bool) string {
 		if ci < len(cells) {
 			cell = cells[ci]
 		}
-		padded := lipgloss.NewStyle().Width(w).Render(cell)
+		padded := lipgloss.NewStyle().Width(w).Render(display(cell))
 		if isHeader {
 			parts = append(parts, mdTableHeaderStyle.Render(" "+padded+" "))
 		} else {
