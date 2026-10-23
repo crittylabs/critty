@@ -148,6 +148,10 @@ func (m *AppModel) rebuildContent() {
 	tableBlockMap := make(map[int]*tableBlock)
 	for i := range tableBlocks {
 		tb := &tableBlocks[i]
+		if widths := fitTableWidths(tb.colWidths, textWidth); widths != nil {
+			tb.colWidths = widths
+			tb.wrapCells = true
+		}
 		for l := tb.startLine; l <= tb.endLine; l++ {
 			tableBlockMap[l] = tb
 		}
@@ -344,7 +348,7 @@ func (m *AppModel) rebuildContent() {
 		numStr := numStyle.Render(fmt.Sprintf("%d", lineNum))
 
 		// Check if this line is part of a table block
-		if len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight {
+		if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
 			var rows []string
 			if isMarkdown {
 				rows = markdownDisplayRows(t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false)), textWidth, decorate)
@@ -359,29 +363,52 @@ func (m *AppModel) rebuildContent() {
 				}
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
-			var styledLine string
+			var rows []string
+			var columns [][]tableCellFragment
 			if t.markdown.after.lines[lineNum-1].tableSep {
-				styledLine = formatTableSep(tb.colWidths)
+				rows = []string{formatTableSep(tb.colWidths)}
 			} else {
 				isHeader := lineNum == tb.startLine
-				styledLine = formatTableRow(t.markdownTableCells(lineNum, m.documentLinkSpans(lineNum, false)), tb.colWidths, isHeader)
-			}
-
-			if isSelected {
-				styledLine = inlineBackground(selectedLineBg, styledLine)
-			} else if isSidebarHighlight {
-				styledLine = inlineBackground(sidebarHighlightBg, styledLine)
-			} else if isChanged {
-				styledLine = inlineBackground(diffChangedLineBg, styledLine)
-			}
-
-			wrappedLines := strings.Split(lipgloss.Wrap(highlight(styledLine), textWidth, ""), "\n")
-			for wi, wrappedLine := range wrappedLines {
-				if wi == 0 {
-					layout.appendLiteralSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
+				cells := t.markdownTableCellsWithInline(lineNum, m.documentLinkSpans(lineNum, false), inlineChanges)
+				if tb.wrapCells {
+					m.highlightTableCells(lineRef{line: lineNum}, cells)
+					columns = wrapTableCells(cells, tb.colWidths)
+					for row := range tableRowHeight(columns) {
+						rows = append(rows, formatTableRow(tableRowCells(columns, row), tb.colWidths, isHeader))
+					}
 				} else {
-					layout.appendLiteralSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wrappedLine), lineTarget)
+					rows = []string{formatTableRow(cells, tb.colWidths, isHeader)}
 				}
+			}
+
+			firstRow := len(layout.rows)
+			var wrappedLines []string
+			for _, row := range rows {
+				if isSelected {
+					row = inlineBackground(selectedLineBg, row)
+				} else if isSidebarHighlight {
+					row = inlineBackground(sidebarHighlightBg, row)
+				} else if isChanged && len(inlineChanges) == 0 {
+					row = inlineBackground(diffChangedLineBg, row)
+				}
+				if !tb.wrapCells {
+					row = lipgloss.Wrap(highlight(row), textWidth, "")
+				}
+				wrappedLines = append(wrappedLines, strings.Split(row, "\n")...)
+			}
+			for wi, row := range wrappedLines {
+				prefix := fmt.Sprintf("%s%s ", marker, numStr)
+				if wi > 0 {
+					prefix = fmt.Sprintf(" %s ", continuationGutter)
+				}
+				if columns != nil {
+					layout.appendBlock(&b, prefix+row, lineTarget)
+				} else {
+					layout.appendLiteralSourceBlock(&b, prefix+row, lineTarget)
+				}
+			}
+			if columns != nil {
+				layout.addTableSpans(firstRow, columns, tb.colWidths, &t.markdown.after.lines[lineNum-1], lineTarget)
 			}
 		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
 			if isSelected || isSidebarHighlight {
@@ -808,6 +835,7 @@ type tableBlock struct {
 	startLine int
 	endLine   int
 	colWidths []int
+	wrapCells bool
 }
 
 func detectTableBlocks(lines []markdownLine, renderedCells func(int) []string) []tableBlock {

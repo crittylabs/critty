@@ -18,6 +18,8 @@ type contentTextSpan struct {
 	source            string
 	tableSource       string
 	literal           bool
+	mapped            bool
+	right             int
 }
 
 type textPoint struct{ span, offset int }
@@ -65,6 +67,9 @@ func (m *AppModel) startTextSelection(mouse tea.Mouse) {
 		if row >= 0 && row < len(m.contentLayout.columns) && span.column == 0 && m.contentLayout.columns[row].split > 0 {
 			right = m.contentLayout.columns[row].split
 		}
+		if span.right > 0 {
+			right = span.right
+		}
 		if span.row == row && x >= span.left && x < right {
 			point := textPoint{i, textColumnOffset(span.text, x-span.left)}
 			m.textSelection = contentTextSelection{active: true, dragging: true, tab: m.activeTab,
@@ -87,17 +92,24 @@ func (m *AppModel) updateTextSelection(mouse tea.Mouse, autoScroll bool) {
 	row := min(max(mouse.Y, top), bottom-1) - top + m.contentViewport.YOffset()
 	column := s.spans[s.anchor.span].column
 	best := -1
+	bestRow, bestColumn := int(^uint(0)>>1), int(^uint(0)>>1)
 	for i, span := range s.spans {
 		if span.column != column {
 			continue
 		}
-		if span.row > row {
-			if best < 0 {
-				best = i
-			}
-			break
+		distance := span.row - row
+		if distance < 0 {
+			distance = -distance
 		}
-		best = i
+		x := mouse.X - left
+		right := span.left + ansi.StringWidth(span.text)
+		if span.right > 0 {
+			right = span.right
+		}
+		horizontal := max(span.left-x, x-right, 0)
+		if distance < bestRow || distance == bestRow && horizontal < bestColumn {
+			best, bestRow, bestColumn = i, distance, horizontal
+		}
 	}
 	if best >= 0 {
 		span := s.spans[best]
@@ -256,6 +268,9 @@ func (m *AppModel) prepareTextSpans() {
 	}
 	for i := range m.contentLayout.textSpans {
 		span := &m.contentLayout.textSpans[i]
+		if span.mapped {
+			continue
+		}
 		key := flowKey{span.ref, span.column}
 		f := flows[key]
 		if f == nil {
@@ -296,7 +311,7 @@ func (m *AppModel) decorateTextSelection(content string) string {
 		return content
 	}
 	if s.tab != m.activeTab || !slices.EqualFunc(s.spans, m.contentLayout.textSpans, func(a, b contentTextSpan) bool {
-		a.row, a.left = b.row, b.left
+		a.row, a.left, a.right = b.row, b.left, b.right
 		return a == b
 	}) {
 		m.textSelection = contentTextSelection{}

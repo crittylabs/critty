@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Markdown tables render links, emphasis, and inline code in documents and attachments instead of showing their markup.  Columns use the displayed text width, and copying selections preserves Markdown formatting and link targets.
+- Markdown tables in documents and attachments render links, emphasis, and inline code instead of showing their markup.  Cells wrap independently to keep columns and borders aligned, preserving short columns' natural widths.  Copying selections retains Markdown formatting and link targets across wrapped cells.  Tables that cannot fit two characters plus padding per column retain whole-row wrapping.
 
 ## 1.6.0
 

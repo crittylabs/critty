@@ -362,6 +362,10 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 }
 
 func (t *FileTab) markdownTableCells(line int, links []linkSpan) []string {
+	return t.markdownTableCellsWithInline(line, links, nil)
+}
+
+func (t *FileTab) markdownTableCellsWithInline(line int, links []linkSpan, inline []gitpkg.InlineSegment) []string {
 	t.ensureMarkdownCache()
 	parsed := &t.markdown.after.lines[line-1]
 	var cells []string
@@ -379,7 +383,7 @@ func (t *FileTab) markdownTableCells(line int, links []linkSpan) []string {
 			part.start, part.end = from, to
 			cell.tokens = append(cell.tokens, part)
 		}
-		cells = append(cells, cell.render(nil, diffCommonTextBg, diffAddedTextBg, links))
+		cells = append(cells, cell.render(inline, diffCommonTextBg, diffAddedTextBg, links))
 	}
 	return cells
 }
