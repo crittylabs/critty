@@ -4449,7 +4449,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
-		{keys: "alt+o", desc: "open image/link"},
+		{keys: "alt+o", desc: "open image/link/reference on line"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
 		{keys: "q/C-c", desc: "submit review"},

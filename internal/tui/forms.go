@@ -456,10 +456,10 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 		raw = raw[:span.Start] + raw[span.End:]
 	}
 	if checkbox == nil {
-		return strings.TrimRight(raw, " \t\r"), -1, true
+		return m.linkFileReferences(strings.TrimRight(raw, " \t\r")), -1, true
 	}
 	if checkbox.Line != line {
-		label := highlightInlineWith(strings.TrimSpace(raw), formChip.link, formChip.code)
+		label := highlightInlineReferences(strings.TrimSpace(raw), formChip.link, formChip.code, m.linkFileReferences)
 		if checkbox.Required {
 			label = lipgloss.NewStyle().Bold(true).Render(label)
 		}
@@ -470,7 +470,7 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	// Preserve nesting without treating an ordered-list marker as indentation.
 	prefix := raw[:column]
 	indent := expandDisplayTabs(prefix[:len(prefix)-len(strings.TrimLeft(prefix, " \t"))]) + "  "
-	label := highlightInlineWith(strings.TrimSpace(raw[column+3:]), formChip.link, formChip.code)
+	label := highlightInlineReferences(strings.TrimSpace(raw[column+3:]), formChip.link, formChip.code, m.linkFileReferences)
 	if checkbox.SelectAll != nil {
 		return indent + m.selectAllDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
 	}
