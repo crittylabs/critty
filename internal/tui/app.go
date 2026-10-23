@@ -4423,7 +4423,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "M-? · esc", desc: "help / close help"},
-		}, innerWidth)
+		}, innerWidth) + renderHostHelp(reviewHost(), innerWidth)
 	}
 	columnWidth := (innerWidth - 4) / 3
 	general := renderHelpGroup("General", []helpItem{
@@ -4491,13 +4491,50 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
 	help := columns + "\n\n" + search + "\n\n" + contexts
-	if reviewHost() == "tmux" {
-		help += "\n\n" + renderHelpGroup("tmux controls (default bindings, 3.8+)", []helpItem{
+	return help + renderHostHelp(reviewHost(), innerWidth)
+}
+
+func renderHostHelp(host string, width int) string {
+	var title string
+	var items []helpItem
+	switch host {
+	case "tmux":
+		title = "tmux controls (default bindings, 3.8+)"
+		items = []helpItem{
 			{keys: "prefix @", desc: "toggle floating / tiled pane"},
 			{keys: "prefix ;", desc: "return to previous pane"},
-		}, innerWidth)
+		}
+	case "Herdr":
+		title = "Herdr controls (default bindings; prefix: C-b)"
+		items = []helpItem{
+			{keys: "prefix z", desc: "toggle pane zoom"},
+			{keys: "prefix h/j/k/l", desc: "focus pane left/down/up/right"},
+			{keys: "prefix tab/shift+tab", desc: "next / previous pane"},
+			{keys: "prefix ?", desc: "show Herdr keybindings"},
+		}
+	case "Zellij":
+		title = "Zellij controls (default bindings)"
+		items = []helpItem{
+			{keys: "C-g", desc: "lock / unlock Zellij controls"},
+			{keys: "C-p e", desc: "toggle floating / tiled pane"},
+			{keys: "C-p f", desc: "toggle pane fullscreen"},
+			{keys: "C-p ; esc", desc: "return to previous pane"},
+			{keys: "M-f", desc: "show / hide floating panes"},
+			{keys: "M-←/↓/↑/→", desc: "move focus (left/right can switch tabs)"},
+			{keys: "C-g p", desc: "Unlock First preset: then e/f/; as above; esc locks"},
+		}
+	case "cmux":
+		title = "cmux controls (default bindings)"
+		items = []helpItem{
+			{keys: "cmd+shift+enter", desc: "toggle pane zoom"},
+			{keys: "cmd+alt+←/↓/↑/→", desc: "focus pane left/down/up/right"},
+			{keys: "cmd+[ / cmd+]", desc: "focus back / forward"},
+			{keys: "cmd+shift+[ / ]", desc: "previous / next tab in pane"},
+		}
+	default:
+		return ""
 	}
-	return help
+	return "\n\n" + renderHelpGroup(title, items, width)
 }
 
 func (m *AppModel) scrollHelp(delta int) {
