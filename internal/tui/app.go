@@ -4421,10 +4421,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "s/t", desc: "toggle sidebar / view"},
 			{keys: "w · S · I", desc: "whitespace / split / images"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
-			{keys: "●", desc: "updated tab; open to mark read"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "M-? · esc", desc: "help / close help"},
-		}, innerWidth)
+		}, innerWidth) + renderHostHelp(reviewHost(), innerWidth)
 	}
 	columnWidth := (innerWidth - 4) / 3
 	general := renderHelpGroup("General", []helpItem{
@@ -4439,7 +4438,6 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
-		{keys: "●", desc: "updated; open to mark read"},
 		{keys: "alt+o", desc: "open image/link"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
@@ -4493,30 +4491,79 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
 	help := columns + "\n\n" + search + "\n\n" + contexts
-	if reviewHost() == "tmux" {
-		help += "\n\n" + renderHelpGroup("tmux controls (default bindings, 3.8+)", []helpItem{
+	return help + renderHostHelp(reviewHost(), innerWidth)
+}
+
+func renderHostHelp(host string, width int) string {
+	var title string
+	var items []helpItem
+	switch host {
+	case "tmux":
+		title = "tmux controls (default bindings, 3.8+)"
+		items = []helpItem{
 			{keys: "prefix @", desc: "toggle floating / tiled pane"},
 			{keys: "prefix ;", desc: "return to previous pane"},
-		}, innerWidth)
+		}
+	case "Herdr":
+		title = "Herdr controls (default bindings; prefix: C-b)"
+		items = []helpItem{
+			{keys: "prefix z", desc: "toggle pane zoom"},
+			{keys: "prefix h/j/k/l", desc: "focus pane left/down/up/right"},
+			{keys: "prefix tab/shift+tab", desc: "next / previous pane"},
+			{keys: "prefix ?", desc: "show Herdr keybindings"},
+		}
+	case "Zellij":
+		title = "Zellij controls (default bindings)"
+		items = []helpItem{
+			{keys: "C-g", desc: "lock / unlock Zellij controls"},
+			{keys: "C-p e", desc: "toggle floating / tiled pane"},
+			{keys: "C-p f", desc: "toggle pane fullscreen"},
+			{keys: "C-p ; esc", desc: "return to previous pane"},
+			{keys: "M-f", desc: "show / hide floating panes"},
+			{keys: "M-←/↓/↑/→", desc: "move focus (left/right can switch tabs)"},
+			{keys: "C-g p", desc: "Unlock First preset: then e/f/; as above; esc locks"},
+		}
+	case "cmux":
+		title = "cmux controls (default bindings)"
+		items = []helpItem{
+			{keys: "cmd+shift+enter", desc: "toggle pane zoom"},
+			{keys: "cmd+alt+←/↓/↑/→", desc: "focus pane left/down/up/right"},
+			{keys: "cmd+[ / cmd+]", desc: "focus back / forward"},
+			{keys: "cmd+shift+[ / ]", desc: "previous / next tab in pane"},
+		}
+	default:
+		return ""
 	}
-	return help
+	return "\n\n" + renderHelpGroup(title, items, width)
 }
 
 func (m *AppModel) scrollHelp(delta int) {
 	lines := strings.Split(m.renderHelp(m.modalInnerWidth()), "\n")
-	header, _ := m.helpHeader(m.modalInnerWidth())
-	footer, _ := m.helpFooter(m.modalInnerWidth(), 0, 0)
-	available := max(1, m.height-modalStyle.GetVerticalFrameSize()-lipgloss.Height(header)-lipgloss.Height(footer))
+	available := m.helpPageSize(m.modalInnerWidth(), m.height, len(lines))
 	maxOffset := max(0, len(lines)-available)
 	m.helpOffset = max(0, min(min(m.helpOffset, maxOffset)+delta, maxOffset))
 }
 
+func (m AppModel) helpPageSize(width, height, lineCount int) int {
+	header, _ := m.helpHeader(width)
+	footer, _ := m.helpFooter(width, 0, 0)
+	available := max(1, height-modalStyle.GetVerticalFrameSize()-lipgloss.Height(header)-lipgloss.Height(footer))
+	if lineCount > available {
+		footer, _ = m.helpFooter(width, 1, 0)
+		available = max(1, height-modalStyle.GetVerticalFrameSize()-lipgloss.Height(header)-lipgloss.Height(footer))
+	}
+	return available
+}
+
 func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegion) {
+	brand := ansi.Truncate(BrandVersion(m.version, terminalIsDark), width, "…")
+	if pageSize == 0 {
+		return "\n" + lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(brand), nil
+	}
 	buttons, regions := layoutModalButtonRow([]modalButtonSpec{
 		{rendered: m.renderModalButton("Up", "↑/PgUp", false), action: modalMouseAction{scrollable: true, scrollOffset: -pageSize}},
 		{rendered: m.renderModalButton("Down", "↓/PgDn", false), action: modalMouseAction{scrollable: true, scrollOffset: pageSize}},
 	}, width, top+1)
-	brand := ansi.Truncate(BrandVersion(m.version, terminalIsDark), width, "…")
 	if lipgloss.Height(buttons) == 1 && lipgloss.Width(buttons)+2+lipgloss.Width(brand) <= width {
 		return "\n" + buttons + strings.Repeat(" ", width-lipgloss.Width(buttons)-lipgloss.Width(brand)) + brand, regions
 	}
@@ -4773,12 +4820,15 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		header, closeRegion := m.helpHeader(innerWidth)
 		regions = append(regions, closeRegion)
 		lines := strings.Split(m.renderHelp(innerWidth), "\n")
-		footer, _ := m.helpFooter(innerWidth, 0, 0)
-		available := max(1, bgH-frameStyle.GetVerticalFrameSize()-lipgloss.Height(header)-lipgloss.Height(footer))
+		available := m.helpPageSize(innerWidth, bgH, len(lines))
 		offset := max(0, min(m.helpOffset, len(lines)-available))
 		body := strings.Join(lines[offset:min(len(lines), offset+available)], "\n")
 		prefix := header + "\n" + body + "\n"
-		footer, scrollRegions := m.helpFooter(innerWidth, available, strings.Count(prefix, "\n"))
+		pageSize := 0
+		if len(lines) > available {
+			pageSize = available
+		}
+		footer, scrollRegions := m.helpFooter(innerWidth, pageSize, strings.Count(prefix, "\n"))
 		regions = append(regions, scrollRegions...)
 		content := prefix + footer
 		modalContent = frameStyle.Width(modalWidth).Render(content)

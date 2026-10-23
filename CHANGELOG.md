@@ -7,11 +7,16 @@
 - Refresh Git changes, documents, and file-backed attachments during a review with Reload, or enable Watch to follow edits automatically.  Agents can start Watch with `--watch`; it defaults off and defers updates while editing or confirming submission.  Watch uses filesystem notifications, excludes ignored directories and unrelated worktree metadata, and does no polling while idle.  Supplied diffs, saved plan versions, and committed comparisons stay snapshots.  Updates to the visible tab flash a two-second notice; changed and added tabs show a dark yellow unread dot in their titles and Files entries until opened, without moving filenames.  `W` toggles Watch; use `w` for whitespace filtering.
 - Copy text from documents and code diffs by dragging across the content and pressing `M-w` or clicking Copy text.  Copies the source text to the kill ring and system clipboard, excluding line numbers and annotations; wrapped rows stay joined.  Markdown retains its syntax and link targets, including for partial link labels.  Selections that include an opening modifier or code fence close it at the selection end.  Without a text selection, `M-w` still copies a reference.  System clipboard access requires terminal OSC 52 support.
 - Review one commit with `--scope=COMMIT`, using a SHA or revision such as `HEAD`.  The comparison uses its first parent, including for merge commits; root commits show all files as additions.  Available in both `critty review` and `critty view`.
+- Herdr, Zellij, and cmux users can find default host shortcuts in Keyboard Help to enlarge the review and move between panes or tabs.  Host controls also appear in read-only views when the host is known.
 
 ### Changed
 
 - Copying a reference shows a muted cyan confirmation for two seconds, then restores the footer hints.
 - The Files tab highlights the current file across the full row with a soft gray background, including while scrolling long filenames or reading in the content pane.
+
+### Fixed
+
+- Keyboard Help hides its scroll controls when all shortcuts fit the window, including the shorter list in `critty view`.
 
 ## 1.5.1
 
