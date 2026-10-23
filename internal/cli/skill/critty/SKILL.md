@@ -115,6 +115,6 @@ Refresh the input selected by the session and verify that it includes the reques
 | Supplied diff | Regenerate with the original producer, then use `critty sessions resume <id> --diff=changes.diff` or pipe to `critty sessions resume <id> --diff`. |
 | Attached documents | Add the complete ordered `--attachment` list again to replace saved snapshots; retain any form result option required by `/critty-approval`. |
 
-`critty sessions resume <id>` reuses saved plans, diffs, and attachments.  Retain the ID to continue the same review.  Reopen from the original directory after submitted feedback, or after explicit chat instructions to resume an interruption.  For supplied diffs with incomplete context, check drifted comments against their anchors.
+`critty sessions resume <id>` reuses saved plans, diffs, and attachments.  Retain the ID to continue the same review.  Resume by ID after submitted feedback, or after explicit chat instructions to resume an interruption.  Critty restores the saved working directory automatically.  For supplied diffs with incomplete context, check drifted comments against their anchors.
 
 Repeat Step 2, including a fresh Codex marker, then handle the next result.  Continue until approved or the user cancels or replaces the task.

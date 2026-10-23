@@ -91,10 +91,31 @@ func listReviewSessions() error {
 	if err != nil {
 		return err
 	}
+	for i := range result {
+		result[i].GitCommonDir = ""
+	}
 	return printJSON(os.Stdout, result)
 }
 
 func collectReviewSessions(directory string, all bool) ([]savedSession, error) {
+	directory, err := resolveSessionDirectory(directory)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := review.ListSessionEntries()
+	if err != nil {
+		return nil, err
+	}
+	result := []savedSession{}
+	for _, entry := range entries {
+		if all || entry.CWD == directory {
+			result = append(result, savedSessionStatus(entry))
+		}
+	}
+	return result, nil
+}
+
+func resolveSessionDirectory(directory string) (string, error) {
 	var err error
 	if directory == "" {
 		directory, err = os.Getwd()
@@ -111,27 +132,18 @@ func collectReviewSessions(directory string, all bool) ([]savedSession, error) {
 			}
 		}
 	}
+	return directory, err
+}
+
+func savedSessionStatus(entry review.SessionEntry) savedSession {
+	item := savedSession{SessionEntry: entry, Running: ipc.Alive(review.SocketPathFor(entry.Key))}
+	task, err := history.New(entry.CWD).ForSession(entry.Key)
 	if err != nil {
-		return nil, err
+		item.HistoryError = err.Error()
+	} else if task != nil {
+		item.Task = task.ID
+	} else {
+		item.Ungrouped = true
 	}
-	entries, err := review.ListSessionEntries()
-	if err != nil {
-		return nil, err
-	}
-	result := []savedSession{}
-	for _, entry := range entries {
-		if all || entry.CWD == directory {
-			item := savedSession{SessionEntry: entry, Running: ipc.Alive(review.SocketPathFor(entry.Key))}
-			task, err := history.New(entry.CWD).ForSession(entry.Key)
-			if err != nil {
-				item.HistoryError = err.Error()
-			} else if task != nil {
-				item.Task = task.ID
-			} else {
-				item.Ungrouped = true
-			}
-			result = append(result, item)
-		}
-	}
-	return result, nil
+	return item
 }

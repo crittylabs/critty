@@ -150,7 +150,7 @@ The finish prompt contains all comments and replies, including resolved threads 
 
 ## Targeting a session or plan
 
-`critty sessions list` (or `critty sessions`) lists saved reviews in the current directory as a table, with running sessions first.  `--directory DIR` selects another directory, resolving relative paths and symbolic links.  `--all` includes every directory and cannot be combined with `--directory`; resume from the listed directory.  `--json` returns the session metadata and history membership from `status`, plus `status`, `round`, `verdict` for finished rounds, and `error` when review data cannot be read.  Status values are `running`, `stopped`, `approved`, `changes-requested`, `feedback`, `submitted` (legacy finished rounds without a verdict), and `unavailable`.  Running describes a reachable review process; a saved verdict does not authorize new actions.  The existing `critty status` JSON contract is unchanged.
+`critty sessions list` (or `critty sessions`) lists saved reviews for the current project.  Git worktrees sharing a common Git directory belong to one project; outside Git, the directory identifies the project.  New sessions save this identity; listings also retain identities detected for older entries without changing review data, start times, or registry modification times.  Git registration can identify a removed legacy worktree until pruning removes that information.  `--directory DIR` selects the project containing DIR, resolving relative paths and symbolic links.  `--all` includes every project and cannot be combined with `--directory`.  The table groups sessions by project and shows running sessions first within each project.  Worktree paths are omitted from the table.  `--json` retains `cwd` and adds stable `project_id`, canonical `project_name`, optional `git_common_dir`, `status`, `round`, `verdict` for finished rounds, and `error` when review data cannot be read.  Status values are `running`, `stopped`, `approved`, `changes-requested`, `feedback`, `submitted` (legacy finished rounds without a verdict), and `unavailable`.  A saved verdict does not authorize new actions.  The legacy `critty status` stays scoped to its current directory with the same JSON fields.
 
 Each new review invocation creates independent storage.  Always use the session ID printed at startup or in the finish prompt, including for plans and bulk replies.  Commands without an ID refuse to guess when multiple saved reviews match.
 
@@ -163,7 +163,7 @@ critty comment --session <id> --json --file replies.json --author 'Claude Code'
 
 `--scope` stays fixed for a session.  Identical scope arguments, document paths, or plan names can have independent session IDs.  `--plan <slug>` selects a plan only when its name is unambiguous; prefer the ID.
 
-To resume a stopped session, run `critty sessions resume <id>` from its original directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  To replace that input, use `critty plan --session <id> <file>` or `critty sessions resume <id> --diff=<file>`.  The `/critty` skill covers the interactive review loop.
+To resume a stopped session, run `critty sessions resume <id>` from any directory.  Critty automatically opens the saved working directory; keep its `cwd` when assigning AI reviewers or other tools that need source context.  Relative attachment, diff, plan-revision, result, summary, and explicit custom-launcher paths use the caller's directory.  If a command is still waiting for the reviewer, retain its execution handle and collect that command's result instead.  The `/critty` skill distinguishes retryable launch failures from interrupted reviews that require explicit chat instructions to resume.  Resuming restores the saved plan or diff input.  If the saved working directory no longer exists, resuming reports the error and keeps the review data.  To replace that input, use `critty plan --session <id> <file>` or `critty sessions resume <id> --diff=<file>`.  The `/critty` skill covers the interactive review loop.
 
 ## Live sources
 
@@ -318,7 +318,7 @@ Line and file comment IDs are unique within one file, so the same ID can exist i
 
 ```bash
 critty sessions stop <id>        # close the TUI, retaining saved state
-critty sessions resume <id>      # resume from the original directory
+critty sessions resume <id>      # resume by ID from any directory
 critty sessions remove <id>      # delete one stopped review
 critty clear --all               # delete every saved review for this directory
 ```

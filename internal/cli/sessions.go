@@ -14,10 +14,12 @@ import (
 
 type sessionStatus struct {
 	savedSession
-	Status  string         `json:"status"`
-	Round   int            `json:"round,omitempty"`
-	Verdict review.Verdict `json:"verdict,omitempty"`
-	Error   string         `json:"error,omitempty"`
+	ProjectID   string         `json:"project_id"`
+	ProjectName string         `json:"project_name"`
+	Status      string         `json:"status"`
+	Round       int            `json:"round,omitempty"`
+	Verdict     review.Verdict `json:"verdict,omitempty"`
+	Error       string         `json:"error,omitempty"`
 }
 
 func newSessionsCommand() *cobra.Command {
@@ -26,25 +28,28 @@ func newSessionsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sessions",
 		Short: "List saved review sessions and their states",
-		Long: `List saved reviews in the current directory, with running sessions first.
-Shows stopped reviews and submitted verdicts separately.  Use --directory DIR
-to select another directory, --all to include every directory, or --json for
-structured output.  Resume a review with
-critty sessions resume <id> from the directory shown in the listing.`,
+		Long: `List saved reviews for the current project, including its linked worktrees.
+Git projects share a common Git directory; non-Git projects use their directory.
+Use --directory DIR to select the project there, --all to include every project,
+or --json for structured output.  Sessions are grouped by project, with running
+reviews first in each group.  Resume with critty sessions resume <id>; Critty
+automatically uses the session's saved working directory.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("directory") && directory == "" {
 				return fmt.Errorf("--directory requires a directory")
 			}
-			entries, err := collectReviewSessions(directory, all)
+			items, err := collectProjectSessions(directory, all)
 			if err != nil {
 				return err
 			}
-			items := make([]sessionStatus, 0, len(entries))
-			for _, entry := range entries {
-				items = append(items, inspectSessionStatus(entry))
-			}
 			slices.SortStableFunc(items, func(a, b sessionStatus) int {
+				if a.ProjectID != b.ProjectID {
+					if order := strings.Compare(a.ProjectName, b.ProjectName); order != 0 {
+						return order
+					}
+					return strings.Compare(a.ProjectID, b.ProjectID)
+				}
 				if a.Running != b.Running {
 					if a.Running {
 						return -1
@@ -60,7 +65,7 @@ critty sessions resume <id> from the directory shown in the listing.`,
 				_, err := fmt.Fprintln(cmd.OutOrStdout(), "No saved review sessions.")
 				return err
 			}
-			rows := [][]string{{"ID", "STATUS", "MODE", "ROUND", "TARGET", "DIRECTORY"}}
+			rows := [][]string{{"PROJECT", "ID", "STATUS", "MODE", "ROUND", "TARGET"}}
 			clean := func(s string) string { return strings.Join(strings.Fields(ansi.Strip(s)), " ") }
 			for _, item := range items {
 				target := item.Branch
@@ -72,7 +77,7 @@ critty sessions resume <id> from the directory shown in the listing.`,
 				if item.Topic != nil && *item.Topic != "" {
 					target = *item.Topic
 				}
-				rows = append(rows, []string{clean(item.Key), item.Status, clean(item.Mode), fmt.Sprint(item.Round), clean(target), clean(item.CWD)})
+				rows = append(rows, []string{clean(item.ProjectName), clean(item.Key), item.Status, clean(item.Mode), fmt.Sprint(item.Round), clean(target)})
 			}
 			widths := make([]int, len(rows[0]))
 			for _, row := range rows {
@@ -103,8 +108,8 @@ critty sessions resume <id> from the directory shown in the listing.`,
 	}
 	list := &cobra.Command{Use: "list", Short: cmd.Short, Long: cmd.Long, Args: cobra.NoArgs, RunE: cmd.RunE}
 	for _, command := range []*cobra.Command{cmd, list} {
-		command.Flags().BoolVar(&all, "all", false, "include reviews from all directories")
-		command.Flags().StringVar(&directory, "directory", "", "list reviews belonging to DIR (default current directory)")
+		command.Flags().BoolVar(&all, "all", false, "include reviews from all projects")
+		command.Flags().StringVar(&directory, "directory", "", "list reviews for the project containing DIR (default current project)")
 		command.Flags().BoolVar(&jsonOutput, "json", false, "print session states as JSON")
 		command.MarkFlagsMutuallyExclusive("all", "directory")
 	}

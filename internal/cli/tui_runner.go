@@ -355,7 +355,11 @@ func nextRoundCommand(sess *review.Session, mode *reviewMode) string {
 		return "critty sessions resume " + sess.Key + " --diff < updated.diff"
 	}
 	if mode.plan() && mode.planFile != "" {
-		return "critty plan --session " + sess.Key + " " + shellEscape(mode.planFile)
+		path := mode.planFile
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(sess.Meta.CWD, path)
+		}
+		return "critty plan --session " + sess.Key + " " + shellEscape(path)
 	}
 	return "critty sessions resume " + sess.Key
 }

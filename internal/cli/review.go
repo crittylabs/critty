@@ -242,11 +242,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 	if err := saveReviewMode(sess, mode); err != nil {
 		return err
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	store := history.New(cwd)
+	store := history.New(sess.Meta.CWD)
 	if reviewTask != "" {
 		if err := store.Add(reviewTask, sess.Key); err != nil {
 			return fmt.Errorf("review %s was saved but could not join task %s: %w; retry with history add before resuming this review", sess.Key, reviewTask, err)
@@ -406,6 +402,9 @@ func openReviewSession(cfg *config.Config, mode *reviewMode) (*review.Session, e
 }
 
 func saveReviewMode(sess *review.Session, mode *reviewMode) error {
+	if sess.Meta.GitCommonDir == "" {
+		sess.Meta.GitCommonDir = reviewGitCommonDir(sess.Meta.CWD)
+	}
 	mode.sessionKey = sess.Key
 	if mode.replaceDocuments {
 		if err := sess.ReplaceDocuments(mode.documents); err != nil {

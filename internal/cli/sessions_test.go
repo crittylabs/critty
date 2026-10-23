@@ -103,17 +103,22 @@ func TestSessionsListsStatesAndDirectoryScope(t *testing.T) {
 		t.Fatalf("listing changed directory: %q, %v", got, err)
 	}
 	table := run()
-	for _, want := range []string{"ID", "STATUS", "DIRECTORY", "a.md", "approved"} {
+	for _, want := range []string{"PROJECT", "ID", "STATUS", "a.md", "approved"} {
 		if !strings.Contains(table, want) {
 			t.Errorf("table omits %q", want)
 		}
 	}
 	header, _, _ := strings.Cut(table, "\n")
-	directoryColumn := ansi.StringWidth(header[:strings.Index(header, "DIRECTORY")])
+	idColumn := ansi.StringWidth(header[:strings.Index(header, "ID")])
 	for _, line := range strings.Split(table, "\n") {
-		if i := strings.Index(line, cwd); i >= 0 && ansi.StringWidth(line[:i]) != directoryColumn {
-			t.Fatalf("directory column shifts for wide filenames: %q", line)
+		for _, sess := range sessions {
+			if i := strings.Index(line, sess.Key); i >= 0 && ansi.StringWidth(line[:i]) != idColumn {
+				t.Fatalf("ID column shifts: %q", line)
+			}
 		}
+	}
+	if strings.Contains(table, cwd) {
+		t.Fatal("listing exposes the session working directory")
 	}
 	entry := savedSession{SessionEntry: sessions[1].Meta, Running: true}
 	if item := inspectSessionStatus(entry); item.Status != "running" {

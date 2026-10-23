@@ -48,20 +48,33 @@ func applyHeaderFlags(sess *review.Session) {
 }
 
 func reviewProject(root string) string {
-	// The common Git directory identifies the project even in a linked worktree.
-	cmd := exec.Command("git", "rev-parse", "--path-format=absolute", "--git-common-dir")
-	cmd.Dir = root
-	if out, err := cmd.Output(); err == nil {
-		common := strings.TrimSpace(string(out))
-		if filepath.Base(common) == ".git" {
-			return filepath.Base(filepath.Dir(common))
-		}
-		return strings.TrimSuffix(filepath.Base(common), ".git")
+	if common := reviewGitCommonDir(root); common != "" {
+		return gitProjectName(common)
 	}
 	if root == "" {
 		return ""
 	}
 	return filepath.Base(root)
+}
+
+func reviewGitCommonDir(root string) string {
+	cmd := exec.Command("git", "rev-parse", "--path-format=absolute", "--git-common-dir")
+	cmd.Dir = root
+	if out, err := cmd.Output(); err == nil {
+		common := strings.TrimSpace(string(out))
+		if path, err := filepath.EvalSymlinks(common); err == nil {
+			return path
+		}
+		return common
+	}
+	return ""
+}
+
+func gitProjectName(common string) string {
+	if filepath.Base(common) == ".git" {
+		return filepath.Base(filepath.Dir(common))
+	}
+	return strings.TrimSuffix(filepath.Base(common), ".git")
 }
 
 func reviewTopicLabel(sess *review.Session, mode *reviewMode) string {

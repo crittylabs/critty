@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -284,6 +285,7 @@ func TestBuildFinishPayloadApproved(t *testing.T) {
 
 func TestBuildFinishPayloadPlanMode(t *testing.T) {
 	sess := newPayloadSession(t)
+	sess.Meta.CWD = filepath.Join(t.TempDir(), "source worktree")
 	sess.CJ.CliArgs = []string{"plan", "--name", "my-plan", "docs/plan.md"}
 	sess.SetFileComments("current.md", "", []review.Comment{
 		{ID: "c_1", StartLine: 1, EndLine: 1, Body: "clarify"},
@@ -293,7 +295,7 @@ func TestBuildFinishPayloadPlanMode(t *testing.T) {
 
 	payload := buildFinishPayload(cfg, sess, mode, false)
 
-	if want := "critty plan --session " + sess.Key + " 'docs/plan.md'"; payload.NextCommand != want {
+	if want := "critty plan --session " + sess.Key + " " + shellEscape(filepath.Join(sess.Meta.CWD, "docs/plan.md")); payload.NextCommand != want {
 		t.Errorf("NextCommand = %q, want %q", payload.NextCommand, want)
 	}
 	for _, want := range []string{

@@ -14,18 +14,19 @@ import (
 // later (status, clear, comment) can find review folders belonging to a
 // working directory without re-deriving every possible key.
 type SessionEntry struct {
-	Project    *string  `json:"project,omitempty"`
-	Topic      *string  `json:"topic,omitempty"`
-	Mode       string   `json:"mode,omitempty"`
-	PlanSlug   string   `json:"plan_slug,omitempty"`
-	Key        string   `json:"key"`
-	CWD        string   `json:"cwd"`
-	Args       []string `json:"args,omitempty"`
-	Branch     string   `json:"branch,omitempty"`
-	ReviewPath string   `json:"review_path"`
-	StartedAt  string   `json:"started_at"`
-	PID        int      `json:"pid,omitempty"`
-	SocketPath string   `json:"socket_path,omitempty"`
+	GitCommonDir string   `json:"git_common_dir,omitempty"`
+	Project      *string  `json:"project,omitempty"`
+	Topic        *string  `json:"topic,omitempty"`
+	Mode         string   `json:"mode,omitempty"`
+	PlanSlug     string   `json:"plan_slug,omitempty"`
+	Key          string   `json:"key"`
+	CWD          string   `json:"cwd"`
+	Args         []string `json:"args,omitempty"`
+	Branch       string   `json:"branch,omitempty"`
+	ReviewPath   string   `json:"review_path"`
+	StartedAt    string   `json:"started_at"`
+	PID          int      `json:"pid,omitempty"`
+	SocketPath   string   `json:"socket_path,omitempty"`
 }
 
 // SocketPathFor returns the Unix socket path for a session key.
@@ -44,6 +45,11 @@ func sessionEntryPath(key string) string {
 
 // writeSessionEntry records or refreshes the registry entry for a session.
 func writeSessionEntry(e SessionEntry) error {
+	if e.GitCommonDir == "" {
+		if saved, err := ReadSessionEntry(e.Key); err == nil && saved.CWD == e.CWD {
+			e.GitCommonDir = saved.GitCommonDir
+		}
+	}
 	if err := os.MkdirAll(SessionsDir(), 0o700); err != nil {
 		return fmt.Errorf("creating sessions dir: %w", err)
 	}
@@ -62,6 +68,41 @@ func writeSessionEntry(e SessionEntry) error {
 		return fmt.Errorf("renaming session entry: %w", err)
 	}
 	return nil
+}
+
+// RecordSessionProject enriches an old entry without touching the review or its
+// timestamps.  The review lock protects concurrent saves and registry updates.
+func RecordSessionProject(entry SessionEntry, common string) error {
+	dir := Dir("", entry.Key)
+	if entry.ReviewPath != "" {
+		dir = filepath.Dir(entry.ReviewPath)
+	}
+	sess := &Session{Key: entry.Key, Dir: dir}
+	return sess.withLock(func() error {
+		data, err := os.ReadFile(sessionEntryPath(entry.Key))
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		var fresh SessionEntry
+		if err := json.Unmarshal(data, &fresh); err != nil {
+			return err
+		}
+		if fresh.GitCommonDir != "" || fresh.CWD != entry.CWD {
+			return nil
+		}
+		info, err := os.Stat(sessionEntryPath(entry.Key))
+		if err != nil {
+			return err
+		}
+		fresh.GitCommonDir = common
+		if err := writeSessionEntry(fresh); err != nil {
+			return err
+		}
+		return os.Chtimes(sessionEntryPath(entry.Key), info.ModTime(), info.ModTime())
+	})
 }
 
 // ListSessionEntries returns all registered session entries.

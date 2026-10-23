@@ -36,6 +36,13 @@ to save a new version and continue a previous review.`,
 }
 
 func runPlan(args []string) error {
+	if planSession != "" {
+		return withSessionDirectory(planSession, args, runPlanInDirectory)
+	}
+	return runPlanInDirectory(args)
+}
+
+func runPlanInDirectory(args []string) error {
 	inputs := &reviewMode{sessionKey: planSession}
 	if err := prepareDocuments(inputs); err != nil {
 		return err

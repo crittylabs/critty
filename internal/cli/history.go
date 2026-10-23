@@ -245,6 +245,13 @@ func init() {
 		if cmd.Flags().Lookup("task") == nil || reviewTask == "" {
 			return nil
 		}
+		if key := resumingSessionID(cmd, args); key != "" {
+			entry, err := resumeEntry(key)
+			if err != nil {
+				return err
+			}
+			return history.New(entry.CWD).Validate(reviewTask)
+		}
 		store, _, err := historyContext()
 		if err != nil {
 			return err
