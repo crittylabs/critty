@@ -3,12 +3,14 @@ package tui
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -179,6 +181,8 @@ type isearchState struct {
 	originOnForm       bool
 	originAnnoIdx      int
 	originOffset       int
+	markdownRE         *regexp.Regexp
+	markdownHighlights map[*markdownSource]map[int][]markdownSearchHighlight
 }
 
 // caseSensitive reports whether a query matches case sensitively: with smart
@@ -721,6 +725,9 @@ func (m *AppModel) isearchDecorator(ref lineRef) func(string) (string, bool) {
 	if !s.active || s.re == nil {
 		return nil
 	}
+	if decorate := m.markdownISearchDecorator(ref); decorate != nil {
+		return decorate
+	}
 	current := -1
 	if s.found && s.match.tab == m.activeTab && s.match.ref == ref {
 		current = s.match.ordinal
@@ -734,23 +741,88 @@ func (m *AppModel) isearchDecorator(ref lineRef) func(string) (string, bool) {
 // styled line, keeping the surrounding styles.  The match with the given
 // ordinal is the current one.
 func highlightISearch(styled string, locs [][]int, current int) (string, bool) {
-	plain := ansi.Strip(styled)
-	if len(locs) == 0 {
+	spans := make([]isearchHighlight, 0, len(locs))
+	for i, loc := range locs {
+		spans = append(spans, isearchHighlight{loc[0], loc[1], i == current})
+	}
+	return highlightISearchSpans(styled, spans)
+}
+
+type isearchHighlight struct {
+	start, end int
+	current    bool
+}
+
+func highlightISearchSpans(styled string, spans []isearchHighlight) (string, bool) {
+	if len(spans) == 0 {
 		return styled, false
 	}
-	var b strings.Builder
-	prev := 0
-	for i, loc := range locs {
-		start, end := ansi.StringWidth(plain[:loc[0]]), ansi.StringWidth(plain[:loc[1]])
-		b.WriteString(ansi.Cut(styled, prev, start))
-		style := isearchMatchStyle
-		if i == current {
-			style = isearchCurrentStyle
+	type event struct{ offset, count, current int }
+	events := make([]event, 0, 2*len(spans))
+	for _, span := range spans {
+		current := 0
+		if span.current {
+			current = 1
 		}
-		b.WriteString(style.Render(plain[loc[0]:loc[1]]))
-		prev = end
+		events = append(events, event{span.start, 1, current}, event{span.end, -1, -current})
 	}
-	b.WriteString(ansi.Cut(styled, prev, ansi.StringWidth(plain)))
+	slices.SortFunc(events, func(a, b event) int { return a.offset - b.offset })
+	var b, run strings.Builder
+	var pen uv.Style
+	var link uv.Link
+	flush := func() {
+		value := pen.Styled(run.String())
+		if link.URL != "" {
+			value = ansi.SetHyperlink(link.URL, link.Params) + value + ansi.ResetHyperlink()
+		}
+		b.WriteString(value)
+		run.Reset()
+	}
+	offset, next, active, selected := 0, 0, 0, 0
+	advance := func(end int) {
+		for next < len(events) && events[next].offset <= end {
+			active += events[next].count
+			selected += events[next].current
+			next++
+		}
+	}
+	for rowIndex, row := range uv.NewStyledString(styled).Lines(ansi.GraphemeWidth) {
+		if rowIndex > 0 {
+			flush()
+			b.WriteByte('\n')
+			offset++
+		}
+		for _, cell := range row {
+			if cell.Content == "" {
+				continue
+			}
+			advance(offset)
+			matched, current := active > 0, selected > 0
+			end := offset + len(cell.Content)
+			// A match inside a combining sequence highlights its whole grapheme.
+			for next < len(events) && events[next].offset < end {
+				advance(events[next].offset)
+				matched, current = matched || active > 0, current || selected > 0
+			}
+			if matched {
+				style := isearchMatchStyle
+				if current {
+					style = isearchCurrentStyle
+				}
+				cell.Style.Bg = style.GetBackground()
+				cell.Style.Attrs |= uv.AttrBold
+			}
+			offset = end
+			if run.Len() > 0 && (!pen.Equal(&cell.Style) || link != cell.Link) {
+				flush()
+			}
+			pen, link = cell.Style, cell.Link
+			run.WriteString(cell.Content)
+		}
+	}
+	if run.Len() > 0 {
+		flush()
+	}
 	return b.String(), true
 }
 
