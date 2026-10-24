@@ -2613,7 +2613,7 @@ func (m *AppModel) updateCommentSidebar() {
 		if isSelected {
 			prefix = cursorCol.Render(cursorMarker.Render(">"))
 		}
-		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), max(1, m.commentViewport.Width()))
+		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), isSelected && !m.readOnly, max(1, m.commentViewport.Width()))
 		button.translate(0, len(m.sidebarTargets))
 		button.id = it.id
 		m.sidebarActions = append(m.sidebarActions, button)
@@ -4274,7 +4274,7 @@ func (m AppModel) renderFooter() string {
 			items = append(items, k("e", "edit/reply"))
 		}
 		if len(t.state.Comments) > 0 {
-			items = append(items, k("r/R", "resolve/+next"))
+			items = append(items, k("r/space/R", "resolve/+next"))
 		}
 		if m.multiFile {
 			items = append([]string{
@@ -4412,7 +4412,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "M-↑/↓", desc: "move ranked item"},
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
-		{keys: "r/R", desc: "resolve/+next"},
+		{keys: "r/space · R", desc: "resolve / resolve and go to next"},
 		{keys: "V · O", desc: "reading view / open all"},
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
@@ -4924,7 +4924,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		if m.hasModalResolution() {
 			comment, _ := m.driftedComment(m.editingID)
-			checkbox := renderResolution(comment.Resolved, "Resolved", false) + " " + modalBtnNormalKey.Render("M-r")
+			checkbox := renderResolution(comment.Resolved, "Resolved", false, false) + " " + modalBtnNormalKey.Render("M-r")
 			checkboxWidth := lipgloss.Width(checkbox)
 			left := max(0, innerWidth-checkboxWidth-3)
 			title = ansi.Truncate(modalTitleStyle.MarginBottom(0).Render(titleText), max(0, left-1), "…")

@@ -76,7 +76,7 @@ var keys = keyMap{
 	NextTab:          key.NewBinding(key.WithKeys("tab", "alt+}", "alt+shift+]", "alt+shift+}"), key.WithHelp("TAB/M-}", "next tab")),
 	NextChange:       key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next change/open thread/form")),
 	PrevChange:       key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev change/open thread/form")),
-	Resolve:          key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resolve/unresolve")),
+	Resolve:          key.NewBinding(key.WithKeys("r", "space", " "), key.WithHelp("r/SPC", "resolve/unresolve")),
 	ResolveNext:      key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resolve and go to next")),
 	CommentDisplay:   key.NewBinding(key.WithKeys("V"), key.WithHelp("V", "toggle reading view")),
 	OpenAll:          key.NewBinding(key.WithKeys("O"), key.WithHelp("O", "open all / default")),

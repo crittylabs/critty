@@ -562,7 +562,7 @@ func TestCommentHeaderActionsAlignRight(t *testing.T) {
 		t.Run(fmt.Sprintf("width=%d/deletable=%t", tc.width, tc.deletable), func(t *testing.T) {
 			var open, resolved commentHeaderRegion
 			for _, state := range []bool{false, true} {
-				header, region := renderCommentHeader(label, state, tc.deletable, tc.width)
+				header, region := renderCommentHeader(label, state, tc.deletable, false, tc.width)
 				rows := strings.Split(ansi.Strip(header), "\n")
 				if len(rows) != tc.rows || region.resolve.top != tc.rows-1 {
 					t.Fatalf("header rows = %q, actions at row %d, want %d rows", rows, region.resolve.top, tc.rows)

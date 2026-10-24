@@ -1028,6 +1028,33 @@ func TestResolveKeysStayOrAdvance(t *testing.T) {
 	}
 }
 
+func TestSpaceTogglesFocusedComment(t *testing.T) {
+	for _, pane := range []pane{contentPane, commentPane} {
+		t.Run(fmt.Sprint(pane), func(t *testing.T) {
+			app := setupAppWithDoc(t, "source\n")
+			app.tab().state.Comments = []review.Comment{testComment()}
+			app.sidebarView = commentsView
+			app.width, app.height = 100, 30
+			app.recalculateLayout()
+			app.focused = pane
+			app.tab().cursorOnAnnotation = pane == contentPane
+			app.tab().cursorLine = testComment().StartLine
+			app.rebuildContent()
+			app.updateCommentSidebar()
+			id := app.selectedCommentID()
+			for _, want := range []bool{true, false} {
+				app = pressKey(app, tea.KeySpace)
+				if got := app.session.FileComments(app.tab().path)[0].Resolved; got != want {
+					t.Fatalf("resolved = %t, want %t", got, want)
+				}
+				if app.focused != pane || app.selectedCommentID() != id || app.modal != noModal {
+					t.Fatal("Space moved focus or opened a dialog")
+				}
+			}
+		})
+	}
+}
+
 func TestFillTabRowJoinsFlushTabToPaneBorder(t *testing.T) {
 	border := lipgloss.RoundedBorder()
 	style := lipgloss.NewStyle().Foreground(accent)
@@ -1249,15 +1276,15 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 }
 
 func TestAccessKeyUnderline(t *testing.T) {
-	resolve, _ := renderCommentHeader("", false, false, 40)
-	resolved, _ := renderCommentHeader("", true, false, 40)
+	resolve, _ := renderCommentHeader("", false, false, false, 40)
+	resolved, _ := renderCommentHeader("", true, false, false, 40)
 	for _, tt := range []struct {
 		name, rendered, want string
 	}{
 		{"resolve", resolve, "R"},
 		{"resolved", resolved, "R"},
 		{"images", renderAccessKeyBarButton("Images: on"), ""},
-		{"edit dialog", renderResolution(true, "Resolved", false), ""},
+		{"edit dialog", renderResolution(true, "Resolved", false, false), ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var underlined strings.Builder

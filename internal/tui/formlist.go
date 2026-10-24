@@ -168,7 +168,7 @@ func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMous
 	title, closeRegion := modalTitle("Answers", width)
 	content := title + "\n"
 	filter, filterRegions := layoutModalButtonRow([]modalButtonSpec{{
-		rendered: renderResolution(m.formList.unansweredOnly, "Unanswered only", false) + " " + modalBtnNormalKey.Render("u"),
+		rendered: renderResolution(m.formList.unansweredOnly, "Unanswered only", false, false) + " " + modalBtnNormalKey.Render("u"),
 		action:   modalMouseAction{focus: 1},
 	}}, width, strings.Count(content, "\n"))
 	content += filter + "\n\n"

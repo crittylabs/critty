@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Focused comments show their Resolve checkbox in bold and accept Space, as well as `r`, to toggle resolution.
 - The search shortcut appears with footer hints instead of taking space in the top bar.
 - Read code at full width with `V`: hide the sidebar and fold all comment bodies, then restore the previous expansion setting when leaving View.  `O` opens all comments, leaving View if needed, or returns to the default display, which folds resolved threads, including those resolved in the current round.  These shortcuts replace the former `h`/`H` controls; see Keyboard Help.
 - Open the image, link, or reference on the current line with `o`; the existing `M-o` shortcut remains available.
