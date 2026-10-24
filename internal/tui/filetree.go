@@ -309,7 +309,7 @@ func (m *AppModel) renderFileTree() {
 		prefix := cursorCol.Render("")
 		text := m.treeRowText(i)
 		if i == tree.cursor {
-			if m.focused == commentPane {
+			if m.focused == commentPane && !m.outline.focused {
 				prefix = cursorCol.Render(cursorMarker.Render(">"))
 			}
 			if tree.hscroll > 0 {

@@ -820,6 +820,46 @@ def scenarios() -> None:
         report(
             "multiline Markdown keeps formatting, source text and comment lines after resize"
         )
+        outline_source = "# Outline root\n\n" + "".join(
+            f"## Part {i:02}\nBody for part {i:02}.\n\n" for i in range(24)
+        )
+        outline_source += "```md\n# Not a section\n```\n"
+        (WORK / "outline.md").write_text(outline_source)
+        outline = Round("markdown-outline", ["outline.md"])
+        tmux("resize-pane", "-t", outline.pane, "-x", "90", "-y", "28")
+        outline_width = int(
+            tmux("display-message", "-p", "-t", outline.pane, "#{pane_width}")
+        )
+        wait_until(
+            lambda: any(
+                row.startswith("│")
+                and row.endswith("│")
+                and len(row.expandtabs(8)) == outline_width
+                for row in outline.screen().splitlines()
+            ),
+            "outline review redrawn after resize",
+        )
+        outline.wait_screen("─ Outline", "Files shows a Markdown outline")
+        outline.click("Part 01", last=True)
+        outline.keys("Enter", "Enter")
+        outline.text("Heading jump anchor.")
+        outline.keys("C-s")
+        wait_until(lambda: outline.comments(), "outline jump comment saved")
+        assert outline.comments()[0]["start_line"] == 6, outline.comments()
+        outline.keys("s", "C-Down", "G")
+        outline.wait_screen(
+            "Part 23", "outline keyboard navigation reaches the last heading"
+        )
+        outline.keys("Enter", "Enter")
+        outline.text("Last heading anchor.")
+        outline.keys("C-s")
+        wait_until(lambda: len(outline.comments()) == 2, "last heading comment saved")
+        assert outline.comments()[1]["start_line"] == 72, outline.comments()
+        assert (WORK / "outline.md").read_text() == outline_source
+        outline.finish(False)
+        report(
+            "Markdown outline mouse and keyboard jumps preserve source comment anchors"
+        )
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "
             + "left " * 25

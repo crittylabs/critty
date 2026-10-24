@@ -155,6 +155,7 @@ type AppModel struct {
 	commentViewport   viewport.Model
 	sidebarView       sidebarView
 	fileTree          fileTree
+	outline           documentOutline
 	modalTextarea     textarea.Model
 	clipboardID       uint64
 	clipboardPending  bool
@@ -338,6 +339,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		contentViewport:  viewport.New(),
 		commentViewport:  viewport.New(),
 		fileTree:         newFileTree(),
+		outline:          newDocumentOutline(),
 		modalTextarea:    ta,
 	}
 	m.addDocuments(cfg.Documents)
@@ -436,6 +438,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		contentViewport: viewport.New(),
 		commentViewport: viewport.New(),
 		fileTree:        newFileTree(),
+		outline:         newDocumentOutline(),
 		modalTextarea:   ta,
 	}
 	m.addDocuments(cfg.Documents)
@@ -1026,7 +1029,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.toggleSidebarView()
 		return m, nil
 	}
-	if m.focused == commentPane && m.sidebarView == filesView && !t.selecting && m.handleFileTreeKey(msg) {
+	if m.focused == commentPane && m.sidebarView == filesView && !t.selecting && m.handleFilesSidebarKey(msg) {
 		return m, nil
 	}
 	if m.focused == contentPane && !t.cursorOnAnnotation && t.cursorSide == "" &&
@@ -2451,7 +2454,7 @@ func (m *AppModel) recalculateLayout() {
 	m.commentViewport.SetWidth(max(0, m.commentPanelWidth()-2-paneHorizontalPadding*2))
 	m.commentViewport.SetHeight(mainHeight)
 	m.fileTree.viewport.SetWidth(m.commentViewport.Width())
-	m.fileTree.viewport.SetHeight(mainHeight)
+	m.layoutFilesSidebar()
 
 	modalWidth := m.width * 2 / 3
 	if modalWidth < 50 {
@@ -2536,6 +2539,8 @@ func newAnnotation(c review.Comment) annotation {
 
 func (m *AppModel) updateCommentSidebar() {
 	m.syncFileTree()
+	m.syncOutline()
+	m.renderFileTree()
 	if len(m.tabs) == 0 {
 		m.commentViewport.SetContent("")
 		return
@@ -3516,7 +3521,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	left, top, right, bottom = m.commentBounds()
 	if mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
 		if m.sidebarView == filesView {
-			m.handleFileTreeClick(mouse.Y - top + m.fileTree.viewport.YOffset())
+			m.handleFilesSidebarClick(mouse.Y - top)
 			m.rebuildContent()
 			return m, nil
 		}
@@ -3705,6 +3710,12 @@ func (m *AppModel) handleDeleteConfirmModalMouse(mouse tea.Mouse) (tea.Model, te
 }
 
 func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	if m.outline.dragging {
+		if m.modal == noModal && msg.Mouse().Button == tea.MouseLeft && !m.viewMode && m.sidebarView == filesView {
+			m.resizeOutlineAt(msg.Mouse().Y)
+		}
+		return m, nil
+	}
 	if m.modal == noModal && m.textSelection.dragging && msg.Mouse().Button == tea.MouseLeft {
 		m.updateTextSelection(msg.Mouse(), true)
 		return m, nil
@@ -3748,6 +3759,10 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 }
 
 func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	if m.outline.dragging {
+		m.outline.dragging = false
+		return m, nil
+	}
 	if m.modal == noModal && m.textSelection.dragging && msg.Mouse().Button == tea.MouseLeft {
 		m.updateTextSelection(msg.Mouse(), false)
 		m.textSelection.dragging = false
@@ -3948,7 +3963,7 @@ func (m AppModel) renderSidebarPane() string {
 	tabRow := fillTabRow(lipgloss.JoinHorizontal(lipgloss.Top, m.sidebarTabs()...), width, border, line)
 	view := m.commentViewport.View()
 	if m.sidebarView == filesView {
-		view = m.fileTree.viewport.View()
+		view = m.renderFilesSidebar()
 	}
 	body := lipgloss.NewStyle().
 		Width(width-2).
@@ -4101,11 +4116,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	left, top, right, bottom := m.commentBounds()
 	if !m.viewMode && mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
 		if m.sidebarView == filesView {
-			if direction < 0 {
-				m.fileTree.viewport.ScrollUp(3)
-			} else {
-				m.fileTree.viewport.ScrollDown(3)
-			}
+			m.scrollFilesSidebar(mouse.Y-top, direction*3)
 			return m, nil
 		}
 		if i, ok := m.sidebarMouseTarget(mouse.Y - top + m.commentViewport.YOffset()); ok {
@@ -4410,6 +4421,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "v · esc", desc: "select lines / cancel"},
 			{keys: "M-w", desc: "copy selected text or reference"},
 			{keys: "s/t", desc: "toggle sidebar / view"},
+			{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · resize outline"},
+			{keys: "enter/esc", desc: "outline: return to source"},
 			{keys: "w · S · I", desc: "whitespace / split / images"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
@@ -4464,6 +4477,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
 		{keys: "V", desc: "toggle reading view: hide sidebar and fold all comments; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
+		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
+		{keys: "↑/↓,j/k · ←/→,h/l · enter/esc", desc: "outline: jump to heading · parent/child · return to source; the current section follows the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
