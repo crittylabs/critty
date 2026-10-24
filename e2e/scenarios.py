@@ -860,6 +860,33 @@ def scenarios() -> None:
         report(
             "Markdown outline mouse and keyboard jumps preserve source comment anchors"
         )
+        go_source = (
+            "package sample\n\ntype Server struct{}\n\n"
+            "func (s *Server) Serve() {\n println(1)\n}\n\nfunc Stop() {}\n"
+        )
+        (WORK / "outline.go").write_text(go_source)
+        go_outline = Round("go-outline", ["outline.go"])
+        go_outline.wait_screen(
+            "func (*Server) Serve", "Go receiver appears in the outline"
+        )
+        go_outline.click(r"func \(\*Server\) Serve")
+        go_outline.keys("Enter", "Enter")
+        go_outline.text("Go method anchor.")
+        go_outline.keys("C-s")
+        wait_until(lambda: go_outline.comments(), "Go method jump comment saved")
+        assert go_outline.comments()[0]["start_line"] == 5, go_outline.comments()
+        go_outline.keys("s", "C-Down", "G", "Enter", "Enter")
+        go_outline.text("Go function anchor.")
+        go_outline.keys("C-s")
+        wait_until(
+            lambda: len(go_outline.comments()) == 2, "Go function jump comment saved"
+        )
+        assert go_outline.comments()[1]["start_line"] == 9, go_outline.comments()
+        assert (WORK / "outline.go").read_text() == go_source
+        go_outline.finish(False)
+        report(
+            "Go outline mouse and keyboard jumps preserve declaration comment anchors"
+        )
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "
             + "left " * 25

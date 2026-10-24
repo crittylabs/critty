@@ -5,7 +5,7 @@
 ### Added
 
 - Attach PNG, JPEG, GIF, and WebP images alongside review documents, including in attachment-only reviews.  Reviewers can preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Reviews and history exports retain the saved image after its source changes or disappears.  Image attachments are limited to 5 MiB and 16 megapixels; animated GIFs preview their first frame.
-- Navigate Markdown documents and attachments from an outline below the Files tree.  Nested headings follow the source cursor, and clicking a heading or navigating with the keyboard jumps to its section.  Resize the outline up to two thirds of the sidebar; short outlines leave more room for files.
+- Navigate Markdown and Go files, including attachments, from an outline below the Files tree.  Markdown headings are nested; Go functions, methods, and types appear in source order, with receiver types on methods.  The outline follows the source cursor, and clicking an entry or navigating with the keyboard jumps to its source line.  Resize the outline up to two thirds of the sidebar; short outlines leave more room for files.
 
 ### Changed
 

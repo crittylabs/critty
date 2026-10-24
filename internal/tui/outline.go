@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -19,7 +20,7 @@ type outlineHeading struct {
 
 type documentOutline struct {
 	rows       []outlineHeading
-	source     *markdownSource
+	source     any
 	active     int
 	focused    bool
 	dragging   bool
@@ -87,20 +88,23 @@ func (m *AppModel) layoutFilesSidebar() {
 
 func (m *AppModel) syncOutline() {
 	o := &m.outline
-	var source *markdownSource
+	var source any
+	var rows []outlineHeading
 	if len(m.tabs) > 0 {
 		t := m.tab()
 		if t.isMarkdown && t.doc != nil {
 			t.ensureMarkdownCache()
-			source = t.markdown.after
+			source, rows = t.markdown.after, t.markdown.after.headings
+		} else if t.doc != nil && strings.EqualFold(filepath.Ext(t.path), ".go") {
+			cache := t.ensureGoOutline()
+			source, rows = cache, cache.rows
 		}
 	}
 	changed := source != o.source
 	previous := o.active
 	previousHeight := o.viewport.Height()
-	o.source, o.rows, o.active = source, nil, -1
+	o.source, o.rows, o.active = source, rows, -1
 	if source != nil {
-		o.rows = source.headings
 		line := m.tab().cursorLine
 		if m.tab().cursorSide == "old" {
 			line = m.outlineNewLine(line)

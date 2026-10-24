@@ -4478,7 +4478,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "V", desc: "toggle reading view: hide sidebar and fold all comments; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
-		{keys: "↑/↓,j/k · ←/→,h/l · enter/esc", desc: "outline: jump to heading · parent/child · return to source; the current section follows the source cursor"},
+		{keys: "↑/↓,j/k · ←/→,h/l · enter/esc", desc: "outline: jump to entry · parent/child · return to source; Markdown headings and Go declarations follow the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
