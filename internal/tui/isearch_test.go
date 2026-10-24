@@ -225,6 +225,24 @@ func TestISearchHighlightsHiddenMarkdown(t *testing.T) {
 	}
 }
 
+func TestISearchHiddenMatchInTable(t *testing.T) {
+	const content = "| Link | Notes |\n| --- | --- |\n| [label](https://example.org/needle) | needle and **bold** |"
+	for _, width := range []int{100, 45, 20} {
+		app := setupAppWithDoc(t, content)
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 30})
+		app = ctrlKey(app, 's')
+		app = typeSearch(app, "needle")
+		if app.isearch.count != 2 {
+			t.Fatalf("width=%d: count = %d, want 2", width, app.isearch.count)
+		}
+		assertISearchHighlight(t, app.contentViewport.GetContent(), "label", true)
+		assertISearchHighlight(t, app.contentViewport.GetContent(), "needle", false)
+		app = ctrlKey(app, 's')
+		assertISearchHighlight(t, app.contentViewport.GetContent(), "label", false)
+		assertISearchHighlight(t, app.contentViewport.GetContent(), "needle", true)
+	}
+}
+
 func TestISearchHiddenLinkInFormLabel(t *testing.T) {
 	app, _ := formTestAppWithContent(t, "- [ ] See [label](https://example.org/hidden) <!-- form: id=check -->")
 	app = ctrlKey(app, 's')

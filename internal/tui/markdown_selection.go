@@ -342,9 +342,20 @@ func partialAutoLink(label, uri string) string {
 // Match those display units without copying their decoration into the source.
 func tableSourceOffset(source, displayed string, offset int, end bool) int {
 	a, b := 0, 0
+	// Wrapping can discard the space before a continuation row.
+	if r, _ := utf8.DecodeRuneInString(displayed); r != ' ' && r != '\t' && r != '│' && r != '┼' && r != '─' {
+		for a < len(source) && (source[a] == ' ' || source[a] == '\t') {
+			a++
+		}
+	}
 	for b < len(displayed) && b < offset {
-		start := a
 		r, size := utf8.DecodeRuneInString(displayed[b:])
+		if r != ' ' && r != '\t' {
+			for a < len(source) && (source[a] == ' ' || source[a] == '\t') {
+				a++
+			}
+		}
+		start := a
 		stop := b + size
 		switch r {
 		case ' ', '\t':

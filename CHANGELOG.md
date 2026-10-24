@@ -5,6 +5,7 @@
 ### Fixed
 
 - Incremental search highlights the link label or formatted text when a match falls in a hidden Markdown URL, title, or formatting marker.  Current-match highlighting follows source order, including multiline labels, while preserving text styles and clickable links.
+- Markdown tables in documents and attachments render links, emphasis, and inline code instead of showing their markup.  Cells wrap independently to keep columns and borders aligned, preserving short columns' natural widths.  Copying selections retains Markdown formatting and link targets across wrapped cells.  Tables that cannot fit two characters plus padding per column retain whole-row wrapping.
 
 ## 1.6.0
 

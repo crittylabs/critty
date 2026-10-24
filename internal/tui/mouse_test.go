@@ -247,7 +247,7 @@ func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
 		{name: "plain", content: "wrapped-start " + words(20) + "continuation-tail\nnext unique\n", first: "wrapped-start", next: "next unique", minRows: 2},
 		{name: "tab indented two rows", content: "\t\ttab-start " + words(10) + "two-row-tail\nnext unique\n", first: "tab-start", next: "next unique", minRows: 2},
 		{name: "tab indented three rows", content: "\t\ttab-start " + words(20) + "three-row-tail\nnext unique\n", first: "tab-start", next: "next unique", minRows: 3},
-		{name: "markdown table", content: "| very-long-header-cell " + words(12) + "| value |\n| --- | --- |\n| body | value |\n", first: "very-long-header-cell", next: "2 │", minRows: 2},
+		{name: "markdown table", content: "| very-long-header-cell " + words(12) + "| value |\n| --- | --- |\n| body | value |\n", first: "very", next: "2 │", minRows: 2},
 		{name: "deleted before line", content: "current unique\nnext unique\n", first: "deleted-start", next: "current unique", deleted: true, minRows: 2},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

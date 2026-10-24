@@ -72,6 +72,53 @@ func TestMarkdownIncompleteContextIsLiteral(t *testing.T) {
 	}
 }
 
+func TestMarkdownTableInlineRendering(t *testing.T) {
+	const uri = "https://github.com/knu/avail/pull/54"
+	const content = "| PR | Notes |\n| --- | --- |\n| [avail #54](" + uri + ") | **bold** and `code` |\n"
+	for _, attachment := range []bool{false, true} {
+		t.Run(fmt.Sprintf("attachment=%t", attachment), func(t *testing.T) {
+			app := setupAppWithDoc(t, content)
+			if attachment {
+				app, _ = formTestAppWithContent(t, content)
+			}
+			app.width, app.height = 100, 30
+			app.recalculateLayout()
+			app.rebuildContent()
+			view := app.contentViewport.GetContent()
+			if !strings.Contains(view, ansi.SetHyperlink(uri)) {
+				t.Fatalf("table link is not rendered: %q", ansi.Strip(view))
+			}
+			if strings.Contains(ansi.Strip(view), "**bold**") || strings.Contains(ansi.Strip(view), "`code`") {
+				t.Fatalf("table markup is visible: %q", ansi.Strip(view))
+			}
+		})
+	}
+}
+
+func TestMarkdownTableCells(t *testing.T) {
+	for _, tt := range []struct {
+		name, source string
+		want         []string
+	}{
+		{"nested link destination", "| plain | [label](https://example.org/a_(b)) |", []string{"plain", "label"}},
+		{"empty cell", "| | **bold** |", []string{"", "bold"}},
+		{"unicode", "| 日本語 | é |", []string{"日本語", "é"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app := setupAppWithDoc(t, "| First | Second |\n| --- | --- |\n"+tt.source)
+			cells := app.tab().markdownTableCells(3, nil)
+			if len(cells) != len(tt.want) {
+				t.Fatalf("cells = %q, want %q", cells, tt.want)
+			}
+			for i, cell := range cells {
+				if got := ansi.Strip(cell); got != tt.want[i] {
+					t.Fatalf("cell %d = %q, want %q", i, got, tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestMarkdownCachedInlineCompatibilityAndImages(t *testing.T) {
 	for _, source := range []string{
 		`plain \*literal\* &amp; &#x1F600;`,

@@ -138,10 +138,20 @@ func (m *AppModel) rebuildContent() {
 	if t.doc != nil {
 		sourceLines = t.doc.Lines
 	}
-	tableBlocks := detectTableBlocks(sourceLines)
+	var tableBlocks []tableBlock
+	if isMarkdown {
+		t.ensureMarkdownCache()
+		if t.markdown != nil {
+			tableBlocks = detectTableBlocks(t.markdown.after.lines, func(line int) []string { return t.markdownTableCells(line, nil) })
+		}
+	}
 	tableBlockMap := make(map[int]*tableBlock)
 	for i := range tableBlocks {
 		tb := &tableBlocks[i]
+		if widths := fitTableWidths(tb.colWidths, textWidth); widths != nil {
+			tb.colWidths = widths
+			tb.wrapCells = true
+		}
 		for l := tb.startLine; l <= tb.endLine; l++ {
 			tableBlockMap[l] = tb
 		}
@@ -338,7 +348,7 @@ func (m *AppModel) rebuildContent() {
 		numStr := numStyle.Render(fmt.Sprintf("%d", lineNum))
 
 		// Check if this line is part of a table block
-		if len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight {
+		if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
 			var rows []string
 			if isMarkdown {
 				rows = markdownDisplayRows(t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false)), textWidth, decorate)
@@ -353,35 +363,52 @@ func (m *AppModel) rebuildContent() {
 				}
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
-			var styledLine string
-			if reTableSep.MatchString(line) {
-				styledLine = formatTableSep(tb.colWidths)
+			var rows []string
+			var columns [][]tableCellFragment
+			if t.markdown.after.lines[lineNum-1].tableSep {
+				rows = []string{formatTableSep(tb.colWidths)}
 			} else {
 				isHeader := lineNum == tb.startLine
-				if t.attachment != nil {
-					styledLine = formatTableRowWith(line, tb.colWidths, isHeader, func(cell string) string {
-						return m.linkFileReferences(displaySourceText(cell))
-					})
+				cells := t.markdownTableCellsWithInline(lineNum, m.documentLinkSpans(lineNum, false), inlineChanges)
+				m.highlightTableCells(lineRef{line: lineNum}, cells)
+				if tb.wrapCells {
+					columns = wrapTableCells(cells, tb.colWidths)
+					for row := range tableRowHeight(columns) {
+						rows = append(rows, formatTableRow(tableRowCells(columns, row), tb.colWidths, isHeader))
+					}
 				} else {
-					styledLine = formatTableRow(displaySourceText(line), tb.colWidths, isHeader)
+					rows = []string{formatTableRow(cells, tb.colWidths, isHeader)}
 				}
 			}
 
-			if isSelected {
-				styledLine = inlineBackground(selectedLineBg, styledLine)
-			} else if isSidebarHighlight {
-				styledLine = inlineBackground(sidebarHighlightBg, styledLine)
-			} else if isChanged {
-				styledLine = inlineBackground(diffChangedLineBg, styledLine)
-			}
-
-			wrappedLines := strings.Split(lipgloss.Wrap(highlight(styledLine), textWidth, ""), "\n")
-			for wi, wrappedLine := range wrappedLines {
-				if wi == 0 {
-					layout.appendLiteralSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wrappedLine), lineTarget)
-				} else {
-					layout.appendLiteralSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wrappedLine), lineTarget)
+			firstRow := len(layout.rows)
+			var wrappedLines []string
+			for _, row := range rows {
+				if isSelected {
+					row = inlineBackground(selectedLineBg, row)
+				} else if isSidebarHighlight {
+					row = inlineBackground(sidebarHighlightBg, row)
+				} else if isChanged && len(inlineChanges) == 0 {
+					row = inlineBackground(diffChangedLineBg, row)
 				}
+				if !tb.wrapCells {
+					row = lipgloss.Wrap(row, textWidth, "")
+				}
+				wrappedLines = append(wrappedLines, strings.Split(row, "\n")...)
+			}
+			for wi, row := range wrappedLines {
+				prefix := fmt.Sprintf("%s%s ", marker, numStr)
+				if wi > 0 {
+					prefix = fmt.Sprintf(" %s ", continuationGutter)
+				}
+				if columns != nil {
+					layout.appendBlock(&b, prefix+row, lineTarget)
+				} else {
+					layout.appendLiteralSourceBlock(&b, prefix+row, lineTarget)
+				}
+			}
+			if columns != nil {
+				layout.addTableSpans(firstRow, columns, tb.colWidths, &t.markdown.after.lines[lineNum-1], lineTarget)
 			}
 		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
 			if isSelected || isSidebarHighlight {
@@ -808,15 +835,17 @@ type tableBlock struct {
 	startLine int
 	endLine   int
 	colWidths []int
+	wrapCells bool
 }
 
-func detectTableBlocks(lines []string) []tableBlock {
+func detectTableBlocks(lines []markdownLine, renderedCells func(int) []string) []tableBlock {
 	var blocks []tableBlock
 	inTable := false
 	var current tableBlock
 
 	for i, line := range lines {
-		isTable := reTableRow.MatchString(line) || reTableSep.MatchString(line)
+		cells := renderedCells(i + 1)
+		isTable := len(cells) > 0 || line.tableSep
 		if isTable {
 			if !inTable {
 				inTable = true
@@ -824,14 +853,13 @@ func detectTableBlocks(lines []string) []tableBlock {
 			}
 			current.endLine = i + 1
 
-			if !reTableSep.MatchString(line) {
-				cells := parseTableCells(line)
+			if !line.tableSep {
 				for len(current.colWidths) < len(cells) {
 					current.colWidths = append(current.colWidths, 0)
 				}
 				for ci, cell := range cells {
-					if len(cell) > current.colWidths[ci] {
-						current.colWidths[ci] = len(cell)
+					if width := lipgloss.Width(cell); width > current.colWidths[ci] {
+						current.colWidths[ci] = width
 					}
 				}
 			}
@@ -848,23 +876,7 @@ func detectTableBlocks(lines []string) []tableBlock {
 	return blocks
 }
 
-func parseTableCells(line string) []string {
-	line = strings.TrimSpace(line)
-	line = strings.Trim(line, "|")
-	parts := strings.Split(line, "|")
-	cells := make([]string, len(parts))
-	for i, p := range parts {
-		cells[i] = strings.TrimSpace(p)
-	}
-	return cells
-}
-
-func formatTableRow(line string, colWidths []int, isHeader bool) string {
-	return formatTableRowWith(line, colWidths, isHeader, func(cell string) string { return cell })
-}
-
-func formatTableRowWith(line string, colWidths []int, isHeader bool, display func(string) string) string {
-	cells := parseTableCells(line)
+func formatTableRow(cells []string, colWidths []int, isHeader bool) string {
 	pipe := mdTablePipe.Render("│")
 
 	var parts []string
@@ -874,7 +886,7 @@ func formatTableRowWith(line string, colWidths []int, isHeader bool, display fun
 		if ci < len(cells) {
 			cell = cells[ci]
 		}
-		padded := lipgloss.NewStyle().Width(w).Render(display(cell))
+		padded := lipgloss.NewStyle().Width(w).Render(cell)
 		if isHeader {
 			parts = append(parts, mdTableHeaderStyle.Render(" "+padded+" "))
 		} else {
