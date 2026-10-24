@@ -2876,7 +2876,7 @@ func (m AppModel) renderReviewBar() string {
 		text += style.Render(scope) + reviewBarStyle.Render(" ")
 	}
 	text += reviewBarStyle.Render(subject)
-	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.searchButton(), m.submitButton()}
+	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.submitButton()}
 	var rows []string
 	row := ""
 	for _, button := range buttons {
@@ -3082,7 +3082,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if button := m.splitButton(); button != "" {
 		layout.splitButton, layout.hasSplitButton = buttonRect(header, 0, button)
 	}
-	if rect, ok := buttonRect(header, 0, m.searchButton()); ok && m.searchButton() != "" {
+	if rect, ok := buttonRect(footer, footerTop, m.searchHint()); ok && m.searchHint() != "" && !m.isearch.active {
 		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
 	}
 	if m.isearch.active && m.modal == noModal {
@@ -4309,7 +4309,7 @@ func (m AppModel) renderFooter() string {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
-		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · View: read-only · /: search · v: select · M-w: copy reference · q: close")
+		return m.renderFooterItems([]string{m.footerHelpButton(), "View: read-only", "v: select", "M-w: copy reference", "q: close", m.searchHint()})
 	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
@@ -4381,8 +4381,30 @@ func (m AppModel) renderFooter() string {
 		items = append([]string{button}, items...)
 	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
+	items = append(items, m.searchHint())
 
-	return footerStyle.Width(m.width).Render(strings.Join(items, " · "))
+	return m.renderFooterItems(items)
+}
+
+// Keep each key hint together so its clickable region survives wrapping.
+func (m AppModel) renderFooterItems(items []string) string {
+	var rows []string
+	row := ""
+	for _, item := range items {
+		if item == "" {
+			continue
+		}
+		if row != "" && lipgloss.Width(row)+3+lipgloss.Width(item) > m.width {
+			rows = append(rows, row)
+			row = ""
+		}
+		if row != "" {
+			row += " · "
+		}
+		row += item
+	}
+	rows = append(rows, row)
+	return footerStyle.Width(m.width).Render(strings.Join(rows, "\n"))
 }
 
 // formListButton opens the answer list when any attachment has a form.

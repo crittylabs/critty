@@ -471,14 +471,14 @@ func clickISearchAction(t *testing.T, app AppModel, action isearchMouseAction) A
 			return clickMouse(app, region.rect.left, region.rect.top)
 		}
 	}
-	t.Fatalf("search action %d is not visible", action)
+	t.Fatalf("search action %d is not visible at width %d: %q", action, app.width, ansi.Strip(app.renderFooter()))
 	return app
 }
 
 func TestISearchMouseControls(t *testing.T) {
 	for _, width := range []int{18, 40, 100} {
 		app := newISearchApp(t, 1)
-		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 12})
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 40})
 		app = clickISearchAction(t, app, isearchStart)
 		if !app.isearch.active {
 			t.Fatal("Search did not start incremental search")

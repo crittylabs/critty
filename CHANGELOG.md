@@ -4,6 +4,7 @@
 
 ### Changed
 
+- The search shortcut appears with footer hints instead of taking space in the top bar.
 - Cycle comment display with `H`: normal display, fold all resolved threads, then hide all comments.  The former `h` folding shortcut now scrolls tables left, paired with `l` to scroll right.
 
 ### Fixed
