@@ -149,17 +149,7 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 	}
 	pos := 0
 	for i, token := range line.tokens {
-		value := displaySourceText(token.text)
-		if !line.literal && i == 0 && token.style == 0 {
-			var rest strings.Builder
-			for _, remaining := range line.tokens[1:] {
-				rest.WriteString(displaySourceText(remaining.text))
-			}
-			actual := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil))
-			if suffix := rest.String(); strings.HasSuffix(actual, suffix) {
-				value = actual[:len(actual)-len(suffix)]
-			}
-		}
+		value := line.displayTokenText(i)
 		stop := pos + len(value)
 		if offset < stop || end && offset == stop && stop > pos {
 			sourceEnd := token.sourceEnd
@@ -171,6 +161,22 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 		pos = stop
 	}
 	return len(line.source)
+}
+
+func (line *markdownLine) displayTokenText(i int) string {
+	token := line.tokens[i]
+	value := displaySourceText(token.text)
+	if !line.literal && i == 0 && token.style == 0 {
+		var rest strings.Builder
+		for _, remaining := range line.tokens[1:] {
+			rest.WriteString(displaySourceText(remaining.text))
+		}
+		actual := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil))
+		if suffix := rest.String(); strings.HasSuffix(actual, suffix) {
+			value = actual[:len(actual)-len(suffix)]
+		}
+	}
+	return value
 }
 
 func (m *markdownSource) copyRange(startLine, startOffset, endLine, endOffset int) string {

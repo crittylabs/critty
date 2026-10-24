@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -198,6 +199,113 @@ func TestISearchHighlightsMatches(t *testing.T) {
 	}
 }
 
+func TestISearchHighlightsHiddenMarkdown(t *testing.T) {
+	for _, tt := range []struct {
+		name, source, query string
+		want                []string
+	}{
+		{"link destination", "[label](https://hidden.example/path)", "hidden", []string{"label"}},
+		{"link title", "[label](https://example.org \"hidden title\")", "hidden", []string{"label"}},
+		{"bold delimiter", "**bold**", `\*\*`, []string{"bold"}},
+		{"code delimiter", "`code`", "`", []string{"code"}},
+		{"multiline label", "[first\nsecond](https://hidden.example)", "hidden", []string{"first", "second"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app := setupAppWithDoc(t, tt.source)
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+			app = ctrlKey(app, 's')
+			app = typeSearch(app, tt.query)
+			if !app.isearch.found {
+				t.Fatal("source match not found")
+			}
+			for _, want := range tt.want {
+				assertISearchHighlight(t, app.contentViewport.GetContent(), want, true)
+			}
+		})
+	}
+}
+
+func TestISearchHiddenLinkInFormLabel(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "- [ ] See [label](https://example.org/hidden) <!-- form: id=check -->")
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "hidden")
+	assertISearchHighlight(t, app.contentViewport.GetContent(), "label", true)
+}
+
+func TestISearchHiddenMatchKeepsSourceOrder(t *testing.T) {
+	app := setupAppWithDoc(t, "[label](https://example.org/needle) needle")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "needle")
+	if app.isearch.count != 2 {
+		t.Fatalf("count = %d, want 2", app.isearch.count)
+	}
+	assertISearchHighlight(t, app.contentViewport.GetContent(), "label", true)
+	assertISearchHighlight(t, app.contentViewport.GetContent(), "needle", false)
+	app = ctrlKey(app, 's')
+	assertISearchHighlight(t, app.contentViewport.GetContent(), "label", false)
+	assertISearchHighlight(t, app.contentViewport.GetContent(), "needle", true)
+}
+
+func TestISearchHiddenMatchPreservesLinkAndFormatting(t *testing.T) {
+	const uri = "https://example.org/hidden"
+	app := setupAppWithDoc(t, "[**日本語 é**]("+uri+")")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "hidden")
+	content := app.contentViewport.GetContent()
+	assertISearchHighlight(t, content, "日本語 é", true)
+	count := 0
+	for _, row := range uv.NewStyledString(content).Lines(ansi.GraphemeWidth) {
+		for _, cell := range row {
+			if cell.Link.URL == uri {
+				count++
+				if cell.Style.Attrs&uv.AttrBold == 0 {
+					t.Fatal("highlighted link lost bold formatting")
+				}
+			}
+		}
+	}
+	if count == 0 {
+		t.Fatal("highlighted label lost its hyperlink")
+	}
+}
+
+func TestISearchHiddenMatchOnOldDiffSide(t *testing.T) {
+	const patch = "diff --git a/review.md b/review.md\n--- a/review.md\n+++ b/review.md\n@@ -1 +1 @@\n-[old label](https://example.org/hidden)\n+[new label](https://example.org/visible)\n"
+	for _, split := range []bool{false, true} {
+		app := patchApp(t, patch)
+		app.tab().doc.Known = nil
+		app.split = split
+		app = ctrlKey(app, 's')
+		app = typeSearch(app, "hidden")
+		if app.isearch.match.ref.side != "old" {
+			t.Fatalf("split=%t: match is not on the old side: %+v", split, app.isearch.match)
+		}
+		assertISearchHighlight(t, app.contentViewport.GetContent(), "old label", true)
+	}
+}
+
+func assertISearchHighlight(t *testing.T, content, text string, current bool) {
+	t.Helper()
+	runes, styles := renderedCells(content)
+	plain := string(runes)
+	start := strings.Index(plain, text)
+	if start < 0 {
+		t.Fatalf("highlighted text %q missing from %q", text, plain)
+	}
+	first := len([]rune(plain[:start]))
+	want := isearchMatchStyle.GetBackground()
+	if current {
+		want = isearchCurrentStyle.GetBackground()
+	}
+	for i := first; i < first+len([]rune(text)); i++ {
+		if !sameColor(styles[i].Bg, want) {
+			t.Fatalf("%q has no search highlight at %d: %q", text, i-first, content)
+		}
+	}
+}
+
 func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
 	styled := "\x1b[31mfoo bar baz\x1b[0m"
 	out, ok := highlightISearch(styled, findNonEmpty(regexp.MustCompile("bar|baz"), ansi.Strip(styled)), 1)
@@ -207,9 +315,8 @@ func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
 	if ansi.Strip(out) != "foo bar baz" {
 		t.Fatalf("text changed: %q", ansi.Strip(out))
 	}
-	if !strings.Contains(out, isearchMatchStyle.Render("bar")) || !strings.Contains(out, isearchCurrentStyle.Render("baz")) {
-		t.Fatalf("matches are not styled: %q", out)
-	}
+	assertISearchHighlight(t, out, "bar", false)
+	assertISearchHighlight(t, out, "baz", true)
 	if !strings.HasPrefix(out, "\x1b[31mfoo ") {
 		t.Fatalf("leading style lost: %q", out)
 	}

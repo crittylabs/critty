@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Incremental search highlights the link label or formatted text when a match falls in a hidden Markdown URL, title, or formatting marker.  Current-match highlighting follows source order, including multiline labels, while preserving text styles and clickable links.
+
 ## 1.6.0
 
 ### Added
