@@ -12,7 +12,7 @@ import (
 func TestTableHorizontalControlsAndResize(t *testing.T) {
 	content := "| ID | Description | Notes |\n| --- | --- | --- |\n| 1 | " + strings.Repeat("word ", 20) + " | " + strings.Repeat("note ", 20) + " |"
 	app := setupAppWithDoc(t, content+"\n\n"+content)
-	app.hideComments = true
+	app.viewMode = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 70, Height: 40})
 	app.tab().cursorLine = 3
 	first := *app.tableAtLine(3)
@@ -27,7 +27,7 @@ func TestTableHorizontalControlsAndResize(t *testing.T) {
 		t.Fatal("keyboard did not scroll only the cursor's table")
 	}
 	app = pressKey(app, 'h')
-	if app.tableAtLine(3).window.offset != 0 || app.foldResolved || !app.hideComments {
+	if app.tableAtLine(3).window.offset != 0 || app.openAll || !app.viewMode {
 		t.Fatal("h did not scroll left while preserving comment display")
 	}
 	app = pressKey(app, 'l')
@@ -55,7 +55,7 @@ func TestTableHorizontalControlsAndResize(t *testing.T) {
 func TestTableSearchRevealsHiddenLinkAndWrappedRow(t *testing.T) {
 	content := "| First | Second |\n| --- | --- |\n| " + strings.Repeat("left ", 25) + " | " + strings.Repeat("filler ", 30) + " [日本語](https://hidden.example) |"
 	app := setupAppWithDoc(t, content)
-	app.hideComments = true
+	app.viewMode = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 60, Height: 14})
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "hidden.example")
@@ -73,7 +73,7 @@ func TestScrolledTableSelectionKeepsMarkdownAndGutter(t *testing.T) {
 	const label = "日本語 é label"
 	const link = "[**" + label + "**](https://example.org/path)"
 	app := setupAppWithDoc(t, "| First | Second |\n| --- | --- |\n| "+strings.Repeat("words ", 20)+" | "+link+" |")
-	app.hideComments = true
+	app.viewMode = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 45, Height: 30})
 	table := *app.tableAtLine(3)
 	app.scrollTable(table, table.window.maxOffset())

@@ -198,10 +198,8 @@ func (m *AppModel) rebuildContent() {
 		layout.appendBlock(&b, "", contentMouseTarget{drifted: true})
 	}
 	for idx, ann := range m.annotationsAfterLine(0, "") {
-		if !m.hideComments || ann.drifted {
-			focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == 0 && t.cursorAnnoIdx == idx
-			appendAnnotation(ann, focused, contentMouseTarget{annotation: true, annotationIndex: idx})
-		}
+		focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == 0 && t.cursorAnnoIdx == idx
+		appendAnnotation(ann, focused, contentMouseTarget{annotation: true, annotationIndex: idx})
 	}
 	if t.isBinary || t.doc == nil {
 		if t.isBinary {
@@ -284,9 +282,6 @@ func (m *AppModel) rebuildContent() {
 				layout.appendBlock(&b, images, target)
 			}
 			for idx, ann := range oldAnnosByEndLine[del.OldLineNum] {
-				if m.hideComments && !ann.drifted {
-					continue
-				}
 				focused := m.focused == contentPane && t.cursorOnAnnotation && isCursor && t.cursorAnnoIdx == idx
 				appendAnnotation(ann, focused, contentMouseTarget{
 					line: del.OldLineNum, side: "old", annotation: true, annotationIndex: idx,
@@ -487,9 +482,6 @@ func (m *AppModel) rebuildContent() {
 		}
 		if anns, ok := annosByEndLine[lineNum]; ok {
 			for idx, ann := range anns {
-				if m.hideComments && !ann.drifted {
-					continue
-				}
 				focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorSide == "" && t.cursorLine == lineNum && t.cursorAnnoIdx == idx
 				appendAnnotation(ann, focused, contentMouseTarget{
 					line: lineNum, annotation: true, annotationIndex: idx,
@@ -511,8 +503,8 @@ func (m *AppModel) rebuildContent() {
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
 func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused bool) (string, commentHeaderRegion) {
-	collapsed := m.collapseResolved(ann.resolved, ann.resolvedRound) && !focused
-	if ann.drifted && m.tab().expandedDrifted[ann.id] && !m.foldResolved {
+	collapsed := m.commentCollapsed(ann.resolved, focused)
+	if ann.drifted && m.driftedExpanded(ann.id, ann.resolved) && !m.viewMode {
 		collapsed = false
 	}
 	var lineLabel string
@@ -567,10 +559,6 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 	}
 	button.translate(gutterWidth+2, 1)
 	return b.String(), button
-}
-
-func (m *AppModel) collapseResolved(resolved bool, round int) bool {
-	return resolved && (m.foldResolved || round == 0 || round < m.reviewRound())
 }
 
 // formLineBackground returns the background of form labels, which yields to

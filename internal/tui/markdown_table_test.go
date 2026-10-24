@@ -41,7 +41,7 @@ func TestWrappedMarkdownTableSelection(t *testing.T) {
 	for _, selection := range []string{"link", "note", "whole"} {
 		t.Run(selection, func(t *testing.T) {
 			app := setupAppWithDoc(t, content)
-			app.width, app.height, app.hideComments = 200, 40, true
+			app.width, app.height, app.viewMode = 200, 40, true
 			app.recalculateLayout()
 			app.rebuildContent()
 			spans := app.contentLayout.textSpans

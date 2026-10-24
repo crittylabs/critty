@@ -254,12 +254,15 @@ func TestFileCommentsRenderBeforeContent(t *testing.T) {
 			if app.selectedCommentID() != "open" || !strings.Contains(app.contentViewport.View(), "newer") {
 				t.Fatal("file comment navigation did not reveal the selected thread")
 			}
-			app = pressKey(app, 'H')
-			app = pressKey(app, 'H')
+			app = pressKey(app, 'V')
+			found := false
 			for _, row := range app.contentLayout.rows {
 				if row.annotation {
-					t.Fatal("hidden file comment remains in content layout")
+					found = true
 				}
+			}
+			if !app.viewMode || !found {
+				t.Fatal("View mode lost inline file comments")
 			}
 		})
 	}

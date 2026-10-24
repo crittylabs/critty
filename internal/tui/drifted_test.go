@@ -106,7 +106,7 @@ func TestResolvedThreadsExpandOnKeyboardFocus(t *testing.T) {
 				t.Run(fmt.Sprintf("drifted=%t/fold=%t/key=%d", drifted, fold, key), func(t *testing.T) {
 					app := setupAppWithDoc(t, "one\ntwo\nthree\n")
 					app.width, app.height = 120, 40
-					app.foldResolved = fold
+					app.openAll = fold
 					app.recalculateLayout()
 					app.tab().state.Comments = []review.Comment{{ID: "done", StartLine: 2, EndLine: 2, Resolved: true, Drifted: drifted, Body: "resolved body"}}
 					app.tab().cursorLine = 2
@@ -114,8 +114,8 @@ func TestResolvedThreadsExpandOnKeyboardFocus(t *testing.T) {
 						app.tab().cursorLine = 3
 					}
 					app.rebuildContent()
-					if strings.Contains(ansi.Strip(app.contentViewport.View()), "resolved body") {
-						t.Fatal("resolved thread initially expanded")
+					if strings.Contains(ansi.Strip(app.contentViewport.View()), "resolved body") != fold {
+						t.Fatal("resolved thread does not match the Open all setting")
 					}
 					app = pressKey(app, key)
 					if app.selectedCommentID() != "done" || app.modal != noModal || !strings.Contains(ansi.Strip(app.contentViewport.View()), "resolved body") {
@@ -259,34 +259,30 @@ func TestUnplacedCommentsStayReachable(t *testing.T) {
 			if app.tab().state.Comments[1].Drifted || app.tab().state.Comments[1].Scope != "" {
 				t.Fatal("fallback changed stored drift or scope")
 			}
-			app = pressKey(app, 'H')
-			app = pressKey(app, 'H')
-			app.toggleDrifted(c.ID)
+			app = pressKey(app, 'V')
 			app.selectMarker([]string{c.ID})
-			if !app.hideComments || app.modal != noModal || !strings.Contains(ansi.Strip(app.contentViewport.View()), c.Anchor) {
-				t.Fatal("unplaced comment cannot be opened while comments are hidden")
+			if !app.viewMode || app.modal == noModal || !strings.Contains(ansi.Strip(app.View().Content), c.Anchor) {
+				t.Fatal("unplaced comment cannot be opened in View")
 			}
 		})
 	}
 }
 
-func TestDriftedDeletedMarkerAndHiddenMode(t *testing.T) {
+func TestDriftedDeletedMarkerAndReadingView(t *testing.T) {
 	app := setupAppWithDoc(t, "new\n")
 	app.width, app.height = 100, 35
 	app.recalculateLayout()
 	app.tab().deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "deleted"}}}
 	app.tab().state.Comments = []review.Comment{{ID: "old", StartLine: 1, EndLine: 1, Side: "old", Drifted: true, Body: "body", Anchor: "old anchor"}}
-	app = pressKey(app, 'H')
-	app = pressKey(app, 'H')
-	app.toggleDrifted("old")
+	app = pressKey(app, 'V')
 	marker := app.contentLayout.markers[0]
 	if row := app.contentLayout.rows[marker.rect.top]; row.side != "old" || row.line != 1 {
 		t.Fatalf("marker attached to wrong row: %+v", row)
 	}
 	left, top, _, _ := app.contentBounds()
 	app = clickMouse(app, left+marker.rect.left, top+marker.rect.top)
-	if !app.hideComments || app.modal != noModal || !app.tab().expandedDrifted["old"] {
-		t.Fatal("hidden marker did not open its thread")
+	if !app.viewMode || app.modal == noModal || app.editingID != "old" || app.tab().expandedDrifted["old"] {
+		t.Fatal("View marker did not open its dialog without changing expansion")
 	}
 	if view := ansi.Strip(app.View().Content); !strings.Contains(view, "old anchor") {
 		t.Fatalf("modal lacks original context: %q", view)

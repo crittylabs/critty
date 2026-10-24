@@ -9,7 +9,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -337,170 +336,21 @@ func TestResolveThreadReleasesFocus(t *testing.T) {
 			if surface == "sidebar-file" {
 				view = app.commentViewport.View()
 			}
-			if !strings.Contains(ansi.Strip(view), comment.Body) {
-				t.Fatalf("thread resolved this round was folded in normal mode: %q", view)
+			if strings.Contains(ansi.Strip(view), comment.Body) {
+				t.Fatalf("thread resolved this round did not fold in default display: %q", view)
 			}
 		})
 	}
 }
 
-func TestToggleCommentVisibility(t *testing.T) {
-	for _, focus := range []pane{contentPane, commentPane} {
-		app := setupAppWithDoc(t, "source\n")
-		app.width, app.height = 120, 50
-		app.recalculateLayout()
-		app.tab().state.Comments = []review.Comment{
-			{ID: "line", StartLine: 1, EndLine: 1, Body: "line body"},
-			{ID: "file", Scope: "file", Body: "file body", Resolved: true},
-		}
-		app.focused = focus
-		app.tab().cursorOnAnnotation = true
-		app.updateCommentSidebar()
-		for _, hidden := range []bool{false, true, false} {
-			app = pressKey(app, 'H')
-			if app.hideComments != hidden {
-				t.Fatal("comment display cycle selected the wrong mode")
-			}
-			screen, _ := app.renderReviewScreen()
-			for _, view := range []string{app.contentViewport.View(), screen} {
-				if strings.Contains(ansi.Strip(view), "body") == hidden {
-					t.Fatalf("hidden=%t: unexpected body visibility in %q", hidden, ansi.Strip(view))
-				}
-			}
-		}
-	}
-	app := newCommentNavigationTestApp()
-	app = pressKey(app, 'H')
-	app = pressKey(app, 'H')
-	app = pressKey(app, '3')
-	if app.activeTab != 2 || !app.hideComments {
-		t.Fatal("folding mode did not survive tab switch")
-	}
-}
-
-func TestCommentVisibilityThreeStates(t *testing.T) {
-	for initial := range 3 {
-		for presses := 1; presses <= 3; presses++ {
-			t.Run(fmt.Sprintf("%d/%d", initial, presses), func(t *testing.T) {
-				comments := []review.Comment{
-					{ID: "open", Scope: "file", Body: "open body"},
-					{ID: "current", Scope: "file", Body: "current body", Resolved: true, ResolvedRound: 3},
-					{ID: "past", Scope: "file", Body: "past body", Resolved: true, ResolvedRound: 2},
-				}
-				app, _ := newFinishTestApp(t, comments)
-				app.session.CJ.ReviewRound = 3
-				app.width, app.height = 160, 60
-				app.recalculateLayout()
-				for range initial {
-					app = pressKey(app, 'H')
-				}
-				for range presses {
-					app = pressKey(app, 'H')
-				}
-				want := (initial + presses) % 3
-				if app.hideComments != (want == 2) || app.foldResolved != (want == 1) {
-					t.Fatalf("state: hidden=%v folded=%v, want %d", app.hideComments, app.foldResolved, want)
-				}
-				for _, view := range []string{app.contentViewport.View(), app.commentViewport.View()} {
-					plain := ansi.Strip(view)
-					if strings.Contains(plain, "open body") != (want != 2) ||
-						strings.Contains(plain, "current body") != (want == 0) || strings.Contains(plain, "past body") {
-						t.Fatalf("state %d: incorrect bodies: %q", want, plain)
-					}
-				}
-			})
-		}
-	}
-}
-
-func TestHiddenCommentsUseClickableGutter(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
-	app.width, app.height = 100, 30
-	app.recalculateLayout()
-	width := app.contentViewport.Width()
-	app.tab().state.Comments = []review.Comment{{ID: "c", StartLine: 1, EndLine: 2, Body: "body"}}
-	app.tab().cursorLine = 1
-	app = pressKey(app, 'H')
-	app = pressKey(app, 'H')
-	if app.contentViewport.Width() <= width {
-		t.Fatal("hiding comments did not widen the source")
-	}
-	if len(app.contentLayout.rows) != app.tab().doc.LineCount() {
-		t.Fatal("hidden comments still occupy rows")
-	}
-	if app.gutterComment(0) != "c" || app.gutterComment(1) != "c" || app.gutterComment(2) != "" {
-		t.Fatal("gutter markers do not match the commented range")
-	}
-	for _, row := range strings.Split(app.renderCommentGutter(), "\n") {
-		if got := lipgloss.Width(row); got != app.commentPanelWidth() {
-			t.Fatalf("gutter row width = %d, want %d: %q", got, app.commentPanelWidth(), row)
-		}
-	}
-	app = pressKey(app, 'j')
-	app = pressKey(app, 'j')
-	if app.tab().cursorLine != 3 || app.tab().cursorOnAnnotation {
-		t.Fatal("movement stopped on a hidden comment")
-	}
-	left, top, _, _ := app.commentBounds()
-	app = clickMouse(app, left+1, top)
-	if app.editingID != "c" || app.modal == noModal || !app.hideComments {
-		t.Fatal("gutter click did not open the thread while keeping reading mode")
-	}
-	app = pressKey(app, tea.KeyEscape)
-	app = pressKey(app, 'H')
-	if app.contentViewport.Width() != width {
-		t.Fatal("restoring comments did not restore source width")
-	}
-}
-
-func TestHiddenCommentGutterTracksDeletedWrappedLines(t *testing.T) {
-	app := setupAppWithDoc(t, "new line\n")
-	app.width, app.height = 60, 30
-	app.tab().deletedAfter = map[int][]gitpkg.DeletedLine{
-		0: {{OldLineNum: 1, Content: strings.Repeat("deleted ", 30)}},
-	}
-	app.tab().state.Comments = []review.Comment{{ID: "old", StartLine: 1, EndLine: 1, Side: "old", Body: "hidden"}}
-	app = pressKey(app, 'H')
-	app = pressKey(app, 'H')
-	oldRows := 0
-	for row, target := range app.contentLayout.rows {
-		if target.side == "old" {
-			oldRows++
-		} else if app.gutterComment(row) != "" {
-			t.Fatal("old-side marker leaked onto new-side line")
-		}
-	}
-	if oldRows < 2 {
-		t.Fatal("fixture did not wrap the deleted line")
-	}
-	for row := range oldRows {
-		want := ""
-		if row == oldRows-1 {
-			want = "old"
-		}
-		if got := app.gutterComment(row); got != want {
-			t.Fatalf("row %d marker = %q, want %q", row, got, want)
-		}
-	}
-	app.contentViewport.SetHeight(1)
-	app.contentViewport.SetYOffset(oldRows - 1)
-	if !strings.Contains(ansi.Strip(app.renderCommentGutter()), "💬") {
-		t.Fatal("gutter did not follow scrolling")
-	}
-	app.contentViewport.SetYOffset(0)
-	if strings.Contains(ansi.Strip(app.renderCommentGutter()), "💬") {
-		t.Fatal("marker appeared before the last wrapped row became visible")
-	}
-}
-
-func TestFoldShortcutsPreserveInput(t *testing.T) {
-	for _, key := range []rune{'h', 'H'} {
+func TestCommentDisplayShortcutsPreserveInput(t *testing.T) {
+	for _, key := range []rune{'h', 'o', 'O', 'V'} {
 		for _, modal := range []modalType{commentModal, fileCommentModal, replyModal, editModal, finishModal, discardChangesModal, deleteConfirmModal, helpModal} {
 			app := setupAppWithDoc(t, "source\n")
 			app.modal = modal
 			app.modalTextarea.Focus()
 			app, _ = updateApp(app, tea.KeyPressMsg{Code: key, Text: string(key)})
-			if app.hideComments || app.foldResolved {
+			if app.viewMode || app.openAll {
 				t.Fatalf("modal %v: %c changed comment visibility", modal, key)
 			}
 			switch modal {
@@ -517,7 +367,7 @@ func TestFoldShortcutsPreserveInput(t *testing.T) {
 		app := newCommentNavigationTestApp()
 		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
 		app, _ = updateApp(app, tea.KeyPressMsg{Code: key, Text: string(key)})
-		if app.fileSelect.input.Value() != string(key) || app.hideComments || app.foldResolved {
+		if app.fileSelect.input.Value() != string(key) || app.viewMode || app.openAll {
 			t.Fatalf("%c was intercepted in the file selector", key)
 		}
 	}
@@ -601,13 +451,12 @@ func TestResolvedThreadsOpenWithEnter(t *testing.T) {
 				app.focused = commentPane
 				app.updateCommentSidebar()
 			}
-			app = pressKey(app, 'H')
 			view := app.contentViewport.View()
 			if strings.Contains(surface, "sidebar") {
 				view = app.commentViewport.View()
 			}
 			if !strings.Contains(ansi.Strip(view), "resolved body") {
-				t.Fatal("focused resolved body hidden by H")
+				t.Fatal("focused resolved body is not visible")
 			}
 			app = pressKey(app, tea.KeyEnter)
 			if app.modal == noModal || app.editingID != "resolved" {

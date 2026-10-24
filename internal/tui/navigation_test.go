@@ -322,9 +322,9 @@ func TestChangeNavigationFromResolvedAndHiddenComments(t *testing.T) {
 		t.Fatal("should advance from a resolved comment to the next unresolved thread")
 	}
 	app.tabs[0].cursorOnAnnotation = false
-	app.hideComments = true
+	app.viewMode = true
 	app = pressKey(app, 'n')
-	if app.hideComments || app.selectedCommentID() != "first-b" {
+	if app.viewMode || app.selectedCommentID() != "first-b" {
 		t.Fatal("should reveal the unresolved navigation target")
 	}
 }
