@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Cycle comment display with `H`: normal display, fold all resolved threads, then hide all comments.  The former `h` folding shortcut now scrolls tables left, paired with `l` to scroll right.
+
 ### Fixed
 
 - Incremental search highlights the link label or formatted text when a match falls in a hidden Markdown URL, title, or formatting marker.  Current-match highlighting follows source order, including multiline labels, while preserving text styles and clickable links.
-- Markdown tables in documents and attachments render links, emphasis, and inline code instead of showing their markup.  Cells wrap independently to keep columns and borders aligned, preserving short columns' natural widths.  Copying selections retains Markdown formatting and link targets across wrapped cells.  Tables that cannot fit two characters plus padding per column retain whole-row wrapping.
+- Markdown tables in documents and attachments render links, emphasis, and inline code.  Short columns keep their natural widths; long cells wrap at 40 display columns.  Wide tables scroll horizontally with arrow keys, horizontal mouse wheels, or clickable edge indicators, and search reveals the current match.  Copying selections retains Markdown formatting and link targets across wrapped and scrolled cells.
 
 ## 1.6.0
 

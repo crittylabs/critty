@@ -42,8 +42,7 @@ type keyMap struct {
 	ResolveNext      key.Binding
 	NextUnresolved   key.Binding
 	PrevUnresolved   key.Binding
-	HideComments     key.Binding
-	FoldResolved     key.Binding
+	CommentDisplay   key.Binding
 	Reload           key.Binding
 	Watch            key.Binding
 	IgnoreWhitespace key.Binding
@@ -78,8 +77,7 @@ var keys = keyMap{
 	PrevChange:       key.NewBinding(key.WithKeys("N"), key.WithHelp("N", "prev change/open thread/form")),
 	Resolve:          key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resolve/unresolve")),
 	ResolveNext:      key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "resolve and go to next")),
-	HideComments:     key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "hide/show comments")),
-	FoldResolved:     key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "fold resolved comments")),
+	CommentDisplay:   key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "cycle comment display")),
 	Reload:           key.NewBinding(key.WithKeys("f5", "alt+r"), key.WithHelp("F5/M-r", "reload")),
 	Watch:            key.NewBinding(key.WithKeys("W", "shift+w", "shift+W", "shift+f5", "alt+R", "alt+shift+r", "alt+shift+R"), key.WithHelp("W/S-F5/M-R", "watch")),
 	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),

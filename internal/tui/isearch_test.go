@@ -236,9 +236,7 @@ func TestISearchHiddenMatchInTable(t *testing.T) {
 			t.Fatalf("width=%d: count = %d, want 2", width, app.isearch.count)
 		}
 		assertISearchHighlight(t, app.contentViewport.GetContent(), "label", true)
-		assertISearchHighlight(t, app.contentViewport.GetContent(), "needle", false)
 		app = ctrlKey(app, 's')
-		assertISearchHighlight(t, app.contentViewport.GetContent(), "label", false)
 		assertISearchHighlight(t, app.contentViewport.GetContent(), "needle", true)
 	}
 }

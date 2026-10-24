@@ -214,6 +214,7 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
+	tables       []tableViewport
 	textSpans    []contentTextSpan
 	columns      []diffMouseRow
 	formControls []formControl
@@ -1016,6 +1017,17 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.focused == commentPane && m.sidebarView == filesView && !t.selecting && m.handleFileTreeKey(msg) {
 		return m, nil
 	}
+	if m.focused == contentPane && !t.cursorOnAnnotation && t.cursorSide == "" &&
+		(msg.String() == "left" || msg.String() == "right" || msg.String() == "h" || msg.String() == "l") {
+		if table := m.tableAtLine(t.cursorLine); table != nil {
+			direction := 1
+			if msg.String() == "left" || msg.String() == "h" {
+				direction = -1
+			}
+			m.scrollTable(*table, direction*max(1, table.window.width/2))
+			return m, nil
+		}
+	}
 
 	if msg.String() == "ctrl+pgup" || msg.String() == "ctrl+pgdown" {
 		direction := 1
@@ -1070,15 +1082,14 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.toggleImages()
 		return m, cmd
 
-	case key.Matches(msg, keys.FoldResolved):
-		m.foldResolved = !m.foldResolved
-		m.hideComments = false
-		m.recalculateLayout()
-		m.updateCommentSidebar()
-		m.rebuildContent()
-		return m, nil
-
-	case key.Matches(msg, keys.HideComments):
+	case key.Matches(msg, keys.CommentDisplay):
+		if !m.foldResolved && !m.hideComments {
+			m.foldResolved = true
+			m.recalculateLayout()
+			m.updateCommentSidebar()
+			m.rebuildContent()
+			return m, nil
+		}
 		selectedID := ""
 		if t.sidebarCursor < len(t.sidebarItems) {
 			selectedID = t.sidebarItems[t.sidebarCursor].id
@@ -3357,6 +3368,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal != noModal {
 		return m, nil
 	}
+	if m.handleTableScrollClick(mouse) {
+		return m, nil
+	}
 	pendingTextLink := ""
 	if !m.tab().selecting {
 		uri := m.referenceAt(mouse.X, mouse.Y)
@@ -4138,6 +4152,16 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	mouse := msg.Mouse()
+	if mouse.Button == tea.MouseWheelLeft || mouse.Button == tea.MouseWheelRight {
+		if table := m.tableAtMouse(mouse); table != nil {
+			direction := 1
+			if mouse.Button == tea.MouseWheelLeft {
+				direction = -1
+			}
+			m.scrollTable(*table, direction*max(1, table.window.width/2))
+		}
+		return m, nil
+	}
 	direction := 1
 	if mouse.Button == tea.MouseWheelUp {
 		direction = -1
@@ -4427,6 +4451,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		return renderHelpGroup("View (read-only)", []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
 			{keys: "up/down,j/k · PgUp/PgDn", desc: "move / scroll"},
+			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table horizontally; long cells wrap at 40 columns"},
+			{keys: "H", desc: "cycle comments: normal / fold resolved / hide all"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
@@ -4447,7 +4473,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
-		{keys: "h/H", desc: "fold/hide"},
+		{keys: "H", desc: "normal/fold/hide comments"},
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
@@ -4459,6 +4485,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
 		{keys: "↑/↓,j/k", desc: "move"},
+		{keys: "←/→,h/l", desc: "scroll table"},
 		{keys: "PgUp/PgDn", desc: "half page"},
 		{keys: "shift+↑/↓,C-u/d", desc: "half page"},
 		{keys: "Home/End,g/G,</>", desc: "top/bottom"},
@@ -4482,6 +4509,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, general, "  ", navigation, "  ", codeReview)
 	contexts := renderHelpGroup("Selection and dialogs", []helpItem{
 		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
+		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
+		{keys: "H", desc: "cycle comment display: normal (current-round resolved threads stay open), fold all resolved threads, hide all comments"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},

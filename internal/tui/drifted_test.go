@@ -260,6 +260,7 @@ func TestUnplacedCommentsStayReachable(t *testing.T) {
 				t.Fatal("fallback changed stored drift or scope")
 			}
 			app = pressKey(app, 'H')
+			app = pressKey(app, 'H')
 			app.toggleDrifted(c.ID)
 			app.selectMarker([]string{c.ID})
 			if !app.hideComments || app.modal != noModal || !strings.Contains(ansi.Strip(app.contentViewport.View()), c.Anchor) {
@@ -275,6 +276,7 @@ func TestDriftedDeletedMarkerAndHiddenMode(t *testing.T) {
 	app.recalculateLayout()
 	app.tab().deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "deleted"}}}
 	app.tab().state.Comments = []review.Comment{{ID: "old", StartLine: 1, EndLine: 1, Side: "old", Drifted: true, Body: "body", Anchor: "old anchor"}}
+	app = pressKey(app, 'H')
 	app = pressKey(app, 'H')
 	app.toggleDrifted("old")
 	marker := app.contentLayout.markers[0]

@@ -212,10 +212,16 @@ func TestTextSelectionMarkdownTableSource(t *testing.T) {
 				app.width, app.height = width, 30
 				app.recalculateLayout()
 				app.rebuildContent()
-				for _, span := range app.contentLayout.textSpans {
+				for index, span := range app.contentLayout.textSpans {
 					start := strings.Index(span.text, selected)
 					if start < 0 {
 						continue
+					}
+					if table := app.tableAtLine(span.ref.line); table != nil {
+						x := span.left - table.left + table.window.offset + ansi.StringWidth(span.text[:start])
+						end := x + ansi.StringWidth(selected)
+						app.scrollTable(*table, table.window.reveal(x, end)-table.window.offset)
+						span = app.contentLayout.textSpans[index]
 					}
 					left, top, _, _ := app.contentBounds()
 					app = pressMouse(app, left+span.left+ansi.StringWidth(span.text[:start]), top+span.row)

@@ -356,20 +356,21 @@ func TestToggleCommentVisibility(t *testing.T) {
 		app.focused = focus
 		app.tab().cursorOnAnnotation = true
 		app.updateCommentSidebar()
-		for _, folded := range []bool{true, false} {
+		for _, hidden := range []bool{false, true, false} {
 			app = pressKey(app, 'H')
-			if app.hideComments != folded {
-				t.Fatal("folding changed the wrong preference")
+			if app.hideComments != hidden {
+				t.Fatal("comment display cycle selected the wrong mode")
 			}
 			screen, _ := app.renderReviewScreen()
 			for _, view := range []string{app.contentViewport.View(), screen} {
-				if strings.Contains(ansi.Strip(view), "body") == folded {
-					t.Fatalf("folded=%t: unexpected body visibility in %q", folded, ansi.Strip(view))
+				if strings.Contains(ansi.Strip(view), "body") == hidden {
+					t.Fatalf("hidden=%t: unexpected body visibility in %q", hidden, ansi.Strip(view))
 				}
 			}
 		}
 	}
 	app := newCommentNavigationTestApp()
+	app = pressKey(app, 'H')
 	app = pressKey(app, 'H')
 	app = pressKey(app, '3')
 	if app.activeTab != 2 || !app.hideComments {
@@ -378,9 +379,9 @@ func TestToggleCommentVisibility(t *testing.T) {
 }
 
 func TestCommentVisibilityThreeStates(t *testing.T) {
-	for _, initial := range []rune{0, 'h', 'H'} {
-		for _, pressed := range []rune{'h', 'H'} {
-			t.Run(fmt.Sprintf("%d/%c", initial, pressed), func(t *testing.T) {
+	for initial := range 3 {
+		for presses := 1; presses <= 3; presses++ {
+			t.Run(fmt.Sprintf("%d/%d", initial, presses), func(t *testing.T) {
 				comments := []review.Comment{
 					{ID: "open", Scope: "file", Body: "open body"},
 					{ID: "current", Scope: "file", Body: "current body", Resolved: true, ResolvedRound: 3},
@@ -390,20 +391,19 @@ func TestCommentVisibilityThreeStates(t *testing.T) {
 				app.session.CJ.ReviewRound = 3
 				app.width, app.height = 160, 60
 				app.recalculateLayout()
-				if initial != 0 {
-					app = pressKey(app, initial)
+				for range initial {
+					app = pressKey(app, 'H')
 				}
-				app = pressKey(app, pressed)
-				want := pressed
-				if initial == pressed {
-					want = 0
+				for range presses {
+					app = pressKey(app, 'H')
 				}
-				if app.hideComments != (want == 'H') || app.foldResolved != (want == 'h') {
+				want := (initial + presses) % 3
+				if app.hideComments != (want == 2) || app.foldResolved != (want == 1) {
 					t.Fatalf("state: hidden=%v folded=%v, want %d", app.hideComments, app.foldResolved, want)
 				}
 				for _, view := range []string{app.contentViewport.View(), app.commentViewport.View()} {
 					plain := ansi.Strip(view)
-					if strings.Contains(plain, "open body") != (want != 'H') ||
+					if strings.Contains(plain, "open body") != (want != 2) ||
 						strings.Contains(plain, "current body") != (want == 0) || strings.Contains(plain, "past body") {
 						t.Fatalf("state %d: incorrect bodies: %q", want, plain)
 					}
@@ -420,6 +420,7 @@ func TestHiddenCommentsUseClickableGutter(t *testing.T) {
 	width := app.contentViewport.Width()
 	app.tab().state.Comments = []review.Comment{{ID: "c", StartLine: 1, EndLine: 2, Body: "body"}}
 	app.tab().cursorLine = 1
+	app = pressKey(app, 'H')
 	app = pressKey(app, 'H')
 	if app.contentViewport.Width() <= width {
 		t.Fatal("hiding comments did not widen the source")
@@ -459,6 +460,7 @@ func TestHiddenCommentGutterTracksDeletedWrappedLines(t *testing.T) {
 		0: {{OldLineNum: 1, Content: strings.Repeat("deleted ", 30)}},
 	}
 	app.tab().state.Comments = []review.Comment{{ID: "old", StartLine: 1, EndLine: 1, Side: "old", Body: "hidden"}}
+	app = pressKey(app, 'H')
 	app = pressKey(app, 'H')
 	oldRows := 0
 	for row, target := range app.contentLayout.rows {
@@ -599,13 +601,13 @@ func TestResolvedThreadsOpenWithEnter(t *testing.T) {
 				app.focused = commentPane
 				app.updateCommentSidebar()
 			}
-			app = pressKey(app, 'h')
+			app = pressKey(app, 'H')
 			view := app.contentViewport.View()
 			if strings.Contains(surface, "sidebar") {
 				view = app.commentViewport.View()
 			}
 			if !strings.Contains(ansi.Strip(view), "resolved body") {
-				t.Fatal("focused resolved body hidden by h")
+				t.Fatal("focused resolved body hidden by H")
 			}
 			app = pressKey(app, tea.KeyEnter)
 			if app.modal == noModal || app.editingID != "resolved" {

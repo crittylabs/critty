@@ -749,6 +749,37 @@ def scenarios() -> None:
         report(
             "multiline Markdown keeps formatting, source text and comment lines after resize"
         )
+        (WORK / "table.md").write_text(
+            "| StartColumn | EndColumn |\n| --- | --- |\n| "
+            + "left " * 25
+            + " | "
+            + "filler " * 30
+            + "[target](https://hidden.example) |\n"
+        )
+        table = Round("table-scroll", ["table.md"])
+        tmux("resize-pane", "-t", table.pane, "-x", "60", "-y", "24")
+        table.wait_screen("▶", "wide table has a horizontal scroll button")
+        table.keys("C-s")
+        table.text("hidden.example")
+        table.wait_screen("target", "search reveals a wrapped link in a hidden column")
+        table.keys("Enter", "Left", "Left", "Left", "Left")
+        table.wait_screen("StartColumn", "left arrow returns to the first table column")
+        table.keys("l")
+        table.wait_screen("◀", "l scrolls the table right")
+        table.keys("h", "h", "h", "h")
+        table.wait_screen("StartColumn", "h scrolls the table left")
+        table.click("▶")
+        table.wait_screen("◀", "right edge button scrolls the table")
+        table.keys("Enter")
+        table.wait_screen("Add Comment (line 3)", "scrolled table retains source line")
+        table.text("Keep the source line after scrolling.")
+        table.keys("C-s")
+        wait_until(lambda: table.comments(), "scrolled table comment saved")
+        assert table.comments()[0]["start_line"] == 3, table.comments()
+        table.finish(False)
+        report(
+            "wide tables scroll with keys and mouse, reveal hidden search matches, and retain comment anchors"
+        )
         marker_job = ROOT / "doctor-marker.job.json"
         marker_job.write_text(
             json.dumps(

@@ -11,15 +11,16 @@ import (
 
 // Text spans exclude gutters, annotations, images and split-diff padding.
 type contentTextSpan struct {
-	row, left, column int
-	ref               lineRef
-	text              string
-	offset            int
-	source            string
-	tableSource       string
-	literal           bool
-	mapped            bool
-	right             int
+	row, left, column   int
+	ref                 lineRef
+	text                string
+	offset              int
+	source              string
+	tableSource         string
+	literal             bool
+	mapped              bool
+	right               int
+	clipLeft, clipRight int
 }
 
 type textPoint struct{ span, offset int }
@@ -70,7 +71,12 @@ func (m *AppModel) startTextSelection(mouse tea.Mouse) {
 		if span.right > 0 {
 			right = span.right
 		}
-		if span.row == row && x >= span.left && x < right {
+		left := span.left
+		if span.clipRight > 0 {
+			right = span.left + ansi.StringWidth(span.text)
+			left, right = max(left, span.clipLeft), min(right, span.clipRight)
+		}
+		if span.row == row && x >= left && x < right {
 			point := textPoint{i, textColumnOffset(span.text, x-span.left)}
 			m.textSelection = contentTextSelection{active: true, dragging: true, tab: m.activeTab,
 				anchor: point, cursor: point, spans: slices.Clone(m.contentLayout.textSpans)}
@@ -106,7 +112,14 @@ func (m *AppModel) updateTextSelection(mouse tea.Mouse, autoScroll bool) {
 		if span.right > 0 {
 			right = span.right
 		}
-		horizontal := max(span.left-x, x-right, 0)
+		left := span.left
+		if span.clipRight > 0 {
+			left, right = max(left, span.clipLeft), min(right, span.clipRight)
+			if left >= right {
+				continue
+			}
+		}
+		horizontal := max(left-x, x-right, 0)
 		if distance < bestRow || distance == bestRow && horizontal < bestColumn {
 			best, bestRow, bestColumn = i, distance, horizontal
 		}
@@ -312,6 +325,7 @@ func (m *AppModel) decorateTextSelection(content string) string {
 	}
 	if s.tab != m.activeTab || !slices.EqualFunc(s.spans, m.contentLayout.textSpans, func(a, b contentTextSpan) bool {
 		a.row, a.left, a.right = b.row, b.left, b.right
+		a.clipLeft, a.clipRight = b.clipLeft, b.clipRight
 		return a == b
 	}) {
 		m.textSelection = contentTextSelection{}
@@ -336,6 +350,12 @@ func (m *AppModel) decorateTextSelection(content string) string {
 			end = b.offset
 		}
 		x, y := span.left+ansi.StringWidth(span.text[:start]), span.left+ansi.StringWidth(span.text[:end])
+		if span.clipRight > 0 {
+			x, y = max(x, span.clipLeft), min(y, span.clipRight)
+		}
+		if x >= y {
+			continue
+		}
 		row := rows[span.row]
 		rows[span.row] = ansi.Cut(row, 0, x) + inlineBackground(textSelectionBg, ansi.Cut(row, x, y)) + ansi.Cut(row, y, lipgloss.Width(row))
 	}

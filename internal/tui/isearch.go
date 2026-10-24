@@ -672,6 +672,7 @@ func (m *AppModel) isearchLand(match isearchMatch, ok bool) {
 	t.cursorOnForm = false
 	m.rebuildContent()
 	m.scrollToCursor()
+	m.revealTableMatch()
 }
 
 // countISearch records the number of matches and the current match's
