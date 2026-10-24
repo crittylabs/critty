@@ -134,8 +134,8 @@ type AppModel struct {
 	author           string
 	authorColors     map[string]int
 	threadScrolls    map[threadViewKey]threadScroll
-	hideComments     bool
-	foldResolved     bool
+	viewMode         bool
+	openAll          bool
 	ignoreWhitespace bool
 	split            bool
 	viewAttention    *diffAttention
@@ -214,6 +214,7 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
+	tables       []tableViewport
 	textSpans    []contentTextSpan
 	columns      []diffMouseRow
 	formControls []formControl
@@ -1003,7 +1004,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.copyReference()
 		return m, cmd
 	}
-	if msg.String() == "alt+o" && !t.selecting {
+	if (msg.String() == "o" || msg.String() == "alt+o") && !t.selecting {
 		return m, m.openReferenceAtCursor()
 	}
 	if msg.String() == "alt+p" && m.multiFile {
@@ -1015,6 +1016,17 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.focused == commentPane && m.sidebarView == filesView && !t.selecting && m.handleFileTreeKey(msg) {
 		return m, nil
+	}
+	if m.focused == contentPane && !t.cursorOnAnnotation && t.cursorSide == "" &&
+		(msg.String() == "left" || msg.String() == "right" || msg.String() == "h" || msg.String() == "l") {
+		if table := m.tableAtLine(t.cursorLine); table != nil {
+			direction := 1
+			if msg.String() == "left" || msg.String() == "h" {
+				direction = -1
+			}
+			m.scrollTable(*table, direction*max(1, table.window.width/2))
+			return m, nil
+		}
 	}
 
 	if msg.String() == "ctrl+pgup" || msg.String() == "ctrl+pgdown" {
@@ -1070,52 +1082,17 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.toggleImages()
 		return m, cmd
 
-	case key.Matches(msg, keys.FoldResolved):
-		m.foldResolved = !m.foldResolved
-		m.hideComments = false
-		m.recalculateLayout()
-		m.updateCommentSidebar()
-		m.rebuildContent()
+	case key.Matches(msg, keys.CommentDisplay):
+		m.toggleCommentView()
 		return m, nil
-
-	case key.Matches(msg, keys.HideComments):
-		selectedID := ""
-		if t.sidebarCursor < len(t.sidebarItems) {
-			selectedID = t.sidebarItems[t.sidebarCursor].id
-		}
-		m.hideComments = !m.hideComments
-		m.foldResolved = false
-		if m.hideComments {
-			for i := range m.tabs {
-				clear(m.tabs[i].expandedDrifted)
-			}
-		}
-		m.focused = contentPane
-		t.cursorOnAnnotation = false
-		if t.cursorLine == 0 {
-			m.moveCursorBy(t, 1, 1)
-		}
-		m.recalculateLayout()
-		m.updateCommentSidebar()
-		for i, item := range t.sidebarItems {
-			if item.id == selectedID {
-				t.sidebarCursor = i
-				break
-			}
-		}
-		m.updateCommentSidebar()
-		m.rebuildContent()
-		if m.focused == commentPane {
-			m.scrollToSidebarCursor()
-		} else {
-			m.scrollToCursor()
-		}
+	case key.Matches(msg, keys.OpenAll):
+		m.toggleOpenAll()
 		return m, nil
 
 	case key.Matches(msg, keys.Tab):
 		if !t.selecting {
-			if m.hideComments {
-				m.hideComments = false
+			if m.viewMode {
+				m.viewMode = false
 				m.recalculateLayout()
 			}
 			if m.focused == contentPane {
@@ -1259,9 +1236,6 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Content pane cursor movement (annotation-aware)
 	if m.focused == contentPane && (t.doc != nil || t.cursorOnAnnotation) {
 		moved := false
-		if m.hideComments && key.Matches(msg, keys.Up, keys.Down) {
-			t.cursorOnAnnotation = false
-		}
 		switch {
 		case key.Matches(msg, keys.Down):
 			if t.cursorOnAnnotation {
@@ -1277,7 +1251,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 			} else {
 				anns := m.annotationsAfterLine(t.cursorLine, t.cursorSide)
-				if len(anns) > 0 && !t.selecting && !m.hideComments {
+				if len(anns) > 0 && !t.selecting {
 					t.cursorOnAnnotation = true
 					t.cursorAnnoIdx = 0
 				} else if next, ok := m.adjacentLine(t, 1); ok && (!t.selecting || next.side == t.selectSide) {
@@ -1296,14 +1270,14 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			} else {
 				if prev, ok := m.adjacentLine(t, -1); ok && (!t.selecting || prev.side == t.selectSide) {
 					anns := m.annotationsAfterLine(prev.line, prev.side)
-					if len(anns) > 0 && !t.selecting && !m.hideComments {
+					if len(anns) > 0 && !t.selecting {
 						t.cursorLine, t.cursorSide = prev.line, prev.side
 						t.cursorOnAnnotation = true
 						t.cursorAnnoIdx = len(anns) - 1
 					} else {
 						t.cursorLine, t.cursorSide = prev.line, prev.side
 					}
-				} else if !t.selecting && !m.hideComments {
+				} else if !t.selecting {
 					if anns := m.annotationsAfterLine(0, ""); len(anns) > 0 {
 						t.cursorLine, t.cursorSide = 0, ""
 						t.cursorOnAnnotation, t.cursorAnnoIdx = true, len(anns)-1
@@ -2456,7 +2430,7 @@ func (m *AppModel) recalculateLayout() {
 	// remains for the bottom border.
 	mainHeight := max(0, m.height-headerHeight-tabBarHeight-footerHeight-1)
 
-	// The comment pane (or the gutter when comments are hidden) takes
+	// The comment pane takes
 	// commentPanelWidth columns; the content pane's borders take two.
 	contentWidth := m.width - m.commentPanelWidth() - 2
 
@@ -2514,39 +2488,37 @@ type commentTarget struct {
 
 // sidebarItem represents a comment in the sidebar list.
 type sidebarItem struct {
-	drifted       bool
-	id            string
-	scope         string
-	line          int
-	endLine       int
-	side          string
-	body          string
-	author        string
-	replies       []review.Reply
-	resolved      bool
-	resolvedRound int
+	drifted  bool
+	id       string
+	scope    string
+	line     int
+	endLine  int
+	side     string
+	body     string
+	author   string
+	replies  []review.Reply
+	resolved bool
 }
 
 // annotation represents an inline comment to render.
 type annotation struct {
-	drifted       bool
-	id            string
-	scope         string
-	body          string
-	line          int
-	endLine       int
-	side          string
-	author        string
-	resolved      bool
-	resolvedRound int
-	replies       []review.Reply
+	drifted  bool
+	id       string
+	scope    string
+	body     string
+	line     int
+	endLine  int
+	side     string
+	author   string
+	resolved bool
+	replies  []review.Reply
 }
 
 func newAnnotation(c review.Comment) annotation {
 	return annotation{
 		id: c.ID, body: c.Body, scope: c.Scope,
 		line: c.StartLine, endLine: c.EndLine, side: c.Side,
-		author: c.Author, resolved: c.Resolved, resolvedRound: c.ResolvedRound, replies: c.Replies,
+		author: c.Author, resolved: c.Resolved, replies: c.Replies,
 	}
 }
 
@@ -2568,7 +2540,7 @@ func (m *AppModel) updateCommentSidebar() {
 		t.sidebarItems = append(t.sidebarItems, sidebarItem{
 			id: c.ID, scope: c.Scope, line: c.StartLine, endLine: c.EndLine, drifted: commentDrifted(t, c),
 			side: c.Side, body: c.Body, author: c.Author, replies: c.Replies,
-			resolved: c.Resolved, resolvedRound: c.ResolvedRound,
+			resolved: c.Resolved,
 		})
 	}
 	sort.SliceStable(t.sidebarItems, func(i, j int) bool {
@@ -2590,7 +2562,7 @@ func (m *AppModel) updateCommentSidebar() {
 	if t.sidebarCursor < 0 {
 		t.sidebarCursor = 0
 	}
-	if m.hideComments {
+	if m.viewMode {
 		m.commentViewport.SetContent("")
 		return
 	}
@@ -2609,9 +2581,9 @@ func (m *AppModel) updateCommentSidebar() {
 
 	for idx, it := range t.sidebarItems {
 		isSelected := m.focused == commentPane && idx == t.sidebarCursor
-		collapsed := m.collapseResolved(it.resolved, it.resolvedRound) && !isSelected
+		collapsed := m.commentCollapsed(it.resolved, isSelected)
 		if it.drifted {
-			collapsed = (!m.driftedExpanded(it.id, it.resolved) || (m.foldResolved && it.resolved)) && (!isSelected || !it.resolved)
+			collapsed = m.viewMode || !m.driftedExpanded(it.id, it.resolved) && (!isSelected || !it.resolved)
 		}
 		var item strings.Builder
 
@@ -2865,7 +2837,7 @@ func (m AppModel) renderReviewBar() string {
 		text += style.Render(scope) + reviewBarStyle.Render(" ")
 	}
 	text += reviewBarStyle.Render(subject)
-	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.searchButton(), m.submitButton()}
+	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.submitButton()}
 	var rows []string
 	row := ""
 	for _, button := range buttons {
@@ -3044,13 +3016,10 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		Width(m.contentViewport.Width()).
 		Height(m.contentViewport.Height()).
 		Render(content)
-	if m.hideComments {
-		contentBox = lipgloss.JoinHorizontal(lipgloss.Top, contentBox, m.renderCommentGutter())
-	}
 	contentPane := renderPane(m.renderTabBar(), contentBox, lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
 
 	mainRow := contentPane
-	if !m.hideComments {
+	if !m.viewMode {
 		mainRow = lipgloss.JoinHorizontal(lipgloss.Top, contentPane, m.renderSidebarPane())
 	}
 
@@ -3071,7 +3040,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if button := m.splitButton(); button != "" {
 		layout.splitButton, layout.hasSplitButton = buttonRect(header, 0, button)
 	}
-	if rect, ok := buttonRect(header, 0, m.searchButton()); ok && m.searchButton() != "" {
+	if rect, ok := buttonRect(footer, footerTop, m.searchHint()); ok && m.searchHint() != "" && !m.isearch.active {
 		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
 	}
 	if m.isearch.active && m.modal == noModal {
@@ -3357,6 +3326,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal != noModal {
 		return m, nil
 	}
+	if m.handleTableScrollClick(mouse) {
+		return m, nil
+	}
 	pendingTextLink := ""
 	if !m.tab().selecting {
 		uri := m.referenceAt(mouse.X, mouse.Y)
@@ -3531,12 +3503,6 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 
 	left, top, right, bottom = m.commentBounds()
 	if mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
-		if m.hideComments {
-			if id := m.gutterComment(mouse.Y - top + m.contentViewport.YOffset()); id != "" {
-				m.openCommentThread(id)
-			}
-			return m, nil
-		}
 		if m.sidebarView == filesView {
 			m.handleFileTreeClick(mouse.Y - top + m.fileTree.viewport.YOffset())
 			m.rebuildContent()
@@ -3876,53 +3842,19 @@ func (m *AppModel) highlightedCommentLines() (int, int, string) {
 }
 
 func (m AppModel) commentPanelWidth() int {
-	if m.hideComments {
-		return 4
+	if m.viewMode {
+		return 0
 	}
 	return max(m.width/4, 26) // room for the Comments and Files tabs
-}
-
-func (m AppModel) gutterComment(row int) string {
-	if m.tab().state == nil || row < 0 || row >= len(m.contentLayout.rows) {
-		return ""
-	}
-	target := m.contentLayout.rows[row]
-	if target.line <= 0 {
-		return ""
-	}
-	if row+1 < len(m.contentLayout.rows) {
-		next := m.contentLayout.rows[row+1]
-		if next.line == target.line && next.side == target.side {
-			return ""
-		}
-	}
-	for _, c := range m.tab().state.Comments {
-		if !commentDrifted(m.tab(), c) && !isGeneralCommentScope(c.Scope) && c.Side == target.side && c.StartLine <= target.line && target.line <= c.EndLine {
-			return c.ID
-		}
-	}
-	return ""
-}
-
-func (m AppModel) renderCommentGutter() string {
-	rows := make([]string, m.contentViewport.Height())
-	for i := range rows {
-		marker := " "
-		if m.gutterComment(i+m.contentViewport.YOffset()) != "" {
-			marker = "💬"
-		}
-		rows[i] = lipgloss.NewStyle().Width(m.commentPanelWidth()).Align(lipgloss.Center).Render(marker)
-	}
-	return strings.Join(rows, "\n")
 }
 
 // paneHorizontalPadding is the space between a pane's side borders and its body.
 const paneHorizontalPadding = 1
 
 // contentPaneWidth returns the total width of the tabbed content pane,
-// including its borders and the gutter shown while comments are hidden.
+// including its borders.  View mode uses the full terminal width.
 func (m AppModel) contentPaneWidth() int {
-	if m.hideComments {
+	if m.viewMode {
 		return m.width
 	}
 	return m.width - m.commentPanelWidth()
@@ -3980,7 +3912,7 @@ func (m AppModel) sidebarTabs() []string {
 
 // sidebarTabAt returns the sidebar view whose tab spans screen column x.
 func (m AppModel) sidebarTabAt(x int) (sidebarView, bool) {
-	if m.hideComments {
+	if m.viewMode {
 		return 0, false
 	}
 	left := m.contentPaneWidth()
@@ -4046,7 +3978,7 @@ func joinTabRowRight(row string, style lipgloss.Style) string {
 
 func (m *AppModel) commentBounds() (left, top, right, bottom int) {
 	_, top, left, bottom = m.contentBounds()
-	if m.hideComments {
+	if m.viewMode {
 		return left, top, left + m.commentPanelWidth(), bottom
 	}
 	left = m.contentPaneWidth() + 1
@@ -4138,6 +4070,16 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	mouse := msg.Mouse()
+	if mouse.Button == tea.MouseWheelLeft || mouse.Button == tea.MouseWheelRight {
+		if table := m.tableAtMouse(mouse); table != nil {
+			direction := 1
+			if mouse.Button == tea.MouseWheelLeft {
+				direction = -1
+			}
+			m.scrollTable(*table, direction*max(1, table.window.width/2))
+		}
+		return m, nil
+	}
 	direction := 1
 	if mouse.Button == tea.MouseWheelUp {
 		direction = -1
@@ -4145,7 +4087,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	left, top, right, bottom := m.commentBounds()
-	if !m.hideComments && mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
+	if !m.viewMode && mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
 		if m.sidebarView == filesView {
 			if direction < 0 {
 				m.fileTree.viewport.ScrollUp(3)
@@ -4171,7 +4113,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	left, top, right, bottom = m.contentBounds()
-	if mouse.X < left || (!m.hideComments && mouse.X >= right) || mouse.Y < top || mouse.Y >= bottom {
+	if mouse.X < left || (!m.viewMode && mouse.X >= right) || mouse.Y < top || mouse.Y >= bottom {
 		return m, nil
 	}
 	if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && target.annotation && mouse.X >= left+gutterWidth {
@@ -4285,7 +4227,7 @@ func (m AppModel) renderFooter() string {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
-		return footerStyle.Width(m.width).Render(m.footerHelpButton() + " · View: read-only · /: search · v: select · M-w: copy reference · q: close")
+		return m.renderFooterItems([]string{m.footerHelpButton(), "View: read-only", "v: select", "M-w: copy reference", "q: close", m.searchHint()})
 	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
@@ -4357,8 +4299,30 @@ func (m AppModel) renderFooter() string {
 		items = append([]string{button}, items...)
 	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
+	items = append(items, m.searchHint())
 
-	return footerStyle.Width(m.width).Render(strings.Join(items, " · "))
+	return m.renderFooterItems(items)
+}
+
+// Keep each key hint together so its clickable region survives wrapping.
+func (m AppModel) renderFooterItems(items []string) string {
+	var rows []string
+	row := ""
+	for _, item := range items {
+		if item == "" {
+			continue
+		}
+		if row != "" && lipgloss.Width(row)+3+lipgloss.Width(item) > m.width {
+			rows = append(rows, row)
+			row = ""
+		}
+		if row != "" {
+			row += " · "
+		}
+		row += item
+	}
+	rows = append(rows, row)
+	return footerStyle.Width(m.width).Render(strings.Join(rows, "\n"))
 }
 
 // formListButton opens the answer list when any attachment has a form.
@@ -4427,6 +4391,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		return renderHelpGroup("View (read-only)", []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
 			{keys: "up/down,j/k · PgUp/PgDn", desc: "move / scroll"},
+			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table horizontally; long cells wrap at 40 columns"},
+			{keys: "V · O", desc: "reading view / open all comments"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
@@ -4447,11 +4413,11 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/R", desc: "resolve/+next"},
-		{keys: "h/H", desc: "fold/hide"},
+		{keys: "V · O", desc: "reading view / open all"},
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
-		{keys: "alt+o", desc: "open image/link/reference on line"},
+		{keys: "o/M-o", desc: "open image/link/reference on line"},
 		{keys: "SPC/BS·M-o·RET·esc", desc: "zoom·next·open·close"},
 		{keys: "d", desc: "delete comment"},
 		{keys: "q/C-c", desc: "submit review"},
@@ -4459,6 +4425,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
 		{keys: "↑/↓,j/k", desc: "move"},
+		{keys: "←/→,h/l", desc: "scroll table"},
 		{keys: "PgUp/PgDn", desc: "half page"},
 		{keys: "shift+↑/↓,C-u/d", desc: "half page"},
 		{keys: "Home/End,g/G,</>", desc: "top/bottom"},
@@ -4482,6 +4449,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, general, "  ", navigation, "  ", codeReview)
 	contexts := renderHelpGroup("Selection and dialogs", []helpItem{
 		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
+		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
+		{keys: "V", desc: "toggle reading view: hide sidebar and fold all comments; leaving restores the previous expansion setting"},
+		{keys: "O", desc: "toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},

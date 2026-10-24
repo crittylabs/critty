@@ -143,6 +143,10 @@ func (m *AppModel) selectMarker(ids []string) {
 			break
 		}
 	}
+	if m.viewMode || m.openAll {
+		m.openCommentThread(id)
+		return
+	}
 	if len(ids) > 1 {
 		t := m.tab()
 		if t.expandedDrifted == nil {
@@ -169,6 +173,12 @@ func (m *AppModel) selectMarker(ids []string) {
 }
 
 func (m *AppModel) driftedExpanded(id string, resolved bool) bool {
+	if m.viewMode {
+		return false
+	}
+	if m.openAll {
+		return true
+	}
 	if expanded, ok := m.tab().expandedDrifted[id]; ok {
 		return expanded
 	}
@@ -176,6 +186,10 @@ func (m *AppModel) driftedExpanded(id string, resolved bool) bool {
 }
 
 func (m *AppModel) toggleDrifted(id string) {
+	if m.viewMode || m.openAll {
+		m.openCommentThread(id)
+		return
+	}
 	if c, _ := m.driftedComment(id); c.Resolved {
 		m.openCommentThread(id)
 		return

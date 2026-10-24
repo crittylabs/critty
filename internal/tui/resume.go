@@ -102,7 +102,7 @@ func (m *AppModel) focusNewReply() {
 					tab.expandedDrifted[comment.ID] = true
 				}
 				m.threadScrolls[threadViewKey{path: tab.path, id: target.id}] = threadScroll{revealReply: reply.ID}
-				m.hideComments = false
+				m.viewMode = false
 				m.recalculateLayout()
 				m.selectComment(i, target)
 				return

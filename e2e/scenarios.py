@@ -745,9 +745,79 @@ def scenarios() -> None:
         wait_until(lambda: paragraph.comments(), "multiline Markdown comment saved")
         assert paragraph.comments()[0]["start_line"] == 2, paragraph.comments()
         assert (WORK / "paragraph.md").read_text() == paragraph_source
-        paragraph.finish(False)
+        paragraph.click("Resolve")
+        wait_until(
+            lambda: paragraph.comments()[0].get("resolved"),
+            "current-round comment resolved",
+        )
+        wait_until(
+            lambda: "anchors." not in paragraph.screen(),
+            "resolved comment folds by default",
+        )
+        paragraph.keys("O")
+        paragraph.wait_screen("anchors.", "Open all expands resolved comments")
+        paragraph.keys("V")
+        wait_until(
+            lambda: (
+                "Comments (0)" not in paragraph.screen()
+                and "anchors." not in paragraph.screen()
+            ),
+            "View hides the sidebar and folds comment bodies",
+        )
+        paragraph.keys("O")
+        paragraph.wait_screen("Comments (0)", "O leaves View and restores the sidebar")
+        paragraph.wait_screen("anchors.", "O opens all comments when leaving View")
+        paragraph.keys("V")
+        wait_until(
+            lambda: (
+                "Comments (0)" not in paragraph.screen()
+                and "anchors." not in paragraph.screen()
+            ),
+            "View temporarily overrides Open all",
+        )
+        paragraph.keys("V")
+        paragraph.wait_screen("Comments (0)", "V restores the sidebar")
+        paragraph.wait_screen("anchors.", "V restores the previous expansion setting")
+        paragraph.keys("O")
+        wait_until(
+            lambda: "anchors." not in paragraph.screen(),
+            "O restores default expansion",
+        )
+        paragraph.keys("q", "c", "Enter")
+        paragraph.completed(False)
         report(
             "multiline Markdown keeps formatting, source text and comment lines after resize"
+        )
+        (WORK / "table.md").write_text(
+            "| StartColumn | EndColumn |\n| --- | --- |\n| "
+            + "left " * 25
+            + " | "
+            + "filler " * 30
+            + "[target](https://hidden.example) |\n"
+        )
+        table = Round("table-scroll", ["table.md"])
+        tmux("resize-pane", "-t", table.pane, "-x", "60", "-y", "24")
+        table.wait_screen("▶", "wide table has a horizontal scroll button")
+        table.keys("C-s")
+        table.text("hidden.example")
+        table.wait_screen("target", "search reveals a wrapped link in a hidden column")
+        table.keys("Enter", "Left", "Left", "Left", "Left")
+        table.wait_screen("StartColumn", "left arrow returns to the first table column")
+        table.keys("l")
+        table.wait_screen("◀", "l scrolls the table right")
+        table.keys("h", "h", "h", "h")
+        table.wait_screen("StartColumn", "h scrolls the table left")
+        table.click("▶")
+        table.wait_screen("◀", "right edge button scrolls the table")
+        table.keys("Enter")
+        table.wait_screen("Add Comment (line 3)", "scrolled table retains source line")
+        table.text("Keep the source line after scrolling.")
+        table.keys("C-s")
+        wait_until(lambda: table.comments(), "scrolled table comment saved")
+        assert table.comments()[0]["start_line"] == 3, table.comments()
+        table.finish(False)
+        report(
+            "wide tables scroll with keys and mouse, reveal hidden search matches, and retain comment anchors"
         )
         marker_job = ROOT / "doctor-marker.job.json"
         marker_job.write_text(
@@ -816,8 +886,11 @@ def scenarios() -> None:
             tmux("display-message", "-p", "-t", formats.pane, "#{pane_width}")
         )
         wait_until(
-            lambda: (
-                len(formats.screen().splitlines()[0].expandtabs(8)) == pane_width - 1
+            lambda: any(
+                row.startswith("│")
+                and row.endswith("│")
+                and len(row.expandtabs(8)) == pane_width
+                for row in formats.screen().splitlines()
             ),
             "review redrawn at the server's pane width before mouse input",
         )

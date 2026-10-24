@@ -52,18 +52,11 @@ type isearchMouseRegion struct {
 	action isearchMouseAction
 }
 
-func (m AppModel) searchButton() string {
+func (m AppModel) searchHint() string {
 	if len(m.tabs) == 0 || m.tab().doc == nil {
 		return ""
 	}
-	button := renderBarButton("Search", "/")
-	if m.multiFile && m.width > 0 && lipgloss.Width(m.splitButton()+" "+m.whitespaceButton()+" "+button+" "+m.submitButton()+" ") > m.width {
-		return modalBtnFocusedKey.Render("/")
-	}
-	if m.width > 0 && lipgloss.Width(button+" "+m.submitButton()+" ") > m.width {
-		button = renderBarButton("Search", "")
-	}
-	return button
+	return footerKeyStyle.Render("/") + " " + footerDescStyle.Render("search")
 }
 
 func (m AppModel) isearchControls(top int) (string, []isearchMouseRegion) {
@@ -672,6 +665,7 @@ func (m *AppModel) isearchLand(match isearchMatch, ok bool) {
 	t.cursorOnForm = false
 	m.rebuildContent()
 	m.scrollToCursor()
+	m.revealTableMatch()
 }
 
 // countISearch records the number of matches and the current match's

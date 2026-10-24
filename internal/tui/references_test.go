@@ -56,16 +56,18 @@ func TestAttachmentReferences(t *testing.T) {
 					t.Fatal("comment reference did not select the resolved thread")
 				}
 			}
-			app.activeTab = attachment
-			app.tab().cursorLine = 1
-			if tc.name == "table" {
-				app.tab().cursorLine = 3
-			}
-			app.focused = contentPane
-			app.rebuildContent()
-			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
-			if app.activeTab != 1 || app.tab().cursorLine != 2 {
-				t.Fatal("M-o did not follow the first reference on the line")
+			for _, openingKey := range []tea.KeyPressMsg{{Code: 'o', Text: "o"}, {Code: 'o', Mod: tea.ModAlt}} {
+				app.activeTab = attachment
+				app.tab().cursorLine = 1
+				if tc.name == "table" {
+					app.tab().cursorLine = 3
+				}
+				app.focused = contentPane
+				app.rebuildContent()
+				app, _ = updateApp(app, openingKey)
+				if app.activeTab != 1 || app.tab().cursorLine != 2 {
+					t.Fatalf("%s did not follow the first reference on the line", openingKey.String())
+				}
 			}
 		})
 	}
@@ -181,11 +183,11 @@ func TestCommentReferenceNavigation(t *testing.T) {
 			if ansi.Strip(rendered) != body || strings.Count(rendered, "critty://comment") != 1 {
 				t.Fatalf("unexpected reference rendering: %q", rendered)
 			}
-			app.hideComments = true
+			app.viewMode = true
 			if !app.navigateCommentReference("critty://comment?id=c_abcdef") {
 				t.Fatal("reference did not navigate")
 			}
-			if app.activeTab != 1 || app.hideComments || app.selectedCommentID() != "c_abcdef" || !app.tab().state.Comments[0].Resolved {
+			if app.activeTab != 1 || app.viewMode || app.selectedCommentID() != "c_abcdef" || !app.tab().state.Comments[0].Resolved {
 				t.Fatal("reference did not focus the resolved target")
 			}
 			editorMeta(&app, 'w')

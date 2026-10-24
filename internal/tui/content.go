@@ -148,9 +148,21 @@ func (m *AppModel) rebuildContent() {
 	tableBlockMap := make(map[int]*tableBlock)
 	for i := range tableBlocks {
 		tb := &tableBlocks[i]
-		if widths := fitTableWidths(tb.colWidths, textWidth); widths != nil {
-			tb.colWidths = widths
-			tb.wrapCells = true
+		totalWidth := 1
+		for i, width := range tb.colWidths {
+			tb.colWidths[i] = max(2, min(width, tableColumnMaxWidth))
+			totalWidth += tb.colWidths[i] + 3
+		}
+		width, left := textWidth, gutterWidth
+		if totalWidth > width {
+			width -= 2
+			left++
+		}
+		tb.viewport = tableViewport{startLine: tb.startLine, endLine: tb.endLine, left: left,
+			window: horizontalViewport{width: width, contentWidth: totalWidth}}
+		tb.viewport.window.offset = tb.viewport.window.clamp(t.tableOffsets[tb.startLine])
+		if t.tableOffsets != nil {
+			t.tableOffsets[tb.startLine] = tb.viewport.window.offset
 		}
 		for l := tb.startLine; l <= tb.endLine; l++ {
 			tableBlockMap[l] = tb
@@ -186,10 +198,8 @@ func (m *AppModel) rebuildContent() {
 		layout.appendBlock(&b, "", contentMouseTarget{drifted: true})
 	}
 	for idx, ann := range m.annotationsAfterLine(0, "") {
-		if !m.hideComments || ann.drifted {
-			focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == 0 && t.cursorAnnoIdx == idx
-			appendAnnotation(ann, focused, contentMouseTarget{annotation: true, annotationIndex: idx})
-		}
+		focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == 0 && t.cursorAnnoIdx == idx
+		appendAnnotation(ann, focused, contentMouseTarget{annotation: true, annotationIndex: idx})
 	}
 	if t.isBinary || t.doc == nil {
 		if t.isBinary {
@@ -272,9 +282,6 @@ func (m *AppModel) rebuildContent() {
 				layout.appendBlock(&b, images, target)
 			}
 			for idx, ann := range oldAnnosByEndLine[del.OldLineNum] {
-				if m.hideComments && !ann.drifted {
-					continue
-				}
 				focused := m.focused == contentPane && t.cursorOnAnnotation && isCursor && t.cursorAnnoIdx == idx
 				appendAnnotation(ann, focused, contentMouseTarget{
 					line: del.OldLineNum, side: "old", annotation: true, annotationIndex: idx,
@@ -371,13 +378,9 @@ func (m *AppModel) rebuildContent() {
 				isHeader := lineNum == tb.startLine
 				cells := t.markdownTableCellsWithInline(lineNum, m.documentLinkSpans(lineNum, false), inlineChanges)
 				m.highlightTableCells(lineRef{line: lineNum}, cells)
-				if tb.wrapCells {
-					columns = wrapTableCells(cells, tb.colWidths)
-					for row := range tableRowHeight(columns) {
-						rows = append(rows, formatTableRow(tableRowCells(columns, row), tb.colWidths, isHeader))
-					}
-				} else {
-					rows = []string{formatTableRow(cells, tb.colWidths, isHeader)}
+				columns = wrapTableCells(cells, tb.colWidths)
+				for row := range tableRowHeight(columns) {
+					rows = append(rows, formatTableRow(tableRowCells(columns, row), tb.colWidths, isHeader))
 				}
 			}
 
@@ -391,24 +394,27 @@ func (m *AppModel) rebuildContent() {
 				} else if isChanged && len(inlineChanges) == 0 {
 					row = inlineBackground(diffChangedLineBg, row)
 				}
-				if !tb.wrapCells {
-					row = lipgloss.Wrap(row, textWidth, "")
-				}
-				wrappedLines = append(wrappedLines, strings.Split(row, "\n")...)
+				wrappedLines = append(wrappedLines, row)
 			}
 			for wi, row := range wrappedLines {
 				prefix := fmt.Sprintf("%s%s ", marker, numStr)
 				if wi > 0 {
 					prefix = fmt.Sprintf(" %s ", continuationGutter)
 				}
-				if columns != nil {
-					layout.appendBlock(&b, prefix+row, lineTarget)
-				} else {
-					layout.appendLiteralSourceBlock(&b, prefix+row, lineTarget)
+				if columns == nil {
+					layout.addTextSpan(len(layout.rows), 0, 0, prefix+row, lineTarget)
+					span := &layout.textSpans[len(layout.textSpans)-1]
+					span.literal = true
+					span.left = tb.viewport.left - tb.viewport.window.offset
+					span.clipLeft, span.clipRight = tb.viewport.left, tb.viewport.left+tb.viewport.window.width
 				}
+				layout.appendBlock(&b, prefix+tb.viewport.render(row), lineTarget)
 			}
 			if columns != nil {
-				layout.addTableSpans(firstRow, columns, tb.colWidths, &t.markdown.after.lines[lineNum-1], lineTarget)
+				layout.addTableSpans(firstRow, columns, tb.colWidths, &t.markdown.after.lines[lineNum-1], lineTarget, tb.viewport)
+				if match := m.tableSearchMatch(lineNum, firstRow, columns, tb.colWidths); match != nil {
+					tb.viewport.match = match
+				}
 			}
 		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
 			if isSelected || isSidebarHighlight {
@@ -476,9 +482,6 @@ func (m *AppModel) rebuildContent() {
 		}
 		if anns, ok := annosByEndLine[lineNum]; ok {
 			for idx, ann := range anns {
-				if m.hideComments && !ann.drifted {
-					continue
-				}
 				focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorSide == "" && t.cursorLine == lineNum && t.cursorAnnoIdx == idx
 				appendAnnotation(ann, focused, contentMouseTarget{
 					line: lineNum, annotation: true, annotationIndex: idx,
@@ -487,6 +490,9 @@ func (m *AppModel) rebuildContent() {
 		}
 	}
 	renderDeleted(t.doc.LineCount())
+	for _, table := range tableBlocks {
+		layout.tables = append(layout.tables, table.viewport)
+	}
 	if t.doc.Known != nil {
 		layout.appendBlock(&b, "       ⋯ remaining context not included in diff", contentMouseTarget{})
 	}
@@ -497,8 +503,8 @@ func (m *AppModel) rebuildContent() {
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
 func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused bool) (string, commentHeaderRegion) {
-	collapsed := m.collapseResolved(ann.resolved, ann.resolvedRound) && !focused
-	if ann.drifted && m.tab().expandedDrifted[ann.id] && !m.foldResolved {
+	collapsed := m.commentCollapsed(ann.resolved, focused)
+	if ann.drifted && m.driftedExpanded(ann.id, ann.resolved) && !m.viewMode {
 		collapsed = false
 	}
 	var lineLabel string
@@ -553,10 +559,6 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 	}
 	button.translate(gutterWidth+2, 1)
 	return b.String(), button
-}
-
-func (m *AppModel) collapseResolved(resolved bool, round int) bool {
-	return resolved && (m.foldResolved || round == 0 || round < m.reviewRound())
 }
 
 // formLineBackground returns the background of form labels, which yields to
@@ -835,7 +837,7 @@ type tableBlock struct {
 	startLine int
 	endLine   int
 	colWidths []int
-	wrapCells bool
+	viewport  tableViewport
 }
 
 func detectTableBlocks(lines []markdownLine, renderedCells func(int) []string) []tableBlock {

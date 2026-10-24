@@ -69,8 +69,8 @@ func (m *AppModel) navigateCommentReference(uri string) bool {
 	if !ok {
 		return false
 	}
-	if m.hideComments {
-		m.hideComments = false
+	if m.viewMode {
+		m.viewMode = false
 		m.recalculateLayout()
 	}
 	m.tab().selecting = false

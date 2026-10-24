@@ -1,49 +1,13 @@
 package tui
 
 import (
-	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Cap long columns equally while retaining the natural width of short ones.
-func fitTableWidths(natural []int, width int) []int {
-	budget := width - 3*len(natural) - 1
-	if budget < 2*len(natural) {
-		return nil
-	}
-	used := func(cap int) int {
-		total := 0
-		for _, w := range natural {
-			total += max(2, min(w, cap))
-		}
-		return total
-	}
-	low, high := 2, 2
-	for _, w := range natural {
-		high = max(high, w)
-	}
-	for low < high {
-		mid := low + (high-low+1)/2
-		if used(mid) <= budget {
-			low = mid
-		} else {
-			high = mid - 1
-		}
-	}
-	widths := slices.Clone(natural)
-	remaining := budget - used(low)
-	for i, w := range widths {
-		widths[i] = max(2, min(w, low))
-		if remaining > 0 && w > widths[i] {
-			widths[i]++
-			remaining--
-		}
-	}
-	return widths
-}
+const tableColumnMaxWidth = 40
 
 type tableCellFragment struct {
 	text   string
@@ -128,9 +92,9 @@ func (line *markdownLine) displayOffset(sourceOffset int) int {
 }
 
 // Keep spans in source order even though wrapped cells share display rows.
-func (l *renderedContentLayout) addTableSpans(firstRow int, columns [][]tableCellFragment, widths []int, line *markdownLine, target contentMouseTarget) {
+func (l *renderedContentLayout) addTableSpans(firstRow int, columns [][]tableCellFragment, widths []int, line *markdownLine, target contentMouseTarget, viewport tableViewport) {
 	source := ansi.Strip(line.render(nil, diffCommonTextBg, diffAddedTextBg, nil))
-	left := gutterWidth
+	left := viewport.left - viewport.window.offset
 	for i, column := range columns {
 		if i >= len(line.cells) {
 			break
@@ -155,6 +119,7 @@ func (l *renderedContentLayout) addTableSpans(firstRow int, columns [][]tableCel
 			}
 			l.textSpans = append(l.textSpans, contentTextSpan{
 				row: firstRow + row, left: left, right: left + ansi.StringWidth(text),
+				clipLeft: viewport.left, clipRight: viewport.left + viewport.window.width,
 				ref: lineRef{line: target.line, side: target.side}, text: text,
 				offset: offset, source: line.source, tableSource: source, literal: true, mapped: true,
 			})

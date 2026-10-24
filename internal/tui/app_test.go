@@ -393,7 +393,7 @@ func TestReviewFrameFitsTerminalWithSidebar(t *testing.T) {
 			t.Run(fmt.Sprintf("width=%d/hidden=%t", width, hidden), func(t *testing.T) {
 				app := setupAppWithDoc(t, strings.Repeat("source\n", 30))
 				app.width, app.height, app.multiFile = width, 30, true
-				app.hideComments = hidden
+				app.viewMode = hidden
 				app.tab().state.Comments = []review.Comment{{ID: "file", Scope: "file", Body: "comment"}}
 				app.recalculateLayout()
 				app.updateCommentSidebar()
@@ -696,7 +696,7 @@ func TestFileCommentShortcutRepliesToExistingThread(t *testing.T) {
 						thread,
 						{ID: "other-file-thread", Scope: "file", Body: "another thread"},
 					}
-					app.hideComments = hidden
+					app.viewMode = hidden
 					app.updateCommentSidebar()
 					app = pressKey(app, 'f')
 					if app.modal != replyModal || app.editingID != thread.ID || app.editingReplyID != "" {
@@ -1142,7 +1142,7 @@ func TestReviewBarHostsSubmitButton(t *testing.T) {
 	}
 
 	app.host = ""
-	app.ignoreWhitespace, app.hideComments = true, false
+	app.ignoreWhitespace, app.viewMode = true, false
 	app.multiFile = true
 	app.width = 45
 	app.recalculateLayout()

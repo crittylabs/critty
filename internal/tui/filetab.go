@@ -70,6 +70,7 @@ type FileTab struct {
 	deletedLineCache map[int][]string // pre-highlighted deleted line content, keyed by afterLine
 	isMarkdown       bool
 	markdown         *markdownCache
+	tableOffsets     map[int]int // horizontal offsets keyed by table start line
 }
 
 // changeChunk represents a contiguous block of changed lines.

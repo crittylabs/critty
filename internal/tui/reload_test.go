@@ -56,11 +56,11 @@ func TestReloadDocumentAndAttachments(t *testing.T) {
 	app.tab().state.Comments = []review.Comment{{ID: "anchor", Body: "keep", StartLine: 2, EndLine: 2}}
 	app.persist()
 	round := app.session.CJ.ReviewRound
-	app.split, app.foldResolved = true, true
+	app.split, app.openAll, app.viewMode = true, true, true
 	write(app.filePath, "inserted\nfirst\nanchor\n")
 	write(attachment, "# Notes\nnew\n")
 	reloadApp(t, &app)
-	if app.tab().path != app.filePath || !app.split || !app.foldResolved {
+	if app.tab().path != app.filePath || !app.split || !app.openAll || !app.viewMode {
 		t.Fatal("reload lost active file or display options")
 	}
 	if app.session.CJ.ReviewRound != round {
