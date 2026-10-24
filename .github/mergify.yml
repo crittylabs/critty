@@ -1,9 +1,12 @@
+merge_queue:
+  max_parallel_checks: 1
+
 queue_rules:
   - name: dependency-updates
     batch_size: 5
     batch_max_wait_time: 1 min
     checks_timeout: auto
-    merge_method: merge-batch
+    merge_method: fast-forward
     queue_conditions:
       - base = main
       - author ~= ^(dependabot|renovate)\[bot\]$
