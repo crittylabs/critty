@@ -10,6 +10,18 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 )
 
+func isCodeFile(filename string) bool {
+	lexer := lexers.Match(filename)
+	if lexer == nil {
+		return false
+	}
+	switch lexer.Config().Name {
+	case "plaintext", "markdown", "reStructuredText", "Org Mode":
+		return false
+	}
+	return true
+}
+
 // newCodeHighlighter selects a file's lexer once.  Each call independently
 // tokenises content and returns lines with ANSI styling.
 func newCodeHighlighter(filename string) func(string) []string {

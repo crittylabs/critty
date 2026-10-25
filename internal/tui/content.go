@@ -458,7 +458,7 @@ func (m *AppModel) rebuildContent() {
 
 			if isMarkdown {
 				displayLine = t.markdownDisplayLine(lineNum, false, line, nil, m.documentLinkSpans(lineNum, false))
-			} else if t.attachment != nil {
+			} else if t.attachment != nil && !t.isCode {
 				displayLine = linkedDisplayLine(line, m.documentLinkSpans(lineNum, false), displaySourceText)
 			}
 			displayLine = highlight(displayLine)

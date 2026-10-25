@@ -226,8 +226,11 @@ func (m *AppModel) referenceSpans(body string) []linkSpan {
 }
 
 func (m *AppModel) documentLinkSpans(line int, before bool) []linkSpan {
-	spans := m.imageSpans(line, before)
 	t := m.tab()
+	if t.isCode {
+		return nil
+	}
+	spans := m.imageSpans(line, before)
 	if t.attachment == nil || before || t.doc == nil || !t.doc.HasLine(line) {
 		return spans
 	}
