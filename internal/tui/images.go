@@ -316,6 +316,10 @@ func decodePreview(data []byte) (image.Image, error) {
 }
 
 func (m *AppModel) prepareImage() tea.Cmd {
+	return tea.Batch(m.releaseHiddenMarkdownImages(), m.prepareVisibleImage())
+}
+
+func (m *AppModel) prepareVisibleImage() tea.Cmd {
 	if m.session != nil && m.session.CJ.RoundState.Finished {
 		return nil
 	}

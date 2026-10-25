@@ -24,7 +24,8 @@ type markdownImage struct {
 	url    string // web URL that is linked but not previewed
 	local  bool
 	// start and end bound the reference text on its line.
-	start, end int
+	start, end    int
+	columns, rows int // retain layout while pixels are released or reloading
 	previewSide
 }
 
@@ -275,6 +276,41 @@ func (m AppModel) markdownImageSize(img *inlineImage) (int, int) {
 	return img.size(min(44, m.contentViewport.Width()-gutterWidth), min(19, max(5, m.contentViewport.Height())), m.images.cell)
 }
 
+func (m AppModel) markdownImageVisible(ref markdownImage) bool {
+	ranges := m.contentLayout.lineRanges
+	if ref.before {
+		ranges = m.contentLayout.oldRanges
+	}
+	r, ok := ranges[ref.line]
+	top := m.contentViewport.YOffset()
+	return ok && r.start < top+m.contentViewport.Height() && r.end > top
+}
+
+// Keep dimensions when releasing pixels so scrolling back can reload the
+// image without changing the document's layout.
+func (m *AppModel) releaseHiddenMarkdownImages() tea.Cmd {
+	if m.modal != noModal {
+		return nil
+	}
+	var sequence strings.Builder
+	for i := range m.tabs {
+		for j := range m.tabs[i].markdownImages {
+			ref := &m.tabs[i].markdownImages[j]
+			img := ref.image
+			if img == nil || img.id == 0 || i == m.activeTab && !m.images.hidden && m.markdownImageVisible(*ref) {
+				continue
+			}
+			fmt.Fprintf(&sequence, "\x1b_Ga=d,d=I,q=2,i=%d\x1b\\", img.id)
+			ref.columns, ref.rows = img.columns, img.rows
+			ref.image, ref.attempted = nil, false
+		}
+	}
+	if sequence.Len() == 0 {
+		return nil
+	}
+	return tea.Raw(m.images.wrap(sequence.String()))
+}
+
 func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 	t := m.tab()
 	if !t.markdownImagesPending {
@@ -291,12 +327,16 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 	}
 	for i := range t.markdownImages {
 		ref := &t.markdownImages[i]
+		if !m.markdownImageVisible(*ref) {
+			continue
+		}
 		if img := ref.image; img != nil {
 			cols, rows := m.markdownImageSize(img)
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
 			}
 			img.columns, img.rows, img.ready = cols, rows, false
+			ref.columns, ref.rows = cols, rows
 			msg := imageReadyMsg{path: t.path, before: ref.before, columns: cols, rows: rows, markdown: i + 1}
 			cmds = append(cmds, tea.Sequence(tea.Raw(m.images.wrap(img.placement())), func() tea.Msg { return msg }))
 		} else if ref.url == "" && !ref.attempted && loading < 2 {
@@ -325,6 +365,9 @@ func (m AppModel) renderMarkdownImages(line int, before bool) string {
 			blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 		} else if ref.image != nil && ref.image.ready {
 			blocks = append(blocks, ref.image.linkedPlaceholder(ref.target().uri()))
+		} else if ref.columns > 0 && ref.rows > 0 {
+			row := strings.Repeat(" ", min(width, ref.columns+2))
+			blocks = append(blocks, strings.TrimSuffix(strings.Repeat(row+"\n", ref.rows), "\n"))
 		}
 	}
 	rows := packImageBlocks(blocks, width)

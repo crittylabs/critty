@@ -83,6 +83,51 @@ func TestMarkdownImagesLayoutAndComments(t *testing.T) {
 	}
 }
 
+func TestMarkdownImagesLoadVisibleReferences(t *testing.T) {
+	app := setupAppWithDoc(t, "![first](first.png)\n\n![second](second.png)\n")
+	app.images.enabled = true
+	app.tab().markdownImagesPending = true
+	app.tab().markdownImages = []markdownImage{{line: 1, path: "first.png"}, {line: 3, path: "second.png"}}
+	app.contentViewport.SetHeight(2)
+	app.rebuildContent()
+	app.prepareMarkdownImages()
+	if !app.tab().markdownImages[0].attempted || app.tab().markdownImages[1].attempted {
+		t.Fatal("only the visible image should begin loading")
+	}
+}
+
+func TestMarkdownImagesReleasePixelsAndRetainLayout(t *testing.T) {
+	app := setupAppWithDoc(t, "![first](first.png)\n\n![second](second.png)\n")
+	app.images.enabled = true
+	app.tab().markdownImagesPending = true
+	app.tab().markdownImages = []markdownImage{
+		{line: 1, path: "first.png", previewSide: previewSide{attempted: true, image: &inlineImage{id: 42, width: 100, height: 100, columns: 10, rows: 5, ready: true}}},
+		{line: 3, path: "second.png"},
+	}
+	app.contentViewport.SetHeight(2)
+	app.rebuildContent()
+	position := app.contentLayout.lineRanges[3].start
+	app.contentViewport.SetYOffset(position)
+	output := strings.Join(rawMessages(app.releaseHiddenMarkdownImages()), "")
+	ref := &app.tab().markdownImages[0]
+	if ref.image != nil || ref.attempted || !strings.Contains(output, "a=d,d=I,q=2,i=42") {
+		t.Fatalf("offscreen pixels were not released: %+v %q", ref, output)
+	}
+	app.rebuildContent()
+	if app.contentLayout.lineRanges[3].start != position {
+		t.Fatal("releasing pixels changed the document layout")
+	}
+	app.contentViewport.SetYOffset(0)
+	app.prepareMarkdownImages()
+	if !app.tab().markdownImages[0].attempted {
+		t.Fatal("returning to the image did not request a reload")
+	}
+	app.rebuildContent()
+	if app.contentLayout.lineRanges[3].start != position {
+		t.Fatal("reloading pixels changed the document layout")
+	}
+}
+
 func TestMarkdownImagesUseDocumentLocationAndScope(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
@@ -199,8 +244,9 @@ func TestMarkdownImagesInAttachmentsWithoutGit(t *testing.T) {
 			}
 			if len(patch.Files) > 0 {
 				app.activeTab = slices.IndexFunc(app.tabs, func(tab FileTab) bool { return tab.path == "changed.md" })
-				if cmd := app.prepareImage(); cmd != nil {
-					t.Fatal("supplied diff resolved images from the working directory")
+				output := strings.Join(rawMessages(app.prepareImage()), "")
+				if strings.Contains(output, "f=100") || app.tab().markdownImagesPending {
+					t.Fatal("supplied diff requested images from the working directory")
 				}
 			}
 		})

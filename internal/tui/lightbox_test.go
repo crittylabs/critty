@@ -358,8 +358,8 @@ func TestLightboxCyclesImagesOnTheLine(t *testing.T) {
 	}
 	app, _ = pressKeyCmd(app, tea.KeyEscape)
 	app = pressKey(app, 'j')
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
-	if app.modal != lightboxModal || app.lightbox.image.id != 0x104 || len(app.lightbox.siblings) != 1 {
+	app, cmd = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+	if app.modal != lightboxModal || cmd == nil || !strings.HasSuffix(app.lightbox.target.path, "c.png") || len(app.lightbox.siblings) != 1 {
 		t.Fatalf("single image line: %+v", app.lightbox)
 	}
 	if strings.Contains(ansi.Strip(app.View().Content), "on the line") {
