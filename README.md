@@ -19,7 +19,7 @@ If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or c
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/a3796b5e-390d-436a-a1cd-5dce17034d7e
+https://github.com/user-attachments/assets/a4889092-18a3-4ce7-829e-fe7049a464f5
 
 For example:
 
@@ -44,8 +44,9 @@ For example:
 - **Per-project Session Management** — find saved reviews across a project's worktrees and continue from another checkout, even after the original worktree is removed.
 - **Plists and other encodings** — review binary plists and encoded text through your configured Git text converters.  Enable the converters you need in Critty's configuration.
 - **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
-- **Inline image previews** — compare image changes, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
+- **Inline image previews** — compare image changes, attach images alongside review documents, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
+- **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.
 - **Navigation and editing** — search across files as you type, follow file and comment references, and open source in your preferred editor.
 - **Text Selection and Copying** — select text from documents and diffs to reuse it, preserving Markdown formatting and link targets.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
@@ -141,7 +142,7 @@ Critty opens a review pane or tab in the detected multiplexer, or a new window o
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-https://github.com/user-attachments/assets/b4fc6097-f19c-440f-9636-f35fa02faa31
+https://github.com/user-attachments/assets/ae71a3ff-708e-4b13-a5d2-7e334abc14a7
 
 For a manual review:
 
@@ -281,73 +282,83 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos and screenshots captured with the v1.6.0 candidate.
+Videos and screenshots captured with v1.7.0 candidates.
+
+### Navigating outlines and image attachments
+
+Jump through source declarations and Markdown headings, then inspect an attached image.  `M-G` focuses the outline; Enter returns to the source.
+
+https://github.com/user-attachments/assets/87719a49-f561-4832-9e02-d6d00cf88309
+
+![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/011565e7-5544-4028-859f-cb2ba203b262)
+
+![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/d1252fef-4b0d-47b8-b072-32732f7714be)
 
 ### Code review with inline comments
 
-https://github.com/user-attachments/assets/b4fc6097-f19c-440f-9636-f35fa02faa31
+https://github.com/user-attachments/assets/ae71a3ff-708e-4b13-a5d2-7e334abc14a7
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/a0919b83-31b4-4386-87e8-8706323e8ff6)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/d77f6402-bd93-4e83-a375-7f599ab2fca8)
 
 ### Review round trips with Claude Code
 
-https://github.com/user-attachments/assets/b836c364-386e-48fa-825b-0cfea1f4b44e
+https://github.com/user-attachments/assets/e858029a-6e37-4ae7-856e-def321b83164
 
 ### Review round trips with Codex
 
-https://github.com/user-attachments/assets/7c2ec35e-fb92-4484-9f0e-e8c4469baa47
+https://github.com/user-attachments/assets/0a465ba6-42af-4352-b982-0648cce07d83
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-https://github.com/user-attachments/assets/dfa164d6-7ee4-4876-98a4-5acc6b1bce38
+https://github.com/user-attachments/assets/d1dfb811-f9fd-46d0-9140-ad60c00f8801
 
 ### Following live review updates
 
 Watch follows file edits and marks changed background tabs.  Follow a file reference from an attachment to inspect the updated source.
 
-https://github.com/user-attachments/assets/91a4697d-9a8f-42a4-8776-24a3ea7e24db
+https://github.com/user-attachments/assets/185be8f2-693f-46cb-a408-0ff17b6ea497
 
 ### Reviewing a document
 
-https://github.com/user-attachments/assets/43236155-8be4-49ee-8a7b-a70aaa03c498
+https://github.com/user-attachments/assets/fb33d590-13dc-4012-8a9e-54b2925e9ed6
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/25f0bbe9-ec36-44ab-806d-91db27465820)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/d99ab5f1-9cfc-43af-aa45-c0df2d3f4d83)
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/2ee47a75-7d4f-428d-ae7d-edee44130ff7)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/35f2d6c2-dcd6-4edd-8651-ef041d4c69f6)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/cc8685c9-b7e0-4a9c-8586-20f651c09ebc)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/7b4ba84a-19f5-475b-8777-6487b325b2e6)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/d6182096-354f-469d-bf6f-7e7523cf7004)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/3c195e0a-2cb9-41bd-af79-ec1486b1b35e)
 
 ### Answering a questionnaire with form widgets
 
 See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/7a17417c-8797-4fe4-8857-abce85568939)
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/c56702b7-1298-437a-b631-2a474083751b)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/9039e25d-0fb5-45ef-9773-ce7ad7ae6c6c)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/2b22f664-7e86-4ad2-b3b7-927f7a6c8309)
 
 ### Approval checks for unfinished items
 
-![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/78ef680e-3f6b-406c-acf8-d2cb536f0717)
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/5db8cb35-6030-4d98-9f79-dfae2a55febd)
 
 ### Incremental search
 
-![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/798da846-6f3a-4867-9b9d-70e3f8e01550)
+![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/9b4fdfb8-1e74-4541-bf14-f96071d8efe5)
 
 ## Contributing
 

@@ -2,24 +2,27 @@
 
 ## Unreleased
 
+## 1.7.0
+
 ### Added
 
-- Attach PNG, JPEG, GIF, and WebP images alongside review documents, including in attachment-only reviews.  Reviewers can preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Reviews and history exports retain the saved image after its source changes or disappears.  Image attachments are limited to 5 MiB and 16 megapixels; animated GIFs preview their first frame.
-- Navigate Markdown and source files, including attachments, from an outline below the Files tree.  Supports Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Markdown headings are nested; source declarations follow file order, with block or indentation nesting where available.  Go methods include their receiver type in a flat list.  Languages other than Go use lightweight heuristics for conventionally formatted source, so unusual syntax may be missed or misidentified.  Click or use the keyboard to jump to an entry; the outline follows the source cursor and resizes up to two thirds of the sidebar.  Short outlines leave more room for files.
+- **Source outlines**: jump to Markdown headings and source declarations from the Files sidebar, including in attachments.  Supports Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Entries follow source order, with nesting where available; Go methods include their receiver type in a flat list.  Go uses its standard parser, while other source languages use lightweight heuristics and may miss unusual syntax.  The outline follows the cursor, and short outlines leave more room for files.  `M-G` focuses the outline directly; contextual footer hints show how to reach it and switch between the file tree and outline.  See Keyboard Help for navigation and resizing.
+- **Image attachments**: attach PNG, JPEG, GIF, and WebP images alongside documents or in attachment-only reviews.  Preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Saved images survive source changes and history exports.  The limit is 5 MiB and 16 megapixels; GIFs preview their first frame, and animated WebP is unsupported.
 
 ### Changed
 
-- Image files show their format and original width and height when inline previews are unavailable or hidden, including separate Before/After details for comparisons.  Animated GIFs are identified without decoding their frames.
-- Focused comments show their Resolve checkbox in bold and accept Space, as well as `r`, to toggle resolution.
-- The search shortcut appears with footer hints instead of taking space in the top bar.
-- Read code at full width with `V`: hide the sidebar and fold all comment bodies, then restore the previous expansion setting when leaving View.  `O` opens all comments, leaving View if needed, or returns to the default display, which folds resolved threads, including those resolved in the current round.  These shortcuts replace the former `h`/`H` controls; see Keyboard Help.
-- Open the image, link, or reference on the current line with `o`; the existing `M-o` shortcut remains available.
+- Read at full width with `V`, which hides the sidebar and folds comments, then restores the previous expansion setting when leaving View.  `O` opens all comments or returns to the default display, which folds resolved threads.  These replace the former `h`/`H` controls; see Keyboard Help.
+- Open the image, link, or reference on the current line with `o`; `M-o` remains available.  Focused Resolve checkboxes are bold and accept Space as well as `r`.  The search shortcut now appears with footer hints.
+- Image placeholders show the format and original dimensions when previews are unavailable or hidden, including Before/After details.  Animated GIFs are identified.
 
 ### Fixed
 
-- Attached source files retain syntax highlighting.  Highlighting and outlines share filename-pattern and shebang detection, including plain `env` and `env -S`, for scripts without language suffixes.  Source code, including its comments, no longer treats URLs or review references as links; text documents and review comments keep their links.
-- Incremental search highlights the link label or formatted text when a match falls in a hidden Markdown URL, title, or formatting marker.  Current-match highlighting follows source order, including multiline labels, while preserving text styles and clickable links.
-- Markdown tables in documents and attachments render links, emphasis, and inline code.  Short columns keep their natural widths; long cells wrap at 40 display columns.  Wide tables scroll horizontally with arrow keys, `h`/`l`, horizontal mouse wheels, or clickable edge indicators, and search reveals the current match.  Copying selections retains Markdown formatting and link targets across wrapped and scrolled cells.
+- Markdown image previews remain available when browsing documents with many large images.  Offscreen previews release terminal image storage and reload on return, keeping their layout space.
+- Attached source files keep their syntax highlighting.  Highlighting and outlines share filename-pattern and shebang detection, including plain `env` and `env -S`, for scripts without language suffixes.  Source code, including comments, leaves URLs and review references as source text; text documents and review comments retain links.
+- Empty Markdown link and image labels show their destination instead of disappearing or leaving only an image marker.  Image references to other file types, such as videos, open in the default external application.
+- Markdown tables retain links, emphasis, and inline code.  Short columns keep their natural widths, long cells wrap at 40 display columns, and wide tables scroll horizontally.  Search reveals hidden matches; copying retains Markdown source across wrapped and scrolled cells.
+- Incremental search highlights visible labels or text when matches fall in hidden Markdown URLs, titles, or formatting.  Multiline matches follow source order and retain text styles and links.
+- Codex review workflows can fall back to the user's usual terminal window when multiplexer binding is unavailable.  Desktop launches no longer require a terminal marker.
 
 ## 1.6.0
 
