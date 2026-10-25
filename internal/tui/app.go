@@ -455,6 +455,8 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 		tab := newFileTab(d.Path(), nil)
 		m.attachments[d.Path()] = d
 		tab.attachment = &d
+		tab.isBinary = d.Image != ""
+		tab.binaryRevision = d.Revision
 		if d.Removed {
 			removed = append(removed, tab)
 		} else {

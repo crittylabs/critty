@@ -22,6 +22,7 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/imageinfo"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func previewPNG(t *testing.T, width, height int) []byte {
@@ -44,6 +45,71 @@ func TestTextReviewDoesNotProbeImages(t *testing.T) {
 	}
 	if strings.Contains(out.output(), "a=T,f=32") {
 		t.Fatal("text review sent an image capability query")
+	}
+}
+
+func TestImageAttachmentPreviewAndLightbox(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/sample.png"
+	if err := os.WriteFile(path, previewPNG(t, 64, 32), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := review.ReadAttachedDocuments([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := review.OpenSession(dir, "image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sess.ReplaceDocuments(docs); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := sess.LoadDocuments()
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := NewCodeReviewApp(nil, "", AppConfig{Session: sess, Documents: saved.Documents, Patch: &gitpkg.Patch{}})
+	app.tab().state = &fileReview{}
+	app.width, app.height = 100, 32
+	app.recalculateLayout()
+	app.images = imageDisplay{attempts: maxImageProbeAttempts}
+	msg := app.prepareImage()().(imageInfoMsg)
+	model, _ := app.Update(msg)
+	app = model.(AppModel)
+	if got := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(got, "PNG (64×32)") {
+		t.Fatalf("image attachment fallback: %s", got)
+	}
+	app.images.enabled = true
+	loaded := app.loadImage(false)().(imageLoadedMsg)
+	if loaded.err != nil || loaded.width != 64 || loaded.height != 32 {
+		t.Fatalf("image attachment preview: %+v", loaded)
+	}
+	app.tab().preview.after.image = &inlineImage{id: 100, width: 64, height: 32, columns: 8, rows: 2, ready: true}
+	app.rebuildContent()
+	if !strings.ContainsRune(app.contentViewport.GetContent(), kitty.Placeholder) {
+		t.Fatal("attachment image was not rendered inline")
+	}
+	app.openImageAtCursor()
+	if app.modal != lightboxModal || app.lightbox.image.width != 64 {
+		t.Fatal("image attachment did not open its lightbox")
+	}
+	lightbox := app.loadLightboxImage(app.lightbox.target)().(lightboxLoadedMsg)
+	if lightbox.err != nil || lightbox.width != 64 {
+		t.Fatalf("lightbox read mutable source: %+v", lightbox)
+	}
+	opened := stubOpener(t, false)
+	if cmd := app.openImageExternally(app.lightbox.target); cmd == nil {
+		t.Fatal("image snapshot cannot open externally")
+	} else {
+		cmd()
+	}
+	snapshot, err := saved.Documents[0].ImagePath(sess.Dir)
+	if err != nil || len(*opened) != 1 || !strings.HasSuffix((*opened)[0], " "+snapshot) {
+		t.Fatalf("external viewer did not use snapshot: %v, %v", *opened, err)
 	}
 }
 

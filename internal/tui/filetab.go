@@ -200,6 +200,9 @@ func computeChangeChunks(diff *gitpkg.DiffInfo) []changeChunk {
 
 // changeSummary combines file status and line counts inside neutral parentheses.
 func (t *FileTab) changeSummary() string {
+	if t.attachment != nil {
+		return ""
+	}
 	var counts []string
 	if !t.outsideChanges {
 		switch t.status {

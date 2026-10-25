@@ -217,6 +217,38 @@ func TestArchiveIsPortableAndPreservesOriginals(t *testing.T) {
 	}
 }
 
+func TestArchivePreservesImageAttachmentSnapshot(t *testing.T) {
+	store := testStore(t)
+	task := startTask(t, store, "Image attachment")
+	session := addReview(t, store, task)
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 4, 2))); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "image.png")
+	if err := os.WriteFile(path, data.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := review.ReadAttachedDocuments([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := session.ReplaceDocuments(docs); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	archive, err := store.Export(task.ID, t.TempDir(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(archive, "attachments", session.Key, docs[0].ID, "image.png"))
+	if err != nil || !bytes.Equal(got, data.Bytes()) {
+		t.Fatalf("archived image differs from reviewed snapshot: %v", err)
+	}
+}
+
 func TestTaskBoundaryActions(t *testing.T) {
 	for _, action := range []string{"keep", "ask", "archive", "delete"} {
 		t.Run(action, func(t *testing.T) {

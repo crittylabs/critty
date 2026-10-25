@@ -8,10 +8,21 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"path/filepath"
 	"strings"
 
 	_ "golang.org/x/image/webp"
 )
+
+const MaxPixels = 16 << 20
+
+func SupportedPath(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp":
+		return true
+	}
+	return false
+}
 
 type Info struct {
 	Width, Height int

@@ -19,6 +19,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
+	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/imageinfo"
 	_ "golang.org/x/image/webp"
 )
@@ -165,7 +166,7 @@ func (m *AppModel) recheckImagesOnSelection(previousTab int, msg tea.Msg) tea.Cm
 	if t.outsideChanges {
 		return nil
 	}
-	if t.isBinary && imagePath(t.path) && m.patch == nil {
+	if t.isBinary && imagePath(t.path) && (m.patch == nil || t.attachment != nil) {
 		return m.images.restartProbe()
 	}
 	if t.isMarkdown && t.doc != nil && (m.patch == nil || t.attachment != nil) {
@@ -293,11 +294,7 @@ func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func imagePath(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".png", ".jpg", ".jpeg", ".gif", ".webp":
-		return true
-	}
-	return false
+	return imageinfo.SupportedPath(path)
 }
 
 func decodePreview(data []byte) (image.Image, error) {
@@ -344,7 +341,7 @@ func (m *AppModel) prepareImage() tea.Cmd {
 		}
 		return m.prepareMarkdownImages()
 	}
-	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil {
+	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil && t.attachment == nil {
 		return nil
 	}
 	if !m.images.enabled || m.images.hidden {
@@ -392,10 +389,9 @@ func (m AppModel) loadImageInfo(before bool) tea.Cmd {
 	if before && t.oldPath != "" {
 		sourcePath = t.oldPath
 	}
-	source := m.imageSource()
 	return func() tea.Msg {
 		msg := imageInfoMsg{path: path, before: before}
-		data, err := source.PreviewContent(sourcePath, before, maxPreviewBytes)
+		data, err := m.imageContent(sourcePath, before)
 		if err == nil {
 			msg.info, _ = imageinfo.Read(data)
 		}
@@ -439,10 +435,24 @@ func (m AppModel) loadImage(before bool) tea.Cmd {
 		sourcePath = t.oldPath
 	}
 	return func() tea.Msg {
-		source := m.imageSource()
-		data, err := source.PreviewContent(sourcePath, before, maxPreviewBytes)
+		data, err := m.imageContent(sourcePath, before)
 		return m.images.encode(data, imageLoadedMsg{path: path, before: before, err: err})
 	}
+}
+
+func (m AppModel) imageContent(path string, before bool) ([]byte, error) {
+	if doc, ok := m.attachments[path]; ok && doc.Image != "" {
+		base := ""
+		if m.session != nil {
+			base = m.session.Dir
+		}
+		return doc.ReadImage(base)
+	}
+	source := m.imageSource()
+	if filepath.IsAbs(path) {
+		source = gitpkg.ReviewSource{}
+	}
+	return source.PreviewContent(path, before, maxPreviewBytes)
 }
 
 func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {

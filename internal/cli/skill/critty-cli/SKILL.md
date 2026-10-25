@@ -84,6 +84,10 @@ Apply this procedure to file-level and line comments carrying `textconv`, or who
 
 Repeated `--attachment FILE` flags on `review`, `resume`, `plan`, or the default command save text snapshots before the review.  `documents.json` in the session directory records versioned metadata, source paths, content, order, and revisions.  Attachment comment paths use `attachments/<document-id>/<basename>`; they are session identities, not files on disk.  Use those paths with `comment --session <id>` to keep attachment and working-file comments separate.  The finish prompt includes the snapshot text and source mapping.  Resume uses saved text unless a complete replacement list is supplied; `--clear-attachments` removes the list.  Removed documents retain their snapshots and comments.  In the TUI, commented removed attachments appear after current files in collapsed, read-only attachment history.  Their forms are inactive and excluded from current answers; opening a comment reveals its historical snapshot.
 
+PNG, JPEG, GIF, and WebP files can also be attached, up to 5 MiB and 16 megapixels.  Supported terminals show inline previews and the lightbox; other terminals show the format and original dimensions.  Animated GIFs preview their first frame; animated WebP is unsupported.  Image comments are file-level.  Images are saved as content-addressed snapshots under the session's `attachments/` directory, so source changes or removal do not alter a resumed review.  Reload or a complete replacement attachment list updates the reviewed image.  Removed images keep their saved pixels for comment history and exports.
+
+For image documents, `content` describes the format and dimensions, while `image` names the saved image relative to the session directory.  The finish output supplies this snapshot path; `--summary` returns `image` with the attachment identity and `image_base` as its base directory.  Use the saved image with an image-viewing tool when reading feedback.  Do not interpret the attachment's comment path as an on-disk image path.  Existing text attachments omit `image`.
+
 `critty review --null --attachment FILE` reviews only attachments without requiring Git.  Empty diff input, including `--diff=/dev/null`, also supports attachment-only reviews.  At least one active attachment is required.  `--null` cannot be combined with a file argument, `--diff`, `--scope`, `--code`, `--staged`, or `--unstaged`.  Resume with `critty sessions resume <id>`, optionally replacing the complete attachment list.  Removing all attachments from an empty review is rejected.
 
 ## Forms and exported results
@@ -201,11 +205,11 @@ Explicit focus applies only to that invocation.  `--focus` wins over a document'
 
 ### Images
 
-Supported terminals preview PNG, JPEG, GIF, and WebP, with Before and After views for modified or renamed images.  Detection is automatic; tmux needs `allow-passthrough on`.  GIF uses its first frame.  Animated WebP, images over 5 MiB or 16 megapixels, and unsupported terminals retain placeholders.  Images accept file comments without adding source lines or changing anchors.
+Supported terminals preview PNG, JPEG, GIF, and WebP, with Before and After views for modified or renamed images.  Detection is automatic; tmux needs `allow-passthrough on`.  GIF uses its first frame.  Animated WebP and images over 5 MiB or 16 megapixels retain placeholders.  Unsupported terminals show the image format and original dimensions when available, identifying animated GIFs.  Images accept file comments without adding source lines or changing anchors.
 
 Capability detection starts when a local image preview is needed and retries unanswered queries.  It supports tmux's extended-key input; tmux queries require the review pane to be selected in the server's sole attached client, so replies reach the review.  If support remains unconfirmed, selecting a tab containing a local image checks again.  Typing and ordinary navigation do not trigger detection.  Further checks can be requested manually.
 
-Git previews read the selected snapshot, including deleted images.  Markdown image paths resolve from the document or attachment's original location; Git references must stay inside the repository.  Supplied diffs remain text-only.  Remote URLs are not fetched.
+Git previews read the selected snapshot, including deleted images.  Markdown image paths resolve from the document or attachment's original location; Git references must stay inside the repository.  Changed files in supplied diffs remain text-only, while image attachments can be previewed.  Remote URLs are not fetched.
 
 Comment images read current local files: ordinary relative paths use the review's working directory, `attachments/` paths use the session directory, and absolute paths may be outside the repository.  Follow the finish output's base directory when reading them.  `/critty` covers reading images before approval cleanup.
 

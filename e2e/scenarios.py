@@ -674,6 +674,38 @@ def scenarios() -> None:
     try:
         transient_views()
         project_sessions()
+        image_source = WORK / "attached-image.png"
+        shutil.copyfile(
+            Path(__file__).resolve().parent.parent / "assets" / "critty-icon.png",
+            image_source,
+        )
+        image_review = Round(
+            "image-attachment", ["--null", "--attachment", str(image_source)]
+        )
+        image_review.wait_screen(
+            "PNG (", "image attachment dimensions without graphics"
+        )
+        image_review.comment("Keep this image snapshot.")
+        saved_images = json.loads(
+            (image_review.directory() / "documents.json").read_text()
+        )["documents"]
+        snapshot = image_review.directory() / saved_images[0]["image"]
+        assert snapshot.read_bytes() == image_source.read_bytes()
+        image_source.unlink()
+        image_review.finish(False)
+        resumed_image = Round(
+            "image-attachment-resume", ["sessions", "resume", image_review.session]
+        )
+        resumed_image.wait_screen("PNG (", "removed source uses the saved image")
+        assert resumed_image.comments()[0]["body"] == "Keep this image snapshot."
+        resumed_image.finish(True)
+        summary = json.loads(resumed_image.summary.read_text())
+        assert summary["attachments"][0]["image"] == saved_images[0]["image"]
+        assert "Image snapshot:" in resumed_image.out.read_text()
+        assert snapshot.exists(), "approval cleanup removed an unread image"
+        report(
+            "image attachments retain dimensions, comments, and saved pixels across resume"
+        )
         (WORK / "copy-text.md").write_text(
             'Before `sample` after.\nLink: [long label](https://example.org/a_(b) "title")\n'
         )
