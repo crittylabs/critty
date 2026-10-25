@@ -18,6 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        tmux: [v3.7c, preview]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -60,16 +61,37 @@ jobs:
           "$RUNNER_TEMP/review-venv/bin/python3" e2e/codex_review_server_test.py
 
       - name: Install tmux for E2E scenarios
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TMUX_VERSION: ${{ matrix.tmux }}
         run: |
           set -euo pipefail
-          if ! command -v tmux >/dev/null 2>&1; then
-            if [ "$RUNNER_OS" = "Linux" ]; then
-              sudo apt-get update
-              sudo apt-get install -y tmux
-            else
-              brew install tmux
-            fi
-          fi
+          case "$RUNNER_OS" in
+            Linux) platform=linux ;;
+            macOS) platform=macos ;;
+            *) exit 1 ;;
+          esac
+          case "$RUNNER_ARCH" in
+            X64) arch=x86_64 ;;
+            ARM64) arch=arm64 ;;
+            *) exit 1 ;;
+          esac
+          tmux_dir="$RUNNER_TEMP/tmux"
+          mkdir -p "$tmux_dir"
+          gh release view "$TMUX_VERSION" --repo tmux/tmux-builds --json assets > "$tmux_dir/release.json"
+          asset=$(jq -er --arg suffix "-$platform-$arch.tar.gz" '
+            [.assets[] | select(.name | startswith("tmux-") and endswith($suffix))]
+            | if length == 1 then .[0].name else error("expected one tmux archive") end
+          ' "$tmux_dir/release.json")
+          digest=$(jq -er --arg name "$asset" '
+            .assets[] | select(.name == $name) | .digest
+            | select(test("^sha256:[0-9a-f]{64}$")) | ltrimstr("sha256:")
+          ' "$tmux_dir/release.json")
+          gh release download "$TMUX_VERSION" --repo tmux/tmux-builds --pattern "$asset" --dir "$tmux_dir"
+          printf '%s  %s\n' "$digest" "$tmux_dir/$asset" | shasum -a 256 --check
+          tar -xzf "$tmux_dir/$asset" -C "$tmux_dir"
+          printf '%s\n' "$tmux_dir" >> "$GITHUB_PATH"
+          "$tmux_dir/tmux" -V
 
       - name: Test CLI and TUI review scenarios
         run: python3 e2e/scenarios.py

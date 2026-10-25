@@ -79,7 +79,7 @@ go vet ./...
 
 Run `python3 e2e/scenarios.py` before pushing to test the final changes together.  While iterating on UI feedback, run targeted package tests and defer `e2e/scenarios.py` until the change is ready for commit or push.  Reuse a passing result while the tested code remains unchanged.
 
-CI installs released tmux (apt on Ubuntu, Homebrew on macOS), which may be older and narrower than the local build.  Detect tmux features from the server, give E2E panes an explicit size when matching long text, and reproduce CI-only failures with an official tmux release built in a temporary directory.
+CI tests stable and rolling preview builds from `tmux/tmux-builds` on Ubuntu and macOS; see the workflow matrix for versions.  Detect tmux features from the server, give E2E panes an explicit size when matching long text, and reproduce CI-only failures with the matching official build in a temporary directory.
 
 Use `e2e/native_terminal.py` inside the native terminal for isolated checks with saved stdout, stderr, and exit results.  Read its command help before launching; window closure alone does not indicate failure.
 
