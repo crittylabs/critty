@@ -13,7 +13,7 @@ import (
 )
 
 // markdownLinkRefs uses the Markdown and HTML parsers to exclude code and
-// resolve reference links as well as inline links and plain web URLs.
+// resolve links and image references as well as plain web URLs.
 func markdownLinkRefs(source string) []markdownImageRef {
 	data := []byte(source)
 	root := parser.New(parser.WithExtensions(extension.LinkifyParser)).Parse(data)
@@ -93,7 +93,7 @@ func markdownLinkRefs(source string) []markdownImageRef {
 	if err != nil {
 		return nil
 	}
-	return refs
+	return append(refs, markdownImageRefs(source)...)
 }
 
 func (m *AppModel) openReferenceAtCursor() tea.Cmd {
@@ -137,7 +137,12 @@ func (m *AppModel) openReferenceAtCursor() tea.Cmd {
 	}
 	for _, ref := range markdownImageRefs(t.doc.Content) {
 		if ref.line == t.cursorLine {
-			return m.openImageAtCursor()
+			for _, image := range t.markdownImages {
+				if image.line == t.cursorLine {
+					return m.openImageAtCursor()
+				}
+			}
+			return m.openLink(ref.destination, false)
 		}
 	}
 	for _, ref := range markdownLinkRefs(t.doc.Content) {

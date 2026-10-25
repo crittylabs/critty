@@ -34,6 +34,7 @@ func TestCopyMarkdownSource(t *testing.T) {
 		{"entity", "a &amp; b", "&amp;", 1, 2, 1, 7},
 		{"escape", "a \\* b", "\\*", 1, 2, 1, 4},
 		{"tab", "a\tb", "\t", 1, 1, 1, 5},
+		{"empty link label", "[](https://example.org/path)", "[example](<https://example.org/path>)", 1, 8, 1, 15},
 		{"fence prefix", "```go\nfirst\nsecond\n```", "```go\nfirst\n```", 1, 0, 2, 5},
 		{"closed fence", "```go\nfirst\n```", "```go\nfirst\n```", 1, 0, 3, 3},
 		{"fence body", "```go\nfirst\nsecond\n```", "first", 2, 0, 2, 5},

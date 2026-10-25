@@ -95,3 +95,37 @@ func TestOpenLinksRespectsRemoteAndSchemes(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenNonImageMarkdownTarget(t *testing.T) {
+	opened := stubOpener(t, false)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "clip.mp4"), []byte("video"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app, _ := formTestAppWithContent(t, "![](./clip.mp4)\n")
+	app.tab().attachment.Source = filepath.Join(dir, "media.md")
+	app.width, app.height = 100, 35
+	app.recalculateLayout()
+	app.rebuildContent()
+	if status := openStatus(app.openReferenceAtCursor()); status != "Opened ./clip.mp4" {
+		t.Fatalf("keyboard open: %q", status)
+	}
+	cells, _ := linkCells(app.contentViewport.GetContent(), "./clip.mp4")
+	if len(cells) == 0 {
+		t.Fatal("video target has no clickable cells")
+	}
+	left, top, _, _ := app.contentBounds()
+	point := cells[len(cells)-1]
+	app = pressMouse(app, left+point.X, top+point.Y)
+	app, cmd := updateApp(app, tea.MouseReleaseMsg{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft})
+	if status := openStatus(cmd); status != "Opened ./clip.mp4" || len(*opened) != 2 {
+		t.Fatalf("mouse open: %q opened=%v", status, *opened)
+	}
+	app.session.Meta.CWD = dir
+	app.openLineComment()
+	app.modalTextarea.SetValue("![](./clip.mp4)")
+	app.modalTextarea.MoveToEnd()
+	if status := openStatus(app.openReferenceAtCursor()); status != "Opened ./clip.mp4" || len(*opened) != 3 {
+		t.Fatalf("editor open: %q opened=%v", status, *opened)
+	}
+}

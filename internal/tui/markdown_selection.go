@@ -59,7 +59,22 @@ func (p sourceInlineParser) Parse(parent ast.Node, reader text.Reader, context p
 				labelEnd = child.Value.Index().Stop
 			}
 		}
-		ranges[n] = markdownMarkup{start: start, contentStart: labelStart, contentEnd: labelEnd, end: after.Start, link: true}
+		autoURI := ""
+		if !markdownHasLabel(n, reader.Source()) {
+			var destination text.SingleLineValue
+			switch node := n.(type) {
+			case *ast.Link:
+				destination = node.Destination
+			case *ast.Image:
+				destination = node.Destination
+			}
+			i := destination.Index()
+			if i.Start >= 0 && i.Stop > i.Start {
+				labelStart, labelEnd = i.Start, i.Stop
+				autoURI = destination.Str(reader.Source())
+			}
+		}
+		ranges[n] = markdownMarkup{start: start, contentStart: labelStart, contentEnd: labelEnd, end: after.Start, link: true, autoURI: autoURI}
 	}
 	return n
 }

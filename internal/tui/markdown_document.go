@@ -255,13 +255,28 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 		case *ast.Link:
 			style |= markdownLink
 			uri = node.Destination.Str(input)
+			if !markdownHasLabel(node, input) {
+				i := node.Destination.Index()
+				if i.Start >= 0 && i.Stop <= len(input) {
+					emit(i.Start, i.Stop, uri, style, uri)
+				}
+				return
+			}
 		case *ast.AutoLink:
 			i := node.Label.Index()
 			emit(i.Start, i.Stop, node.Label.Str(input), style|markdownLink, node.Destination.Str(input))
 			return
 		case *ast.Image:
+			uri = node.Destination.Str(input)
 			emit(node.Pos(), node.Pos()+1, "!", style, uri)
 			style |= markdownLink
+			if !markdownHasLabel(node, input) {
+				i := node.Destination.Index()
+				if i.Start >= 0 && i.Stop <= len(input) {
+					emit(i.Start, i.Stop, node.Destination.Str(input), style, uri)
+				}
+				return
+			}
 		case *ast.RawHTML:
 			for _, i := range node.Value.Indices() {
 				emit(i.Start, i.Stop, "", style, uri)

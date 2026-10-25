@@ -987,6 +987,33 @@ def scenarios() -> None:
         report(
             "source attachment outlines preserve block, indentation, Lisp, and selector anchors"
         )
+        empty_image_source = (
+            "# Media references\n\n![](./clip.mp4)\n\n[](https://example.test/guide)\n"
+        )
+        (WORK / "empty-labels.md").write_text(empty_image_source)
+        empty_image = Round(
+            "empty-image-label", ["--null", "--attachment", "empty-labels.md"]
+        )
+        empty_image.wait_screen(
+            "!./clip.mp4", "empty image label shows its destination"
+        )
+        empty_image.wait_screen(
+            "https://example.test/guide", "empty link shows its URL"
+        )
+        empty_image.click(r"!\./clip\.mp4")
+        empty_image.keys("Enter")
+        empty_image.wait_screen(
+            "Add Comment", "empty image reference accepts a comment"
+        )
+        empty_image.text("Keep the destination visible.")
+        empty_image.keys("C-s")
+        wait_until(
+            lambda: empty_image.comments(), "empty image reference comment saved"
+        )
+        assert empty_image.comments()[0]["start_line"] == 3
+        assert (WORK / "empty-labels.md").read_text() == empty_image_source
+        empty_image.finish(False)
+        report("empty Markdown labels retain destinations and source comment anchors")
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "
             + "left " * 25

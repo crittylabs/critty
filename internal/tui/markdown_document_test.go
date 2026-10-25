@@ -144,6 +144,36 @@ func TestMarkdownCachedInlineCompatibilityAndImages(t *testing.T) {
 	}
 }
 
+func TestMarkdownEmptyLabels(t *testing.T) {
+	for _, tc := range []struct{ source, want, uri string }{
+		{"![](./clip.mp4)", "!./clip.mp4", ""},
+		{"[](./guide.md)", "./guide.md", "./guide.md"},
+		{"before [ ](https://example.org) after", "before https://example.org after", "https://example.org"},
+		{"[](https://example.org/a**b**)", "https://example.org/a**b**", "https://example.org/a**b**"},
+		{"before ![ ](./chart.png) after", "before !./chart.png after", ""},
+		{"![](https://example.org/a**b**.png)", "!https://example.org/a**b**.png", ""},
+	} {
+		t.Run(tc.source, func(t *testing.T) {
+			parsed := parseMarkdownSource([]string{tc.source}, nil)
+			cached := parsed.lines[0].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+			for name, got := range map[string]string{"cached": cached, "inline": highlightInline(tc.source)} {
+				if plain := ansi.Strip(got); plain != tc.want {
+					t.Errorf("%s label = %q, want %q", name, plain, tc.want)
+				}
+				if tc.uri != "" && !strings.Contains(got, ansi.SetHyperlink(tc.uri)) {
+					t.Errorf("%s link lost its target: %q", name, got)
+				}
+			}
+			if parsed.lines[0].source != tc.source {
+				t.Fatal("rendering changed the source")
+			}
+			if got := parsed.copyRange(1, 0, 1, len(tc.want)); got != tc.source {
+				t.Fatalf("copied source = %q, want %q", got, tc.source)
+			}
+		})
+	}
+}
+
 func TestMarkdownWordDiffKeepsParagraphContext(t *testing.T) {
 	initAdaptiveStyles(true)
 	parsed := parseMarkdownSource([]string{"**old first", "common changed**"}, nil)

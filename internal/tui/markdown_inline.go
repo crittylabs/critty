@@ -58,16 +58,39 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 			linkDepth++
 			label := children(n, linkStyle.Inherit(style))
 			linkDepth--
+			if !markdownHasLabel(n, source) {
+				label = linkStyle.Inherit(style).Render(n.Destination.Str(source))
+			}
 			return linkedText(n.Destination.Str(source), label)
 		case *ast.AutoLink:
 			return linkedText(n.Destination.Str(source), linkStyle.Inherit(style).Render(n.Label.Str(source)))
 		case *ast.Image:
-			// Image targets are linked by the document's image renderer.
-			return "!" + children(n, linkStyle.Inherit(style))
+			// Previewable images get lightbox links from the image renderer.
+			if !markdownHasLabel(n, source) {
+				return linkedText(n.Destination.Str(source), "!"+linkStyle.Inherit(style).Render(n.Destination.Str(source)))
+			}
+			return linkedText(n.Destination.Str(source), "!"+children(n, linkStyle.Inherit(style)))
 		case *ast.RawHTML:
 			return style.Render(n.Value.Str(source))
 		}
 		return children(n, style)
 	}
 	return strings.TrimPrefix(render(root, lipgloss.NewStyle()), prefix) + suffix
+}
+
+func markdownHasLabel(n ast.Node, source []byte) bool {
+	switch n := n.(type) {
+	case *ast.Text:
+		return strings.TrimSpace(n.Value.Str(source)) != ""
+	case *ast.CodeSpan:
+		return strings.TrimSpace(n.Value.Str(source)) != ""
+	case *ast.RawHTML:
+		return strings.TrimSpace(n.Value.Str(source)) != ""
+	}
+	for child := n.FirstChild(); child != nil; child = child.NextSibling() {
+		if markdownHasLabel(child, source) {
+			return true
+		}
+	}
+	return false
 }
