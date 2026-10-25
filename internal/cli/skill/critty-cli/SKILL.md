@@ -203,6 +203,12 @@ Attached documents can refer to review files with `@path L64` (the line is optio
 
 Explicit focus applies only to that invocation.  `--focus` wins over a document's line suffix; otherwise later rounds focus the first visible thread, in file and display order, with a new reply from another author.  Scope and tab order remain unchanged.
 
+### Source outlines
+
+The Files sidebar outlines Markdown headings and source declarations in documents, attachments, and available diff fragments.  Supported source languages are Go, JS/TS (including JSX/TSX), Rust, Ruby, Python, Swift, Kotlin, C/C++, Java, and Bourne-family shell scripts.  Common shell shebangs also identify extensionless scripts.  No language server, compiler, or external indexer is needed.
+
+Go uses its standard parser and lists declarations without regrouping receiver methods.  Other languages use existing lexers plus bounded declaration rules for conventionally formatted code.  Multiline headers are scanned up to 16 lines or 8 KiB.  Braced declarations follow source block nesting; Python and Ruby use actual indentation rather than a fixed indent width.  Common comments and string bodies are skipped.  Unusual formatting, complex signatures, generated declarations, and wrapper expressions may be missed or misidentified.  These outlines are navigation hints, not symbol-resolution results.  Source text and comment anchors stay unchanged; separate supplied diff fragments reset lexical and nesting state.  Human controls are documented in Keyboard Help.
+
 ### Images
 
 Supported terminals preview PNG, JPEG, GIF, and WebP, with Before and After views for modified or renamed images.  Detection is automatic; tmux needs `allow-passthrough on`.  GIF uses its first frame.  Animated WebP and images over 5 MiB or 16 megapixels retain placeholders.  Unsupported terminals show the image format and original dimensions when available, identifying animated GIFs.  Images accept file comments without adding source lines or changing anchors.

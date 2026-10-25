@@ -887,6 +887,49 @@ def scenarios() -> None:
         report(
             "Go outline mouse and keyboard jumps preserve declaration comment anchors"
         )
+        source_ts = (
+            "export class Service {\n"
+            "  run(value: number) {\n    return value;\n  }\n}\n"
+            "export const stop = () => {};\n"
+        )
+        source_py = (
+            "class Service:\n  def run(self):\n    return 1\n\ndef stop():\n  pass\n"
+        )
+        (WORK / "sample.ts").write_text(source_ts)
+        (WORK / "sample.py").write_text(source_py)
+        source_outline = Round(
+            "source-outlines",
+            ["--null", "--attachment", "sample.ts", "--attachment", "sample.py"],
+        )
+        source_outline.wait_screen(
+            "run()", "TypeScript attachment shows method outline"
+        )
+        source_outline.click(r"run\(\)")
+        source_outline.keys("Enter", "Enter")
+        source_outline.text("TypeScript method anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: source_outline.comments(), "TypeScript outline comment saved"
+        )
+        assert source_outline.comments()[0]["start_line"] == 2
+        source_outline.click("sample.py")
+        source_outline.wait_screen("def run", "Python attachment shows method outline")
+        source_outline.keys("s", "C-Down", "g", "l", "Enter", "Enter")
+        source_outline.text("Python method anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: len(source_outline.comments()) == 2, "Python outline comment saved"
+        )
+        python_comment = next(
+            c for c in source_outline.comments() if c["path"].endswith("/sample.py")
+        )
+        assert python_comment["start_line"] == 2, python_comment
+        assert (WORK / "sample.ts").read_text() == source_ts
+        assert (WORK / "sample.py").read_text() == source_py
+        source_outline.finish(False)
+        report(
+            "curly and indented source attachment outlines preserve navigation anchors"
+        )
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "
             + "left " * 25

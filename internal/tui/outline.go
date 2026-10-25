@@ -98,6 +98,10 @@ func (m *AppModel) syncOutline() {
 		} else if t.doc != nil && strings.EqualFold(filepath.Ext(t.path), ".go") {
 			cache := t.ensureGoOutline()
 			source, rows = cache, cache.rows
+		} else if t.doc != nil && !t.isBinary {
+			if cache := t.ensureCodeOutline(); cache != nil {
+				source, rows = cache, cache.rows
+			}
 		}
 	}
 	changed := source != o.source

@@ -25,24 +25,7 @@ func (t *FileTab) ensureGoOutline() *goOutlineCache {
 	}
 	c := &goOutlineCache{doc: t.doc, content: t.doc.Content, partial: t.doc.Known != nil}
 	t.goOutline = c
-	if !c.partial {
-		c.rows = parseGoOutline(t.doc.Content, 0)
-		return c
-	}
-	// Parse each supplied patch fragment independently so an unfinished block
-	// cannot swallow declarations across a gap in the source.
-	for start := 0; start < len(t.doc.Lines); {
-		if !t.doc.HasLine(start + 1) {
-			start++
-			continue
-		}
-		end := start + 1
-		for end < len(t.doc.Lines) && t.doc.HasLine(end+1) {
-			end++
-		}
-		c.rows = append(c.rows, parseGoOutline(strings.Join(t.doc.Lines[start:end], "\n"), start)...)
-		start = end
-	}
+	c.rows = parseOutlineDocument(t.doc, parseGoOutline)
 	return c
 }
 

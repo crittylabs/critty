@@ -72,6 +72,7 @@ type FileTab struct {
 	isCode           bool
 	markdown         *markdownCache
 	goOutline        *goOutlineCache
+	codeOutline      *codeOutlineCache
 	tableOffsets     map[int]int // horizontal offsets keyed by table start line
 }
 

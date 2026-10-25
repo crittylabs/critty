@@ -5,7 +5,7 @@
 ### Added
 
 - Attach PNG, JPEG, GIF, and WebP images alongside review documents, including in attachment-only reviews.  Reviewers can preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Reviews and history exports retain the saved image after its source changes or disappears.  Image attachments are limited to 5 MiB and 16 megapixels; animated GIFs preview their first frame.
-- Navigate Markdown and Go files, including attachments, from an outline below the Files tree.  Markdown headings are nested; Go functions, methods, and types appear in source order, with receiver types on methods.  The outline follows the source cursor, and clicking an entry or navigating with the keyboard jumps to its source line.  Resize the outline up to two thirds of the sidebar; short outlines leave more room for files.
+- Navigate Markdown and source files, including attachments, from an outline below the Files tree.  Supports Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Java, and Bourne-family shell scripts.  Markdown headings are nested; source declarations follow file order, with block or indentation nesting where available.  Go methods include their receiver type in a flat list.  Languages other than Go use lightweight heuristics for conventionally formatted source, so unusual syntax may be missed or misidentified.  Click or use the keyboard to jump to an entry; the outline follows the source cursor and resizes up to two thirds of the sidebar.  Short outlines leave more room for files.
 
 ### Changed
 
