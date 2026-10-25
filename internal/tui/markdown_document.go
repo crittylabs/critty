@@ -29,6 +29,7 @@ const (
 	markdownItalic
 	markdownCode
 	markdownLink
+	markdownCodePadding
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -229,7 +230,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			}
 			style |= markdownCode
 			first, last := indices[0], indices[len(indices)-1]
-			emit(first.Start-1, first.Start, " ", style, uri)
+			emit(first.Start-1, first.Start, " ", style|markdownCodePadding, uri)
 			if first.Start < last.Stop && input[first.Start] == ' ' && input[last.Stop-1] == ' ' && strings.Trim(string(input[first.Start:last.Stop]), " \n") != "" {
 				indices = slices.Clone(indices)
 				indices[0].Start++
@@ -238,7 +239,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			for _, index := range indices {
 				emit(index.Start, index.Stop, "", style, uri)
 			}
-			emit(last.Stop, last.Stop+1, " ", style, uri)
+			emit(last.Stop, last.Stop+1, " ", style|markdownCodePadding, uri)
 			return
 		case *ast.Strong:
 			style |= markdownBold

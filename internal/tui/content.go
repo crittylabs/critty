@@ -378,7 +378,7 @@ func (m *AppModel) rebuildContent() {
 				isHeader := lineNum == tb.startLine
 				cells := t.markdownTableCellsWithInline(lineNum, m.documentLinkSpans(lineNum, false), inlineChanges)
 				m.highlightTableCells(lineRef{line: lineNum}, cells)
-				columns = wrapTableCells(cells, tb.colWidths)
+				columns = wrapTableCells(cells, tb.colWidths, &t.markdown.after.lines[lineNum-1])
 				for row := range tableRowHeight(columns) {
 					rows = append(rows, formatTableRow(tableRowCells(columns, row), tb.colWidths, isHeader))
 				}

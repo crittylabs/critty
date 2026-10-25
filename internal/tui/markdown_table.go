@@ -14,7 +14,7 @@ type tableCellFragment struct {
 	offset int
 }
 
-func wrapTableCells(cells []string, widths []int) [][]tableCellFragment {
+func wrapTableCells(cells []string, widths []int, line *markdownLine) [][]tableCellFragment {
 	columns := make([][]tableCellFragment, len(widths))
 	for i, width := range widths {
 		cell := ""
@@ -22,17 +22,42 @@ func wrapTableCells(cells []string, widths []int) [][]tableCellFragment {
 			cell = cells[i]
 		}
 		plain := ansi.Strip(cell)
+		wrapText := plain
+		if line != nil && i < len(line.cells) {
+			wrapText = line.tableCellWrapText(i, plain)
+		}
 		offset := 0
-		for _, row := range strings.Split(lipgloss.Wrap(cell, width, ""), "\n") {
-			text := ansi.Strip(row)
-			if start := strings.Index(plain[offset:], text); start >= 0 {
+		for _, text := range strings.Split(lipgloss.Wrap(wrapText, width, ""), "\n") {
+			if start := strings.Index(wrapText[offset:], text); start >= 0 {
 				offset += start
 			}
-			columns[i] = append(columns[i], tableCellFragment{row, offset})
+			start := ansi.StringWidth(wrapText[:offset])
+			row := ansi.Cut(cell, start, start+ansi.StringWidth(text))
+			columns[i] = append(columns[i], tableCellFragment{row, len(ansi.Truncate(plain, start, ""))})
 			offset += len(text)
 		}
 	}
 	return columns
+}
+
+// Keep synthetic code padding attached while wrapping, then cut the original
+// styled cell so text, hyperlinks, and source offsets stay unchanged.
+func (line *markdownLine) tableCellWrapText(column int, plain string) string {
+	base := line.displayOffset(line.cells[column][0])
+	end := line.cells[column][1]
+	var b strings.Builder
+	start := 0
+	for _, token := range line.tokens {
+		if token.start < line.cells[column][0] || token.end > end || token.style&markdownCodePadding == 0 {
+			continue
+		}
+		offset := line.displayOffset(token.start) - base
+		b.WriteString(plain[start:offset])
+		b.WriteRune('\u00a0')
+		start = offset + 1
+	}
+	b.WriteString(plain[start:])
+	return b.String()
 }
 
 func tableRowHeight(columns [][]tableCellFragment) int {

@@ -13,7 +13,7 @@ func TestWrapTableCells(t *testing.T) {
 	const uri = "https://example.org/path"
 	cells := []string{linkedText(uri, "long linked label"), "日本語 é and text"}
 	widths := []int{6, 8}
-	columns := wrapTableCells(cells, widths)
+	columns := wrapTableCells(cells, widths, nil)
 	if tableRowHeight(columns) < 2 {
 		t.Fatal("cells did not wrap")
 	}
@@ -33,12 +33,29 @@ func TestWrapTableCells(t *testing.T) {
 	}
 }
 
+func TestTableCodePaddingWrap(t *testing.T) {
+	app := setupAppWithDoc(t, "| Terminal |\n| --- |\n| `xdg-terminal`, `ghostty-window`, `iterm-window` |")
+	cells := app.tab().markdownTableCells(3, nil)
+	columns := wrapTableCells(cells, []int{40}, &app.tab().markdown.after.lines[2])
+	if got := ansi.Strip(columns[0][1].text); got != " iterm-window " {
+		t.Fatalf("continuation = %q, want code padding to stay with its text", got)
+	}
+	for _, fragment := range columns[0] {
+		plain := ansi.Strip(fragment.text)
+		cell := ansi.Strip(cells[0])
+		if got := cell[fragment.offset : fragment.offset+len(plain)]; got != plain {
+			t.Fatalf("fragment = %q, source at offset %d = %q", plain, fragment.offset, got)
+		}
+	}
+}
+
 func TestWrappedMarkdownTableSelection(t *testing.T) {
 	const label = "first one two three four five six seven eight nine last"
 	const link = "[" + label + "](https://example.org/path)"
 	const note = "**alpha bravo charlie delta echo foxtrot golf hotel omega**"
-	const content = "| Link | Notes |\n| --- | --- |\n| " + link + " | " + note + " |"
-	for _, selection := range []string{"link", "note", "whole"} {
+	const code = "``startCode one two three 日本語 é ` four five six seven eight nine endCode``"
+	const content = "| Link | Notes | Code |\n| --- | --- | --- |\n| " + link + " | " + note + " | " + code + " |"
+	for _, selection := range []string{"link", "note", "code", "whole"} {
 		t.Run(selection, func(t *testing.T) {
 			app := setupAppWithDoc(t, content)
 			app.width, app.height, app.viewMode = 200, 40, true
@@ -52,6 +69,8 @@ func TestWrappedMarkdownTableSelection(t *testing.T) {
 				want = link
 				if selection == "note" {
 					a, b, want = "alpha", "omega", note
+				} else if selection == "code" {
+					a, b, want = "startCode", "endCode", code
 				}
 				for _, span := range spans {
 					if at := strings.Index(span.text, a); at >= 0 {
