@@ -757,6 +757,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.restoreDiffAttention(attention)
 			m.focusStartupLocation()
 			m.focusNewReply()
+			if m.isearch.active && m.isearch.found {
+				m.revealTableMatch()
+			}
 		}
 		return m, nil
 

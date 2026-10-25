@@ -69,6 +69,20 @@ func TestTableSearchRevealsHiddenLinkAndWrappedRow(t *testing.T) {
 	}
 }
 
+func TestTableSearchRevealsMatchAfterResize(t *testing.T) {
+	content := "| StartColumn | EndColumn |\n| --- | --- |\n| " + strings.Repeat("left ", 25) + " | " + strings.Repeat("filler ", 30) + "[target](https://hidden.example) |\n"
+	app := setupAppWithDoc(t, content)
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 60, Height: 38})
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "hidden.example")
+	for _, width := range []int{110, 60} {
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 38})
+		if !strings.Contains(ansi.Strip(app.contentViewport.View()), "target") {
+			t.Fatalf("target not visible after resize to %d: table=%+v\n%s", width, app.tableAtLine(3), ansi.Strip(app.contentViewport.View()))
+		}
+	}
+}
+
 func TestScrolledTableSelectionKeepsMarkdownAndGutter(t *testing.T) {
 	const label = "日本語 é label"
 	const link = "[**" + label + "**](https://example.org/path)"
