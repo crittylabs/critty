@@ -69,7 +69,10 @@ type FileTab struct {
 	chromaLines      []string         // syntax-highlighted lines (nil for markdown)
 	deletedLineCache map[int][]string // pre-highlighted deleted line content, keyed by afterLine
 	isMarkdown       bool
+	isCode           bool
 	markdown         *markdownCache
+	goOutline        *goOutlineCache
+	codeOutline      *codeOutlineCache
 	tableOffsets     map[int]int // horizontal offsets keyed by table start line
 }
 
@@ -105,6 +108,7 @@ func (ft *FileTab) ensureHighlightCache() {
 	}
 	ext := strings.ToLower(filepath.Ext(ft.path))
 	ft.isMarkdown = ext == ".md" || ext == ".markdown"
+	ft.isCode = isCodeFile(ft.path)
 	if ft.isMarkdown {
 		ft.ensureMarkdownCache()
 		return

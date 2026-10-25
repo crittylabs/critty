@@ -59,11 +59,12 @@ type markdownEdit struct {
 }
 
 type markdownSource struct {
-	lines   []markdownLine
-	source  string
-	offsets []int
-	markup  []markdownMarkup
-	fences  []markdownFence
+	lines    []markdownLine
+	source   string
+	offsets  []int
+	markup   []markdownMarkup
+	fences   []markdownFence
+	headings []outlineHeading
 }
 
 func parseMarkdownSource(lines []string, known map[int]bool) *markdownSource {
@@ -110,6 +111,12 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 	visit = func(n ast.Node) {
 		switch n.(type) {
 		case *ast.Paragraph, *ast.Heading, *extast.TableCell:
+			if heading, ok := n.(*ast.Heading); ok {
+				m.headings = append(m.headings, outlineHeading{
+					line: start + lineAt(heading.Pos()) + 1, level: heading.Level,
+					label: outlineHeadingLabel(heading, data),
+				})
+			}
 			segments := n.(ast.BlockNode).Source()
 			if len(segments) == 0 {
 				return

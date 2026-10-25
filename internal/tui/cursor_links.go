@@ -125,6 +125,9 @@ func (m *AppModel) openReferenceAtCursor() tea.Cmd {
 	if t.isBinary || t.cursorOnAnnotation || t.cursorLine == 0 || t.cursorSide == "old" || t.doc == nil {
 		return m.openImageAtCursor()
 	}
+	if t.isCode {
+		return nil
+	}
 	if t.attachment != nil && t.doc.HasLine(t.cursorLine) {
 		for _, span := range m.documentLinkSpans(t.cursorLine, false) {
 			if cmd, ok := m.activateReference(span.uri); ok {

@@ -20,18 +20,25 @@ func TestAttachmentReferences(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name, body string
-		plain      bool
+		path       string
 	}{
 		{name: "wrapped prose", body: strings.Repeat("日本語 é ", 4) + "@target.md L2 and c_abcdef"},
 		{name: "inline code", body: "See `@target.md L2` and `c_abcdef`"},
 		{name: "explicit link", body: "[c_abcdef](https://example.org) @target.md L2 and c_abcdef"},
 		{name: "table", body: "| File | Comment |\n| --- | --- |\n| @target.md L2 | c_abcdef |"},
 		{name: "form", body: "- [ ] Check @target.md L2 and `c_abcdef` <!-- form: id=check -->"},
-		{name: "plain text", body: "See @target.md L2 and c_abcdef", plain: true},
+		{name: "plain text", body: "See @target.md L2 and c_abcdef", path: "notes.txt"},
+		{name: "reStructuredText", body: "See @target.md L2 and c_abcdef", path: "notes.rst"},
+		{name: "Org", body: "See @target.md L2 and c_abcdef", path: "notes.org"},
+		{name: "unknown format", body: "See @target.md L2 and c_abcdef", path: "notes.unknown"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app, _ := formTestAppWithContent(t, tc.body+"\n")
-			app.tab().isMarkdown = !tc.plain
+			if tc.path != "" {
+				app.tab().path = "attachments/a/" + tc.path
+				app.tab().chromaLines = nil
+				app.tab().ensureHighlightCache()
+			}
 			app.tabs[1].doc = document.FromContent("target.md", []byte("one\ntwo\n"))
 			app.tabs[1].state.Comments = []review.Comment{{ID: "c_abcdef", StartLine: 2, EndLine: 2, Body: "target", Resolved: true}}
 			app.width, app.height = 65, 35
@@ -82,6 +89,30 @@ func TestAttachmentReferenceOutsideReview(t *testing.T) {
 	app.openReferenceAtCursor()
 	if app.modal != openSourceModal || app.pendingLocation.path != "other.go" || app.pendingLocation.line != 2 {
 		t.Fatal("reference outside the review did not offer the source editor")
+	}
+}
+
+func TestSourceAttachmentKeepsHighlightingWithoutLinks(t *testing.T) {
+	const source = "package main\nvar address = \"https://example.org\"\n// @target.md L2 c_abcdef https://example.org\n"
+	app, _ := formTestAppWithContent(t, source)
+	tab := app.tab()
+	tab.path = "attachments/a/example.go"
+	tab.chromaLines = nil
+	tab.ensureHighlightCache()
+	app.tabs[1].state.Comments = []review.Comment{{ID: "c_abcdef", StartLine: 2, Body: "target"}}
+	app.rebuildContent()
+	styled := documentDisplayLine(tab, 1, tab.doc.Lines[1])
+	if styled == ansi.Strip(styled) || !strings.Contains(app.contentViewport.GetContent(), styled) {
+		t.Fatal("source attachment lost syntax highlighting")
+	}
+	if spans := app.documentLinkSpans(3, false); len(spans) != 0 {
+		t.Fatalf("source comment has reference links: %+v", spans)
+	}
+	for _, line := range []int{2, 3} {
+		tab.cursorLine = line
+		if cmd := app.openReferenceAtCursor(); cmd != nil || app.activeTab != 0 {
+			t.Fatalf("source line %d activated a link", line)
+		}
 	}
 }
 

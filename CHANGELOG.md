@@ -5,6 +5,7 @@
 ### Added
 
 - Attach PNG, JPEG, GIF, and WebP images alongside review documents, including in attachment-only reviews.  Reviewers can preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Reviews and history exports retain the saved image after its source changes or disappears.  Image attachments are limited to 5 MiB and 16 megapixels; animated GIFs preview their first frame.
+- Navigate Markdown and source files, including attachments, from an outline below the Files tree.  Supports Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Markdown headings are nested; source declarations follow file order, with block or indentation nesting where available.  Go methods include their receiver type in a flat list.  Languages other than Go use lightweight heuristics for conventionally formatted source, so unusual syntax may be missed or misidentified.  Click or use the keyboard to jump to an entry; the outline follows the source cursor and resizes up to two thirds of the sidebar.  Short outlines leave more room for files.
 
 ### Changed
 
@@ -16,6 +17,7 @@
 
 ### Fixed
 
+- Attached source files retain syntax highlighting.  Source code, including its comments, no longer treats URLs or review references as links; text documents and review comments keep their links.
 - Incremental search highlights the link label or formatted text when a match falls in a hidden Markdown URL, title, or formatting marker.  Current-match highlighting follows source order, including multiline labels, while preserving text styles and clickable links.
 - Markdown tables in documents and attachments render links, emphasis, and inline code.  Short columns keep their natural widths; long cells wrap at 40 display columns.  Wide tables scroll horizontally with arrow keys, `h`/`l`, horizontal mouse wheels, or clickable edge indicators, and search reveals the current match.  Copying selections retains Markdown formatting and link targets across wrapped and scrolled cells.
 

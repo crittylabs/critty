@@ -14,12 +14,16 @@ func TestCodeHighlighterKeepsInputsIndependent(t *testing.T) {
 		path   string
 		inputs []string
 	}{
+		{"test.mm", []string{"@implementation Service\n", "- (void)run { /* https://example.test */ }\n"}},
 		{"test.go", []string{"package main\n/* unfinished comment", "var name = `日本語`", "", "// comment\n"}},
 		{"test.py", []string{"value = \"\"\"unfinished string", "print('日本語')\n", "\t# comment"}},
 		{"Makefile", []string{"all:\n\techo hello\n", "\techo goodbye"}},
 		{"test.unknown-extension", []string{"plain text\n", "\t日本語", ""}},
 	} {
 		t.Run(tt.path, func(t *testing.T) {
+			if tt.path == "test.mm" && !isCodeFile(tt.path) {
+				t.Fatal("source file was classified as text")
+			}
 			highlight := newCodeHighlighter(tt.path)
 			for _, input := range tt.inputs {
 				want := newCodeHighlighter(tt.path)(input)

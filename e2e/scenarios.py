@@ -820,6 +820,170 @@ def scenarios() -> None:
         report(
             "multiline Markdown keeps formatting, source text and comment lines after resize"
         )
+        outline_source = "# Outline root\n\n" + "".join(
+            f"## Part {i:02}\nBody for part {i:02}.\n\n" for i in range(24)
+        )
+        outline_source += "```md\n# Not a section\n```\n"
+        (WORK / "outline.md").write_text(outline_source)
+        outline = Round("markdown-outline", ["outline.md"])
+        tmux("resize-pane", "-t", outline.pane, "-x", "90", "-y", "28")
+        outline_width = int(
+            tmux("display-message", "-p", "-t", outline.pane, "#{pane_width}")
+        )
+        wait_until(
+            lambda: any(
+                row.startswith("│")
+                and row.endswith("│")
+                and len(row.expandtabs(8)) == outline_width
+                for row in outline.screen().splitlines()
+            ),
+            "outline review redrawn after resize",
+        )
+        outline.wait_screen("─ Outline", "Files shows a Markdown outline")
+        outline.click("Part 01", last=True)
+        outline.keys("Enter", "Enter")
+        outline.text("Heading jump anchor.")
+        outline.keys("C-s")
+        wait_until(lambda: outline.comments(), "outline jump comment saved")
+        assert outline.comments()[0]["start_line"] == 6, outline.comments()
+        outline.keys("s", "C-Down", "G")
+        outline.wait_screen(
+            "Part 23", "outline keyboard navigation reaches the last heading"
+        )
+        outline.keys("Enter", "Enter")
+        outline.text("Last heading anchor.")
+        outline.keys("C-s")
+        wait_until(lambda: len(outline.comments()) == 2, "last heading comment saved")
+        assert outline.comments()[1]["start_line"] == 72, outline.comments()
+        assert (WORK / "outline.md").read_text() == outline_source
+        outline.finish(False)
+        report(
+            "Markdown outline mouse and keyboard jumps preserve source comment anchors"
+        )
+        go_source = (
+            "package sample\n\ntype Server struct{}\n\n"
+            "func (s *Server) Serve() {\n println(1)\n}\n\nfunc Stop() {}\n"
+        )
+        (WORK / "outline.go").write_text(go_source)
+        go_outline = Round("go-outline", ["outline.go"])
+        go_outline.wait_screen(
+            "func (*Server) Serve", "Go receiver appears in the outline"
+        )
+        go_outline.click(r"func \(\*Server\) Serve")
+        go_outline.keys("Enter", "Enter")
+        go_outline.text("Go method anchor.")
+        go_outline.keys("C-s")
+        wait_until(lambda: go_outline.comments(), "Go method jump comment saved")
+        assert go_outline.comments()[0]["start_line"] == 5, go_outline.comments()
+        go_outline.keys("s", "C-Down", "G", "Enter", "Enter")
+        go_outline.text("Go function anchor.")
+        go_outline.keys("C-s")
+        wait_until(
+            lambda: len(go_outline.comments()) == 2, "Go function jump comment saved"
+        )
+        assert go_outline.comments()[1]["start_line"] == 9, go_outline.comments()
+        assert (WORK / "outline.go").read_text() == go_source
+        go_outline.finish(False)
+        report(
+            "Go outline mouse and keyboard jumps preserve declaration comment anchors"
+        )
+        source_ts = (
+            "export class Service {\n"
+            "  run(value: number) {\n    return value;\n  }\n}\n"
+            "export const stop = () => {};\n"
+        )
+        source_py = (
+            "class Service:\n  def run(self):\n    return 1\n\ndef stop():\n  pass\n"
+        )
+        source_el = (
+            "(use-package example\n  :config\n"
+            '  (defun example-run ()\n    (message "ready")))\n'
+            '(define-minor-mode example-mode "Example mode.")\n'
+        )
+        source_objc = (
+            "@implementation Service\n"
+            "- (void)run:(int)value\n    completion:(Handler)handler {\n}\n@end\n"
+        )
+        for name, content in {
+            "sample.ts": source_ts,
+            "sample.py": source_py,
+            "sample.el": source_el,
+            "sample.mm": source_objc,
+        }.items():
+            (WORK / name).write_text(content)
+        source_outline = Round(
+            "source-outlines",
+            [
+                "--null",
+                "--attachment",
+                "sample.ts",
+                "--attachment",
+                "sample.py",
+                "--attachment",
+                "sample.el",
+                "--attachment",
+                "sample.mm",
+            ],
+        )
+        source_outline.wait_screen(
+            "run()", "TypeScript attachment shows method outline"
+        )
+        source_outline.click(r"run\(\)")
+        source_outline.keys("Enter", "Enter")
+        source_outline.text("TypeScript method anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: source_outline.comments(), "TypeScript outline comment saved"
+        )
+        assert source_outline.comments()[0]["start_line"] == 2
+        source_outline.click("sample.py")
+        source_outline.wait_screen("def run", "Python attachment shows method outline")
+        source_outline.keys("s", "C-Down", "g", "l", "Enter", "Enter")
+        source_outline.text("Python method anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: len(source_outline.comments()) == 2, "Python outline comment saved"
+        )
+        python_comment = next(
+            c for c in source_outline.comments() if c["path"].endswith("/sample.py")
+        )
+        assert python_comment["start_line"] == 2, python_comment
+        source_outline.click("sample.el")
+        source_outline.wait_screen("use-package example", "Emacs Lisp package outline")
+        source_outline.click("use-package example", last=True)
+        source_outline.keys("l", "Enter", "Enter")
+        source_outline.text("Emacs Lisp function anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: len(source_outline.comments()) == 3,
+            "Emacs Lisp outline comment saved",
+        )
+        elisp_comment = next(
+            c for c in source_outline.comments() if c["path"].endswith("/sample.el")
+        )
+        assert elisp_comment["start_line"] == 3, elisp_comment
+        source_outline.click("sample.mm")
+        source_outline.wait_screen("run:completion:", "Objective-C++ selector outline")
+        source_outline.click("run:completion:")
+        source_outline.keys("Enter", "Enter")
+        source_outline.text("Objective-C method anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: len(source_outline.comments()) == 4,
+            "Objective-C outline comment saved",
+        )
+        objc_comment = next(
+            c for c in source_outline.comments() if c["path"].endswith("/sample.mm")
+        )
+        assert objc_comment["start_line"] == 2, objc_comment
+        assert (WORK / "sample.el").read_text() == source_el
+        assert (WORK / "sample.mm").read_text() == source_objc
+        assert (WORK / "sample.ts").read_text() == source_ts
+        assert (WORK / "sample.py").read_text() == source_py
+        source_outline.finish(False)
+        report(
+            "source attachment outlines preserve block, indentation, Lisp, and selector anchors"
+        )
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "
             + "left " * 25
