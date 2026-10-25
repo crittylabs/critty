@@ -40,9 +40,26 @@ func codeOutlineLanguage(path, source string) string {
 		return "swift"
 	case ".kt", ".kts":
 		return "kotlin"
+	case ".m", ".mm":
+		return "objective-c"
+	case ".zig":
+		return "zig"
+	case ".pl", ".pm", ".t":
+		return "perl"
+	case ".el":
+		return "emacs-lisp"
+	case ".lua", ".wlua":
+		return "lua"
+	case ".vim":
+		return "vim"
 	case ".c":
 		return "c"
-	case ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx":
+	case ".h":
+		if outlineObjCType.MatchString(source) {
+			return "objective-c"
+		}
+		return "cpp"
+	case ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx":
 		return "cpp"
 	case ".java":
 		return "java"
@@ -50,6 +67,10 @@ func codeOutlineLanguage(path, source string) string {
 		return "bash"
 	}
 	switch filepath.Base(path) {
+	case ".emacs":
+		return "emacs-lisp"
+	case ".vimrc", ".gvimrc", ".exrc", "_vimrc", "_gvimrc", "_exrc", "vimrc", "gvimrc":
+		return "vim"
 	case "Gemfile", "Rakefile":
 		return "ruby"
 	case ".profile", ".bashrc", ".bash_profile", ".zshrc", ".zprofile", ".kshrc":
@@ -137,7 +158,7 @@ func outlineCode(language, source string) string {
 		}
 	}
 	code := b.String()
-	if language == "cpp" {
+	if language == "cpp" || language == "objective-c" {
 		masked := []byte(code)
 		end := 0
 		for _, m := range outlineCppRaw.FindAllStringSubmatchIndex(source, -1) {
@@ -197,7 +218,13 @@ func parseCodeOutline(language, source string, offset int) []outlineHeading {
 	var parents []scope
 	depth, base := 0, 0
 	opens := map[int]string{}
-	indented := language == "python" || language == "ruby"
+	indented := language == "python" || language == "ruby" || language == "lua" || language == "vim"
+	open, close := byte('{'), byte('}')
+	if language == "emacs-lisp" {
+		open, close = '(', ')'
+	}
+	// Semicolon packages and Objective-C containers have no enclosing braces.
+	region, regionDepth := 0, 0
 	for i, line := range lines {
 		text := strings.TrimSpace(line)
 		indent := outlineIndent(line)
@@ -206,8 +233,17 @@ func parseCodeOutline(language, source string, offset int) []outlineHeading {
 				parents = parents[:len(parents)-1]
 			}
 		}
+		if language == "objective-c" && strings.HasPrefix(text, "@end") {
+			region = 0
+		}
 		decl, ok := outlineDeclaration(language, text)
-		if ok && !indented {
+		container := language == "objective-c" && outlineObjCType.MatchString(text)
+		packageLine := language == "perl" && strings.HasPrefix(text, "package ")
+		if language == "objective-c" && outlineObjCMethod.MatchString(text) {
+			decl = outlineObjCSelector(lines, i)
+			ok = decl.label != ""
+		}
+		if ok && !indented && !container && language != "emacs-lisp" {
 			var arrow bool
 			decl.body, decl.prototype, arrow = outlineBody(lines, i, len(line)-len(strings.TrimLeft(line, " \t"))+decl.start, base)
 			ok = !decl.needsArrow || arrow
@@ -217,7 +253,26 @@ func parseCodeOutline(language, source string, offset int) []outlineHeading {
 			}
 		}
 		if ok {
-			rows = append(rows, outlineHeading{line: i + 1 + offset, level: len(parents) + 1, label: decl.label})
+			parentRegion := region
+			for _, parent := range parents {
+				if parent.kind == "package" {
+					parentRegion = 0
+				}
+			}
+			level := len(parents) + parentRegion + 1
+			if container || packageLine {
+				level = len(parents) + 1
+			}
+			rows = append(rows, outlineHeading{line: i + 1 + offset, level: level, label: decl.label})
+			if container && !strings.Contains(text, ";") || packageLine && decl.prototype {
+				region, regionDepth = 1, depth
+			}
+			if language == "emacs-lisp" {
+				decl.body = base + len(line) - len(strings.TrimLeft(line, " \t"))
+			}
+			if packageLine {
+				decl.kind = "package"
+			}
 			if indented {
 				parents = append(parents, scope{indent, decl.kind})
 			} else if decl.body >= 0 {
@@ -227,17 +282,20 @@ func parseCodeOutline(language, source string, offset int) []outlineHeading {
 		if !indented {
 			for j := range len(line) {
 				switch line[j] {
-				case '{':
+				case open:
 					depth++
 					if kind, ok := opens[base+j]; ok {
 						parents = append(parents, scope{depth, kind})
 						delete(opens, base+j)
 					}
-				case '}':
+				case close:
 					for len(parents) > 0 && parents[len(parents)-1].depth >= depth {
 						parents = parents[:len(parents)-1]
 					}
 					depth = max(0, depth-1)
+					if depth < regionDepth {
+						region = 0
+					}
 				}
 			}
 		}

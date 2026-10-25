@@ -35,7 +35,7 @@ func outlineMatch(pattern *regexp.Regexp, text string) (codeDeclaration, bool) {
 	}
 	kind, name := text[m[2]:m[3]], text[m[4]:m[5]]
 	category := "type"
-	if kind == "def" || kind == "fn" || kind == "func" || kind == "fun" || kind == "function" {
+	if kind == "sub" || kind == "def" || kind == "fn" || kind == "func" || kind == "fun" || kind == "function" {
 		category = "function"
 	}
 	return codeDeclaration{label: kind + " " + name, kind: category, start: m[1], body: -1}, true
@@ -43,6 +43,33 @@ func outlineMatch(pattern *regexp.Regexp, text string) (codeDeclaration, bool) {
 
 func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 	switch language {
+	case "zig":
+		if decl, ok := outlineMatch(outlineZig, text); ok {
+			return decl, true
+		}
+		if m := outlineZigType.FindStringSubmatchIndex(text); m != nil {
+			return codeDeclaration{label: "const " + text[m[2]:m[3]], kind: "type", start: m[1], body: -1}, true
+		}
+		return codeDeclaration{}, false
+	case "perl":
+		return outlineMatch(outlinePerl, text)
+	case "emacs-lisp":
+		return outlineMatch(outlineElisp, text)
+	case "lua":
+		if decl, ok := outlineMatch(outlineLua, text); ok {
+			return decl, true
+		}
+		if m := outlineLuaValue.FindStringSubmatchIndex(text); m != nil {
+			return codeDeclaration{label: "function " + text[m[2]:m[3]], kind: "function", body: -1}, true
+		}
+		return codeDeclaration{}, false
+	case "vim":
+		return outlineMatch(outlineVim, text)
+	case "objective-c":
+		if m := outlineObjCType.FindStringSubmatchIndex(text); m != nil {
+			return codeDeclaration{label: strings.TrimSpace(text[m[2]:m[3]]) + " " + strings.TrimSpace(text[m[4]:m[5]]), kind: "type", body: -1}, true
+		}
+		return outlineDeclaration("cpp", text)
 	case "python":
 		return outlineMatch(outlinePython, text)
 	case "ruby":

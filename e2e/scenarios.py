@@ -895,11 +895,35 @@ def scenarios() -> None:
         source_py = (
             "class Service:\n  def run(self):\n    return 1\n\ndef stop():\n  pass\n"
         )
-        (WORK / "sample.ts").write_text(source_ts)
-        (WORK / "sample.py").write_text(source_py)
+        source_el = (
+            "(use-package example\n  :config\n"
+            '  (defun example-run ()\n    (message "ready")))\n'
+            '(define-minor-mode example-mode "Example mode.")\n'
+        )
+        source_objc = (
+            "@implementation Service\n"
+            "- (void)run:(int)value\n    completion:(Handler)handler {\n}\n@end\n"
+        )
+        for name, content in {
+            "sample.ts": source_ts,
+            "sample.py": source_py,
+            "sample.el": source_el,
+            "sample.mm": source_objc,
+        }.items():
+            (WORK / name).write_text(content)
         source_outline = Round(
             "source-outlines",
-            ["--null", "--attachment", "sample.ts", "--attachment", "sample.py"],
+            [
+                "--null",
+                "--attachment",
+                "sample.ts",
+                "--attachment",
+                "sample.py",
+                "--attachment",
+                "sample.el",
+                "--attachment",
+                "sample.mm",
+            ],
         )
         source_outline.wait_screen(
             "run()", "TypeScript attachment shows method outline"
@@ -924,11 +948,41 @@ def scenarios() -> None:
             c for c in source_outline.comments() if c["path"].endswith("/sample.py")
         )
         assert python_comment["start_line"] == 2, python_comment
+        source_outline.click("sample.el")
+        source_outline.wait_screen("use-package example", "Emacs Lisp package outline")
+        source_outline.click("use-package example", last=True)
+        source_outline.keys("l", "Enter", "Enter")
+        source_outline.text("Emacs Lisp function anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: len(source_outline.comments()) == 3,
+            "Emacs Lisp outline comment saved",
+        )
+        elisp_comment = next(
+            c for c in source_outline.comments() if c["path"].endswith("/sample.el")
+        )
+        assert elisp_comment["start_line"] == 3, elisp_comment
+        source_outline.click("sample.mm")
+        source_outline.wait_screen("run:completion:", "Objective-C++ selector outline")
+        source_outline.click("run:completion:")
+        source_outline.keys("Enter", "Enter")
+        source_outline.text("Objective-C method anchor.")
+        source_outline.keys("C-s")
+        wait_until(
+            lambda: len(source_outline.comments()) == 4,
+            "Objective-C outline comment saved",
+        )
+        objc_comment = next(
+            c for c in source_outline.comments() if c["path"].endswith("/sample.mm")
+        )
+        assert objc_comment["start_line"] == 2, objc_comment
+        assert (WORK / "sample.el").read_text() == source_el
+        assert (WORK / "sample.mm").read_text() == source_objc
         assert (WORK / "sample.ts").read_text() == source_ts
         assert (WORK / "sample.py").read_text() == source_py
         source_outline.finish(False)
         report(
-            "curly and indented source attachment outlines preserve navigation anchors"
+            "source attachment outlines preserve block, indentation, Lisp, and selector anchors"
         )
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "

@@ -28,6 +28,15 @@ func TestCodeOutlineDeclarations(t *testing.T) {
 		{"sample.c", "typedef unsigned int Index;\nstruct Service {\n    int value;\n};\nstatic int\nrun(\n    const int value\n)\n{\n    if (value) { send(value); }\n    return value;\n}\nvoid stop(void);\n", []outlineHeading{{1, 1, "typedef Index"}, {2, 1, "struct Service"}, {6, 1, "run()"}, {13, 1, "stop()"}}},
 		{"sample.cpp", "namespace example {\nclass Service {\npublic:\n    Service() {}\n    void run() {\n        if (ready()) { send(); }\n    }\n};\nint finish() { return 0; }\n}\nvoid done() {}\n", []outlineHeading{{1, 1, "namespace example"}, {2, 2, "class Service"}, {4, 3, "Service()"}, {5, 3, "run()"}, {9, 2, "finish()"}, {11, 1, "done()"}}},
 		{"Sample.java", "public class Service {\n    public Service() {}\n    @Override\n    public String run(\n        String value\n    ) {\n        if (value != null) { send(value); }\n        return value;\n    }\n    private static class Nested {\n        void stop() {}\n    }\n}\n", []outlineHeading{{1, 1, "class Service"}, {2, 2, "Service()"}, {4, 2, "run()"}, {10, 2, "class Nested"}, {11, 3, "stop()"}}},
+		{"sample.zig", "pub const Service = struct {\n    pub fn run(self: *Service) void {\n        send();\n    }\n};\nconst Kind = enum { ready, done };\npub fn finish() void {}\n", []outlineHeading{{1, 1, "const Service"}, {2, 2, "fn run"}, {6, 1, "const Kind"}, {7, 1, "fn finish"}}},
+		{"sample.pm", "package First;\nsub new { bless {}, shift }\nsub run {\n    send();\n}\npackage Second {\n    sub stop {}\n}\nsub finish {}\n", []outlineHeading{{1, 1, "package First"}, {2, 2, "sub new"}, {3, 2, "sub run"}, {6, 1, "package Second"}, {7, 2, "sub stop"}, {9, 2, "sub finish"}}},
+		{"packages.pl", "package First;\nsub first {}\npackage Second;\nsub second {}\n", []outlineHeading{{1, 1, "package First"}, {2, 2, "sub first"}, {3, 1, "package Second"}, {4, 2, "sub second"}}},
+		{"Service.h", "@protocol Forward;\n@interface Service : NSObject\n- (void)run;\n@end\nvoid finish(void);\n", []outlineHeading{{1, 1, "@protocol Forward"}, {2, 1, "@interface Service"}, {3, 2, "- run"}, {5, 1, "finish()"}}},
+		{"sample.el", "(use-package example\n  :config\n  (defun example-run ()\n    (message \"ready\")))\n(cl-defstruct example-entry value)\n(define-minor-mode example-mode\n  \"Example mode.\"\n  :lighter \" Ex\")\n(defcustom example-enabled t \"Enabled.\" :type 'boolean)\n(define-key example-map (kbd \"x\") #'example-run)\n(default-value 'example-enabled)\n(cl-defun example-stop (&key force) force)\n", []outlineHeading{{1, 1, "use-package example"}, {3, 2, "defun example-run"}, {5, 1, "cl-defstruct example-entry"}, {6, 1, "define-minor-mode example-mode"}, {9, 1, "defcustom example-enabled"}, {12, 1, "cl-defun example-stop"}}},
+		{"sample.lua", "local function run()\n  local function nested() end\n  nested()\nend\nfunction Service:stop()\n  send()\nend\nService.start = function() end\n", []outlineHeading{{1, 1, "function run"}, {2, 2, "function nested"}, {5, 1, "function Service:stop"}, {8, 1, "function Service.start"}}},
+		{"sample.vim", "function! s:Run(value) abort\n  call Send(a:value)\nendfunction\nfu! example#Stop()\nendfunction\nexport def Start(): void\nenddef\nclass Service\n  def Stop()\n  enddef\nendclass\n", []outlineHeading{{1, 1, "function! s:Run"}, {4, 1, "fu! example#Stop"}, {6, 1, "def Start"}, {8, 1, "class Service"}, {9, 2, "def Stop"}}},
+		{"sample.m", "@interface Service : NSObject\n- (void)run:(int)value\n    completion:(Handler)handler;\n+ (instancetype)shared;\n@end\n@implementation Service (Extra)\n- (void)stop {\n    [self send];\n}\n@end\n@protocol Store\n- (id)get;\n@end\nvoid finish(void) {}\n", []outlineHeading{{1, 1, "@interface Service"}, {2, 2, "- run:completion:"}, {4, 2, "+ shared"}, {6, 1, "@implementation Service (Extra)"}, {7, 2, "- stop"}, {11, 1, "@protocol Store"}, {12, 2, "- get"}, {14, 1, "finish()"}}},
+		{"sample.mm", "namespace example {\nclass Worker {\n  void run() {}\n};\n}\n@implementation Service\n- (void)run {\n  example::Worker worker;\n}\n@end\n", []outlineHeading{{1, 1, "namespace example"}, {2, 2, "class Worker"}, {3, 3, "run()"}, {6, 1, "@implementation Service"}, {7, 2, "- run"}}},
 		{"sample.sh", "#!/bin/sh\nrun()\n{\n    if ready; then\n        send\n    fi\n}\nfunction finish {\n    :\n}\n", []outlineHeading{{2, 1, "function run"}, {8, 1, "function finish"}}},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
@@ -58,6 +67,12 @@ func BenchmarkCodeOutline(b *testing.B) {
 
 func TestCodeOutlineIgnoresCommentsAndStrings(t *testing.T) {
 	for _, tc := range []struct{ path, source string }{
+		{"sample.zig", "// fn hidden() void {}\nconst text =\n    \\\\fn hidden() void {}\n;\nfn visible() void {}\n"},
+		{"sample.pl", "=pod\nsub hidden {}\n=cut\nmy $text = <<'TEXT';\nsub hidden {}\nTEXT\nsub visible {}\n"},
+		{"sample.el", "; (defun hidden () t)\n(defvar visible \"\n(defun hidden () t)\n\")\n"},
+		{"sample.lua", "--[[\nfunction hidden() end\n]]\nlocal text = [=[\nfunction hidden() end\n]=]\nfunction visible() end\n"},
+		{"sample.vim", "\" function! Hidden()\nlet text = 'function! Hidden()'\nfunction! visible()\nendfunction\n"},
+		{"sample.m", "/*\n@interface Hidden\n@end\n*/\nconst char *text = \"@implementation Hidden\";\nvoid visible() {}\n"},
 		{"sample.ts", "/*\nclass Hidden {\n  run() {}\n}\n*/\nconst text = `\nfunction hidden() {}\n`;\nfunction visible() {}\n"},
 		{"sample.rs", "/*\nfn hidden() {}\n*/\nlet text = r#\"\nfn hidden() {}\n\"#;\nfn visible() {}\n"},
 		{"sample.py", "\"\"\"\nclass Hidden:\n  def hidden(): pass\n\"\"\"\n# def hidden(): pass\ndef visible(): pass\n"},
