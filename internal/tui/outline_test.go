@@ -83,6 +83,54 @@ func TestOutlineFollowsSourceAndJumps(t *testing.T) {
 	}
 }
 
+func TestOutlineShortcut(t *testing.T) {
+	for _, msg := range []tea.KeyPressMsg{
+		{Code: 'G', Mod: tea.ModAlt},
+		{Code: 'g', Mod: tea.ModAlt | tea.ModShift},
+		{Code: 'G', Mod: tea.ModAlt | tea.ModShift},
+	} {
+		t.Run(msg.String(), func(t *testing.T) {
+			app := outlineTestApp(t, "# Root\nbody\n## Child\n")
+			app.sidebarView = commentsView
+			app.viewMode = true
+			app.tab().cursorLine = 2
+			app, _ = updateApp(app, msg)
+			if app.viewMode || app.sidebarView != filesView || app.focused != commentPane || !app.outline.focused || app.tab().cursorLine != 2 {
+				t.Fatalf("%s did not focus the outline without moving the source cursor", msg.String())
+			}
+			app = pressKey(app, 'j')
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+			if app.focused != contentPane || app.tab().cursorLine != 3 {
+				t.Fatal("Enter did not return to the selected source entry")
+			}
+		})
+	}
+}
+
+func TestOutlineFooterHints(t *testing.T) {
+	for _, readOnly := range []bool{false, true} {
+		app := outlineTestApp(t, "# Root\nbody\n")
+		app.readOnly = readOnly
+		app.focused = contentPane
+		if footer := ansi.Strip(app.renderFooter()); !strings.Contains(footer, "M-G outline") || strings.Contains(footer, "C-↑/↓") {
+			t.Fatalf("source footer: %q", footer)
+		}
+		app.focused = commentPane
+		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || !strings.Contains(footer, "C-↑/↓ tree/outline") {
+			t.Fatalf("Files footer: %q", footer)
+		}
+		app.sidebarView = commentsView
+		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || strings.Contains(footer, "C-↑/↓") {
+			t.Fatalf("comments footer: %q", footer)
+		}
+		app.focused = contentPane
+		app.outline.rows = nil
+		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || strings.Contains(footer, "C-↑/↓") {
+			t.Fatalf("footer without outline: %q", footer)
+		}
+	}
+}
+
 func TestOutlineLayoutScrollingAndResize(t *testing.T) {
 	var source strings.Builder
 	for i := range 40 {

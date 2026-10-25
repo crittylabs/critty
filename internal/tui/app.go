@@ -1012,6 +1012,10 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "alt+g" {
 		return m, m.openGotoLine()
 	}
+	if msg.String() == "alt+G" || msg.String() == "alt+shift+g" || msg.String() == "alt+shift+G" {
+		m.focusOutline()
+		return m, nil
+	}
 	if msg.String() == "alt+w" {
 		if m.focused == contentPane && m.hasTextSelection() {
 			return m, m.copySelectedText()
@@ -4250,7 +4254,7 @@ func (m AppModel) renderFooter() string {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
-		return m.renderFooterItems([]string{m.footerHelpButton(), "View: read-only", "v: select", "M-w: copy reference", "q: close", m.searchHint()})
+		return m.renderFooterItems([]string{m.footerHelpButton(), "View: read-only", m.outlineHint(), "v: select", "M-w: copy reference", "q: close", m.searchHint()})
 	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
@@ -4322,6 +4326,9 @@ func (m AppModel) renderFooter() string {
 		items = append([]string{button}, items...)
 	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
+	if !t.selecting {
+		items = append(items, m.outlineHint())
+	}
 	items = append(items, m.searchHint())
 
 	return m.renderFooterItems(items)
@@ -4421,6 +4428,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "v · esc", desc: "select lines / cancel"},
 			{keys: "M-w", desc: "copy selected text or reference"},
 			{keys: "s/t", desc: "toggle sidebar / view"},
+			{keys: "M-G", desc: "focus outline"},
 			{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · resize outline"},
 			{keys: "enter/esc", desc: "outline: return to source"},
 			{keys: "w · S · I", desc: "whitespace / split / images"},
@@ -4478,6 +4486,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "V", desc: "toggle reading view: hide sidebar and fold all comments; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
+		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},
 		{keys: "↑/↓,j/k · ←/→,h/l · enter/esc", desc: "outline: jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},

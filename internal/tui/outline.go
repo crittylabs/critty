@@ -203,6 +203,38 @@ func (m *AppModel) jumpOutline(i int) {
 	m.scrollToCursor()
 }
 
+func (m AppModel) outlineHint() string {
+	if len(m.outline.rows) == 0 {
+		return ""
+	}
+	if m.focused == contentPane {
+		return footerKeyStyle.Render("M-G") + " " + footerDescStyle.Render("outline")
+	}
+	if m.sidebarView == filesView {
+		return footerKeyStyle.Render("C-↑/↓") + " " + footerDescStyle.Render("tree/outline")
+	}
+	return ""
+}
+
+func (m *AppModel) focusOutline() {
+	m.syncOutline()
+	if len(m.outline.rows) == 0 {
+		return
+	}
+	m.viewMode = false
+	m.sidebarView = filesView
+	m.recalculateLayout()
+	m.updateCommentSidebar()
+	if m.outline.viewport.Height() > 0 {
+		m.focused = commentPane
+		m.outline.focused = true
+	}
+	m.rebuildContent()
+	m.renderFileTree()
+	m.renderOutline()
+	m.revealOutlineHeading()
+}
+
 func (m *AppModel) handleFilesSidebarKey(msg tea.KeyPressMsg) bool {
 	o := &m.outline
 	if o.viewport.Height() > 0 {
