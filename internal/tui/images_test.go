@@ -21,6 +21,7 @@ import (
 	"github.com/charmbracelet/x/ansi/kitty"
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/imageinfo"
 )
 
 func previewPNG(t *testing.T, width, height int) []byte {
@@ -559,6 +560,10 @@ func TestPreviewReadsReviewedImage(t *testing.T) {
 		t.Run(fmt.Sprintf("%s/deleted=%t", tc.source.Scope, tc.deleted), func(t *testing.T) {
 			app := AppModel{images: imageDisplay{enabled: true}, source: &tc.source,
 				tabs: []FileTab{{path: "画像.png", isBinary: true, isDeleted: tc.deleted, state: &fileReview{}}}}
+			size := app.loadImageInfo(tc.deleted)().(imageInfoMsg)
+			if size.info.Width != tc.width || size.info.Height != 2 {
+				t.Fatalf("dimensions from wrong snapshot: %+v", size)
+			}
 			msg := app.prepareImage()().(imageLoadedMsg)
 			if msg.err != nil || msg.width != tc.width || msg.height != 2 || !strings.Contains(msg.sequence, "f=100") {
 				t.Fatalf("loaded wrong snapshot: %+v", msg)
@@ -620,6 +625,43 @@ func TestPreviewReadsReviewedImage(t *testing.T) {
 	after := app.loadImage(false)().(imageLoadedMsg)
 	if before.err != nil || before.width != 4 || after.err != nil || after.width != 7 {
 		t.Fatal("renamed comparison did not read the old path")
+	}
+}
+
+func TestImageDimensionsWithoutPreview(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("image.png", previewPNG(t, 320, 200), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, hidden := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hidden=%t", hidden), func(t *testing.T) {
+			app := setupAppWithDoc(t, "text\n")
+			app.tab().path, app.tab().isBinary = "image.png", true
+			app.images = imageDisplay{hidden: hidden, attempts: maxImageProbeAttempts}
+			cmd := app.prepareImage()
+			if cmd == nil {
+				t.Fatal("missing dimension read without terminal support")
+			}
+			msg := cmd().(imageInfoMsg)
+			model, _ := app.Update(msg)
+			app = model.(AppModel)
+			if got := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(got, "(320×200)") {
+				t.Fatalf("missing image dimensions: %s", got)
+			}
+			if app.tab().preview.after.attempted || app.tab().preview.after.image != nil {
+				t.Fatal("metadata read loaded an inline preview")
+			}
+			if app.prepareImage() != nil {
+				t.Fatal("dimensions were not cached")
+			}
+			app.tab().status = "modified"
+			app.tab().preview.before.info = imageinfo.Info{Width: 160, Height: 100, Format: "PNG"}
+			app.rebuildContent()
+			view := ansi.Strip(app.contentViewport.GetContent())
+			if !strings.Contains(view, "Before PNG (160×100)") || !strings.Contains(view, "After PNG (320×200)") {
+				t.Fatalf("missing comparison dimensions: %s", view)
+			}
+		})
 	}
 }
 

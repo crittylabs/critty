@@ -623,6 +623,16 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case imageLoadedMsg:
 		return m.finishImageLoad(msg)
+	case imageInfoMsg:
+		for i := range m.tabs {
+			if m.tabs[i].path == msg.path {
+				m.tabs[i].preview.side(msg.before).info = msg.info
+			}
+		}
+		if len(m.tabs) > 0 && m.tab().state != nil {
+			m.rebuildContent()
+		}
+		return m, nil
 	case imageTransmittedMsg:
 		if msg.comment != nil {
 			if side := m.commentImages[*msg.comment]; side != nil {

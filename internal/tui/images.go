@@ -19,6 +19,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
+	"github.com/crittylabs/critty/internal/imageinfo"
 	_ "golang.org/x/image/webp"
 )
 
@@ -73,6 +74,8 @@ type previewSide struct {
 	image     *inlineImage
 	attempted bool
 	failed    bool
+	info      imageinfo.Info
+	infoRead  bool
 }
 
 type imagePreview struct {
@@ -105,10 +108,17 @@ type imageLoadedMsg struct {
 	sequence      string
 	id            int
 	width, height int
+	info          imageinfo.Info
 	err           error
 }
 
 type imageTransmittedMsg struct{ imageLoadedMsg }
+
+type imageInfoMsg struct {
+	path   string
+	before bool
+	info   imageinfo.Info
+}
 
 type imageReadyMsg struct {
 	path          string
@@ -312,13 +322,16 @@ func (m *AppModel) prepareImage() tea.Cmd {
 	if m.session != nil && m.session.CJ.RoundState.Finished {
 		return nil
 	}
-	if m.images.hidden || len(m.tabs) == 0 || m.tab().state == nil {
+	if len(m.tabs) == 0 || m.tab().state == nil {
 		return nil
 	}
 	t := m.tab()
 	// Supplied diffs carry no files to resolve against, but attachments
 	// keep their original location.
 	if t.isMarkdown && !t.isBinary && !t.outsideChanges && (m.patch == nil || t.attachment != nil) {
+		if m.images.hidden {
+			return nil
+		}
 		if !t.markdownImagesPending {
 			t.markdownImagesPending = true
 			return m.findMarkdownImages()
@@ -334,8 +347,19 @@ func (m *AppModel) prepareImage() tea.Cmd {
 	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil {
 		return nil
 	}
-	if !m.images.enabled {
-		return m.requestImageProbe()
+	if !m.images.enabled || m.images.hidden {
+		var cmds []tea.Cmd
+		for _, before := range t.previewSides() {
+			side := t.preview.side(before)
+			if !side.infoRead && side.image == nil {
+				side.infoRead = true
+				cmds = append(cmds, m.loadImageInfo(before))
+			}
+		}
+		if !m.images.hidden {
+			cmds = append(cmds, m.requestImageProbe())
+		}
+		return tea.Batch(cmds...)
 	}
 	width, height, _ := m.imagePreviewLayout()
 	var cmds []tea.Cmd
@@ -359,6 +383,44 @@ func (m *AppModel) prepareImage() tea.Cmd {
 		m.rebuildContent()
 	}
 	return tea.Batch(cmds...)
+}
+
+func (m AppModel) loadImageInfo(before bool) tea.Cmd {
+	t := m.tab()
+	path := t.path
+	sourcePath := path
+	if before && t.oldPath != "" {
+		sourcePath = t.oldPath
+	}
+	source := m.imageSource()
+	return func() tea.Msg {
+		msg := imageInfoMsg{path: path, before: before}
+		data, err := source.PreviewContent(sourcePath, before, maxPreviewBytes)
+		if err == nil {
+			msg.info, _ = imageinfo.Read(data)
+		}
+		return msg
+	}
+}
+
+func (t *FileTab) imageDescription() string {
+	var lines []string
+	for _, before := range t.previewSides() {
+		side := t.preview.side(before)
+		info := side.info
+		if info.Width <= 0 || info.Height <= 0 {
+			continue
+		}
+		label := ""
+		if t.compareImages() {
+			label = "After "
+			if before {
+				label = "Before "
+			}
+		}
+		lines = append(lines, "  "+label+info.String())
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m *AppModel) requestImageProbe() tea.Cmd {
@@ -387,6 +449,7 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 	if msg.err != nil {
 		return msg
 	}
+	msg.info, _ = imageinfo.Read(data)
 	img, err := decodePreview(data)
 	msg.err = err
 	if err != nil {
@@ -401,6 +464,14 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 }
 
 func (m AppModel) finishImageLoad(msg imageLoadedMsg) (tea.Model, tea.Cmd) {
+	if msg.comment == nil && msg.markdown == 0 {
+		for i := range m.tabs {
+			if m.tabs[i].path == msg.path {
+				side := m.tabs[i].preview.side(msg.before)
+				side.info, side.infoRead = msg.info, true
+			}
+		}
+	}
 	if msg.err != nil {
 		if msg.comment != nil {
 			if side := m.commentImages[*msg.comment]; side != nil {
