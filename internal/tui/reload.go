@@ -415,7 +415,7 @@ func tabContentChanged(before, after FileTab) bool {
 func (m *AppModel) loadBinaryRevisions() {
 	var paths []string
 	for _, tab := range m.tabs {
-		if tab.isBinary && !tab.isDeleted && !tab.outsideChanges {
+		if tab.isBinary && tab.attachment == nil && !tab.isDeleted && !tab.outsideChanges {
 			paths = append(paths, tab.path)
 		}
 	}
@@ -447,7 +447,7 @@ func (m *AppModel) loadBinaryRevisions() {
 	}
 	for i := range m.tabs {
 		tab := &m.tabs[i]
-		if !tab.isBinary || tab.isDeleted || tab.outsideChanges {
+		if !tab.isBinary || tab.attachment != nil || tab.isDeleted || tab.outsideChanges {
 			continue
 		}
 		tab.binaryRevision = revisions[tab.path]

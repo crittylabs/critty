@@ -481,7 +481,14 @@ func (w *archiveWriter) session(main *strings.Builder, session *review.Session) 
 				return err
 			}
 		}
-		if err := w.write(target, []byte(body)); err != nil {
+		data := []byte(body)
+		if doc.Image != "" {
+			data, err = doc.ReadImage(session.Dir)
+			if err != nil {
+				return err
+			}
+		}
+		if err := w.write(target, data); err != nil {
 			return err
 		}
 		fmt.Fprintf(main, "Attachment: %s  \nSource: %s  \nRevision: %s  \nRemoved: %t\n\n", archiveLink(doc.Name, target), markdownText(doc.Source), doc.Revision, doc.Removed)

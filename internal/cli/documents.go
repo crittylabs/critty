@@ -19,7 +19,7 @@ var answersMode, noAnswersMode bool
 func addAttachmentFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&resultPath, "result", "", "Save the self-contained form result as JSON")
 	cmd.Flags().StringVar(&summaryPath, "summary", "", "Save verdict, all threads, and attachment identities as JSON")
-	cmd.Flags().StringArrayVar(&attachmentPaths, "attachment", nil, "Attach a document before the review (repeatable)")
+	cmd.Flags().StringArrayVar(&attachmentPaths, "attachment", nil, "Attach a text document or supported image before the review (repeatable)")
 	cmd.Flags().BoolVar(&clearAttachments, "clear-attachments", false, "remove all attached documents from a saved review")
 	cmd.Flags().BoolVar(&answersMode, "answers", false, "label Comment as Confirm answers for rounds that collect form answers")
 	cmd.Flags().BoolVar(&noAnswersMode, "no-answers", false, "restore the Comment label after --answers")

@@ -115,6 +115,8 @@ After enabling passthrough, run `critty doctor` in the foreground of that termin
 
 PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
 
+Attach images alongside review documents with `--attachment image.png`, including in attachment-only reviews.  Images are saved with the review, so resuming keeps the reviewed version even if the original changes or disappears.  Supported terminals show the image inline and in the lightbox; other terminals show its format and dimensions.  Image attachments are limited to 5 MiB and 16 megapixels.  Animated GIFs display their first frame.
+
 <a id="codex-with-a-background-server"></a>
 
 ### Using Codex in a multiplexer

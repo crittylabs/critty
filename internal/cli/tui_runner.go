@@ -329,6 +329,9 @@ func buildFinishPayload(cfg *config.Config, sess *review.Session, mode *reviewMo
 				state = " (removed from the review)"
 			}
 			finishPrompt += fmt.Sprintf("\n- %q → %q (%s)%s\n%s", d.Path(), d.Source, d.Revision, state, d.Content)
+			if d.Image != "" {
+				finishPrompt += fmt.Sprintf("\nImage snapshot: %q (relative to %q)", d.Image, sess.Dir)
+			}
 		}
 		finishPrompt += "\nTo revise attachments, pass the complete ordered list with repeated --attachment flags when resuming the session. Without these flags, saved snapshots are reused. Use --clear-attachments to remove the list."
 	}

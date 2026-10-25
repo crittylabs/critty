@@ -455,6 +455,8 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 		tab := newFileTab(d.Path(), nil)
 		m.attachments[d.Path()] = d
 		tab.attachment = &d
+		tab.isBinary = d.Image != ""
+		tab.binaryRevision = d.Revision
 		if d.Removed {
 			removed = append(removed, tab)
 		} else {
@@ -623,6 +625,16 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case imageLoadedMsg:
 		return m.finishImageLoad(msg)
+	case imageInfoMsg:
+		for i := range m.tabs {
+			if m.tabs[i].path == msg.path {
+				m.tabs[i].preview.side(msg.before).info = msg.info
+			}
+		}
+		if len(m.tabs) > 0 && m.tab().state != nil {
+			m.rebuildContent()
+		}
+		return m, nil
 	case imageTransmittedMsg:
 		if msg.comment != nil {
 			if side := m.commentImages[*msg.comment]; side != nil {

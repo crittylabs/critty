@@ -2,13 +2,11 @@ package tui
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
 // lightboxPlacementID names the enlarged placement, which coexists with an
@@ -41,12 +39,8 @@ type lightboxLoadedMsg struct {
 }
 
 func (m AppModel) loadLightboxImage(target imageTarget) tea.Cmd {
-	source := m.imageSource()
-	if filepath.IsAbs(target.path) {
-		source = gitpkg.ReviewSource{}
-	}
 	return func() tea.Msg {
-		data, err := source.PreviewContent(target.path, target.before, maxPreviewBytes)
+		data, err := m.imageContent(target.path, target.before)
 		return lightboxLoadedMsg{target, m.images.encode(data, imageLoadedMsg{err: err})}
 	}
 }

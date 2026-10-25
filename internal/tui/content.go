@@ -208,6 +208,9 @@ func (m *AppModel) rebuildContent() {
 				layout.appendBlock(&b, preview, contentMouseTarget{})
 			} else {
 				layout.appendBlock(&b, "\n  Binary file "+t.changeSummary()+" — cannot display content.", contentMouseTarget{})
+				if dimensions := t.imageDescription(); dimensions != "" {
+					layout.appendBlock(&b, dimensions, contentMouseTarget{})
+				}
 				if t.preview.before.failed || t.preview.after.failed {
 					layout.appendBlock(&b, "  Image preview unavailable (unsupported, damaged, or too large).", contentMouseTarget{})
 				}

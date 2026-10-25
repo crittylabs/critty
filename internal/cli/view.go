@@ -76,6 +76,9 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 		}
 		appCfg.Session.Meta.CWD = cwd
 		defer func() { result = errors.Join(result, appCfg.Session.Close()) }()
+		if err := appCfg.Session.ReplaceDocuments(mode.documents); err != nil {
+			return err
+		}
 	}
 	var model tui.AppModel
 	if mode.code() {

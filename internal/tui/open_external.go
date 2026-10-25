@@ -53,6 +53,14 @@ func (m *AppModel) openImageExternally(target imageTarget) tea.Cmd {
 		return nil
 	}
 	source := m.imageSource()
+	if doc, ok := m.attachments[target.path]; ok && doc.Image != "" && m.session != nil {
+		path, err := doc.ImagePath(m.session.Dir)
+		if err != nil {
+			return m.flashNotice(err.Error())
+		}
+		target.path = path
+		source = gitpkg.ReviewSource{}
+	}
 	return func() tea.Msg {
 		return externalOpenMsg{openImageTarget(source, target)}
 	}

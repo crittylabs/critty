@@ -2,8 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Attach PNG, JPEG, GIF, and WebP images alongside review documents, including in attachment-only reviews.  Reviewers can preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Reviews and history exports retain the saved image after its source changes or disappears.  Image attachments are limited to 5 MiB and 16 megapixels; animated GIFs preview their first frame.
+
 ### Changed
 
+- Image files show their format and original width and height when inline previews are unavailable or hidden, including separate Before/After details for comparisons.  Animated GIFs are identified without decoding their frames.
 - Focused comments show their Resolve checkbox in bold and accept Space, as well as `r`, to toggle resolution.
 - The search shortcut appears with footer hints instead of taking space in the top bar.
 - Read code at full width with `V`: hide the sidebar and fold all comment bodies, then restore the previous expansion setting when leaving View.  `O` opens all comments, leaving View if needed, or returns to the default display, which folds resolved threads, including those resolved in the current round.  These shortcuts replace the former `h`/`H` controls; see Keyboard Help.

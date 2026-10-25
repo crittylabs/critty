@@ -1,10 +1,67 @@
 package review
 
 import (
+	"bytes"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestImageAttachmentSnapshots(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "image.png")
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewRGBA(image.Rect(0, 0, 32, 16))); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := ReadAttachedDocuments([]string{path})
+	if err != nil || docs[0].Image == "" || docs[0].Content != "PNG (32×16)" {
+		t.Fatalf("image input: %+v, %v", docs, err)
+	}
+	s, err := OpenSession(dir, "image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := s.ReplaceDocuments(docs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := s.LoadDocuments()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := saved.Documents[0].ReadImage(s.Dir)
+	if err != nil || !bytes.Equal(got, data.Bytes()) {
+		t.Fatalf("image snapshot was not retained: %v", err)
+	}
+	if err := s.ReplaceDocuments(nil); err != nil {
+		t.Fatal(err)
+	}
+	saved, err = s.LoadDocuments()
+	if err != nil || !saved.Documents[0].Removed || saved.Documents[0].Image != docs[0].Image {
+		t.Fatalf("removed image lost its snapshot: %+v, %v", saved, err)
+	}
+	for _, invalid := range []string{"../outside.png", "attachments/../outside.png", "/outside.png"} {
+		if _, err := (AttachedDocument{Image: invalid}).ImagePath(dir); err == nil {
+			t.Fatalf("accepted invalid snapshot path %q", invalid)
+		}
+	}
+	if err := os.WriteFile(path, []byte("not an image"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadAttachedDocuments([]string{path}); err == nil {
+		t.Fatal("invalid image accepted")
+	}
+}
 
 func TestDocumentAttachmentSnapshots(t *testing.T) {
 	dir := t.TempDir()

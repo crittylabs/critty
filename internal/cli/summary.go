@@ -12,6 +12,7 @@ type summaryAttachment struct {
 	Source   string `json:"source"`
 	Revision string `json:"revision"`
 	Removed  bool   `json:"removed,omitempty"`
+	Image    string `json:"image,omitempty"`
 }
 
 // finishSummary indexes complete finish output without copying attachment bodies.
@@ -67,7 +68,7 @@ func writeFinishSummary(payload *ipc.FinishPayload, sess *review.Session) error 
 	}
 	attachments := make([]summaryAttachment, 0, len(documents.Documents))
 	for _, d := range documents.Documents {
-		attachments = append(attachments, summaryAttachment{Path: d.Path(), Source: d.Source, Revision: d.Revision, Removed: d.Removed})
+		attachments = append(attachments, summaryAttachment{Path: d.Path(), Source: d.Source, Revision: d.Revision, Removed: d.Removed, Image: d.Image})
 	}
 	comments := payload.Comments
 	if comments == nil {
