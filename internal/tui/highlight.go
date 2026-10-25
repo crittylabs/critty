@@ -2,7 +2,6 @@ package tui
 
 import (
 	"bytes"
-	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -11,17 +10,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 )
 
-// Chroma has no Objective-C++ filename mapping.  Its Objective-C lexer still
-// recognizes the shared comments, strings, and declaration punctuation.
-func codeLexer(filename string) chroma.Lexer {
-	if strings.EqualFold(filepath.Ext(filename), ".mm") {
-		return lexers.Get("objective-c")
-	}
-	return lexers.Match(filename)
-}
-
-func isCodeFile(filename string) bool {
-	lexer := codeLexer(filename)
+func isCodeLexer(lexer chroma.Lexer) bool {
 	if lexer == nil {
 		return false
 	}
@@ -32,10 +21,9 @@ func isCodeFile(filename string) bool {
 	return true
 }
 
-// newCodeHighlighter selects a file's lexer once.  Each call independently
+// newCodeHighlighter reuses the selected lexer.  Each call independently
 // tokenises content and returns lines with ANSI styling.
-func newCodeHighlighter(filename string) func(string) []string {
-	lexer := codeLexer(filename)
+func newCodeHighlighter(lexer chroma.Lexer) func(string) []string {
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}

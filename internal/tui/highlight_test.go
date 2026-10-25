@@ -21,12 +21,12 @@ func TestCodeHighlighterKeepsInputsIndependent(t *testing.T) {
 		{"test.unknown-extension", []string{"plain text\n", "\t日本語", ""}},
 	} {
 		t.Run(tt.path, func(t *testing.T) {
-			if tt.path == "test.mm" && !isCodeFile(tt.path) {
+			if tt.path == "test.mm" && !isCodeLexer(codeLexer(tt.path, "")) {
 				t.Fatal("source file was classified as text")
 			}
-			highlight := newCodeHighlighter(tt.path)
+			highlight := newCodeHighlighter(codeLexer(tt.path, ""))
 			for _, input := range tt.inputs {
-				want := newCodeHighlighter(tt.path)(input)
+				want := newCodeHighlighter(codeLexer(tt.path, ""))(input)
 				if got := highlight(input); !reflect.DeepEqual(got, want) {
 					t.Fatalf("ANSI output for %q depends on previous input:\ngot  %q\nwant %q", input, got, want)
 				}
@@ -50,7 +50,7 @@ func BenchmarkHighlightDeletedLines(b *testing.B) {
 
 func TestCodeHighlighterKeepsLineCountWithBareCR(t *testing.T) {
 	content := "[alias]\n\tfix = sed \"s/\r$//\"\n[core]\n\teditor = vim\n"
-	got := newCodeHighlighter("config")(content)
+	got := newCodeHighlighter(codeLexer("config", content))(content)
 	want := []string{"[alias]", "\tfix = sed \"s/\r$//\"", "[core]", "\teditor = vim"}
 	if len(got) != len(want) {
 		t.Fatalf("line count %d, want %d: %q", len(got), len(want), got)

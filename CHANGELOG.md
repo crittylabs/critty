@@ -17,7 +17,7 @@
 
 ### Fixed
 
-- Attached source files retain syntax highlighting.  Source code, including its comments, no longer treats URLs or review references as links; text documents and review comments keep their links.
+- Attached source files retain syntax highlighting.  Highlighting and outlines share filename-pattern and shebang detection, including plain `env` and `env -S`, for scripts without language suffixes.  Source code, including its comments, no longer treats URLs or review references as links; text documents and review comments keep their links.
 - Incremental search highlights the link label or formatted text when a match falls in a hidden Markdown URL, title, or formatting marker.  Current-match highlighting follows source order, including multiline labels, while preserving text styles and clickable links.
 - Markdown tables in documents and attachments render links, emphasis, and inline code.  Short columns keep their natural widths; long cells wrap at 40 display columns.  Wide tables scroll horizontally with arrow keys, `h`/`l`, horizontal mouse wheels, or clickable edge indicators, and search reveals the current match.  Copying selections retains Markdown formatting and link targets across wrapped and scrolled cells.
 

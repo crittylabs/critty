@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -17,67 +16,23 @@ type codeOutlineCache struct {
 	rows          []outlineHeading
 }
 
-var outlineShellShebang = regexp.MustCompile(`^#!\s*(?:\S*/)?(?:env(?:\s+-S)?\s+)?(?:sh|bash|dash|ksh|zsh)(?:\s|$)`)
 var outlineRubyHeredoc = regexp.MustCompile("^<<-?[\"'`]?([a-zA-Z_][a-zA-Z0-9_]*)")
 var outlineCppRaw = regexp.MustCompile(`(?:u8|u|U|L)?R"([^\s()\\]{0,16})\(`)
 
 func codeOutlineLanguage(path, source string) string {
-	if filepath.Ext(path) == ".C" {
-		return "cpp"
+	lexer := codeLexer(path, source)
+	if lexer == nil {
+		return ""
 	}
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".js", ".jsx", ".mjs", ".cjs":
-		return "javascript"
-	case ".ts", ".tsx", ".mts", ".cts":
-		return "typescript"
-	case ".rs":
-		return "rust"
-	case ".rb", ".rake", ".gemspec":
-		return "ruby"
-	case ".py", ".pyi":
-		return "python"
-	case ".swift":
-		return "swift"
-	case ".kt", ".kts":
-		return "kotlin"
-	case ".m", ".mm":
-		return "objective-c"
-	case ".zig":
-		return "zig"
-	case ".pl", ".pm", ".t":
-		return "perl"
-	case ".el":
-		return "emacs-lisp"
-	case ".lua", ".wlua":
-		return "lua"
-	case ".vim":
-		return "vim"
-	case ".c":
-		return "c"
-	case ".h":
-		if outlineObjCType.MatchString(source) {
-			return "objective-c"
+	for _, alias := range lexer.Config().Aliases {
+		switch alias {
+		case "jsx":
+			return "javascript"
+		case "tsx":
+			return "typescript"
+		case "javascript", "typescript", "rust", "ruby", "python", "swift", "kotlin", "c", "cpp", "java", "bash", "objective-c", "zig", "perl", "emacs-lisp", "lua", "vim":
+			return alias
 		}
-		return "cpp"
-	case ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx":
-		return "cpp"
-	case ".java":
-		return "java"
-	case ".sh", ".bash", ".zsh", ".ksh", ".dash":
-		return "bash"
-	}
-	switch filepath.Base(path) {
-	case ".emacs":
-		return "emacs-lisp"
-	case ".vimrc", ".gvimrc", ".exrc", "_vimrc", "_gvimrc", "_exrc", "vimrc", "gvimrc":
-		return "vim"
-	case "Gemfile", "Rakefile":
-		return "ruby"
-	case ".profile", ".bashrc", ".bash_profile", ".zshrc", ".zprofile", ".kshrc":
-		return "bash"
-	}
-	if outlineShellShebang.MatchString(source) {
-		return "bash"
 	}
 	return ""
 }

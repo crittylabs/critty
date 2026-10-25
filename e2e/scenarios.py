@@ -893,6 +893,7 @@ def scenarios() -> None:
             "export const stop = () => {};\n"
         )
         source_py = (
+            "#!/usr/bin/env -S python3 -u\n"
             "class Service:\n  def run(self):\n    return 1\n\ndef stop():\n  pass\n"
         )
         source_el = (
@@ -906,7 +907,7 @@ def scenarios() -> None:
         )
         for name, content in {
             "sample.ts": source_ts,
-            "sample.py": source_py,
+            "worker": source_py,
             "sample.el": source_el,
             "sample.mm": source_objc,
         }.items():
@@ -918,7 +919,7 @@ def scenarios() -> None:
                 "--attachment",
                 "sample.ts",
                 "--attachment",
-                "sample.py",
+                "worker",
                 "--attachment",
                 "sample.el",
                 "--attachment",
@@ -936,8 +937,10 @@ def scenarios() -> None:
             lambda: source_outline.comments(), "TypeScript outline comment saved"
         )
         assert source_outline.comments()[0]["start_line"] == 2
-        source_outline.click("sample.py")
-        source_outline.wait_screen("def run", "Python attachment shows method outline")
+        source_outline.click("worker")
+        source_outline.wait_screen(
+            "def run", "Extensionless Python attachment shows method outline"
+        )
         source_outline.keys("s", "C-Down", "g", "l", "Enter", "Enter")
         source_outline.text("Python method anchor.")
         source_outline.keys("C-s")
@@ -945,9 +948,9 @@ def scenarios() -> None:
             lambda: len(source_outline.comments()) == 2, "Python outline comment saved"
         )
         python_comment = next(
-            c for c in source_outline.comments() if c["path"].endswith("/sample.py")
+            c for c in source_outline.comments() if c["path"].endswith("/worker")
         )
-        assert python_comment["start_line"] == 2, python_comment
+        assert python_comment["start_line"] == 3, python_comment
         source_outline.click("sample.el")
         source_outline.wait_screen("use-package example", "Emacs Lisp package outline")
         source_outline.click("use-package example", last=True)
@@ -979,7 +982,7 @@ def scenarios() -> None:
         assert (WORK / "sample.el").read_text() == source_el
         assert (WORK / "sample.mm").read_text() == source_objc
         assert (WORK / "sample.ts").read_text() == source_ts
-        assert (WORK / "sample.py").read_text() == source_py
+        assert (WORK / "worker").read_text() == source_py
         source_outline.finish(False)
         report(
             "source attachment outlines preserve block, indentation, Lisp, and selector anchors"

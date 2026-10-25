@@ -108,12 +108,13 @@ func (ft *FileTab) ensureHighlightCache() {
 	}
 	ext := strings.ToLower(filepath.Ext(ft.path))
 	ft.isMarkdown = ext == ".md" || ext == ".markdown"
-	ft.isCode = isCodeFile(ft.path)
+	lexer := codeLexer(ft.path, ft.doc.Content)
+	ft.isCode = isCodeLexer(lexer)
 	if ft.isMarkdown {
 		ft.ensureMarkdownCache()
 		return
 	}
-	highlight := newCodeHighlighter(ft.path)
+	highlight := newCodeHighlighter(lexer)
 	ft.chromaLines = highlight(ft.doc.Content)
 
 	// Pre-highlight deleted lines

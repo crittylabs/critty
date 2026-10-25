@@ -187,7 +187,7 @@ Without a text selection, `M-w` copies a file reference or comment ID.  Follow t
 
 Search covers all review files by default.  Use the **Files** button or `M-s m` during search to restrict it to the current file.  Selecting lines keeps search in that file.
 
-The outline below the Files tree lets you jump to Markdown headings or source declarations, including in attachments.  Source outlines support Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Go uses its standard parser; other languages use lightweight rules for conventionally formatted code and may miss or misidentify unusual syntax.  Entries stay in source order, with nesting where available.  See Keyboard Help for navigation and resizing.
+The outline below the Files tree lets you jump to Markdown headings or source declarations, including in attachments.  Source outlines support Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Known file names and shebangs such as `#!/usr/bin/env ruby` identify scripts without a language suffix for both syntax highlighting and outlines; `env -S` is also supported.  Go uses its standard parser; other languages use lightweight rules for conventionally formatted code and may miss or misidentify unusual syntax.  Entries stay in source order, with nesting where available.  See Keyboard Help for navigation and resizing.
 
 ### Review plists and other encodings
 
