@@ -3122,7 +3122,7 @@ type tabLabel struct {
 
 func (m *AppModel) tabLabels() []tabLabel {
 	labels := make([]tabLabel, len(m.tabs))
-	indicators := m.tabFormIndicators()
+	indicators := m.tabIndicators()
 	for i, t := range m.tabs {
 		label := abbreviatedTabPath(t.displayPath())
 		start := strings.LastIndexByte(label, '/') + 1
@@ -3134,9 +3134,6 @@ func (m *AppModel) tabLabels() []tabLabel {
 		label = t.unreadMarker() + label
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
-		}
-		if t.state != nil && unresolvedCommentCount(t.state.Comments) > 0 {
-			indicators[i] = "💬" + indicators[i]
 		}
 		if indicators[i] != "" {
 			label += " " + indicators[i]

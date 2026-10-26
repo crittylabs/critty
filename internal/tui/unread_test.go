@@ -75,7 +75,7 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 					app := newFileTreeTestApp()
 					row := 4 // a/y.go
 					tabBefore := app.renderTab(app.tabLabels(), 1, false)
-					treeBefore := app.treeRowText(row)
+					treeBefore := app.treeRowText(row, app.tabIndicators())
 					app.tabs[1].unread = true
 					app.tabs[2].unread = true
 					assertDot := func(text string, want bool) {
@@ -108,7 +108,7 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 						}
 					}
 					tabUnread := app.renderTab(app.tabLabels(), 1, false)
-					treeUnread := app.treeRowText(row)
+					treeUnread := app.treeRowText(row, app.tabIndicators())
 					assertDot(tabUnread, true)
 					assertDot(treeUnread, true)
 					assertPosition(tabBefore, tabUnread)
@@ -128,8 +128,8 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 					}
 					assertDot(app.renderTab(app.tabLabels(), 1, false), false)
 					assertPosition(tabUnread, app.renderTab(app.tabLabels(), 1, false))
-					assertDot(app.treeRowText(row), false)
-					assertPosition(treeUnread, app.treeRowText(row))
+					assertDot(app.treeRowText(row, app.tabIndicators()), false)
+					assertPosition(treeUnread, app.treeRowText(row, app.tabIndicators()))
 				})
 			}
 		})

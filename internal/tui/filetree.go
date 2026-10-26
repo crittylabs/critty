@@ -244,7 +244,7 @@ func (m *AppModel) syncFileTree() {
 const treeCursorWidth = 2
 
 // treeRowText renders row i without the cursor column or truncation.
-func (m *AppModel) treeRowText(i int) string {
+func (m *AppModel) treeRowText(i int, indicators []string) string {
 	row := m.fileTree.rows[i]
 	icon := defaultTreeIcons.file
 	label := row.name
@@ -278,6 +278,9 @@ func (m *AppModel) treeRowText(i int) string {
 		if counts := m.tabs[row.tabIndex].changeSummary(); counts != "" {
 			text += " " + counts
 		}
+		if indicator := indicators[row.tabIndex]; indicator != "" {
+			text += " " + indicator
+		}
 	}
 	return text
 }
@@ -294,7 +297,7 @@ func (m *AppModel) maxTreeScroll() int {
 	if len(tree.rows) == 0 {
 		return 0
 	}
-	return max(0, lipgloss.Width(m.treeRowText(tree.cursor))-m.treeTextWidth())
+	return max(0, lipgloss.Width(m.treeRowText(tree.cursor, m.tabIndicators()))-m.treeTextWidth())
 }
 
 // renderFileTree draws the visible rows into the tree viewport.  Only the
@@ -305,9 +308,10 @@ func (m *AppModel) renderFileTree() {
 	width := m.treeTextWidth()
 	cursorCol := lipgloss.NewStyle().Width(treeCursorWidth)
 	lines := make([]string, len(tree.rows))
+	indicators := m.tabIndicators()
 	for i := range tree.rows {
 		prefix := cursorCol.Render("")
-		text := m.treeRowText(i)
+		text := m.treeRowText(i, indicators)
 		if i == tree.cursor {
 			if m.focused == commentPane && !m.outline.focused {
 				prefix = cursorCol.Render(cursorMarker.Render(">"))

@@ -278,6 +278,16 @@ func TestTabFormIndicatorsShowOnlyPendingKinds(t *testing.T) {
 			if step.want != "" && !strings.HasSuffix(label, step.want) {
 				t.Fatalf("indicators are not at the title's right end: %q", label)
 			}
+			app.syncFileTree()
+			want := "💬" + step.want
+			if tree := ansi.Strip(app.fileTree.viewport.GetContent()); !strings.Contains(tree, "form.md "+want) {
+				t.Fatalf("file tree lost pending indicators %q: %q", want, tree)
+			}
+		}
+		app.tabs[0].state.Comments[1].Resolved = true
+		app.syncFileTree()
+		if tree := ansi.Strip(app.fileTree.viewport.GetContent()); strings.ContainsAny(tree, "💬☐○") {
+			t.Fatalf("file tree kept completed indicators: %q", tree)
 		}
 	}
 	initAdaptiveStyles(true)

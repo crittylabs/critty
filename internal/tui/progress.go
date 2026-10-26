@@ -76,6 +76,16 @@ func (m *AppModel) progressCounts() []progressCount {
 	return result
 }
 
+func (m *AppModel) tabIndicators() []string {
+	indicators := m.tabFormIndicators()
+	for i, tab := range m.tabs {
+		if tab.state != nil && unresolvedCommentCount(tab.state.Comments) > 0 {
+			indicators[i] = "💬" + indicators[i]
+		}
+	}
+	return indicators
+}
+
 func (m *AppModel) tabFormIndicators() []string {
 	indicators := make([]string, len(m.tabs))
 	pending := make([][progressOptionalChoices + 1]bool, len(m.tabs))
