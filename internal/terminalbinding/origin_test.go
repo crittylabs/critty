@@ -48,6 +48,11 @@ func TestTerminalHints(t *testing.T) {
 		{map[string]string{"TERM_PROGRAM": "iTerm.app"}, "iterm"},
 		{map[string]string{"TERM_PROGRAM": "Apple_Terminal"}, "terminal-app"},
 		{map[string]string{"WT_SESSION": "fixture"}, "windows-terminal"},
+		{map[string]string{"TERM_PROGRAM": "WezTerm"}, "wezterm"},
+		{map[string]string{"TERM_PROGRAM": "Alacritty"}, "alacritty"},
+		{map[string]string{"KITTY_WINDOW_ID": "1"}, "kitty"},
+		{map[string]string{"WEZTERM_PANE": "1", "WT_SESSION": "outer"}, "wezterm"},
+		{map[string]string{"ALACRITTY_WINDOW_ID": "1"}, "alacritty"},
 		{map[string]string{"TERM": "xterm-256color"}, ""},
 	} {
 		if got := terminalApplication(func(k string) string { return tc.vars[k] }); got != tc.want {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/base64"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -26,14 +27,16 @@ func TestDesktopLauncherOrder(t *testing.T) {
 		platform, terminal, wsl string
 		want                    []string
 	}{
-		{"darwin", "ghostty", "", []string{"ghostty-window", "terminal-app-window"}},
-		{"darwin", "iterm", "", []string{"iterm-window", "terminal-app-window"}},
-		{"darwin", "rio", "", []string{"rio-window", "terminal-app-window"}},
-		{"darwin", "", "", []string{"terminal-app-window"}},
-		{"linux", "", "", []string{"xdg-terminal"}},
-		{"linux", "rio", "", []string{"rio-window", "xdg-terminal"}},
-		{"linux", "rio", "Ubuntu", []string{"rio-window", "windows-terminal-wsl"}},
-		{"linux", "windows-terminal", "Ubuntu", []string{"windows-terminal-wsl"}},
+		{"darwin", "ghostty", "", []string{"ghostty-window", "kitty-window", "iterm-window", "rio-window", "wezterm-window", "alacritty-window", "terminal-app-window"}},
+		{"darwin", "iterm", "", []string{"iterm-window", "ghostty-window", "kitty-window", "rio-window", "wezterm-window", "alacritty-window", "terminal-app-window"}},
+		{"darwin", "wezterm", "", []string{"ghostty-window", "kitty-window", "iterm-window", "wezterm-window", "rio-window", "alacritty-window", "terminal-app-window"}},
+		{"darwin", "terminal-app", "", []string{"ghostty-window", "kitty-window", "iterm-window", "rio-window", "wezterm-window", "alacritty-window", "terminal-app-window"}},
+		{"linux", "", "", []string{"ghostty-window", "kitty-window", "rio-window", "wezterm-window", "alacritty-window", "xdg-terminal", "xterm-window"}},
+		{"linux", "kitty", "", []string{"kitty-window", "ghostty-window", "rio-window", "wezterm-window", "alacritty-window", "xdg-terminal", "xterm-window"}},
+		{"linux", "alacritty", "", []string{"ghostty-window", "kitty-window", "alacritty-window", "rio-window", "wezterm-window", "xdg-terminal", "xterm-window"}},
+		{"linux", "xterm", "", []string{"ghostty-window", "kitty-window", "rio-window", "wezterm-window", "alacritty-window", "xdg-terminal", "xterm-window"}},
+		{"linux", "wezterm", "Ubuntu", []string{"wezterm-window", "rio-window", "alacritty-window", "windows-terminal-wsl"}},
+		{"linux", "windows-terminal", "Ubuntu", []string{"rio-window", "wezterm-window", "alacritty-window", "windows-terminal-wsl"}},
 	} {
 		got := desktopOrder(tc.platform, terminalbinding.Origin{Terminal: tc.terminal, WSLDistribution: tc.wsl})
 		if !slices.Equal(got, tc.want) {
@@ -110,43 +113,106 @@ func TestGhosttyRequiresWindowActivation(t *testing.T) {
 	}
 }
 
-func TestRioCommandPreservesArguments(t *testing.T) {
+func TestTerminalCommandPreservesArguments(t *testing.T) {
 	originalLook := lookPath
 	t.Cleanup(func() { lookPath = originalLook })
 	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
 	value := "path with spaces;日本語 and 'quotes' $(not-a-command)"
 	command := "printf '%s' " + shellEscape(value)
 	cwd := "/path with spaces;日本語"
-	for _, distribution := range []string{"", "Ubuntu"} {
-		t.Run("wsl="+distribution, func(t *testing.T) {
-			launch := desktopLaunch{name: "rio-window", origin: terminalbinding.Origin{WSLDistribution: distribution}}
-			cmd, err := launch.rioCommand(command, cwd)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if distribution == "" {
-				want := []string{"/bin/rio", "--working-dir", cwd, "--title-placeholder", "Critty", "-e", "/bin/sh", "-c", command}
-				if !slices.Equal(cmd.Args, want) {
-					t.Fatalf("args = %q", cmd.Args)
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"rio-window", []string{"--title-placeholder", "Critty", "--working-dir", cwd, "-e"}},
+		{"wezterm-window", []string{"start", "--always-new-process", "--no-auto-connect", "--domain", "local", "--cwd", cwd, "--"}},
+		{"alacritty-window", []string{"--title", "Critty", "--working-directory", cwd, "-e"}},
+		{"kitty-window", []string{"--title", "Critty", "--directory", cwd, "--session", "none"}},
+		{"ghostty-window", []string{"--title=Critty", "--working-directory=" + cwd, "-e"}},
+		{"xterm-window", []string{"-T", "Critty", "-e"}},
+	} {
+		for _, distribution := range []string{"", "Ubuntu Test"} {
+			t.Run(tc.name+"/wsl="+distribution, func(t *testing.T) {
+				launch := desktopLaunch{name: tc.name, origin: terminalbinding.Origin{WSLDistribution: distribution}}
+				cmd, err := launch.terminalCommand("linux", command, cwd)
+				if distribution != "" && !terminalCLIs[tc.name].windows {
+					if err == nil {
+						t.Fatal("unsupported Windows terminal accepted")
+					}
+					return
 				}
-			} else {
-				if cmd.Path != "/bin/rio.exe" || !slices.Contains(cmd.Args, distribution) || slices.Contains(cmd.Args, cwd) {
-					t.Fatalf("WSL args = %q", cmd.Args)
+				if err != nil {
+					t.Fatal(err)
 				}
-				payload := cmd.Args[len(cmd.Args)-1]
-				decoded, err := base64.StdEncoding.DecodeString(payload)
-				if err != nil || string(decoded) != command {
-					t.Fatalf("payload = %q, %v", decoded, err)
+				if distribution == "" {
+					want := append([]string{"/bin/" + terminalCLIs[tc.name].binary}, tc.args...)
+					want = append(want, "/bin/sh", "-c", command)
+					if !slices.Equal(cmd.Args, want) {
+						t.Fatalf("args = %q", cmd.Args)
+					}
+				} else {
+					if cmd.Path != "/bin/"+terminalCLIs[tc.name].binary+".exe" || !slices.Contains(cmd.Args, distribution) || slices.Contains(cmd.Args, cwd) {
+						t.Fatalf("WSL args = %q", cmd.Args)
+					}
+					payload := cmd.Args[len(cmd.Args)-1]
+					decoded, err := base64.StdEncoding.DecodeString(payload)
+					if err != nil || string(decoded) != command {
+						t.Fatalf("payload = %q, %v", decoded, err)
+					}
+					shellIndex := slices.Index(cmd.Args, "-c")
+					out, err := exec.Command("/bin/sh", "-c", cmd.Args[shellIndex+1], "critty", payload).Output()
+					if err != nil || string(out) != value {
+						t.Fatalf("nested command = %q, %v", out, err)
+					}
 				}
-				shellIndex := slices.Index(cmd.Args, "-c")
-				out, err := exec.Command("/bin/sh", "-c", cmd.Args[shellIndex+1], "critty", payload).Output()
-				if err != nil || string(out) != value {
-					t.Fatalf("nested command = %q, %v", out, err)
-				}
-			}
-			if err := launch.close(); err != nil {
-				t.Fatal(err)
+			})
+		}
+	}
+}
+
+func TestTerminalExecutableAvailability(t *testing.T) {
+	originalLook := lookPath
+	t.Cleanup(func() { lookPath = originalLook })
+	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
+	for _, tc := range []struct {
+		name, platform string
+		wsl, available bool
+	}{
+		{"kitty-window", "darwin", false, true},
+		{"ghostty-window", "linux", false, true},
+		{"xterm-window", "linux", false, true},
+		{"xterm-window", "darwin", false, false},
+		{"wezterm-window", "linux", true, true},
+		{"kitty-window", "linux", true, false},
+		{"alacritty-window", "windows", false, false},
+	} {
+		t.Run(tc.name+"/"+tc.platform, func(t *testing.T) {
+			_, err := terminalExecutable(tc.name, tc.platform, tc.wsl)
+			if (err == nil) != tc.available {
+				t.Fatalf("availability error = %v", err)
 			}
 		})
+	}
+	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
+	if _, err := terminalExecutable("xterm-window", "linux", false); err == nil {
+		t.Fatal("missing executable accepted")
+	}
+	t.Setenv("DISPLAY", "")
+	if err := (&desktopLaunch{name: "xterm-window"}).check(); err == nil || !strings.Contains(err.Error(), "X11") {
+		t.Fatalf("missing display error = %v", err)
+	}
+	// Use a user application bundle without depending on host installations.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	bin := filepath.Join(home, "Applications", "Alacritty.app", "Contents", "MacOS", "alacritty")
+	if err := os.MkdirAll(filepath.Dir(bin), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := terminalExecutable("alacritty-window", "darwin", false)
+	if err != nil || got == "" {
+		t.Fatalf("bundle executable = %q, %v", got, err)
 	}
 }

@@ -36,6 +36,8 @@ func terminalApplication(getenv func(string) string) string {
 			return "rio"
 		case "ghostty":
 			return "ghostty"
+		case "wezterm", "alacritty", "kitty":
+			return strings.ToLower(getenv(key))
 		case "iterm", "iterm2", "iterm.app":
 			return "iterm"
 		case "terminal", "terminal.app", "apple_terminal":
@@ -44,6 +46,15 @@ func terminalApplication(getenv func(string) string) string {
 	}
 	if getenv("ITERM_SESSION_ID") != "" {
 		return "iterm"
+	}
+	if getenv("KITTY_WINDOW_ID") != "" {
+		return "kitty"
+	}
+	if getenv("WEZTERM_PANE") != "" {
+		return "wezterm"
+	}
+	if getenv("ALACRITTY_WINDOW_ID") != "" {
+		return "alacritty"
 	}
 	if getenv("WT_SESSION") != "" {
 		return "windows-terminal"

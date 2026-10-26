@@ -21,7 +21,7 @@ import (
 //go:embed launchers/*.applescript launchers/*.sh
 var desktopScripts embed.FS
 
-var desktopNames = []string{"xdg-terminal", "ghostty-window", "iterm-window", "terminal-app-window", "rio-window", "windows-terminal-wsl"}
+var desktopNames = []string{"xdg-terminal", "ghostty-window", "kitty-window", "iterm-window", "rio-window", "wezterm-window", "alacritty-window", "terminal-app-window", "windows-terminal-wsl", "xterm-window"}
 
 func defaultLauncherOrder(names []string) []string {
 	order := slices.Clone(names)
@@ -34,36 +34,32 @@ func defaultLauncherOrder(names []string) []string {
 }
 
 func desktopOrder(platform string, origin terminalbinding.Origin) []string {
-	var preferred, fallback string
+	var names []string
+	var imageCount int
 	switch platform {
 	case "darwin":
-		switch origin.Terminal {
-		case "rio":
-			preferred = "rio-window"
-		case "ghostty":
-			preferred = "ghostty-window"
-		case "iterm":
-			preferred = "iterm-window"
-		case "terminal-app":
-			preferred = "terminal-app-window"
-		}
-		fallback = "terminal-app-window"
+		names = []string{"ghostty-window", "kitty-window", "iterm-window", "rio-window", "wezterm-window", "alacritty-window", "terminal-app-window"}
+		imageCount = 3
 	case "linux":
-		if origin.Terminal == "rio" {
-			preferred = "rio-window"
-		}
-		fallback = "xdg-terminal"
 		if origin.WSLDistribution != "" {
-			fallback = "windows-terminal-wsl"
+			names = []string{"rio-window", "wezterm-window", "alacritty-window", "windows-terminal-wsl"}
+		} else {
+			names = []string{"ghostty-window", "kitty-window", "rio-window", "wezterm-window", "alacritty-window", "xdg-terminal", "xterm-window"}
+			imageCount = 2
 		}
 	}
-	if preferred != "" && preferred != fallback {
-		return []string{preferred, fallback}
+	// Prefer the client's terminal within its image-capability tier, keeping
+	// the system terminal as the last resort. Explicit launcher order wins.
+	if i := slices.Index(names, origin.Terminal+"-window"); i >= 0 && origin.Terminal != "terminal-app" && origin.Terminal != "xterm" {
+		first := 0
+		if i >= imageCount {
+			first = imageCount
+		}
+		name := names[i]
+		copy(names[first+1:i+1], names[first:i])
+		names[first] = name
 	}
-	if fallback != "" {
-		return []string{fallback}
-	}
-	return nil
+	return names
 }
 
 func terminalTarget(terminal reviewMultiplexerContext) terminalbinding.Target {
@@ -133,18 +129,19 @@ type desktopLaunch struct {
 }
 
 func (l *desktopLaunch) check() error {
-	switch l.name {
-	case "rio-window":
-		if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
-			return fmt.Errorf("requires macOS, Linux, or WSL")
+	if l.usesCLI() {
+		if l.name == "xterm-window" && os.Getenv("DISPLAY") == "" {
+			return fmt.Errorf("requires an X11 display (or Xwayland)")
 		}
 		if l.origin.WSLDistribution != "" {
 			if _, err := lookPath("wsl.exe"); err != nil {
 				return err
 			}
 		}
-		_, err := rioExecutable(l.origin.WSLDistribution != "")
+		_, err := terminalExecutable(l.name, runtime.GOOS, l.origin.WSLDistribution != "")
 		return err
+	}
+	switch l.name {
 	case "xdg-terminal":
 		if runtime.GOOS != "linux" {
 			return fmt.Errorf("requires Linux")
@@ -211,7 +208,7 @@ func (l *desktopLaunch) open(mode *reviewMode) (reviewLaunch, error) {
 	}
 	// GUI applications do not inherit the invoking shell's cwd or environment.
 	command = "/bin/sh -c " + shellEscape("cd "+shellEscape(cwd)+" && exec "+strings.Replace(command, "env ", "env -u NO_COLOR -u TMUX -u TMUX_PANE -u HERDR_ENV -u HERDR_SOCKET_PATH -u HERDR_WORKSPACE_ID -u HERDR_TAB_ID -u HERDR_PANE_ID ", 1))
-	if l.name == "xdg-terminal" || l.name == "windows-terminal-wsl" || l.name == "rio-window" {
+	if l.name == "xdg-terminal" || l.name == "windows-terminal-wsl" || l.usesCLI() {
 		if err := l.start(command, cwd); err != nil {
 			return nil, err
 		}
@@ -264,7 +261,7 @@ func (l *desktopLaunch) call(operation, command, cwd string) ([]byte, error) {
 }
 
 func (l *desktopLaunch) close() error {
-	if l.name == "rio-window" {
+	if l.usesCLI() {
 		return nil
 	}
 	if _, err := l.call("close", string(l.token), ""); err != nil {
@@ -280,9 +277,9 @@ func (*desktopLaunch) restoreFocus() {}
 // command lifetime; do not kill its process when the review is submitted.
 func (l *desktopLaunch) start(command, cwd string) error {
 	var cmd *exec.Cmd
-	if l.name == "rio-window" {
+	if l.usesCLI() {
 		var err error
-		cmd, err = l.rioCommand(command, cwd)
+		cmd, err = l.terminalCommand(runtime.GOOS, command, cwd)
 		if err != nil {
 			return err
 		}
@@ -312,42 +309,6 @@ func (l *desktopLaunch) start(command, cwd string) error {
 	}()
 	fmt.Fprintf(os.Stderr, "Opened review with %s\n", l.name)
 	return nil
-}
-
-func rioExecutable(wsl bool) (string, error) {
-	if wsl {
-		return lookPath("rio.exe")
-	}
-	bin, err := lookPath("rio")
-	if err == nil || runtime.GOOS != "darwin" {
-		return bin, err
-	}
-	home, homeErr := os.UserHomeDir()
-	if homeErr != nil {
-		return "", homeErr
-	}
-	for _, dir := range []string{"/Applications", filepath.Join(home, "Applications")} {
-		for _, app := range []string{"Rio.app", "rio.app"} {
-			bin := filepath.Join(dir, app, "Contents", "MacOS", "rio")
-			if info, statErr := os.Stat(bin); statErr == nil && !info.IsDir() && info.Mode()&0111 != 0 {
-				return bin, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("Rio CLI not found on PATH or in an Applications directory: %w", err)
-}
-
-func (l *desktopLaunch) rioCommand(command, cwd string) (*exec.Cmd, error) {
-	bin, err := rioExecutable(l.origin.WSLDistribution != "")
-	if err != nil {
-		return nil, err
-	}
-	if l.origin.WSLDistribution != "" {
-		payload := base64.StdEncoding.EncodeToString([]byte(command))
-		return exec.Command(bin, "--title-placeholder", "Critty", "-e", "wsl.exe", "--distribution", l.origin.WSLDistribution,
-			"--exec", "/bin/sh", "-c", `exec /bin/sh -c "$(printf %s "$1" | base64 -d)"`, "critty", payload), nil
-	}
-	return exec.Command(bin, "--working-dir", cwd, "--title-placeholder", "Critty", "-e", "/bin/sh", "-c", command), nil
 }
 
 func ghosttyScriptingAvailable(dictionary []byte) bool {

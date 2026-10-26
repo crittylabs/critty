@@ -520,29 +520,30 @@ func (r *doctorReport) checkHerdrImages() {
 // Check every supported launcher for this platform, independently of launch priority
 // and the SSH policy. Availability does not establish permission to open a window.
 func (r *doctorReport) checkDesktopLaunchers(platform string, origin terminalbinding.Origin, check func(string) error) {
-	var names []string
-	switch platform {
-	case "darwin":
-		names = []string{"ghostty-window", "iterm-window", "terminal-app-window", "rio-window"}
-	case "linux":
-		names = []string{"xdg-terminal", "rio-window"}
-		if origin.WSLDistribution != "" {
-			names = append(names, "windows-terminal-wsl")
-		}
-	default:
+	names := desktopOrder(platform, terminalbinding.Origin{WSLDistribution: origin.WSLDistribution})
+	if len(names) == 0 {
 		r.add("launchers/desktop-terminal", "info", "no built-in desktop terminal launcher for "+platform, "Use a multiplexer or custom launcher.")
 		return
+	}
+	if platform == "linux" && origin.WSLDistribution != "" {
+		names = append(names, "xdg-terminal")
 	}
 	for _, name := range names {
 		if err := check(name); err != nil {
 			advice := "Install the application and its required scripting support, or use another launcher."
+			if spec, ok := terminalCLIs[name]; ok && (name != "ghostty-window" || platform == "linux") {
+				advice = "Install " + spec.binary + " and make its CLI available on PATH."
+				if origin.WSLDistribution != "" && spec.windows {
+					advice = "Make " + spec.binary + ".exe and wsl.exe available on the WSL PATH."
+				}
+			}
 			switch name {
 			case "xdg-terminal":
 				advice = "Install xdg-terminal-exec and configure a supported terminal desktop entry."
 			case "windows-terminal-wsl":
 				advice = "Install Windows Terminal and make wt.exe and wsl.exe available on the WSL PATH."
-			case "rio-window":
-				advice = "Install Rio and make its CLI available on PATH; WSL needs rio.exe and wsl.exe."
+			case "xterm-window":
+				advice = "Install xterm and provide an X11 display or Xwayland with DISPLAY set."
 			}
 			r.add("launchers/"+name, "warn", err.Error(), advice)
 			continue

@@ -21,7 +21,7 @@ var reviewLauncherNames []string
 var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, cmux, zellij, desktop-terminal, xdg-terminal, ghostty-window, iterm-window, terminal-app-window, rio-window, windows-terminal-wsl, or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, cmux, zellij, desktop-terminal, "+strings.Join(desktopNames, ", ")+", or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
