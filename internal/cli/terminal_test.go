@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,6 +25,18 @@ func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
 		{name: "SSH rejects desktop", request: "missing", ssh: "remote"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			stderr, err := os.CreateTemp(t.TempDir(), "stderr")
+			if err != nil {
+				t.Fatal(err)
+			}
+			previousStderr := os.Stderr
+			os.Stderr = stderr
+			t.Cleanup(func() {
+				os.Stderr = previousStderr
+				if err := stderr.Close(); err != nil {
+					t.Error(err)
+				}
+			})
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			t.Setenv("TMUX", "/unrelated/socket,123,0")
 			t.Setenv("TMUX_PANE", "%99")
@@ -67,7 +80,18 @@ func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
 					names = []string{"mux", "tmux-split", want}
 				}
 			}
-			got, foreground, err := resolveReviewLauncher(names, &reviewMode{sessionKey: "0123456789ab"})
+			mode := &reviewMode{sessionKey: "0123456789ab", launch: &launchSummary{Launcher: "previous-round"}}
+			got, foreground, err := resolveReviewLauncher(names, mode)
+			output, readErr := os.ReadFile(stderr.Name())
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if len(output) != 0 {
+				t.Fatalf("binding failure wrote to stderr: %s", output)
+			}
+			if mode.launch.TerminalError == "" || len(mode.launch.Failures) == 0 || mode.launch.Failures[0].Launcher != "mux" || mode.launch.Launcher != "" {
+				t.Fatalf("wrong binding failure diagnostics: %+v", mode.launch)
+			}
 			if foreground {
 				t.Fatal("failed marker allowed foreground fallback")
 			}

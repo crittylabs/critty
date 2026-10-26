@@ -5,13 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/crittylabs/critty/internal/terminalbinding"
 )
 
 func TestLauncherOrderAndFinalError(t *testing.T) {
@@ -38,16 +40,32 @@ func TestLauncherOrderAndFinalError(t *testing.T) {
 		terminal reviewMultiplexerContext
 		want     string
 		error    string
+		failures []string
 	}{
-		{"mux then custom", []string{"mux", usable}, nil, usable, ""},
-		{"custom then mux", []string{usable, "mux"}, nil, usable, ""},
-		{"failed then usable", []string{failed, usable}, nil, usable, ""},
-		{"custom is final", []string{"mux", failed}, nil, "", "custom unavailable"},
-		{"mux is final", []string{failed, "mux"}, tmuxContext{pane: "%1"}, "", "no usable review launcher"},
-		{"implicit mux", []string{failed}, tmuxContext{pane: "%1"}, "", "no usable review launcher"},
+		{"mux then custom", []string{"mux", "mux", usable}, nil, usable, "", []string{"mux"}},
+		{"custom then mux", []string{usable, "mux"}, nil, usable, "", nil},
+		{"failed then usable", []string{failed, failed, usable}, nil, usable, "", []string{failed}},
+		{"multiple failures", []string{"mux", failed, usable}, nil, usable, "", []string{"mux", failed}},
+		{"custom is final", []string{"mux", failed}, nil, "", "custom unavailable", nil},
+		{"mux is final", []string{failed, "mux"}, tmuxContext{pane: "%1"}, "", "no usable review launcher", nil},
+		{"implicit mux", []string{failed}, tmuxContext{pane: "%1"}, "", "no usable review launcher", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := selectReviewLauncher(tc.order, tc.terminal, &reviewMode{sessionKey: "0123456789ab"})
+			if err := stderr.Truncate(0); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := stderr.Seek(0, io.SeekStart); err != nil {
+				t.Fatal(err)
+			}
+			mode := &reviewMode{sessionKey: "0123456789ab"}
+			got, err := selectReviewLauncher(tc.order, tc.terminal, mode)
+			output, readErr := os.ReadFile(stderr.Name())
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if len(output) != 0 {
+				t.Fatalf("availability checks wrote to stderr: %s", output)
+			}
 			if tc.error != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.error) || got != nil {
 					t.Fatalf("selection = %+v, %v; want %q", got, err, tc.error)
@@ -60,14 +78,19 @@ func TestLauncherOrderAndFinalError(t *testing.T) {
 			if err != nil || got == nil || got.name != tc.want {
 				t.Fatalf("selection = %+v, %v; want %q", got, err, tc.want)
 			}
+			if len(mode.launch.Failures) != len(tc.failures) {
+				t.Fatalf("diagnostics = %+v; want failures %v", mode.launch.Failures, tc.failures)
+			}
+			for i, name := range tc.failures {
+				failure := mode.launch.Failures[i]
+				if failure.Launcher != name || failure.Reason == "" {
+					t.Fatalf("failure %d = %+v; want %s and reason", i, failure, name)
+				}
+				if name == failed && !strings.Contains(failure.Reason, "custom unavailable") {
+					t.Fatalf("missing custom failure reason: %s", failure.Reason)
+				}
+			}
 		})
-	}
-	output, err := os.ReadFile(stderr.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(output) != 0 {
-		t.Fatalf("availability checks wrote to stderr: %s", output)
 	}
 }
 

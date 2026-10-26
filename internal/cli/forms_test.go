@@ -51,14 +51,14 @@ func TestFormExportFailurePreservesApprovalData(t *testing.T) {
 	}
 	doc := review.AttachedDocument{ID: "a", Source: "/form.md", Name: "form.md", Content: "- [ ] Test <!-- form: id=test -->"}
 	payload := &ipc.FinishPayload{Approved: true, Result: &review.FormResult{FormState: review.FormState{Version: 1, Revision: "exact", Documents: []review.FormDocument{{AttachedDocument: doc}}}, Approved: true}}
-	if err := printFinish(payload, sess); err == nil {
+	if err := printFinish(payload, sess, nil); err == nil {
 		t.Fatal("failed export succeeded")
 	}
 	if payload.Result.Revision != "exact" || !payload.Result.Approved {
 		t.Fatal("failed export lost result")
 	}
 	resultPath = filepath.Join(t.TempDir(), "result.json")
-	if err := printFinish(payload, sess); err != nil {
+	if err := printFinish(payload, sess, nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(resultPath)

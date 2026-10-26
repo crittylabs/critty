@@ -12,7 +12,7 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
-func captureFinish(t *testing.T, payload *ipc.FinishPayload, sess *review.Session) (string, string, error) {
+func captureFinish(t *testing.T, payload *ipc.FinishPayload, sess *review.Session, launch *launchSummary) (string, string, error) {
 	t.Helper()
 	out, err := os.CreateTemp(t.TempDir(), "stdout")
 	if err != nil {
@@ -35,7 +35,7 @@ func captureFinish(t *testing.T, payload *ipc.FinishPayload, sess *review.Sessio
 	stdout, stderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = out, errOut
 	defer func() { os.Stdout, os.Stderr = stdout, stderr }()
-	finishErr := printFinish(payload, sess)
+	finishErr := printFinish(payload, sess, launch)
 	outData, err := os.ReadFile(out.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +83,12 @@ func TestFinishSummaryPreservesAllFeedbackWithoutAttachmentBodies(t *testing.T) 
 			}}
 			payload := buildFinishPayload(cfg, sess, &reviewMode{docPath: "file.md"}, verdict == review.VerdictApprove)
 			useSummaryPath(t, filepath.Join(t.TempDir(), "summary.json"))
-			out, stderr, err := captureFinish(t, &payload, sess)
+			launch := &launchSummary{
+				Launcher:      "custom:review",
+				Failures:      []launcherFailure{{Launcher: "mux", Reason: "no terminal"}},
+				TerminalError: "marker not found",
+			}
+			out, stderr, err := captureFinish(t, &payload, sess, launch)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -100,6 +105,9 @@ func TestFinishSummaryPreservesAllFeedbackWithoutAttachmentBodies(t *testing.T) 
 			}
 			if summary.Version != 1 || summary.Session != sess.Key || summary.Round != 3 || summary.Verdict != verdict || summary.Approved != payload.Approved {
 				t.Fatalf("wrong finish identity: %+v", summary)
+			}
+			if summary.Launch == nil || summary.Launch.Launcher != launch.Launcher || summary.Launch.TerminalError != launch.TerminalError || len(summary.Launch.Failures) != 1 || summary.Launch.Failures[0] != launch.Failures[0] {
+				t.Fatalf("lost launcher diagnostics: %+v", summary.Launch)
 			}
 			if summary.ReviewComment == nil || len(summary.Comments) != 2 || !summary.Comments[1].Resolved || len(summary.Comments[1].Replies) != 1 {
 				t.Fatalf("lost feedback: %+v", summary)
@@ -121,7 +129,7 @@ func TestFinishSummaryWithoutCommentsSurvivesCleanup(t *testing.T) {
 	sess := newPayloadSession(t)
 	payload := buildFinishPayload(&config.Config{}, sess, &reviewMode{docPath: "doc.md"}, true)
 	useSummaryPath(t, filepath.Join(t.TempDir(), "summary.json"))
-	if _, _, err := captureFinish(t, &payload, sess); err != nil {
+	if _, _, err := captureFinish(t, &payload, sess, &launchSummary{Launcher: "foreground", Failures: []launcherFailure{}}); err != nil {
 		t.Fatal(err)
 	}
 	cleanupOnApprove(&config.Config{CleanupOnApprove: true}, sess)
@@ -131,6 +139,9 @@ func TestFinishSummaryWithoutCommentsSurvivesCleanup(t *testing.T) {
 	}
 	if !strings.Contains(string(data), `"comments": []`) || !strings.Contains(string(data), `"attachments": []`) || !strings.Contains(string(data), `"approved": true`) {
 		t.Fatalf("missing empty-result contract: %s", data)
+	}
+	if !strings.Contains(string(data), `"failures": []`) || strings.Contains(string(data), `"terminal_error"`) {
+		t.Fatalf("wrong empty launch diagnostics: %s", data)
 	}
 	if _, err := os.Stat(sess.Dir); !os.IsNotExist(err) {
 		t.Fatal("ordinary review was not cleaned up")
@@ -151,7 +162,7 @@ func TestSummaryExportFailureRetainsOldFileAndPrintsNoApproval(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(sess.Dir, "documents.json"), []byte("truncated"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, stderr, err := captureFinish(t, &payload, sess)
+	out, stderr, err := captureFinish(t, &payload, sess, nil)
 	if err == nil || out != "" || strings.Contains(stderr, "approved: true") {
 		t.Fatalf("export failure granted approval: %q %q %v", out, stderr, err)
 	}

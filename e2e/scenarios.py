@@ -1831,7 +1831,15 @@ elif operation == "close":
             ],
         )
         custom.finish(True)
-        assert "unavailable" not in custom.err.read_text()
+        diagnostics = custom.err.read_text()
+        assert "unavailable" not in diagnostics
+        assert f"launcher: custom:{launcher}\n" in diagnostics
+        launch = json.loads(custom.summary.read_text())["launch"]
+        assert launch["launcher"] == f"custom:{launcher}"
+        assert len(launch["failures"]) == 1
+        assert launch["failures"][0]["launcher"] == "custom:/missing/launcher"
+        assert launch["failures"][0]["reason"]
+        assert "terminal_error" not in launch
         closed = json.loads((WORK / "launcher-close.json").read_text())
         assert closed["pane"] == custom.pane
         assert (
@@ -1861,7 +1869,12 @@ elif operation == "close":
                     json.loads((WORK / "launcher-close.json").read_text())["pane"]
                     == configured.pane
                 )
-                assert "unavailable" not in configured.err.read_text()
+                diagnostics = configured.err.read_text()
+                assert f"launcher: custom:{launcher}\n" in diagnostics
+                assert "unavailable" not in diagnostics
+                launch = json.loads(configured.summary.read_text())["launch"]
+                assert launch["launcher"] == f"custom:{launcher}"
+                assert len(launch["failures"]) == (name == "launcher-config-fallback")
         finally:
             project_config.unlink()
         report("configured launchers follow CLI choices and precede implicit mux")
@@ -1869,7 +1882,15 @@ elif operation == "close":
             "launcher-fallback", ["plan.md", "--launcher", "custom:/missing/launcher"]
         )
         fallback.finish(True)
-        assert "unavailable" not in fallback.err.read_text()
+        diagnostics = fallback.err.read_text()
+        assert "unavailable" not in diagnostics
+        assert re.search(
+            r"^launcher: tmux-(?:floating|split)$", diagnostics, re.MULTILINE
+        )
+        launch = json.loads(fallback.summary.read_text())["launch"]
+        assert f"launcher: {launch['launcher']}\n" in diagnostics
+        assert launch["failures"][0]["launcher"] == "custom:/missing/launcher"
+        assert all(failure["reason"] for failure in launch["failures"])
         report("custom launcher check/open/close round trip and unavailable fallback")
     finally:
         tmux("kill-server")

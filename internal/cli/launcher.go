@@ -31,8 +31,10 @@ type reviewLauncher struct {
 }
 
 func resolveReviewLauncher(names []string, mode *reviewMode) (*reviewLauncher, bool, error) {
+	mode.launch = &launchSummary{Failures: []launcherFailure{}}
 	terminal, terminalErr := reviewTerminalContext()
 	if terminalErr != nil {
+		mode.launch.TerminalError = terminalErr.Error()
 		// Keep terminalRequest set so named multiplexers cannot use an unrelated
 		// daemon terminal. Unbound desktop fallbacks use the caller's SSH hints.
 		reviewOrigin = terminalbinding.CaptureOrigin(os.Getpid())
@@ -51,6 +53,9 @@ func resolveReviewLauncher(names []string, mode *reviewMode) (*reviewLauncher, b
 // Selection checks availability before opening anything.  Once open starts,
 // failures must be returned rather than risk creating a second review.
 func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mode *reviewMode) (*reviewLauncher, error) {
+	if mode.launch == nil {
+		mode.launch = &launchSummary{Failures: []launcherFailure{}}
+	}
 	names = defaultLauncherOrder(names)
 	groups := make([][]reviewLauncher, len(names))
 	for i, name := range names {
@@ -62,10 +67,14 @@ func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mod
 	}
 	checked := make(map[string]bool)
 	var unavailable []error
+	recordUnavailable := func(name string, err error) {
+		mode.launch.Failures = append(mode.launch.Failures, launcherFailure{Launcher: name, Reason: err.Error()})
+		unavailable = append(unavailable, fmt.Errorf("launcher %s: %w", name, err))
+	}
 	for i, candidates := range groups {
 		if names[i] == "mux" && terminal == nil {
 			if !checked["mux"] {
-				unavailable = append(unavailable, errors.New("launcher mux: no supported multiplexer terminal detected"))
+				recordUnavailable("mux", errors.New("no supported multiplexer terminal detected"))
 				checked["mux"] = true
 			}
 		}
@@ -75,7 +84,7 @@ func selectReviewLauncher(names []string, terminal reviewMultiplexerContext, mod
 			}
 			checked[candidate.name] = true
 			if err := candidate.check(); err != nil {
-				unavailable = append(unavailable, fmt.Errorf("launcher %s: %w", candidate.name, err))
+				recordUnavailable(candidate.name, err)
 				continue
 			}
 			return &candidate, nil

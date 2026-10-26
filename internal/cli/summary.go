@@ -15,6 +15,17 @@ type summaryAttachment struct {
 	Image    string `json:"image,omitempty"`
 }
 
+type launcherFailure struct {
+	Launcher string `json:"launcher"`
+	Reason   string `json:"reason"`
+}
+
+type launchSummary struct {
+	Launcher      string            `json:"launcher"`
+	Failures      []launcherFailure `json:"failures"`
+	TerminalError string            `json:"terminal_error,omitempty"`
+}
+
 // finishSummary indexes complete finish output without copying attachment bodies.
 type finishSummary struct {
 	Version       int                    `json:"version"`
@@ -29,6 +40,7 @@ type finishSummary struct {
 	Comments      []review.ListedComment `json:"comments"`
 	Attachments   []summaryAttachment    `json:"attachments"`
 	NextCommand   string                 `json:"next_command,omitempty"`
+	Launch        *launchSummary         `json:"launch,omitempty"`
 }
 
 func validateSummaryPath(mode *reviewMode, sess *review.Session) error {
@@ -58,7 +70,7 @@ func validateSummaryPath(mode *reviewMode, sess *review.Session) error {
 	return nil
 }
 
-func writeFinishSummary(payload *ipc.FinishPayload, sess *review.Session) error {
+func writeFinishSummary(payload *ipc.FinishPayload, sess *review.Session, launch *launchSummary) error {
 	if payload.Round < 1 || !payload.Verdict.Valid() || payload.Approved != (payload.Verdict == review.VerdictApprove) {
 		return fmt.Errorf("invalid finish verdict or round")
 	}
@@ -80,5 +92,6 @@ func writeFinishSummary(payload *ipc.FinishPayload, sess *review.Session) error 
 		Verdict: payload.Verdict, Approved: payload.Approved,
 		ReviewComment: payload.ReviewComment, Comments: comments,
 		Attachments: attachments, NextCommand: payload.NextCommand,
+		Launch: launch,
 	})
 }

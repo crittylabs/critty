@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Agents can see why a review opened in a particular terminal: `--summary` JSON includes failed launcher candidates and their reasons, any terminal-marker failure, and the concrete launcher.  Startup stderr identifies the final launcher once the review is ready, with `foreground` for direct current-terminal operation; successful fallbacks keep failed attempts out of stderr.
+
 ### Fixed
 
 - Agent-launched reviews continue to desktop or custom launcher candidates when terminal-marker detection fails or matches multiple panes.  Previously, marker errors stopped startup before fallback launchers could be tried.  SSH restrictions still apply; if all candidates fail, Critty reports both the marker and launcher errors.

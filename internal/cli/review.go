@@ -105,6 +105,7 @@ type reviewMode struct {
 	source            *git.ReviewSource
 	focusPath         string
 	focusLine         int
+	launch            *launchSummary
 }
 
 func (m *reviewMode) code() bool { return m.docPath == "" }
@@ -266,17 +267,21 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 	if launcher != nil {
 		launch, err := launcher.open(mode)
 		if err != nil {
-			return err
+			return fmt.Errorf("launcher %s open: %w", launcher.name, err)
 		}
 		defer launch.restoreFocus()
 		defer func() { result = errors.Join(result, launch.close()) }()
 		if err := ipc.WaitAlive(sock, 15*time.Second); err != nil {
-			return err
+			return fmt.Errorf("launcher %s startup: %w", launcher.name, err)
 		}
-		return runReviewCycle(cfg, sess, sock)
+		fmt.Fprintf(os.Stderr, "launcher: %s\n", launcher.name)
+		mode.launch.Launcher = launcher.name
+		return runReviewCycle(cfg, sess, sock, mode.launch)
 	}
 
 	if term.IsTerminal(int(os.Stdin.Fd())) || mode.patch != nil {
+		fmt.Fprintln(os.Stderr, "launcher: foreground")
+		mode.launch.Launcher = "foreground"
 		payload, err := runTUISession(cfg, sess, mode, false)
 		if err != nil {
 			return err
@@ -285,7 +290,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 			fmt.Fprintln(os.Stderr, "approved: false")
 			return fmt.Errorf("review ended without finishing")
 		}
-		if err := printFinish(payload, sess); err != nil {
+		if err := printFinish(payload, sess, mode.launch); err != nil {
 			return err
 		}
 		if payload.Approved {
@@ -457,13 +462,13 @@ func saveReviewMode(sess *review.Session, mode *reviewMode) error {
 
 // runReviewCycle blocks on the session socket until the reviewer finishes,
 // then prints the agent-facing result and applies approval cleanup.
-func runReviewCycle(cfg *config.Config, sess *review.Session, sock string) error {
+func runReviewCycle(cfg *config.Config, sess *review.Session, sock string, launch *launchSummary) error {
 	payload, err := ipc.ReviewCycle(sock)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "approved: false")
 		return err
 	}
-	if err := printFinish(payload, sess); err != nil {
+	if err := printFinish(payload, sess, launch); err != nil {
 		return err
 	}
 	if payload.Approved {
@@ -474,7 +479,7 @@ func runReviewCycle(cfg *config.Config, sess *review.Session, sock string) error
 
 // printFinish writes the agent contract: the rendered prompt on stdout and
 // the approval verdict on stderr.
-func printFinish(payload *ipc.FinishPayload, sess *review.Session) error {
+func printFinish(payload *ipc.FinishPayload, sess *review.Session, launch *launchSummary) error {
 	if resultPath != "" {
 		if payload.Result == nil {
 			return fmt.Errorf("--result requires an interactive attachment form")
@@ -494,7 +499,7 @@ func printFinish(payload *ipc.FinishPayload, sess *review.Session) error {
 		}
 	}
 	if summaryPath != "" {
-		if err := writeFinishSummary(payload, sess); err != nil {
+		if err := writeFinishSummary(payload, sess, launch); err != nil {
 			return fmt.Errorf("saving finish summary: %w", err)
 		}
 	}
