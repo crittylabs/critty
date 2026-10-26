@@ -562,7 +562,7 @@ def transient_views() -> None:
             lambda demo=demo: ("Submit q" if demo else "Close q") in screen(),
             "transient UI rendered",
         )
-        assert ("Demo" if demo else "View") in screen(), screen()
+        assert ("Demo · not saved" if demo else "view the ") in screen(), screen()
         assert snapshot() == before, "transient mode wrote files during startup"
         if demo:
             if name == "demo-forms":
@@ -937,7 +937,7 @@ def scenarios() -> None:
             lambda: source_outline.comments(), "TypeScript outline comment saved"
         )
         assert source_outline.comments()[0]["start_line"] == 2
-        source_outline.click("worker")
+        source_outline.keys("2")
         source_outline.wait_screen(
             "def run", "Extensionless Python attachment shows method outline"
         )
@@ -951,7 +951,7 @@ def scenarios() -> None:
             c for c in source_outline.comments() if c["path"].endswith("/worker")
         )
         assert python_comment["start_line"] == 3, python_comment
-        source_outline.click("sample.el")
+        source_outline.keys("3")
         source_outline.wait_screen("use-package example", "Emacs Lisp package outline")
         source_outline.click("use-package example", last=True)
         source_outline.keys("l", "Enter", "Enter")
@@ -965,7 +965,7 @@ def scenarios() -> None:
             c for c in source_outline.comments() if c["path"].endswith("/sample.el")
         )
         assert elisp_comment["start_line"] == 3, elisp_comment
-        source_outline.click("sample.mm")
+        source_outline.keys("4")
         source_outline.wait_screen("run:completion:", "Objective-C++ selector outline")
         source_outline.click("run:completion:")
         source_outline.keys("Enter", "Enter")

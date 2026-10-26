@@ -74,7 +74,7 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 				t.Run(route, func(t *testing.T) {
 					app := newFileTreeTestApp()
 					row := 4 // a/y.go
-					tabBefore := app.renderTab(app.tabLabels(), 1, false)
+					tabBefore := app.renderTab(app.tabLabels(), 1)
 					treeBefore := app.treeRowText(row, app.tabIndicators())
 					app.tabs[1].unread = true
 					app.tabs[2].unread = true
@@ -107,7 +107,7 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 							t.Fatal("unread marker moved filename or changed row width")
 						}
 					}
-					tabUnread := app.renderTab(app.tabLabels(), 1, false)
+					tabUnread := app.renderTab(app.tabLabels(), 1)
 					treeUnread := app.treeRowText(row, app.tabIndicators())
 					assertDot(tabUnread, false)
 					assertDot(treeUnread, true)
@@ -126,8 +126,8 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 					if app.activeTab != 1 || app.tabs[1].unread || !app.tabs[2].unread {
 						t.Fatal("opening a tab did not mark only that tab as read")
 					}
-					assertDot(app.renderTab(app.tabLabels(), 1, false), false)
-					assertPosition(tabUnread, app.renderTab(app.tabLabels(), 1, false))
+					assertDot(app.renderTab(app.tabLabels(), 1), false)
+					assertPosition(tabUnread, app.renderTab(app.tabLabels(), 1))
 					assertDot(app.treeRowText(row, app.tabIndicators()), false)
 					assertPosition(treeUnread, app.treeRowText(row, app.tabIndicators()))
 				})

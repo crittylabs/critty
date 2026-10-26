@@ -3133,11 +3133,11 @@ func abbreviatedTabPath(path string) string {
 	return strings.Join(parts, "/")
 }
 
-func (m *AppModel) renderTab(labels []tabLabel, i int, isFirst bool) string {
-	return m.renderTabWidth(labels, i, isFirst, 0)
+func (m *AppModel) renderTab(labels []tabLabel, i int) string {
+	return m.renderTabWidth(labels, i, 0)
 }
 
-func (m *AppModel) renderTabWidth(labels []tabLabel, i int, isFirst bool, width int) string {
+func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
 	style := inactiveTabStyle
 	if i == m.activeTab {
 		style = activeTabStyle
@@ -3148,22 +3148,14 @@ func (m *AppModel) renderTabWidth(labels []tabLabel, i int, isFirst bool, width 
 			style = style.Foreground(activeAttachmentColor)
 		}
 	}
-	border, _, _, _, _ := style.GetBorder()
-	if isFirst && i == m.activeTab {
-		border.BottomLeft = "│"
-	} else if isFirst {
-		border.BottomLeft = "├"
-	}
 	label := labels[i].text
 	if width > 0 {
-		if width <= style.GetHorizontalFrameSize() {
+		if width < 3 {
 			style = style.Padding(0)
 		}
 		style = style.Width(width)
-		available := max(0, width-style.GetHorizontalFrameSize())
-		if available == 0 {
-			label = ""
-		} else if ansi.StringWidth(label) > available {
+		available := max(1, width-style.GetHorizontalFrameSize())
+		if ansi.StringWidth(label) > available {
 			indicators := labels[i].indicators
 			if i == m.activeTab && indicators != "" && lipgloss.Width(indicators) <= available {
 				suffix := " " + indicators
@@ -3178,33 +3170,26 @@ func (m *AppModel) renderTabWidth(labels []tabLabel, i int, isFirst bool, width 
 			}
 		}
 	}
-	return style.Border(border).Render(label)
+	return inlineBackground(style, style.Render(label))
 }
 
-func (m *AppModel) renderTabOverflowIndicator(text string, isFirst bool) string {
-	return m.renderTabOverflowWidth(text, isFirst, 0, true)
+func (m *AppModel) renderTabOverflowIndicator(text string) string {
+	return m.renderTabOverflowWidth(text, 0, true)
 }
 
-func (m *AppModel) renderTabOverflowWidth(text string, isFirst bool, width int, backwards bool) string {
+func (m *AppModel) renderTabOverflowWidth(text string, width int, backwards bool) string {
 	style := inactiveTabStyle
-	if m.contentPaneWidth() < 32 {
-		style = style.Padding(0)
-	}
 	if width > 0 {
-		if width <= style.GetHorizontalFrameSize() {
+		if width < 3 {
 			style = style.Padding(0)
 		}
 		style = style.Width(width)
 		if !backwards {
 			style = style.Align(lipgloss.Right)
 		}
-		text = ansi.Truncate(text, max(0, width-style.GetHorizontalFrameSize()), "…")
+		text = ansi.Truncate(text, max(1, width-style.GetHorizontalFrameSize()), "…")
 	}
-	border, _, _, _, _ := style.GetBorder()
-	if isFirst {
-		border.BottomLeft = "├"
-	}
-	return style.Border(border).Render(text)
+	return inlineBackground(style, style.Render(text))
 }
 
 func (m *AppModel) tabOverflowText(count int, backwards bool) string {
@@ -3215,9 +3200,9 @@ func (m *AppModel) tabOverflowText(count int, backwards bool) string {
 		return "↦"
 	}
 	if backwards {
-		return fmt.Sprintf("↤ %d more", count)
+		return fmt.Sprintf("… %d more", count)
 	}
-	return fmt.Sprintf("%d more ↦", count)
+	return fmt.Sprintf("%d more …", count)
 }
 
 // modalClickGuard is how long a click that opened a dialog blocks another
@@ -3828,8 +3813,7 @@ func (m AppModel) contentPaneWidth() int {
 	return m.width - m.commentPanelWidth()
 }
 
-// renderPane frames body under a tab row: the tab row's bottom edge serves as
-// the top border, and body is wrapped by side borders and a bottom border.
+// renderPane frames body under a single tab row with side and bottom borders.
 func renderPane(tabRow, body string, border lipgloss.Border, style lipgloss.Style) string {
 	left, right := style.Render(border.Left), style.Render(border.Right)
 	var b strings.Builder
@@ -3843,8 +3827,6 @@ func renderPane(tabRow, body string, border lipgloss.Border, style lipgloss.Styl
 	return b.String()
 }
 
-// commentPaneTabLabel returns the label of the comment pane's tab, truncated
-// to fit the pane.
 // sidebarBorderColor is the sidebar pane's border color for its focus state.
 func (m AppModel) sidebarBorderColor() color.Color {
 	if m.focused == commentPane {
@@ -3859,21 +3841,13 @@ func (m AppModel) sidebarTabs() []string {
 		"Files",
 		fmt.Sprintf("Comments (%d)", unresolvedCommentCount(m.tab().state.Comments)),
 	}
-	fg := m.sidebarBorderColor()
 	tabs := make([]string, len(labels))
 	for i, label := range labels {
-		style := inactiveTabStyle.BorderForeground(fg)
+		style := inactiveTabStyle
 		if sidebarView(i) == m.sidebarView {
-			style = activeTabStyle.BorderForeground(fg)
+			style = activeTabStyle
 		}
-		border, _, _, _, _ := style.GetBorder()
-		if i == 0 {
-			border.BottomLeft = "├"
-			if sidebarView(i) == m.sidebarView {
-				border.BottomLeft = "│"
-			}
-		}
-		tabs[i] = style.Border(border).Render(label)
+		tabs[i] = inlineBackground(style, style.Render(label))
 	}
 	return tabs
 }
@@ -3883,13 +3857,13 @@ func (m AppModel) sidebarTabAt(x int) (sidebarView, bool) {
 	if m.viewMode {
 		return 0, false
 	}
-	left := m.contentPaneWidth()
+	left := m.contentPaneWidth() + 2
 	for i, tab := range m.sidebarTabs() {
 		right := left + lipgloss.Width(tab)
 		if x >= left && x < right {
 			return sidebarView(i), true
 		}
-		left = right
+		left = right + 1
 	}
 	return 0, false
 }
@@ -3901,7 +3875,7 @@ func (m AppModel) renderSidebarPane() string {
 	width := m.commentPanelWidth()
 	border := lipgloss.RoundedBorder()
 	line := lipgloss.NewStyle().Foreground(m.sidebarBorderColor())
-	tabRow := fillTabRow(lipgloss.JoinHorizontal(lipgloss.Top, m.sidebarTabs()...), width, border, line)
+	tabRow := fillTabRow(strings.Join(m.sidebarTabs(), " "), width, border, line)
 	view := m.commentViewport.View()
 	if m.sidebarView == filesView {
 		view = m.renderFilesSidebar()
@@ -3914,34 +3888,19 @@ func (m AppModel) renderSidebarPane() string {
 	return renderPane(tabRow, body, border, line)
 }
 
-// fillTabRow fits a rendered tab row to width.  A shorter row is extended
-// with the pane's top border ending in the top-right corner; a row that fills
-// the width exactly gets its last corner joined to the pane's right border.
+// fillTabRow embeds a single tab row in the pane's top border.
 func fillTabRow(row string, width int, border lipgloss.Border, style lipgloss.Style) string {
-	gap := width - lipgloss.Width(row)
-	if gap < 0 {
-		return row
+	if width <= 0 {
+		return ""
 	}
-	if gap == 0 {
-		return joinTabRowRight(row, style)
+	if width == 1 {
+		return style.Render(border.TopLeft)
 	}
-	blank := strings.Repeat(" ", gap)
-	filler := style.Render(
-		blank + "\n" + blank + "\n" + strings.Repeat(border.Top, gap-1) + border.TopRight)
-	return lipgloss.JoinHorizontal(lipgloss.Top, row, filler)
-}
-
-// joinTabRowRight replaces the bottom-right corner of the last tab, which
-// points outward, with a glyph that meets the pane's right border below it.
-func joinTabRowRight(row string, style lipgloss.Style) string {
-	lines := strings.Split(row, "\n")
-	bottom := lines[len(lines)-1]
-	corner := "┤"
-	if strings.HasSuffix(ansi.Strip(bottom), activeTabBorder.BottomRight) {
-		corner = "│"
+	if width < 4 {
+		return style.Render(border.TopLeft + strings.Repeat(border.Top, width-2) + border.TopRight)
 	}
-	lines[len(lines)-1] = ansi.Cut(bottom, 0, lipgloss.Width(bottom)-1) + style.Render(corner)
-	return strings.Join(lines, "\n")
+	row = ansi.Truncate(row, width-4, "")
+	return style.Render(border.TopLeft) + " " + row + " " + style.Render(strings.Repeat(border.Top, max(0, width-4-lipgloss.Width(row)))+border.TopRight)
 }
 
 func (m *AppModel) commentBounds() (left, top, right, bottom int) {
@@ -4140,15 +4099,11 @@ func (m *AppModel) handleTextModalWheel(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 // renderTabBar renders the tab bar for multi-file mode.
 func (m *AppModel) renderTabBar() string {
 	items := m.tabBarItems()
-	if len(items) == 0 {
-		return strings.Repeat("\n", inactiveTabStyle.GetVerticalFrameSize())
-	}
 	parts := make([]string, len(items))
 	for i, item := range items {
 		parts[i] = item.text
 	}
-	row := lipgloss.JoinHorizontal(lipgloss.Top, parts...)
-	return fillTabRow(row, m.contentPaneWidth(), lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
+	return fillTabRow(strings.Join(parts, " "), m.contentPaneWidth(), lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
 }
 
 // footerMinHeight is the terminal height above which the footer's key hints

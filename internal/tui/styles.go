@@ -52,19 +52,6 @@ func (m *AppModel) commentAuthorStyle(author string) lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(colors[index%len(colors)])
 }
 
-func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
-	border := lipgloss.RoundedBorder()
-	border.BottomLeft = left
-	border.Bottom = middle
-	border.BottomRight = right
-	return border
-}
-
-var (
-	activeTabBorder   = tabBorderWithBottom("┘", " ", "└")
-	inactiveTabBorder = tabBorderWithBottom("┴", "─", "┴")
-)
-
 // ANSI 16 named colors — these adapt to the user's terminal color scheme.
 // initAdaptiveStyles replaces success and warning with textColors' shades on
 // a light background, where the ANSI colors are too pale to read.
@@ -337,17 +324,15 @@ var (
 	modalBtnPrimaryLabel, modalBtnPrimaryFocusedLabel = newModalPrimaryStyles(lipgloss.LightDark(true))
 	modalDangerBtnLabel, modalDangerBtnFocused        = newModalDangerStyles(lipgloss.LightDark(true))
 
-	// Tab bar styles — bordered tabs with open-bottom active tab
+	// Tab bars use quiet filled labels separated by unstyled spaces.
 	inactiveTabStyle = lipgloss.NewStyle().
-				Border(inactiveTabBorder, true).
-				BorderForeground(accent).
 				Foreground(muted).
+				Background(lipgloss.Color("#222222")).
 				Padding(0, 1)
 
 	activeTabStyle = lipgloss.NewStyle().
-			Border(activeTabBorder, true).
-			BorderForeground(accent).
 			Foreground(lipgloss.BrightWhite).
+			Background(lipgloss.Color("#444444")).
 			Padding(0, 1)
 
 	fileMatchStyle = lipgloss.NewStyle().
@@ -451,8 +436,8 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	mdTableCellStyle = mdTableCellStyle.Foreground(textSecondary)
 	modalBtnLabel = modalBtnLabel.Foreground(textPrimary)
 	modalBtnNormalLabel = modalBtnLabel.PaddingLeft(1).Background(buttonBackground)
-	inactiveTabStyle = inactiveTabStyle.Foreground(textSecondary)
-	activeTabStyle = activeTabStyle.Foreground(textPrimary)
+	inactiveTabStyle = inactiveTabStyle.Foreground(textSecondary).Background(ld(lipgloss.Color("#F3F3F3"), lipgloss.Color("#222222")))
+	activeTabStyle = activeTabStyle.Foreground(textPrimary).Background(ld(lipgloss.Color("#DADADA"), lipgloss.Color("#444444")))
 	tabCountDelimiter = tabCountDelimiter.Foreground(textSecondary)
 	contextBoxStyle = contextBoxStyle.Foreground(textPrimary)
 	cursorColor := ld(textColors.brightYellow, warning)

@@ -97,7 +97,7 @@ func TestTabFilenameEmphasis(t *testing.T) {
 		} {
 			t.Run(fmt.Sprintf("active=%d/%s", active, tt.name), func(t *testing.T) {
 				app.tabs[0].state = tt.state
-				rendered := app.renderTab(app.tabLabels(), 0, true)
+				rendered := app.renderTab(app.tabLabels(), 0)
 				var underlined, bold, italic strings.Builder
 				runes, styles := renderedCells(rendered)
 				for i, r := range runes {
@@ -389,15 +389,23 @@ func TestDeletedFileRendersSelectableLines(t *testing.T) {
 
 func TestReviewFrameFitsTerminalWithSidebar(t *testing.T) {
 	for _, width := range []int{60, 120} {
-		for _, hidden := range []bool{false, true} {
-			t.Run(fmt.Sprintf("width=%d/hidden=%t", width, hidden), func(t *testing.T) {
+		for _, mode := range []struct {
+			name   string
+			view   sidebarView
+			hidden bool
+		}{{"files", filesView, false}, {"comments", commentsView, false}, {"hidden", filesView, true}} {
+			t.Run(fmt.Sprintf("width=%d/%s", width, mode.name), func(t *testing.T) {
 				app := setupAppWithDoc(t, strings.Repeat("source\n", 30))
 				app.width, app.height, app.multiFile = width, 30, true
-				app.viewMode = hidden
+				app.viewMode = mode.hidden
+				app.sidebarView = mode.view
 				app.tab().state.Comments = []review.Comment{{ID: "file", Scope: "file", Body: "comment"}}
 				app.recalculateLayout()
 				app.updateCommentSidebar()
 				app.rebuildContent()
+				if app.tabBarHeight() != 1 {
+					t.Fatalf("tab bar height = %d, want one row", app.tabBarHeight())
+				}
 				rows := strings.Split(ansi.Strip(app.View().Content), "\n")
 				_, top, contentRight, bottom := app.contentBounds()
 				paneRight := app.contentPaneWidth() - 1
@@ -410,7 +418,7 @@ func TestReviewFrameFitsTerminalWithSidebar(t *testing.T) {
 					}
 				}
 				left, _, right, _ := app.commentBounds()
-				if hidden {
+				if mode.hidden {
 					if left != contentRight || right != paneRight {
 						t.Fatalf("gutter bounds [%d,%d), want [%d,%d)", left, right, contentRight, paneRight)
 					}
@@ -419,8 +427,8 @@ func TestReviewFrameFitsTerminalWithSidebar(t *testing.T) {
 				if left != paneRight+2 || right != width-1 {
 					t.Fatalf("sidebar bounds [%d,%d), want [%d,%d) inside the comment pane", left, right, paneRight+2, width-1)
 				}
-				if got := ansi.Cut(rows[top-1], paneRight+1, width); (!strings.HasPrefix(got, "│") && !strings.HasPrefix(got, "├")) || !strings.HasSuffix(got, "╮") {
-					t.Fatalf("comment pane tab row = %q, want its tab joined to the top border", got)
+				if got := ansi.Cut(rows[top-1], paneRight+1, width); !strings.HasPrefix(got, "╭") || !strings.Contains(got, "Files   Comments (1)") || !strings.HasSuffix(got, "╮") {
+					t.Fatalf("comment pane tab row = %q, want a single tab row with rounded corners", got)
 				}
 				if got := ansi.Cut(rows[bottom], paneRight-1, width); got != "─╯╰"+strings.Repeat("─", width-paneRight-3)+"╯" {
 					t.Fatalf("bottom row = %q, want both panes closed side by side", got)
@@ -1055,38 +1063,79 @@ func TestSpaceTogglesFocusedComment(t *testing.T) {
 	}
 }
 
-func TestFillTabRowJoinsFlushTabToPaneBorder(t *testing.T) {
+func TestTabBackgroundCoversLabelAndLeavesGapsClear(t *testing.T) {
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	for _, dark := range []bool{false, true} {
+		initAdaptiveStyles(dark)
+		for _, active := range []bool{false, true} {
+			t.Run(fmt.Sprintf("dark=%t/active=%t", dark, active), func(t *testing.T) {
+				app := newFileTreeTestApp()
+				app.tabs[0].changedLines = map[int]bool{1: true}
+				app.tabs[0].deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "old"}}}
+				app.tabs[0].state.Comments = []review.Comment{{Scope: "file"}}
+				app.activeTab = 1
+				style := inactiveTabStyle
+				if active {
+					app.activeTab = 0
+					style = activeTabStyle
+				}
+				tab := app.renderTab(app.tabLabels(), 0)
+				plain := ansi.Strip(tab)
+				if !strings.HasPrefix(plain, " a/s/z.go (+1 -1) 💬 ") || strings.HasPrefix(plain, "  ") {
+					t.Fatalf("tab padding or label changed: %q", plain)
+				}
+				runes, styles := renderedCells(tab)
+				for i := range runes {
+					if !sameColor(styles[i].Bg, style.GetBackground()) {
+						t.Fatalf("tab cell %q lost its background: %+v", runes[i], styles[i])
+					}
+				}
+				overflow := app.renderTabOverflowIndicator("1 more …")
+				overflowRunes, overflowStyles := renderedCells(overflow)
+				for i, cell := range overflowStyles {
+					if !sameColor(cell.Bg, inactiveTabStyle.GetBackground()) {
+						t.Fatalf("overflow background differs from inactive tabs: %+v", cell)
+					}
+					if overflowRunes[i] != ' ' && !sameColor(cell.Fg, inactiveTabStyle.GetForeground()) {
+						t.Fatalf("overflow foreground differs from inactive tabs: %+v", cell)
+					}
+				}
+				row := fillTabRow(tab+" "+overflow, 60, lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
+				rowRunes, rowStyles := renderedCells(row)
+				for _, gap := range []int{1, 2 + len(runes), 3 + len(runes) + len(overflowRunes)} {
+					if rowRunes[gap] != ' ' || rowStyles[gap].Bg != nil {
+						t.Fatalf("tab gap has a background: %+v", rowStyles[gap])
+					}
+				}
+				if !strings.HasSuffix(ansi.Strip(row), "─╮") {
+					t.Fatalf("unused space is not a horizontal border: %q", row)
+				}
+			})
+		}
+	}
+}
+
+func TestFillTabRowFitsSingleLine(t *testing.T) {
 	border := lipgloss.RoundedBorder()
 	style := lipgloss.NewStyle().Foreground(accent)
 	for _, tc := range []struct {
-		name  string
-		last  lipgloss.Style
-		wantR string
+		name string
+		last lipgloss.Style
 	}{
-		{"active", activeTabStyle, "│"},
-		{"inactive", inactiveTabStyle, "┤"},
+		{"active", activeTabStyle},
+		{"inactive", inactiveTabStyle},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			row := lipgloss.JoinHorizontal(lipgloss.Top, inactiveTabStyle.Render("one"), tc.last.Render("two"))
-			width := lipgloss.Width(row)
-			lines := strings.Split(fillTabRow(row, width, border, style), "\n")
-			if len(lines) != 3 {
-				t.Fatalf("tab row has %d lines, want 3", len(lines))
-			}
-			for i, line := range lines {
-				if got := lipgloss.Width(line); got != width {
-					t.Fatalf("line %d width = %d, want %d", i, got, width)
+			for _, width := range []int{12, lipgloss.Width(row), lipgloss.Width(row) + 3} {
+				filled := fillTabRow(row, width, border, style)
+				if lipgloss.Height(filled) != 1 || lipgloss.Width(filled) != width {
+					t.Fatalf("tab row does not fit %dx1: %q", width, filled)
 				}
-			}
-			bottom := ansi.Strip(lines[2])
-			if !strings.HasSuffix(bottom, tc.wantR) {
-				t.Fatalf("bottom line = %q, want it to end with %q", bottom, tc.wantR)
-			}
-			if !strings.HasSuffix(lines[2], "\x1b[m") {
-				t.Fatalf("bottom line %q does not reset its style", lines[2])
-			}
-			if got := fillTabRow(row, width+3, border, style); !strings.HasSuffix(ansi.Strip(got), "──╮") {
-				t.Fatalf("wider row = %q, want the top border filler", ansi.Strip(got))
+				if plain := ansi.Strip(filled); !strings.HasPrefix(plain, "╭") || !strings.HasSuffix(plain, "╮") {
+					t.Fatalf("tab row has no rounded corners: %q", filled)
+				}
 			}
 		})
 	}
@@ -1258,7 +1307,15 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 			t.Errorf("%s foreground = %v on a light background, want bright black", name, got)
 		}
 	}
-	if tab := app.renderTab(app.tabLabels(), 0, true); !strings.Contains(tab, "\x1b[1;30m") && !strings.Contains(tab, "\x1b[30m") && !strings.Contains(tab, ";30m") {
+	tab := app.renderTab(app.tabLabels(), 0)
+	runes, styles := renderedCells(tab)
+	var blackText strings.Builder
+	for i, r := range runes {
+		if sameColor(styles[i].Fg, lipgloss.Black) {
+			blackText.WriteRune(r)
+		}
+	}
+	if !strings.Contains(blackText.String(), "test.md") {
 		t.Errorf("active tab = %q, want a black label", tab)
 	}
 	initAdaptiveStyles(true)

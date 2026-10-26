@@ -20,8 +20,11 @@ func TestMouseClickSelectsFileTab(t *testing.T) {
 		t.Fatalf("click below the tab bar selected tab %d", app.activeTab)
 	}
 	labels := app.tabLabels()
-	firstWidth := lipgloss.Width(app.renderTab(labels, 0, true))
-	if app = clickMouse(app, firstWidth+1, app.headerHeight()); app.activeTab != 1 {
+	firstWidth := lipgloss.Width(app.renderTab(labels, 0))
+	if app = clickMouse(app, firstWidth+2, app.headerHeight()); app.activeTab != 0 {
+		t.Fatalf("click in the tab gap selected tab %d", app.activeTab)
+	}
+	if app = clickMouse(app, firstWidth+3, app.headerHeight()); app.activeTab != 1 {
 		t.Fatalf("active tab = %d, want 1", app.activeTab)
 	}
 }
@@ -67,25 +70,26 @@ func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
 	tests := []struct {
 		name  string
 		right bool
-		want  int
 	}{
-		{name: "left", want: 2},
-		{name: "right", right: true, want: 5},
+		{name: "left"},
+		{name: "right", right: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newApp()
 			items := app.tabBarItems()
 			item := items[0]
+			want := app.activeTab - 1
 			if tt.right {
 				item = items[len(items)-1]
+				want = app.activeTab + 1
 			}
 			if !item.overflow {
 				t.Fatal("test setup did not overflow on both sides")
 			}
 			app = clickMouse(app, item.left+min(1, item.width-1), app.headerHeight())
-			if app.activeTab != tt.want {
-				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, tt.want)
+			if app.activeTab != want {
+				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, want)
 			}
 		})
 	}
@@ -788,10 +792,10 @@ func TestMouseClickCommentPaneTabFocusesSidebar(t *testing.T) {
 	app.recalculateLayout()
 	app.rebuildContent()
 
-	tabLeft, y := app.contentPaneWidth(), app.headerHeight()+1
+	tabLeft, y := app.contentPaneWidth(), app.headerHeight()
 	tabs := app.sidebarTabs()
 	tabsWidth := lipgloss.Width(tabs[0]) + lipgloss.Width(tabs[1])
-	app = clickMouse(app, tabLeft+tabsWidth, y)
+	app = clickMouse(app, tabLeft+tabsWidth+3, y)
 	if app.focused != contentPane {
 		t.Fatalf("focus = %v, want content pane after clicking beside the sidebar tabs", app.focused)
 	}
@@ -801,13 +805,13 @@ func TestMouseClickCommentPaneTabFocusesSidebar(t *testing.T) {
 		t.Fatalf("focus = %v, view = %v; want the Files tab focused", app.focused, app.sidebarView)
 	}
 
-	app = clickMouse(app, tabLeft+lipgloss.Width(tabs[0])+1, y)
+	app = clickMouse(app, tabLeft+lipgloss.Width(tabs[0])+3, y)
 
 	if app.focused != commentPane || app.sidebarView != commentsView {
 		t.Fatalf("focus = %v, view = %v; want the Comments tab focused", app.focused, app.sidebarView)
 	}
 	rows := strings.Split(app.View().Content, "\n")
-	if tabRow := ansi.Strip(rows[y]); !strings.Contains(tabRow, "│ Files ││ Comments (0) │") {
+	if tabRow := ansi.Strip(rows[y]); !strings.Contains(tabRow, "╭  Files   Comments (0) ") {
 		t.Fatalf("tab row = %q, want the sidebar tabs", tabRow)
 	}
 	if got := ansi.Cut(rows[y], tabLeft, tabLeft+1); !strings.Contains(got, "\x1b[94m") {

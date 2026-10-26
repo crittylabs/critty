@@ -14,13 +14,13 @@ type tabBarItem struct {
 // the control when a meaningful preview cannot fit.
 func (m *AppModel) tabBarItems() []tabBarItem {
 	labels := m.tabLabels()
-	capacity := max(0, m.contentPaneWidth())
+	capacity := max(0, m.contentPaneWidth()-4)
 	if len(labels) == 0 || capacity == 0 {
 		return nil
 	}
 	prefix := make([]int, len(labels)+1)
 	for i := range labels {
-		labels[i].rendered = m.renderTab(labels, i, i == 0)
+		labels[i].rendered = m.renderTab(labels, i)
 		labels[i].width = lipgloss.Width(labels[i].rendered)
 		prefix[i+1] = prefix[i] + labels[i].width
 	}
@@ -28,15 +28,15 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		if count == 0 {
 			return 0
 		}
-		return lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(count, backwards), false))
+		return lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(count, backwards)))
 	}
 	rangeWidth := func(start, end int) int {
-		width := prefix[end] - prefix[start]
+		width := prefix[end] - prefix[start] + end - start - 1
 		if start > 0 {
-			width += overflowWidth(start, true)
+			width += overflowWidth(start, true) + 1
 		}
 		if end < len(labels) {
-			width += overflowWidth(len(labels)-end, false)
+			width += overflowWidth(len(labels)-end, false) + 1
 		}
 		return width
 	}
@@ -67,34 +67,33 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		overflows++
 	}
 	var items []tabBarItem
-	x := 0
+	x := 2
 	appendItem := func(text string, target int, overflow bool) {
 		width := lipgloss.Width(text)
 		items = append(items, tabBarItem{text: text, left: x, width: width, target: target, overflow: overflow})
-		x += width
+		x += width + 1
 	}
-	if capacity < 3*overflows+2 {
-		appendItem(m.renderTabWidth(labels, m.activeTab, true, capacity), m.activeTab, false)
+	if capacity < 2*overflows+1 {
+		appendItem(m.renderTabWidth(labels, m.activeTab, capacity), m.activeTab, false)
 		return items
 	}
-	coreWidth := prefix[end] - prefix[start]
-	frame := inactiveTabStyle.GetHorizontalFrameSize()
-	minimumActive := min(labels[m.activeTab].width, max(frame+1, lipgloss.Width(labels[m.activeTab].indicators)+frame))
-	budget := max(3*overflows, capacity-coreWidth+labels[m.activeTab].width-minimumActive)
+	coreWidth := prefix[end] - prefix[start] + end - start - 1
+	minimumActive := min(labels[m.activeTab].width, max(3, lipgloss.Width(labels[m.activeTab].indicators)+2))
+	budget := max(overflows, capacity-coreWidth+labels[m.activeTab].width-minimumActive-overflows)
 	leftWidth, rightWidth = fitTabOverflowWidths(leftWidth, rightWidth, budget)
-	activeWidth := min(labels[m.activeTab].width, capacity-coreWidth+labels[m.activeTab].width-leftWidth-rightWidth)
+	activeWidth := min(labels[m.activeTab].width, capacity-coreWidth+labels[m.activeTab].width-leftWidth-rightWidth-overflows)
 	coreWidth += activeWidth - labels[m.activeTab].width
-	extra := capacity - coreWidth - leftWidth - rightWidth
+	extra := capacity - coreWidth - leftWidth - rightWidth - overflows
 	leftExtra, rightExtra := 0, 0
 	switch {
 	case leftWidth > 0 && rightWidth > 0:
 		leftExtra, rightExtra = extra/2, extra-extra/2
-		if extra >= 6 {
-			leftPreview := labels[start-1].width > 6
-			rightPreview := labels[end].width > 6
+		if extra >= 5 {
+			leftPreview := labels[start-1].width > 4
+			rightPreview := labels[end].width > 4
 			if leftPreview && !rightPreview {
 				leftExtra, rightExtra = extra, 0
-			} else if rightPreview && (!leftPreview || extra < 12) {
+			} else if rightPreview && (!leftPreview || extra < 10) {
 				leftExtra, rightExtra = 0, extra
 			}
 		}
@@ -107,17 +106,17 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		preview := partialTabWidth(leftExtra, labels[start-1].width)
 		leftWidth += leftExtra
 		if preview > 0 {
-			leftWidth -= preview
+			leftWidth -= preview + 1
 		}
-		appendItem(m.renderTabOverflowWidth(m.tabOverflowText(start, true), true, leftWidth, true), start-1, true)
+		appendItem(m.renderTabOverflowWidth(m.tabOverflowText(start, true), leftWidth, true), start-1, true)
 		if preview > 0 {
-			appendItem(m.renderTabWidth(labels, start-1, false, preview), start-1, false)
+			appendItem(m.renderTabWidth(labels, start-1, preview), start-1, false)
 		}
 	}
 	for i := start; i < end; i++ {
 		text := labels[i].rendered
 		if i == m.activeTab && activeWidth < labels[i].width {
-			text = m.renderTabWidth(labels, i, i == 0, activeWidth)
+			text = m.renderTabWidth(labels, i, activeWidth)
 		}
 		appendItem(text, i, false)
 	}
@@ -125,10 +124,10 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		preview := partialTabWidth(rightExtra, labels[end].width)
 		rightWidth += rightExtra
 		if preview > 0 {
-			rightWidth -= preview
-			appendItem(m.renderTabWidth(labels, end, false, preview), end, false)
+			rightWidth -= preview + 1
+			appendItem(m.renderTabWidth(labels, end, preview), end, false)
 		}
-		appendItem(m.renderTabOverflowWidth(m.tabOverflowText(len(labels)-end, false), false, rightWidth, false), end, true)
+		appendItem(m.renderTabOverflowWidth(m.tabOverflowText(len(labels)-end, false), rightWidth, false), end, true)
 	}
 	return items
 }
@@ -143,15 +142,15 @@ func fitTabOverflowWidths(left, right, budget int) (int, int) {
 	if right == 0 {
 		return budget, 0
 	}
-	left = min(left, max(3, (budget+1)/2))
+	left = min(left, (budget+1)/2)
 	right = min(right, budget-left)
 	return budget - right, right
 }
 
-// A preview needs borders, padding, a filename cell, and an ellipsis.
+// A preview needs padding, at least one filename cell, an ellipsis, and a gap.
 func partialTabWidth(extra, natural int) int {
-	if extra < 6 || natural <= 6 {
+	if extra < 5 || natural <= 4 {
 		return 0
 	}
-	return min(extra, natural-1)
+	return min(extra-1, natural-1)
 }
