@@ -3,11 +3,89 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/crittylabs/critty/internal/terminalbinding"
 )
+
+func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name, request, ssh, want string
+		custom                   bool
+	}{
+		{name: "missing request", request: "missing", want: "rio-window"},
+		{name: "ambiguous marker", request: "ambiguous", want: "rio-window"},
+		{name: "marker not found", request: "unmatched", custom: true},
+		{name: "SSH custom fallback", request: "missing", ssh: "remote", custom: true},
+		{name: "SSH rejects desktop", request: "missing", ssh: "remote"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("XDG_STATE_HOME", t.TempDir())
+			t.Setenv("TMUX", "/unrelated/socket,123,0")
+			t.Setenv("TMUX_PANE", "%99")
+			for _, key := range []string{"SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY", "WSL_DISTRO_NAME"} {
+				t.Setenv(key, "")
+			}
+			t.Setenv("SSH_CONNECTION", tc.ssh)
+			t.Setenv("TERM_PROGRAM", "rio")
+			t.Setenv("TERMINAL_APP", "rio")
+			previous, origin, path := terminalRequest, reviewOrigin, lookPath
+			t.Cleanup(func() { terminalRequest, reviewOrigin, lookPath = previous, origin, path })
+			terminalRequest = strings.Repeat("0", 32)
+			lookPath = func(name string) (string, error) {
+				if name == "rio" || name == "tmux" {
+					return "/bin/" + name, nil
+				}
+				return "", fmt.Errorf("%s unavailable", name)
+			}
+			if tc.request != "missing" {
+				store := terminalbinding.DefaultStore()
+				request, err := store.Prepare()
+				if err != nil {
+					t.Fatal(err)
+				}
+				terminalRequest = request.ID
+				if tc.request == "ambiguous" {
+					for _, pane := range []string{"%1", "%2"} {
+						if err := store.Notify(request.ID, terminalbinding.Target{Kind: "tmux", Socket: "/recorded/socket", Pane: pane}); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			names := []string{"mux", "tmux-split", "rio-window"}
+			want := tc.want
+			if tc.custom {
+				want = "custom:" + launcherScript(t, filepath.Join(t.TempDir(), "launcher"), "exit 0\n")
+				names = append(names, want)
+				// Force the local timeout case past the desktop candidate too.
+				if tc.ssh == "" {
+					names = []string{"mux", "tmux-split", want}
+				}
+			}
+			got, foreground, err := resolveReviewLauncher(names, &reviewMode{sessionKey: "0123456789ab"})
+			if foreground {
+				t.Fatal("failed marker allowed foreground fallback")
+			}
+			if want == "" {
+				if got != nil || !errors.Is(err, errNoReviewLauncher) || !strings.Contains(err.Error(), "terminal request unavailable") || !strings.Contains(err.Error(), "SSH") {
+					t.Fatalf("selection = %+v, %v; want binding and launcher errors", got, err)
+				}
+				return
+			}
+			if err != nil || got == nil || got.name != want {
+				t.Fatalf("selection = %+v, %v; want %s", got, err, want)
+			}
+			if reviewOrigin.Terminal != "rio" || reviewOrigin.SSH != (tc.ssh != "") {
+				t.Fatalf("fallback lost caller hints: %+v", reviewOrigin)
+			}
+		})
+	}
+}
 
 func TestTerminalNotificationRoutesReview(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

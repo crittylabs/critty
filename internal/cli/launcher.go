@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/crittylabs/critty/internal/terminalbinding"
 )
 
 var reviewLauncherNames []string
@@ -26,6 +28,24 @@ type reviewLauncher struct {
 	name  string
 	check func() error
 	open  func(*reviewMode) (reviewLaunch, error)
+}
+
+func resolveReviewLauncher(names []string, mode *reviewMode) (*reviewLauncher, bool, error) {
+	terminal, terminalErr := reviewTerminalContext()
+	if terminalErr != nil {
+		// Keep terminalRequest set so named multiplexers cannot use an unrelated
+		// daemon terminal. Unbound desktop fallbacks use the caller's SSH hints.
+		reviewOrigin = terminalbinding.CaptureOrigin(os.Getpid())
+	}
+	launcher, err := selectReviewLauncher(names, terminal, mode)
+	if err == nil {
+		return launcher, false, nil
+	}
+	if terminalErr != nil {
+		return nil, false, errors.Join(terminalErr, err)
+	}
+	foreground := errors.Is(err, errNoReviewLauncher) && terminal == nil
+	return nil, foreground, err
 }
 
 // Selection checks availability before opening anything.  Once open starts,

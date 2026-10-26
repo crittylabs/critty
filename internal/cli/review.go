@@ -259,12 +259,8 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 
 	warnHistory(os.Stderr, sess.Meta.CWD, cfg.History)
 
-	multiplexer, err := reviewTerminalContext()
-	if err != nil {
-		return err
-	}
-	launcher, err := selectReviewLauncher(slices.Concat(reviewLauncherNames, cfg.Launchers), multiplexer, mode)
-	if err != nil && (!errors.Is(err, errNoReviewLauncher) || multiplexer != nil) {
+	launcher, foreground, err := resolveReviewLauncher(slices.Concat(reviewLauncherNames, cfg.Launchers), mode)
+	if err != nil && !foreground {
 		return err
 	}
 	if launcher != nil {
