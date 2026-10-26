@@ -1336,7 +1336,7 @@ func TestReadOnlyViewer(t *testing.T) {
 	}
 	app.locationError = ""
 	plain := ansi.Strip(app.View().Content)
-	if !strings.Contains(plain, "View · read-only") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
+	if !strings.Contains(plain, "view the document.") || strings.Contains(plain, "read-only") || strings.Contains(plain, "review the") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
 		t.Fatalf("missing read-only UI: %s", plain)
 	}
 	editorMessage(&app, tea.KeyPressMsg{Code: '/'})

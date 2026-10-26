@@ -2851,12 +2851,14 @@ func (m AppModel) renderReviewBar() string {
 	} else if m.topic != "" {
 		text += reviewBarStyle.Render(headerLabel(m.topic) + " — ")
 	}
-	if m.readOnly {
-		text += reviewBarStyle.Bold(true).Render("View · read-only · ")
-	} else if m.session != nil && m.session.InMemory() {
+	if !m.readOnly && m.session != nil && m.session.InMemory() {
 		text += reviewBarStyle.Bold(true).Render("Demo · not saved · ")
 	}
-	text += reviewBarStyle.Render("review the ")
+	action := "review"
+	if m.readOnly {
+		action = "view"
+	}
+	text += reviewBarStyle.Render(action + " the ")
 	if style, ok := scopeWordStyle(scope); ok {
 		text += style.Render(scope) + reviewBarStyle.Render(" ")
 	}
@@ -4250,6 +4252,9 @@ const footerMinHeight = 22
 // renderFooter renders the key hints and the Help button, or "" when the
 // terminal is too short for them.
 func (m AppModel) renderFooter() string {
+	k := func(key, desc string) string {
+		return footerKeyStyle.Render(keyHintNames.Replace(key)) + " " + footerDescStyle.Render(desc)
+	}
 	if m.reload.err != nil && !m.isearch.active {
 		return footerStyle.Width(m.width).Render("Reload failed: " + headerLabel(m.reload.err.Error()))
 	}
@@ -4257,7 +4262,7 @@ func (m AppModel) renderFooter() string {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
-		return m.renderFooterItems([]string{m.footerHelpButton(), "View: read-only", m.outlineHint(), "v: select", "M-w: copy reference", "q: close", m.searchHint()})
+		return m.renderFooterItems([]string{m.footerHelpButton(), m.outlineHint(), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close"), m.searchHint()})
 	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
@@ -4273,10 +4278,6 @@ func (m AppModel) renderFooter() string {
 		return ""
 	}
 	t := m.tabs[m.activeTab]
-	k := func(key, desc string) string {
-		return footerKeyStyle.Render(keyHintNames.Replace(key)) + " " + footerDescStyle.Render(desc)
-	}
-
 	var items []string
 	if t.selecting {
 		items = []string{
