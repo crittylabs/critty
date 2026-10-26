@@ -3125,13 +3125,13 @@ func (m *AppModel) tabLabels() []tabLabel {
 	indicators := m.tabIndicators()
 	for i, t := range m.tabs {
 		label := abbreviatedTabPath(t.displayPath())
-		start := strings.LastIndexByte(label, '/') + 1
-		filenameStyle := ansi.NewStyle()
-		if i == m.activeTab {
-			filenameStyle = filenameStyle.Bold()
+		if t.attachment != nil {
+			label = t.attachment.Name
 		}
-		label = label[:start] + filenameStyle.String() + label[start:] + ansi.NewStyle().Normal().Underline(false).String()
-		label = t.unreadMarker() + label
+		start := strings.LastIndexByte(label, '/') + 1
+		if i == m.activeTab {
+			label = label[:start] + ansi.NewStyle().Bold().String() + label[start:] + ansi.NewStyle().Normal().Underline(false).String()
+		}
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
 		}
@@ -3162,6 +3162,12 @@ func (m *AppModel) renderTab(labels []tabLabel, i int, isFirst bool) string {
 	style := inactiveTabStyle
 	if i == m.activeTab {
 		style = activeTabStyle
+	}
+	if m.tabs[i].attachment != nil {
+		style = style.Foreground(warning)
+		if i == m.activeTab {
+			style = style.Foreground(activeAttachmentColor)
+		}
 	}
 	border, _, _, _, _ := style.GetBorder()
 	if isFirst && i == m.activeTab {

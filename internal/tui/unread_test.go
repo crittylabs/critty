@@ -109,7 +109,7 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 					}
 					tabUnread := app.renderTab(app.tabLabels(), 1, false)
 					treeUnread := app.treeRowText(row, app.tabIndicators())
-					assertDot(tabUnread, true)
+					assertDot(tabUnread, false)
 					assertDot(treeUnread, true)
 					assertPosition(tabBefore, tabUnread)
 					assertPosition(treeBefore, treeUnread)
