@@ -36,31 +36,17 @@ func TestMouseClickSelectsVisibleOverflowTab(t *testing.T) {
 	app.width = 82 // a 56-column content pane beside the 26-column sidebar
 	app.activeTab = 2
 
-	labels := app.tabLabels()
-	for i := range labels {
-		labels[i].width = lipgloss.Width(app.renderTab(labels, i, i == 0))
+	for _, item := range app.tabBarItems() {
+		if item.overflow || item.target == app.activeTab {
+			continue
+		}
+		app = clickMouse(app, item.left+min(1, item.width-1), app.headerHeight())
+		if app.activeTab != item.target {
+			t.Fatalf("active tab = %d, want %d", app.activeTab, item.target)
+		}
+		return
 	}
-	start, end := app.visibleTabWindow(labels)
-	target := start
-	if target == app.activeTab {
-		target = end - 1
-	}
-	if target == app.activeTab {
-		t.Fatal("test setup did not expose another tab")
-	}
-	x := 0
-	if start > 0 {
-		x = lipgloss.Width(inactiveTabStyle.Render("↤ 1 more"))
-	}
-	for i := start; i < target; i++ {
-		x += labels[i].width
-	}
-
-	app = clickMouse(app, x+1, app.headerHeight())
-
-	if app.activeTab != target {
-		t.Fatalf("active tab = %d, want %d", app.activeTab, target)
-	}
+	t.Fatal("test setup did not expose another tab")
 }
 
 func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
@@ -81,37 +67,25 @@ func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
 	tests := []struct {
 		name  string
 		right bool
+		want  int
 	}{
-		{name: "left"},
-		{name: "right", right: true},
+		{name: "left", want: 2},
+		{name: "right", right: true, want: 5},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newApp()
-			labels := app.tabLabels()
-			for i := range labels {
-				labels[i].rendered = app.renderTab(labels, i, i == 0)
-				labels[i].width = lipgloss.Width(labels[i].rendered)
-			}
-			start, end := app.visibleTabWindow(labels)
-			if start == 0 || end == len(labels) {
-				t.Fatalf("visible window = [%d,%d), want overflow on both sides", start, end)
-			}
-
-			x := 1
-			want := start - 1
+			items := app.tabBarItems()
+			item := items[0]
 			if tt.right {
-				x = lipgloss.Width(app.renderTabOverflowIndicator(app.tabOverflowText(start, true), true))
-				for i := start; i < end; i++ {
-					x += labels[i].width
-				}
-				x++
-				want = end
+				item = items[len(items)-1]
 			}
-
-			app = clickMouse(app, x, app.headerHeight())
-			if app.activeTab != want {
-				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, want)
+			if !item.overflow {
+				t.Fatal("test setup did not overflow on both sides")
+			}
+			app = clickMouse(app, item.left+min(1, item.width-1), app.headerHeight())
+			if app.activeTab != tt.want {
+				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, tt.want)
 			}
 		})
 	}

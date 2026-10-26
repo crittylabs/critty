@@ -3159,6 +3159,10 @@ func abbreviatedTabPath(path string) string {
 }
 
 func (m *AppModel) renderTab(labels []tabLabel, i int, isFirst bool) string {
+	return m.renderTabWidth(labels, i, isFirst, 0)
+}
+
+func (m *AppModel) renderTabWidth(labels []tabLabel, i int, isFirst bool, width int) string {
 	style := inactiveTabStyle
 	if i == m.activeTab {
 		style = activeTabStyle
@@ -3176,34 +3180,50 @@ func (m *AppModel) renderTab(labels []tabLabel, i int, isFirst bool) string {
 		border.BottomLeft = "├"
 	}
 	label := labels[i].text
-	paneWidth := m.contentPaneWidth()
-	total := 0
-	for _, label := range labels {
-		total += ansi.StringWidth(label.text) + style.GetHorizontalFrameSize()
-	}
-	if total > paneWidth {
-		if m.activeTab > 0 {
-			paneWidth -= lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(m.activeTab, true), false))
+	if width > 0 {
+		if width <= style.GetHorizontalFrameSize() {
+			style = style.Padding(0)
 		}
-		if m.activeTab < len(labels)-1 {
-			paneWidth -= lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(len(labels)-m.activeTab-1, false), false))
+		style = style.Width(width)
+		available := max(0, width-style.GetHorizontalFrameSize())
+		if available == 0 {
+			label = ""
+		} else if ansi.StringWidth(label) > available {
+			indicators := labels[i].indicators
+			if i == m.activeTab && indicators != "" && lipgloss.Width(indicators) <= available {
+				suffix := " " + indicators
+				if lipgloss.Width(suffix) < available {
+					label = ansi.Truncate(strings.TrimSuffix(label, suffix), available-lipgloss.Width(suffix), "…") + suffix
+				} else {
+					label = indicators
+				}
+			} else {
+				prefix := ansi.Truncate(label, available-1, "")
+				label = prefix + strings.Repeat(" ", max(0, available-1-lipgloss.Width(prefix))) + "…"
+			}
 		}
-	}
-	available := max(1, paneWidth-style.GetHorizontalFrameSize())
-	if m.width > 0 && ansi.StringWidth(label) > available {
-		suffix := ""
-		if labels[i].indicators != "" {
-			suffix = " " + labels[i].indicators
-		}
-		label = ansi.Truncate(label, max(0, available-ansi.StringWidth(suffix)), "…") + suffix
 	}
 	return style.Border(border).Render(label)
 }
 
 func (m *AppModel) renderTabOverflowIndicator(text string, isFirst bool) string {
-	style := inactiveTabStyle.Foreground(subtle)
+	return m.renderTabOverflowWidth(text, isFirst, 0, true)
+}
+
+func (m *AppModel) renderTabOverflowWidth(text string, isFirst bool, width int, backwards bool) string {
+	style := inactiveTabStyle
 	if m.contentPaneWidth() < 32 {
 		style = style.Padding(0)
+	}
+	if width > 0 {
+		if width <= style.GetHorizontalFrameSize() {
+			style = style.Padding(0)
+		}
+		style = style.Width(width)
+		if !backwards {
+			style = style.Align(lipgloss.Right)
+		}
+		text = ansi.Truncate(text, max(0, width-style.GetHorizontalFrameSize()), "…")
 	}
 	border, _, _, _, _ := style.GetBorder()
 	if isFirst {
@@ -3223,48 +3243,6 @@ func (m *AppModel) tabOverflowText(count int, backwards bool) string {
 		return fmt.Sprintf("↤ %d more", count)
 	}
 	return fmt.Sprintf("%d more ↦", count)
-}
-
-func (m *AppModel) visibleTabWindow(labels []tabLabel) (int, int) {
-	totalWidth := 0
-	for _, label := range labels {
-		totalWidth += label.width
-	}
-	paneWidth := m.contentPaneWidth()
-	if totalWidth <= paneWidth {
-		return 0, len(labels)
-	}
-
-	indicatorWidth := func(text string) int {
-		return lipgloss.Width(m.renderTabOverflowIndicator(text, false))
-	}
-	leftWidth, rightWidth := 0, 0
-	if m.activeTab > 0 {
-		leftWidth = indicatorWidth(m.tabOverflowText(m.activeTab, true))
-	}
-	if m.activeTab < len(labels)-1 {
-		rightWidth = indicatorWidth(m.tabOverflowText(len(labels)-m.activeTab-1, false))
-	}
-
-	available := paneWidth - leftWidth - rightWidth
-	start, end := m.activeTab, m.activeTab+1
-	used := labels[m.activeTab].width
-	for {
-		expanded := false
-		if start > 0 && used+labels[start-1].width <= available {
-			start--
-			used += labels[start].width
-			expanded = true
-		}
-		if end < len(labels) && used+labels[end].width <= available {
-			used += labels[end].width
-			end++
-			expanded = true
-		}
-		if !expanded {
-			return start, end
-		}
-	}
 }
 
 // modalClickGuard is how long a click that opened a dialog blocks another
@@ -3420,33 +3398,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 			m.rebuildContent()
 			return m, nil
 		}
-		labels := m.tabLabels()
-		for i := range labels {
-			labels[i].rendered = m.renderTab(labels, i, i == 0)
-			labels[i].width = lipgloss.Width(labels[i].rendered)
-		}
-		start, end := m.visibleTabWindow(labels)
-		x := 0
-		if start > 0 {
-			indicator := m.renderTabOverflowIndicator(m.tabOverflowText(start, true), true)
-			width := lipgloss.Width(indicator)
-			if mouse.X >= x && mouse.X < x+width {
-				m.selectTab(start - 1)
-				return m, nil
-			}
-			x += width
-		}
-		for i := start; i < end; i++ {
-			if mouse.X >= x && mouse.X < x+labels[i].width {
-				m.selectTab(i)
-				return m, nil
-			}
-			x += labels[i].width
-		}
-		if end < len(labels) {
-			indicator := m.renderTabOverflowIndicator(m.tabOverflowText(len(labels)-end, false), false)
-			if mouse.X >= x && mouse.X < x+lipgloss.Width(indicator) {
-				m.selectTab(end)
+		for _, item := range m.tabBarItems() {
+			if mouse.X >= item.left && mouse.X < item.left+item.width {
+				m.selectTab(item.target)
 				return m, nil
 			}
 		}
@@ -4210,42 +4164,16 @@ func (m *AppModel) handleTextModalWheel(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 
 // renderTabBar renders the tab bar for multi-file mode.
 func (m *AppModel) renderTabBar() string {
-	labels := m.tabLabels()
-	for i := range labels {
-		rendered := m.renderTab(labels, i, i == 0)
-		labels[i].rendered = rendered
-		labels[i].width = lipgloss.Width(rendered)
+	items := m.tabBarItems()
+	if len(items) == 0 {
+		return strings.Repeat("\n", inactiveTabStyle.GetVerticalFrameSize())
 	}
-
-	addFiller := func(row string) string {
-		return fillTabRow(row, m.contentPaneWidth(), lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = item.text
 	}
-
-	start, end := m.visibleTabWindow(labels)
-	if start == 0 && end == len(labels) {
-		var tabs []string
-		for i := range labels {
-			tabs = append(tabs, labels[i].rendered)
-		}
-		row := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
-		return addFiller(row)
-	}
-
-	var parts []string
-	if start > 0 {
-		ind := m.renderTabOverflowIndicator(m.tabOverflowText(start, true), true)
-		parts = append(parts, ind)
-	}
-	for i := start; i < end; i++ {
-		parts = append(parts, m.renderTab(labels, i, i == start && start == 0))
-	}
-	if end < len(labels) {
-		ind := m.renderTabOverflowIndicator(m.tabOverflowText(len(labels)-end, false), false)
-		parts = append(parts, ind)
-	}
-
 	row := lipgloss.JoinHorizontal(lipgloss.Top, parts...)
-	return addFiller(row)
+	return fillTabRow(row, m.contentPaneWidth(), lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
 }
 
 // footerMinHeight is the terminal height above which the footer's key hints
