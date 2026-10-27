@@ -135,8 +135,10 @@ func TestReadingViewRestoresExpansion(t *testing.T) {
 					{ID: "resolved", StartLine: 1, EndLine: 1, Resolved: true, ResolvedRound: 3, Body: "resolved inline body"},
 					{ID: "file", Scope: "file", Body: "open file body"},
 					{ID: "manual", StartLine: 2, EndLine: 2, Drifted: true, Body: "manually folded body"},
+					{ID: "folded-inline", StartLine: 2, EndLine: 2, Body: "folded inline body"},
 				}
 				app.tab().expandedDrifted = map[string]bool{"manual": false}
+				app.tab().foldedComments = map[string]bool{"folded-inline": true}
 				app.openAll = opened
 				app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 50})
 				originalWidth := app.contentViewport.Width()
@@ -147,6 +149,22 @@ func TestReadingViewRestoresExpansion(t *testing.T) {
 				}
 				if strings.Contains(content, "open inline body") || strings.Contains(content, "open file body") || strings.Contains(content, "resolved inline body") {
 					t.Fatalf("wrong comments visible in View: %q", content)
+				}
+				for _, row := range app.contentLayout.rows {
+					if row.annotation {
+						t.Fatal("View retained a comment box instead of a bubble")
+					}
+				}
+				ids := map[string]bool{}
+				for _, marker := range app.contentLayout.markers {
+					for _, id := range marker.ids {
+						ids[id] = true
+					}
+				}
+				for _, c := range app.tab().state.Comments {
+					if !ids[c.ID] {
+						t.Fatalf("View has no bubble for %s", c.ID)
+					}
 				}
 
 				for _, target := range app.commentTargets(0) {
@@ -177,6 +195,9 @@ func TestReadingViewRestoresExpansion(t *testing.T) {
 				if app.tab().expandedDrifted["manual"] || strings.Contains(content, "manually folded body") != opened {
 					t.Fatal("Open all or View changed the saved individual expansion")
 				}
+				if !app.tab().foldedComments["folded-inline"] || strings.Contains(content, "folded inline body") {
+					t.Fatal("View changed the manually folded inline comment")
+				}
 			})
 		}
 	}
@@ -195,6 +216,14 @@ func TestReadingViewKeepsDeletedCommentAnchors(t *testing.T) {
 			}
 			if _, ok := app.contentLayout.oldRanges[11]; !ok {
 				t.Fatal("View lost the deleted-line anchor")
+			}
+			if len(app.contentLayout.markers) != 1 || app.contentLayout.markers[0].ids[0] != "old" {
+				t.Fatal("View lost the deleted-line comment bubble")
+			}
+			for _, row := range app.contentLayout.rows {
+				if row.annotation {
+					t.Fatal("View retained a deleted-line comment box")
+				}
 			}
 			app = pressKey(app, 'V')
 			if !strings.Contains(ansi.Strip(app.contentViewport.GetContent()), "deleted line comment") {

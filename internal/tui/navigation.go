@@ -567,7 +567,7 @@ func (m *AppModel) scrollToCursor() {
 	t := m.tab()
 	if t.cursorOnAnnotation {
 		id := m.selectedCommentID()
-		if c, drifted := m.driftedComment(id); drifted && m.threadCollapsed(id, c.Resolved, true, m.focused == contentPane) {
+		if c, drifted := m.driftedComment(id); (m.viewMode || drifted) && m.threadCollapsed(id, c.Resolved, drifted, m.focused == contentPane) {
 			for _, marker := range m.contentLayout.markers {
 				for _, candidate := range marker.ids {
 					if candidate == id {

@@ -66,11 +66,11 @@ type commentMarker struct {
 	ids  []string
 }
 
-func (m *AppModel) driftedGroups() map[lineRef][]string {
+func (m *AppModel) commentMarkerGroups() map[lineRef][]string {
 	groups := make(map[lineRef][]string)
 	if m.tab().state != nil {
 		for _, c := range m.tab().state.Comments {
-			if commentDrifted(m.tab(), c) {
+			if m.viewMode || commentDrifted(m.tab(), c) {
 				ref := commentLocation(m.tab(), c)
 				groups[ref] = append(groups[ref], c.ID)
 			}
@@ -79,8 +79,8 @@ func (m *AppModel) driftedGroups() map[lineRef][]string {
 	return groups
 }
 
-// decorateDrifted puts one marker on the last source row at each display location.
-func (m *AppModel) decorateDrifted(content string, layout *renderedContentLayout, groups map[lineRef][]string) string {
+// decorateCommentMarkers puts one marker on the last source row at each display location.
+func (m *AppModel) decorateCommentMarkers(content string, layout *renderedContentLayout, groups map[lineRef][]string) string {
 	if len(groups) == 0 {
 		return content
 	}

@@ -255,14 +255,17 @@ func TestFileCommentsRenderBeforeContent(t *testing.T) {
 				t.Fatal("file comment navigation did not reveal the selected thread")
 			}
 			app = pressKey(app, 'V')
-			found := false
 			for _, row := range app.contentLayout.rows {
 				if row.annotation {
-					found = true
+					t.Fatal("View mode retained a file comment box")
 				}
 			}
-			if !app.viewMode || !found {
-				t.Fatal("View mode lost inline file comments")
+			if !app.viewMode || len(app.contentLayout.markers) != 1 || len(app.contentLayout.markers[0].ids) != 2 {
+				t.Fatal("View mode lost file comment bubbles")
+			}
+			app.selectMarker([]string{"open"})
+			if !app.viewMode || app.modal == noModal || app.editingID != "open" {
+				t.Fatal("View mode could not open a file comment from its bubble")
 			}
 		})
 	}

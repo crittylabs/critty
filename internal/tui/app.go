@@ -4410,7 +4410,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "←/→,h/l (comment)", desc: "fold/unfold first; otherwise scroll the table or switch diff sides with arrow keys"},
 		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
 		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
-		{keys: "V", desc: "toggle reading view: hide sidebar and fold all comments; leaving restores the previous expansion setting"},
+		{keys: "V", desc: "toggle reading view: hide sidebar and reduce all comments to bubble markers; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "reset individual folds and toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
 		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},

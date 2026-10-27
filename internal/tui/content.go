@@ -117,7 +117,7 @@ func (m *AppModel) rebuildContent() {
 	// Determine which lines to highlight from the selected annotation.
 	sidebarHighlightStart, sidebarHighlightEnd, sidebarHighlightSide := m.highlightedCommentLines()
 
-	groups := m.driftedGroups()
+	groups := m.commentMarkerGroups()
 	contentWidth := m.contentViewport.Width()
 	for _, ids := range groups {
 		width := lipgloss.Width(fmt.Sprintf("> ☑︎ 💬 %d", len(ids))) + 1
@@ -187,7 +187,7 @@ func (m *AppModel) rebuildContent() {
 		layout.appendBlock(&b, "", contentMouseTarget{})
 	}
 	appendAnnotation := func(ann annotation, focused bool, target contentMouseTarget) {
-		if ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
+		if m.viewMode || ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
 			return
 		}
 		box, button := m.renderAnnotationBox(ann, boxWidth, focused)
@@ -221,7 +221,7 @@ func (m *AppModel) rebuildContent() {
 			layout.appendBlock(&b, "\n  Added file removed — no longer part of the changes.", contentMouseTarget{})
 		}
 		m.contentLayout = layout
-		m.contentViewport.SetContent(m.decorateTextSelection(m.decorateDrifted(b.String(), &m.contentLayout, groups)))
+		m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
 		return
 	}
 	renderDeleted := func(afterLine int) {
@@ -503,7 +503,7 @@ func (m *AppModel) rebuildContent() {
 	}
 
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateDrifted(b.String(), &m.contentLayout, groups)))
+	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
 }
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.

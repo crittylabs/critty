@@ -387,14 +387,14 @@ func (m *AppModel) rebuildDiffContent() {
 	layout := newRenderedContentLayout()
 	var b strings.Builder
 	width := m.contentViewport.Width()
-	groups := m.driftedGroups()
+	groups := m.commentMarkerGroups()
 	for _, ids := range groups {
 		width = min(width, m.contentViewport.Width()-lipgloss.Width(fmt.Sprintf("> ☑︎ 💬 %d", len(ids)))-1)
 	}
 	appendAnnotations := func(ref lineRef) {
 		for idx, ann := range m.annotationsAfterLine(ref.line, ref.side) {
 			focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == ref.line && t.cursorSide == ref.side && t.cursorAnnoIdx == idx
-			if ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
+			if m.viewMode || ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
 				continue
 			}
 			box, button := m.renderAnnotationBox(ann, max(1, width-gutterWidth), focused)
@@ -472,7 +472,7 @@ func (m *AppModel) rebuildDiffContent() {
 		layout.appendBlock(&b, "       ⋯ remaining context not included in diff", contentMouseTarget{})
 	}
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateDrifted(b.String(), &m.contentLayout, groups)))
+	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
 }
 
 func updateDiffRange(ranges map[int]renderedRange, line, row int) {
