@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/crittylabs/critty/internal/terminalbinding"
 )
@@ -20,11 +21,17 @@ func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
 	}{
 		{name: "missing request", request: "missing", want: "rio-window"},
 		{name: "ambiguous marker", request: "ambiguous", want: "rio-window"},
-		{name: "marker not found", request: "unmatched", custom: true},
+		{name: "marker timeout", request: "unmatched", custom: true},
 		{name: "SSH custom fallback", request: "missing", ssh: "remote", custom: true},
 		{name: "SSH rejects desktop", request: "missing", ssh: "remote"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.request == "unmatched" {
+				// Storage tests cover marker polling; this checks fallback on expiry.
+				previousTimeout := terminalRequestTimeout
+				terminalRequestTimeout = 20 * time.Millisecond
+				t.Cleanup(func() { terminalRequestTimeout = previousTimeout })
+			}
 			stderr, err := os.CreateTemp(t.TempDir(), "stderr")
 			if err != nil {
 				t.Fatal(err)

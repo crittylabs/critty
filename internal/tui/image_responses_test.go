@@ -10,6 +10,20 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 )
 
+type terminalInputApp struct {
+	AppModel
+	want string
+}
+
+func (m terminalInputApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	app, cmd := updateApp(m.AppModel, msg)
+	m.AppModel = app
+	if app.modalTextarea.Value() == m.want {
+		return m, tea.Batch(cmd, tea.Quit)
+	}
+	return m, cmd
+}
+
 func TestImageResponseReplayPreservesTextInput(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -27,21 +41,15 @@ func TestImageResponseReplayPreservesTextInput(t *testing.T) {
 			app.modal = commentModal
 			app.modalTextarea.Focus()
 			out := &previewOutput{changed: make(chan struct{}, 1)}
-			p := tea.NewProgram(app, tea.WithInput(strings.NewReader(tc.input)), tea.WithOutput(out),
+			p := tea.NewProgram(terminalInputApp{AppModel: app, want: tc.want}, tea.WithInput(strings.NewReader(tc.input)), tea.WithOutput(out),
 				tea.WithWindowSize(80, 24), tea.WithoutSignalHandler())
-			timer := time.AfterFunc(250*time.Millisecond, p.Quit)
+			timer := time.AfterFunc(3*time.Second, p.Kill)
 			defer timer.Stop()
 			model, err := p.Run()
 			if err != nil {
 				t.Fatalf("buffered keys were not restored to the editor: %v", err)
 			}
-			var got string
-			switch app := model.(type) {
-			case AppModel:
-				got = app.modalTextarea.Value()
-			case *AppModel:
-				got = app.modalTextarea.Value()
-			}
+			got := model.(terminalInputApp).modalTextarea.Value()
 			if got != tc.want {
 				t.Fatalf("editor input = %q, want %q", got, tc.want)
 			}
@@ -70,7 +78,7 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 			reader, writer := io.Pipe()
 			defer reader.Close()
 			out := &previewOutput{changed: make(chan struct{}, 1)}
-			p := tea.NewProgram(app, tea.WithInput(reader), tea.WithOutput(out), tea.WithWindowSize(80, 24), tea.WithoutSignalHandler())
+			p := tea.NewProgram(terminalInputApp{AppModel: app, want: "after"}, tea.WithInput(reader), tea.WithOutput(out), tea.WithWindowSize(80, 24), tea.WithoutSignalHandler())
 			writes := make(chan error, 1)
 			go func() {
 				defer writer.Close()
@@ -79,13 +87,11 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 						writes <- err
 						return
 					}
+					// Confirmed responses must survive beyond the Alt-key deadline.
 					time.Sleep(100 * time.Millisecond)
 				}
 				_, err := io.WriteString(writer, "after")
 				writes <- err
-				// Let the input reader deliver the final ordinary text before quitting.
-				time.Sleep(100 * time.Millisecond)
-				p.Quit()
 			}()
 			timer := time.AfterFunc(3*time.Second, p.Kill)
 			defer timer.Stop()
@@ -96,13 +102,7 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 			if err := <-writes; err != nil {
 				t.Fatal(err)
 			}
-			var got string
-			switch app := model.(type) {
-			case AppModel:
-				got = app.modalTextarea.Value()
-			case *AppModel:
-				got = app.modalTextarea.Value()
-			}
+			got := model.(terminalInputApp).modalTextarea.Value()
 			if got != "after" {
 				t.Fatalf("terminal traffic changed editor input: %q", got)
 			}

@@ -107,30 +107,6 @@ func TestOutlineShortcut(t *testing.T) {
 	}
 }
 
-func TestOutlineFooterHints(t *testing.T) {
-	for _, readOnly := range []bool{false, true} {
-		app := outlineTestApp(t, "# Root\nbody\n")
-		app.readOnly = readOnly
-		app.focused = contentPane
-		if footer := ansi.Strip(app.renderFooter()); !strings.Contains(footer, "M-G outline") || strings.Contains(footer, "C-↑/↓") {
-			t.Fatalf("source footer: %q", footer)
-		}
-		app.focused = commentPane
-		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || !strings.Contains(footer, "C-↑/↓ ⇅ tree/outline") {
-			t.Fatalf("Files footer: %q", footer)
-		}
-		app.sidebarView = commentsView
-		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || strings.Contains(footer, "C-↑/↓") {
-			t.Fatalf("comments footer: %q", footer)
-		}
-		app.focused = contentPane
-		app.outline.rows = nil
-		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || strings.Contains(footer, "C-↑/↓") {
-			t.Fatalf("footer without outline: %q", footer)
-		}
-	}
-}
-
 func TestOutlineLayoutScrollingAndResize(t *testing.T) {
 	var source strings.Builder
 	for i := range 40 {

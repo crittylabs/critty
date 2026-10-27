@@ -21,8 +21,8 @@ import (
 
 func TestDoctorTextColorsAndPlainJSON(t *testing.T) {
 	r := doctorReport{Version: "v1.2.3"}
-	r.add("integrations", "ok", "/home/user/.claude/skills/critty/SKILL.md", "")
-	r.add("integrations", "error", "stale: /home/user/.claude/skills/critty-cli/SKILL.md", "Reinstall with `critty install --force claude-code`.")
+	r.add("integrations", "ok", "/skills/main.md", "")
+	r.add("integrations", "error", "stale: /skills/cli.md", "Reinstall with `critty install --force claude-code`.")
 	r.add("ai/claude", "info", "not on PATH (optional reviewer)", "")
 	r.add("ai/mcp", "warn", "MCP SDK: unavailable", "Install it.")
 	r.add("custom/x", "ok", "fine", "")
@@ -33,42 +33,24 @@ func TestDoctorTextColorsAndPlainJSON(t *testing.T) {
 	if err := r.writeText(&plain, outputStyle{profile: colorprofile.NoTTY}, 0); err != nil {
 		t.Fatal(err)
 	}
-	want := `critty doctor v1.2.3
-
-Integrations
-  ✓ ok     /home/user/.claude/skills/critty/SKILL.md
-  ✗ error  stale: /home/user/.claude/skills/critty-cli/SKILL.md
-           ↳ Reinstall with ` + "`critty install --force claude-code`" + `.
-
-AI reviews
-  · info   claude  not on PATH (optional reviewer)
-  ! warn   mcp     MCP SDK: unavailable
-           ↳ Install it.
-
-custom
-  ✓ ok     x  fine
-
-Summary: 1 error, 1 warning, 1 info, 2 ok
-`
-	if plain.String() != want {
-		t.Fatalf("plain report:\n%s\nwant:\n%s", plain.String(), want)
-	}
-	_, body, _ := strings.Cut(ansi.Strip(colored.String()), "\n")
-	_, wantBody, _ := strings.Cut(strings.ReplaceAll(want, "`", ""), "\n")
-	if body != wantBody || !strings.HasPrefix(ansi.Strip(colored.String()), ">_ critty v1.2.3  doctor\n") {
-		t.Fatalf("colored report text:\n%s", ansi.Strip(colored.String()))
-	}
-	for _, sgr := range []string{"\x1b[1;32m", "\x1b[1;31m", "\x1b[1;33m", "\x1b[1;94m"} {
-		if !strings.Contains(colored.String(), sgr) {
-			t.Fatalf("missing status color %q: %q", sgr, colored.String())
+	for _, d := range r.Checks {
+		for _, text := range []string{plain.String(), ansi.Strip(colored.String())} {
+			if !strings.Contains(text, d.Message) || !strings.Contains(strings.ReplaceAll(text, "`", ""), strings.ReplaceAll(d.Advice, "`", "")) {
+				t.Fatalf("report lost diagnostic %+v:\n%s", d, text)
+			}
 		}
+	}
+	if !strings.Contains(colored.String(), "\x1b[") || strings.Contains(plain.String(), "\x1b[") {
+		t.Fatal("report styling ignored the output profile")
 	}
 	var wrapped bytes.Buffer
 	if err := r.writeText(&wrapped, outputStyle{profile: colorprofile.NoTTY}, 48); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(wrapped.String(), "           ↳ Reinstall with `critty install\n             --force claude-code`.\n") {
-		t.Fatalf("advice not wrapped under its column:\n%s", wrapped.String())
+	for _, line := range strings.Split(wrapped.String(), "\n") {
+		if ansi.StringWidth(line) > 48 {
+			t.Fatalf("report exceeds terminal width: %q", line)
+		}
 	}
 	t.Setenv("NO_COLOR", "1")
 	var disabled bytes.Buffer

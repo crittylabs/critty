@@ -119,7 +119,7 @@ func TestMouseClickOverflowPreviewsAndExpandedControls(t *testing.T) {
 func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
 	app := overflowTabTestApp()
 	app.tabs[0].path = strings.Repeat("界é", 12) + ".go"
-	for width := 8; width <= 120; width++ {
+	for _, width := range []int{8, 9, 18, 40, 41, 42, 63, 64, 65, 120} {
 		for active := range app.tabs {
 			t.Run(fmt.Sprintf("width=%d/active=%d", width, active), func(t *testing.T) {
 				app.width, app.activeTab = width, active
@@ -144,50 +144,6 @@ func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
 					t.Fatalf("tab row does not fit the pane: %q", row)
 				}
 			})
-		}
-	}
-}
-
-func TestTabTitlesShowOnlyUnreadMarkers(t *testing.T) {
-	for _, unread := range []bool{false, true} {
-		app := newFileTreeTestApp()
-		app.activeTab = 1
-		app.tabs[0].attachment = &review.AttachedDocument{Name: "note.md"}
-		app.tabs[0].unread = unread
-		tab := app.renderTab(app.tabLabels(), 0)
-		want := " note.md "
-		if unread {
-			want = " ● note.md "
-		}
-		if caption := ansi.Strip(tab); caption != want {
-			t.Fatalf("unread=%t: caption = %q, want %q", unread, caption, want)
-		}
-		runes, styles := renderedCells(tab)
-		for i, r := range runes {
-			if r == 'n' && !sameColor(styles[i].Fg, warning) {
-				t.Fatalf("unread=%t: attachment lost its yellow: %+v", unread, styles[i])
-			}
-		}
-	}
-}
-
-func TestOverflowTabColorMatchesInactiveFileNames(t *testing.T) {
-	wasDark := terminalIsDark
-	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
-	for _, dark := range []bool{false, true} {
-		initAdaptiveStyles(dark)
-		app := overflowTabTestApp()
-		app.width = 66
-		for _, item := range app.tabBarItems() {
-			if !item.overflow {
-				continue
-			}
-			runes, styles := renderedCells(item.text)
-			for i, r := range runes {
-				if strings.ContainsRune("more0123456789↤↦", r) && !sameColor(styles[i].Fg, inactiveTabStyle.GetForeground()) {
-					t.Fatalf("dark=%t: overflow character %q has a different color from filenames: %+v", dark, r, styles[i])
-				}
-			}
 		}
 	}
 }

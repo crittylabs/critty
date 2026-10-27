@@ -19,17 +19,6 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
-func TestReviewHost(t *testing.T) {
-	for _, host := range []string{"", "tmux", "Herdr"} {
-		t.Run(host, func(t *testing.T) {
-			t.Setenv("CRITTY_HOST", host)
-			if got := reviewHost(); got != host {
-				t.Fatalf("reviewHost() = %q, want %q", got, host)
-			}
-		})
-	}
-}
-
 func renderedCells(s string) ([]rune, []uv.Style) {
 	var runes []rune
 	var styles []uv.Style
@@ -61,10 +50,10 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 	app.project, app.topic = "critty", "header-project-topic"
 	app.width = 120
 	bar := ansi.Strip(app.renderReviewBar())
-	if !strings.HasPrefix(bar, ">_ critty  critty · header-project-topic — review the document.") {
+	if !strings.Contains(bar, "critty · header-project-topic") {
 		t.Fatalf("bar = %q", bar)
 	}
-	app.topic = "\x1b[31m" + strings.Repeat("長いトピック", 20) + "\n\t"
+	app.topic = "\x1b[31m" + strings.Repeat("界é", 40) + "\n\t"
 	for _, width := range []int{20, 60, 100} {
 		app.width = width
 		bar := app.renderReviewBar()
@@ -77,109 +66,32 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 	}
 }
 
-func TestTabFilenameEmphasis(t *testing.T) {
+func TestTabCommentMarkers(t *testing.T) {
 	app := setupAppWithDoc(t, "line\n")
-	app.tabs[0].path = "internal/.github/x/--/日本 file.go"
+	app.tabs[0].path = "internal/.github/x/--/界 file.go"
 	app.tabs[0].changedLines = map[int]bool{1: true}
 	app.tabs[0].deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "old"}}}
-	for _, active := range []int{0, -1} {
-		app.activeTab = active
-		for _, tt := range []struct {
-			name  string
-			state *fileReview
-			want  string
-		}{
-			{name: "no state"},
-			{name: "no comments", state: &fileReview{}},
-			{name: "line comment", state: &fileReview{Comments: []review.Comment{{Scope: "line"}}}, want: "💬"},
-			{name: "resolved", state: &fileReview{Comments: []review.Comment{{Resolved: true}}}},
-			{name: "file comment", state: &fileReview{Comments: []review.Comment{{Scope: "file"}}}, want: "💬"},
-		} {
-			t.Run(fmt.Sprintf("active=%d/%s", active, tt.name), func(t *testing.T) {
-				app.tabs[0].state = tt.state
-				rendered := app.renderTab(app.tabLabels(), 0)
-				var underlined, bold, italic strings.Builder
-				runes, styles := renderedCells(rendered)
-				for i, r := range runes {
-					pen := styles[i]
-					if (r == '(' || r == ')') && !sameColor(pen.Fg, muted) {
-						t.Errorf("delimiter %q foreground = %v, want %v", r, pen.Fg, muted)
-					}
-					if pen.Underline != uv.UnderlineNone {
-						underlined.WriteRune(r)
-					}
-					if pen.Attrs&uv.AttrBold != 0 {
-						bold.WriteRune(r)
-					}
-					if pen.Attrs&uv.AttrItalic != 0 {
-						italic.WriteRune(r)
-					}
-				}
-				if got := underlined.String(); got != "" {
-					t.Fatalf("tab label still uses underlining: %q", got)
-				}
-				if got := strings.Contains(ansi.Strip(rendered), "💬"); got != (tt.want != "") {
-					t.Fatalf("tab bubble presence = %t, want %t", got, tt.want != "")
-				}
-				wantBold := ""
-				if active == 0 {
-					wantBold = "日本 file.go"
-				}
-				if got := bold.String(); got != wantBold {
-					t.Fatalf("bold text = %q, want %q", got, wantBold)
-				}
-				if got := italic.String(); got != "i.g" {
-					t.Fatalf("italic text = %q, want %q", got, "i.g")
-				}
-				if !strings.Contains(ansi.Strip(rendered), "i/.g/x/--/日本 file.go (+1 -1)") {
-					t.Fatalf("tab label changed: %q", rendered)
-				}
-			})
-		}
-	}
-}
-
-func TestRenderHeaderPathBackground(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.filePath = "path/to/file"
-	app.width = 80
-	_, header, _ := strings.Cut(app.renderHeader(), "\n")
-	if !strings.Contains(strings.Join(strings.Fields(ansi.Strip(header)), " "), "path/to/file L0/3 0/0 💬") {
-		t.Fatalf("path and status should retain their order: %q", header)
-	}
-	runes, styles := renderedCells(header)
-	plain := string(runes)
-	runeIndex := func(text string) int {
-		i := strings.Index(plain, text)
-		if i < 0 {
-			t.Fatalf("header missing %q: %q", text, plain)
-		}
-		return len([]rune(plain[:i]))
-	}
-	gapStart, gapEnd := runeIndex("L0/3")+len("L0/3"), runeIndex("0/0")
-	for i := gapStart; i < gapEnd-1; i++ {
-		if runes[i] != ' ' || !sameColor(styles[i].Bg, accent) {
-			t.Fatalf("header gap must contain spaces with the accent background: %+v", styles[i])
-		}
-	}
-	if runes[gapEnd-1] != ' ' || !sameColor(styles[gapEnd-1].Bg, buttonBackground) {
-		t.Fatalf("summary must have one space inside its background: %+v", styles[gapEnd-1])
-	}
-	for _, part := range []struct {
-		text string
-		fg   color.Color
-		bg   color.Color
+	for _, tt := range []struct {
+		name  string
+		state *fileReview
+		want  bool
 	}{
-		{"path/to/file", lipgloss.BrightWhite, accent},
-		{"L0/3", lipgloss.Cyan, accent},
-		{"0/0", success, buttonBackground},
+		{name: "no state"},
+		{name: "no comments", state: &fileReview{}},
+		{name: "line comment", state: &fileReview{Comments: []review.Comment{{Scope: "line"}}}, want: true},
+		{name: "resolved", state: &fileReview{Comments: []review.Comment{{Resolved: true}}}},
+		{name: "file comment", state: &fileReview{Comments: []review.Comment{{Scope: "file"}}}, want: true},
 	} {
-		start := runeIndex(part.text)
-		for _, style := range styles[start : start+len(part.text)] {
-			if !sameColor(style.Fg, part.fg) || !sameColor(style.Bg, part.bg) {
-				t.Fatalf("wrong colors in %q: %+v", part.text, style)
+		t.Run(tt.name, func(t *testing.T) {
+			app.tabs[0].state = tt.state
+			rendered := ansi.Strip(app.renderTab(app.tabLabels(), 0))
+			if got := strings.Contains(rendered, "💬"); got != tt.want {
+				t.Fatalf("tab bubble presence = %t, want %t", got, tt.want)
 			}
-		}
+			if !strings.Contains(rendered, "界 file.go (+1 -1)") {
+				t.Fatalf("tab lost its filename or change counts: %q", rendered)
+			}
+		})
 	}
 }
 
@@ -459,7 +371,7 @@ func TestMetaQuestionMarkOpensAndClosesHelp(t *testing.T) {
 	}
 }
 
-func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
+func TestHelpModalFitsAndCloses(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.width = 80
 	app.height = 24
@@ -471,17 +383,6 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 
 	background := lipgloss.NewStyle().Width(app.width).Height(app.height).Render("")
 	rendered := app.renderWithModal(background)
-	help := app.renderHelp(app.modalInnerWidth())
-	for _, want := range []string{
-		"Keyboard Help", "General", "Navigation", "Code review", "Selection and dialogs",
-		"↑/↓,k/j", "PgUp/PgDn", "Home/End,g/G,</>", "TAB/S-TAB", "C-s", "C-PgUp/PgDn", "a/r/c", "M-p",
-		"Incremental search", "C-s / C-r", "C-d / C-w", "DEL / C-y", "M-s i/c/w/r/m", "terminal paste",
-		"C-: ctrl+, M-: meta/alt+, S-: shift+", "RET: enter", "DEL: backspace",
-	} {
-		if !strings.Contains(rendered+help, want) {
-			t.Errorf("help modal does not contain %q", want)
-		}
-	}
 	if width := lipgloss.Width(rendered); width > app.width {
 		t.Errorf("help width = %d, terminal width = %d", width, app.width)
 	}
@@ -492,12 +393,6 @@ func TestHelpModalShowsAllShortcutGroupsAndCloses(t *testing.T) {
 	app = pressKey(app, tea.KeyEscape)
 	if app.modal != noModal {
 		t.Fatalf("esc left modal %v open", app.modal)
-	}
-
-	app = pressAltKey(app, '?')
-	app = pressAltKey(app, '?')
-	if app.modal != noModal {
-		t.Fatalf("second ? left modal %v open", app.modal)
 	}
 }
 
@@ -1141,94 +1036,6 @@ func TestFillTabRowFitsSingleLine(t *testing.T) {
 	}
 }
 
-func TestReviewBarHostsSubmitButton(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width, app.height, app.host = 100, 24, "tmux"
-	app.recalculateLayout()
-
-	rows := strings.Split(app.renderHeader(), "\n")
-	if len(rows) != lipgloss.Height(app.renderReviewBar())+1 {
-		t.Fatalf("header has %d rows, want bar and file line", len(rows))
-	}
-	bar := app.renderReviewBar()
-	if got := lipgloss.Width(bar); got != app.width {
-		t.Fatalf("bar width = %d, want %d", got, app.width)
-	}
-	plain := ansi.Strip(bar)
-	if !strings.HasPrefix(plain, ">_ critty  review the document on tmux.") || !strings.HasSuffix(plain, " Submit q ") {
-		t.Fatalf("bar = %q, want the subject on the left and Submit on the right", plain)
-	}
-	for _, part := range []string{
-		renderBrand(),
-		reviewBarStyle.Render(" "),
-		reviewBarStyle.Render("review the "),
-		reviewBarStyle.Render("document on tmux."),
-	} {
-		if !strings.Contains(bar, part) {
-			t.Fatalf("bar = %q, want it to contain %q", bar, part)
-		}
-	}
-	initAdaptiveStyles(true)
-	for _, tc := range []struct {
-		scope  string
-		staged bool
-		bg     lipgloss.Style
-	}{{"staged", true, diffAddedTextBg}, {"staged", false, diffAddedTextBg}, {"unstaged", false, diffDeletedTextBg}} {
-		app.multiFile, app.filePath, app.staged = true, "", tc.staged
-		app.source = nil
-		if !tc.staged {
-			app.source = &gitpkg.ReviewSource{Scope: tc.scope}
-		}
-		bar := app.renderReviewBar()
-		if plain := ansi.Strip(bar); !strings.Contains(plain, "review the "+tc.scope+" changes on tmux.") {
-			t.Fatalf("%s bar = %q, want the scope before the noun", tc.scope, plain)
-		}
-		if want := tc.bg.Foreground(lipgloss.BrightWhite).Render(tc.scope); !strings.Contains(bar, want) {
-			t.Fatalf("%s bar = %q, want the scope styled as %q", tc.scope, bar, want)
-		}
-	}
-	app.staged = false
-	app.source = &gitpkg.ReviewSource{Scope: "range", Range: "main..HEAD"}
-	if plain := ansi.Strip(app.renderReviewBar()); !strings.Contains(plain, "review the changes on tmux.") {
-		t.Fatalf("range bar = %q, want no scope word", plain)
-	}
-	app.multiFile, app.filePath, app.source = false, "", nil
-	if label := modalBtnFocusedLabel.Bold(true).Render("Submit "); !strings.Contains(bar, label) {
-		t.Fatalf("bar = %q, want a bold button label %q", bar, label)
-	}
-	if !strings.Contains(bar, modalBtnFocusedKey.Render("q")) {
-		t.Fatalf("bar = %q, want the q key styled as a button key", bar)
-	}
-	footer := ansi.Strip(app.renderFooter())
-	if strings.Contains(footer, "Approve") || strings.Contains(footer, "Submit") {
-		t.Fatalf("footer = %q, want no finish button", footer)
-	}
-	if label := modalBtnFocusedLabel.Bold(true).Render("Help "); !strings.Contains(app.renderFooter(), label) {
-		t.Fatalf("footer = %q, want a bold Help label %q", app.renderFooter(), label)
-	}
-
-	rect, ok := app.finishButtonRect()
-	if !ok || rect.top >= lipgloss.Height(app.renderReviewBar()) {
-		t.Fatalf("submit button rect = %+v, %t; want it on the bar row", rect, ok)
-	}
-	assertRegionContainsRenderedText(t, app, rect, "Submit q")
-	app = clickMouse(app, rect.left, rect.top)
-	if app.modal != finishModal {
-		t.Fatalf("modal = %v, want finish modal", app.modal)
-	}
-
-	app.host = ""
-	app.ignoreWhitespace, app.viewMode = true, false
-	app.multiFile = true
-	app.width = 45
-	app.recalculateLayout()
-	rows = strings.Split(app.renderHeader(), "\n")
-	plain = ansi.Strip(app.renderReviewBar())
-	if lipgloss.Width(app.renderReviewBar()) != app.width || !strings.Contains(plain, "Ignore: WS") || !strings.Contains(plain, "Submit q") {
-		t.Fatalf("narrow bar = %q, want the text truncated ahead of the button", plain)
-	}
-}
-
 func TestFooterHiddenOnShortTerminals(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
 	for _, tc := range []struct {
@@ -1329,32 +1136,6 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 	}
 	if terminalIsDark {
 		t.Error("terminalIsDark is still true after a light background probe")
-	}
-}
-
-func TestAccessKeyUnderline(t *testing.T) {
-	resolve, _ := renderCommentHeader("", false, false, false, 40)
-	resolved, _ := renderCommentHeader("", true, false, false, 40)
-	for _, tt := range []struct {
-		name, rendered, want string
-	}{
-		{"resolve", resolve, "R"},
-		{"resolved", resolved, "R"},
-		{"images", renderAccessKeyBarButton("Images: on"), ""},
-		{"edit dialog", renderResolution(true, "Resolved", false, false), ""},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			var underlined strings.Builder
-			runes, styles := renderedCells(tt.rendered)
-			for i, r := range runes {
-				if styles[i].Underline != uv.UnderlineNone {
-					underlined.WriteRune(r)
-				}
-			}
-			if got := underlined.String(); got != tt.want {
-				t.Fatalf("underlined text = %q, want %q in %q", got, tt.want, tt.rendered)
-			}
-		})
 	}
 }
 

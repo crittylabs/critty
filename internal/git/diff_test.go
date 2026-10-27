@@ -210,7 +210,7 @@ func TestStagedFilesBeforeInitialCommit(t *testing.T) {
 func TestInlineDiff(t *testing.T) {
 	before := "prefix.  `tfil` maintains a screen model of the output and enables mouse reporting.  Hovering continues."
 	after := "prefix.  When Codex starts, `tfil` begins maintaining a screen model of the output and enables mouse reporting.  Non-interactive commands stay quiet.  Hovering continues."
-	oldSegments, newSegments := inlineDiff(before, after)
+	oldSegments, newSegments := inlineDiffTokens(splitInlineTokens(before), splitInlineTokens(after))
 
 	assertSegments := func(name, want string, segments []InlineSegment) string {
 		t.Helper()
@@ -301,7 +301,7 @@ func TestInlineDiffWhitespace(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			old, new := inlineDiff(tc.before, tc.after)
+			old, new := inlineDiffTokens(splitInlineTokens(tc.before), splitInlineTokens(tc.after))
 			if !reflect.DeepEqual(old, tc.old) || !reflect.DeepEqual(new, tc.new) {
 				t.Fatalf("inlineDiff = %#v, %#v; want %#v, %#v", old, new, tc.old, tc.new)
 			}

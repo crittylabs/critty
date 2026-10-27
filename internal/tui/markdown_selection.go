@@ -194,12 +194,6 @@ func (line *markdownLine) displayTokenText(i int) string {
 	return value
 }
 
-func (m *markdownSource) copyRange(startLine, startOffset, endLine, endOffset int) string {
-	a := m.offsets[startLine-1] + m.lines[startLine-1].sourceOffset(startOffset, false)
-	b := m.offsets[endLine-1] + m.lines[endLine-1].sourceOffset(endOffset, true)
-	return m.copySourceRange(a, b)
-}
-
 func (m *markdownSource) copySourceRange(a, b int) string {
 	if a >= b {
 		return ""

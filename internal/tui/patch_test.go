@@ -90,8 +90,8 @@ func TestPatchPartialContext(t *testing.T) {
 	if err := os.WriteFile("a.txt", []byte("unrelated worktree"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if m.tab().cursorLine != 10 || m.reviewScopeLabel() != "Supplied diff" {
-		t.Fatalf("initial cursor = %d, scope = %s", m.tab().cursorLine, m.reviewScopeLabel())
+	if m.tab().cursorLine != 10 {
+		t.Fatalf("initial cursor = %d, want 10", m.tab().cursorLine)
 	}
 	for _, ref := range m.visualLines(m.tab()) {
 		if ref.side == "" && ref.line != 10 && ref.line != 11 && ref.line != 20 {
@@ -111,7 +111,7 @@ func TestPatchPartialContext(t *testing.T) {
 	}
 }
 
-func TestPatchZeroContextDeletionNavigation(t *testing.T) {
+func TestChangeNavigationVisitsDeletedLineComments(t *testing.T) {
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -10,2 +9,0 @@\n-old\n-more\n")
 	lines := m.visualLines(m.tab())
 	if len(lines) != 2 || lines[0].side != "old" || lines[0].line != 10 {
@@ -121,10 +121,6 @@ func TestPatchZeroContextDeletionNavigation(t *testing.T) {
 	if m.tab().cursorLine != 10 || m.tab().cursorSide != "old" {
 		t.Fatalf("change jump = %d, %s", m.tab().cursorLine, m.tab().cursorSide)
 	}
-}
-
-func TestChangeNavigationVisitsDeletedLineComments(t *testing.T) {
-	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -10,2 +9,0 @@\n-old\n-more\n")
 	m.tab().state.Comments = []review.Comment{
 		{ID: "old-first", Side: "old", StartLine: 10, EndLine: 10},
 		{ID: "old-second", Side: "old", StartLine: 11, EndLine: 11},

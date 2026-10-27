@@ -27,49 +27,6 @@ func TestShellEscape(t *testing.T) {
 	}
 }
 
-func TestResolveStagedReviewUsesIndex(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-	t.Chdir(dir)
-	run := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	run("init", "-q")
-	run("config", "user.email", "test@example.com")
-	run("config", "user.name", "Test")
-	if err := os.WriteFile("base.txt", []byte("base\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	run("add", "base.txt")
-	run("commit", "-q", "-m", "initial")
-	if err := os.WriteFile("staged.txt", []byte("staged\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	run("add", "staged.txt")
-
-	originalCode, originalStaged := reviewCode, reviewStaged
-	reviewCode, reviewStaged = true, true
-	t.Cleanup(func() {
-		reviewCode, reviewStaged = originalCode, originalStaged
-	})
-
-	mode, err := resolveReviewMode(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !mode.staged || mode.ref != "HEAD" {
-		t.Errorf("mode = %+v, want staged HEAD review", mode)
-	}
-	if len(mode.files) != 1 || mode.files[0].Path != "staged.txt" {
-		t.Errorf("files = %+v, want only staged.txt", mode.files)
-	}
-}
-
 func TestReviewModePersistedCLIArgs(t *testing.T) {
 	tests := []struct {
 		name string

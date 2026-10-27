@@ -16,7 +16,7 @@ func TestNoticesSurfaceBacklogWithoutChangingReviews(t *testing.T) {
 	s := testStore(t)
 	done := startTask(t, s, "Completed")
 	first := addReview(t, s, done)
-	if _, err := s.Finish(done.ID, "keep", ""); err != nil {
+	if _, err := s.FinishPolicy(done.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	open := startTask(t, s, "Open")
@@ -105,7 +105,7 @@ func TestNoticeCacheAndConditionChanges(t *testing.T) {
 	}
 	now := s.now().Add(2 * time.Hour)
 	s.now = func() time.Time { return now }
-	if _, err := s.Finish(task.ID, "delete", ""); err != nil {
+	if _, err := s.FinishPolicy(task.ID, Policy{End: "delete"}); err != nil {
 		t.Fatal(err)
 	}
 	if messages, err := s.Notices(policy); err != nil || len(messages) != 0 {

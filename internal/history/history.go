@@ -110,6 +110,8 @@ type Store struct {
 	now     func() time.Time
 }
 
+var historyLockTimeout = 2 * time.Second
+
 func New(cwd string) *Store {
 	return &Store{Root: filepath.Join(xdg.StateHome(), "history"), CWD: cwd, Project: filepath.Base(cwd), now: time.Now}
 }
@@ -119,7 +121,7 @@ func (s *Store) withLock(fn func() error) (err error) {
 		return err
 	}
 	lock := flock.New(filepath.Join(s.Root, "history.lock"))
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), historyLockTimeout)
 	defer cancel()
 	locked, err := lock.TryLockContext(ctx, 25*time.Millisecond)
 	if errors.Is(err, context.DeadlineExceeded) || (err == nil && !locked) {
@@ -412,14 +414,6 @@ func (s *Store) Reopen(id string) (task *Task, err error) {
 		return s.save(task)
 	})
 	return task, err
-}
-
-func (s *Store) Finish(id, action, archiveDir string) (result Outcome, err error) {
-	err = s.withLock(func() error {
-		result, err = s.finish(id, action, archiveDir)
-		return err
-	})
-	return result, err
 }
 
 func (s *Store) finish(id, action, archiveDir string) (Outcome, error) {

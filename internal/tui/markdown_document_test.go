@@ -167,7 +167,9 @@ func TestMarkdownEmptyLabels(t *testing.T) {
 			if parsed.lines[0].source != tc.source {
 				t.Fatal("rendering changed the source")
 			}
-			if got := parsed.copyRange(1, 0, 1, len(tc.want)); got != tc.source {
+			start := parsed.lines[0].sourceOffset(0, false)
+			end := parsed.lines[0].sourceOffset(len(tc.want), true)
+			if got := parsed.copySourceRange(start, end); got != tc.source {
 				t.Fatalf("copied source = %q, want %q", got, tc.source)
 			}
 		})

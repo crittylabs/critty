@@ -88,7 +88,7 @@ func TestDoctorHistoryBypassesNoticeThrottleWithoutChangingRecords(t *testing.T)
 	if _, err := os.Stat(session.Path()); err != nil {
 		t.Fatal("doctor removed saved review:", err)
 	}
-	if _, err := store.Finish(task.ID, "delete", ""); err != nil {
+	if _, err := store.FinishPolicy(task.ID, history.Policy{End: "delete"}); err != nil {
 		t.Fatal(err)
 	}
 	resolved := doctorReport{}

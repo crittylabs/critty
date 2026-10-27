@@ -52,7 +52,7 @@ func TestCapacityRotatesOldestWithHeadroom(t *testing.T) {
 			t.Fatal(err)
 		}
 		if i != 3 {
-			if _, err := s.Finish(task.ID, "keep", ""); err != nil {
+			if _, err := s.FinishPolicy(task.ID, Policy{End: "keep"}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -106,13 +106,13 @@ func TestCapacityDoesNotExpandScopeOrOverrideKeep(t *testing.T) {
 	s := testStore(t)
 	task := startTask(t, s, "Current work")
 	session := addReview(t, s, task)
-	if _, err := s.Finish(task.ID, "keep", ""); err != nil {
+	if _, err := s.FinishPolicy(task.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	other := New(t.TempDir())
 	otherTask := startTask(t, other, "Other directory")
 	otherSession := addReview(t, other, otherTask)
-	if _, err := other.Finish(otherTask.ID, "keep", ""); err != nil {
+	if _, err := other.FinishPolicy(otherTask.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	policy, err := (Policy{Start: "keep", MaxBytes: 1}).Normalize()
@@ -178,7 +178,7 @@ func TestAutoFinishChecksCapacityAndProtectsChangedReviews(t *testing.T) {
 
 	next := startTask(t, s, "Changed after selection")
 	saved := addReview(t, s, next)
-	finished, err := s.Finish(next.ID, "keep", "")
+	finished, err := s.FinishPolicy(next.ID, Policy{End: "keep"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -256,7 +256,7 @@ func TestTaskBoundaryActions(t *testing.T) {
 			task := startTask(t, store, "One task")
 			first := addReview(t, store, task)
 			second := addReview(t, store, task)
-			result, err := store.Finish(task.ID, action, t.TempDir())
+			result, err := store.FinishPolicy(task.ID, Policy{End: action, ArchiveDir: t.TempDir()})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -288,7 +288,7 @@ func TestArchiveFailureAndActiveReviewPreserveTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	if _, err := store.Finish(task.ID, "archive", root); err == nil {
+	if _, err := store.FinishPolicy(task.ID, Policy{End: "archive", ArchiveDir: root}); err == nil {
 		t.Fatal("missing referenced image did not fail archive")
 	}
 	entries, err := os.ReadDir(root)
@@ -312,7 +312,7 @@ func TestArchiveFailureAndActiveReviewPreserveTask(t *testing.T) {
 		}
 	}()
 	for _, action := range []string{"keep", "ask", "archive", "delete"} {
-		if _, err := store.Finish(task.ID, action, root); !errors.Is(err, ErrBusy) {
+		if _, err := store.FinishPolicy(task.ID, Policy{End: action, ArchiveDir: root}); !errors.Is(err, ErrBusy) {
 			t.Fatalf("active review allowed %s: %v", action, err)
 		}
 	}
@@ -322,14 +322,14 @@ func TestAgeCleanupOnlyIncludesIdleCompletedTasks(t *testing.T) {
 	store := testStore(t)
 	idle := startTask(t, store, "Old complete")
 	session := addReview(t, store, idle)
-	if _, err := store.Finish(idle.ID, "keep", ""); err != nil {
+	if _, err := store.FinishPolicy(idle.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	ongoing := startTask(t, store, "Still working")
 	other := New(t.TempDir())
 	other.now = store.now
 	foreign := startTask(t, other, "Another project")
-	if _, err := other.Finish(foreign.ID, "keep", ""); err != nil {
+	if _, err := other.FinishPolicy(foreign.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	store.now = func() time.Time { return time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC) }
@@ -402,7 +402,7 @@ func TestInterruptedPruningCanResumeWithoutLostArchive(t *testing.T) {
 	if err := first.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	result, err := store.Finish(task.ID, "archive", "")
+	result, err := store.FinishPolicy(task.ID, Policy{End: "archive"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +424,7 @@ func TestMissingSessionCanBeKeptDetachedOrDeleted(t *testing.T) {
 			if err := missing.Clear(); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := store.Finish(task.ID, "archive", t.TempDir()); err == nil {
+			if _, err := store.FinishPolicy(task.ID, Policy{End: "archive", ArchiveDir: t.TempDir()}); err == nil {
 				t.Fatal("strict archive accepted a missing session")
 			}
 			switch action {
@@ -432,7 +432,7 @@ func TestMissingSessionCanBeKeptDetachedOrDeleted(t *testing.T) {
 				if err := store.Detach(task.ID, missing.Key); err != nil {
 					t.Fatal(err)
 				}
-				result, err := store.Finish(task.ID, "archive", t.TempDir())
+				result, err := store.FinishPolicy(task.ID, Policy{End: "archive", ArchiveDir: t.TempDir()})
 				if err != nil || len(result.Task.Sessions) != 1 {
 					t.Fatalf("detach recovery failed: %+v %v", result, err)
 				}
@@ -449,7 +449,7 @@ func TestMissingSessionCanBeKeptDetachedOrDeleted(t *testing.T) {
 					t.Fatal("incomplete export pruned original", err)
 				}
 			default:
-				result, err := store.Finish(task.ID, action, "")
+				result, err := store.FinishPolicy(task.ID, Policy{End: action})
 				if err != nil || len(result.Missing) != 1 || result.Missing[0] != missing.Key {
 					t.Fatalf("missing session blocked %s: %+v %v", action, result, err)
 				}
@@ -516,7 +516,7 @@ func TestStartReportsArchiveFailureAndContinues(t *testing.T) {
 	if err := session.Save(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Finish(task.ID, "keep", ""); err != nil {
+	if _, err := store.FinishPolicy(task.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	store.now = func() time.Time { return time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC) }
@@ -570,7 +570,12 @@ func TestIncompleteExportLeavesExternalReferencesAndProtectsManagedImages(t *tes
 
 func TestHistoryLockTimeoutReportsBusy(t *testing.T) {
 	store := testStore(t)
-	task := startTask(t, store, "Lock timeout")
+	previous := historyLockTimeout
+	historyLockTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { historyLockTimeout = previous })
+	if err := os.MkdirAll(store.Root, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	lock := flock.New(filepath.Join(store.Root, "history.lock"))
 	if locked, err := lock.TryLock(); err != nil || !locked {
 		t.Fatalf("lock setup: %v", err)
@@ -581,6 +586,6 @@ func TestHistoryLockTimeoutReportsBusy(t *testing.T) {
 		}
 	}()
 	if err := store.withLock(func() error { t.Fatal("entered locked store"); return nil }); !errors.Is(err, ErrBusy) {
-		t.Fatalf("timeout did not report busy: %v (task %s)", err, task.ID)
+		t.Fatalf("timeout did not report busy: %v", err)
 	}
 }

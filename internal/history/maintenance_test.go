@@ -34,7 +34,7 @@ func TestDeferralPersistsAndChangesInvalidateIt(t *testing.T) {
 	s := testStore(t)
 	task := startTask(t, s, "Old discussion")
 	session := addReview(t, s, task)
-	if _, err := s.Finish(task.ID, "keep", ""); err != nil {
+	if _, err := s.FinishPolicy(task.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 	now := s.now().AddDate(0, 0, 60)

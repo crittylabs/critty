@@ -18,6 +18,14 @@ func TestCodexWrapperHint(t *testing.T) {
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
+	oldLook := lookPath
+	lookPath = func(string) (string, error) { return filepath.Join(bin, "codex"), nil }
+	t.Cleanup(func() { lookPath = oldLook })
+	r := doctorReport{}
+	r.checkCodexWrapper()
+	if d := diagnosticFor(t, r, "terminal/codex-wrapper"); d.Status != "ok" {
+		t.Fatalf("bundled wrapper not recognized: %+v", d)
+	}
 	self := filepath.Join(bin, "critty")
 	other := filepath.Join(dir, "other")
 	if err := os.MkdirAll(other, 0755); err != nil {

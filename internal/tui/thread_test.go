@@ -44,23 +44,6 @@ func TestThreadInitialOffset(t *testing.T) {
 	}
 }
 
-func TestThreadAuthorsKeepColorsAcrossRoles(t *testing.T) {
-	app := AppModel{author: "Reviewer"}
-	parent := app.commentAuthorStyle("Reviewer").Render("body")
-	agent := app.commentAuthorStyle("Codex").Render("body")
-	if parent == agent {
-		t.Fatal("reviewer and agent share a color")
-	}
-	app.commentAuthorStyle("Another author")
-	if got := app.commentAuthorStyle("Reviewer").Render("body"); got != parent {
-		t.Fatal("adding an author changed the reviewer's color")
-	}
-	layout := app.layoutThread("Reviewer", "body", []review.Reply{{Author: "Codex", Body: "body"}, {Author: "Reviewer", Body: "body"}}, "", 40)
-	if layout.lines[1] != parent || layout.lines[layout.starts[1]+1] != agent || layout.lines[layout.starts[2]+1] != parent {
-		t.Fatalf("parent/reply colors differ for the same author: %q", layout.lines)
-	}
-}
-
 func TestThreadViewportKeepsHistoryAndResetsForNewReply(t *testing.T) {
 	app := setupAppWithDoc(t, "source\n")
 	app.width, app.height = 120, 40

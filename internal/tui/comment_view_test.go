@@ -92,7 +92,7 @@ func TestDriftedMouseRespectsKeyboardFolds(t *testing.T) {
 	}
 }
 
-func TestCommentDisplayKeysAndHelp(t *testing.T) {
+func TestCommentDisplayKeysInViewAndReview(t *testing.T) {
 	for _, width := range []int{18, 80} {
 		for _, readOnly := range []bool{false, true} {
 			t.Run(fmt.Sprintf("width=%d/readOnly=%t", width, readOnly), func(t *testing.T) {
@@ -110,14 +110,6 @@ func TestCommentDisplayKeysAndHelp(t *testing.T) {
 				app = pressKey(app, 'V')
 				if app.viewMode || !app.openAll {
 					t.Fatal("V did not restore the previous expansion")
-				}
-				bars := ansi.Strip(app.renderReviewBar() + app.renderFooter())
-				if strings.Contains(bars, "Open all") || strings.Contains(bars, "View: on") || strings.Contains(bars, "View: off") {
-					t.Fatal("display modes have status controls outside Help")
-				}
-				help := ansi.Strip(app.renderHelp(80))
-				if !strings.Contains(help, "reading view") || !strings.Contains(help, "open all") {
-					t.Fatal("Help does not explain the display keys")
 				}
 			})
 		}

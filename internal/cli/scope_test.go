@@ -37,23 +37,31 @@ func TestResolveExplicitScopes(t *testing.T) {
 			}
 		}
 	}
-	oldScope, oldStaged, oldUnstaged := reviewScope, reviewStaged, reviewUnstaged
-	t.Cleanup(func() { reviewScope, reviewStaged, reviewUnstaged = oldScope, oldStaged, oldUnstaged })
+	oldScope, oldStaged, oldUnstaged, oldCode := reviewScope, reviewStaged, reviewUnstaged, reviewCode
+	t.Cleanup(func() {
+		reviewScope, reviewStaged, reviewUnstaged, reviewCode = oldScope, oldStaged, oldUnstaged, oldCode
+	})
 	for _, tc := range []struct {
-		scope, want      string
-		staged, unstaged bool
+		scope, want            string
+		staged, unstaged, code bool
 	}{
 		{want: "all"}, {scope: "all", want: "all"},
 		{scope: "staged", want: "staged"}, {scope: "unstaged", want: "unstaged"},
-		{staged: true, want: "staged"}, {unstaged: true, want: "unstaged"},
+		{staged: true, want: "staged"}, {staged: true, code: true, want: "staged"}, {unstaged: true, want: "unstaged"},
 		{scope: "staged", staged: true, want: "staged"},
 		{scope: "unstaged", unstaged: true, want: "unstaged"},
 	} {
-		reviewScope, reviewStaged, reviewUnstaged = tc.scope, tc.staged, tc.unstaged
+		reviewScope, reviewStaged, reviewUnstaged, reviewCode = tc.scope, tc.staged, tc.unstaged, tc.code
 		scope := tc.want
 		mode, err := resolveReviewMode(nil)
 		if err != nil || mode.source == nil || mode.source.Scope != scope || len(mode.files) != 1 {
 			t.Fatalf("%s: mode=%+v err=%v", scope, mode, err)
+		}
+		if tc.want == "staged" {
+			content, err := mode.source.Content("file.txt")
+			if err != nil || string(content) != "staged" || !mode.staged || mode.ref != "HEAD" {
+				t.Fatalf("staged review did not use the index: %+v, content=%q, error=%v", mode, content, err)
+			}
 		}
 		mode.sessionKey = "0123456789ab"
 		cmd, err := buildTUICommand(mode, "tmux")
@@ -61,7 +69,7 @@ func TestResolveExplicitScopes(t *testing.T) {
 			t.Fatalf("command=%q err=%v", cmd, err)
 		}
 	}
-	reviewStaged, reviewUnstaged = false, false
+	reviewStaged, reviewUnstaged, reviewCode = false, false, false
 	for _, scope := range []string{"HEAD~1..", "HEAD"} {
 		reviewScope = scope
 		mode, err := resolveReviewMode(nil)

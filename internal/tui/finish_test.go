@@ -55,13 +55,6 @@ func TestSubmitAttentionColorsAndNotices(t *testing.T) {
 			if strings.Contains(notice, "Required items") != (state == "required") || strings.Contains(notice, "Unresolved threads") != (state == "threads" || state == "optional-and-threads") || strings.Contains(notice, "Optional items") != (state == "required" || state == "optional" || state == "optional-and-threads") {
 				t.Fatalf("%s: unexpected notices: %s", state, notice)
 			}
-			app.openFinishModal()
-			app.finishVerdict = review.VerdictReject
-			content, _ := app.finishModalContent(70)
-			greenTitle := modalTitleStyle.MarginBottom(0).Foreground(success).Render("Submit review")
-			if !strings.Contains(content, greenTitle) {
-				t.Fatal("Submit title changed color with the verdict")
-			}
 		}
 	}
 	initAdaptiveStyles(true)

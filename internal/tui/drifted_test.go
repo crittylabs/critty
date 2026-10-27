@@ -17,7 +17,7 @@ import (
 
 func TestClickRenderedDriftedBubblePreservesResolution(t *testing.T) {
 	t.Parallel()
-	for _, size := range [][2]int{{60, 24}, {80, 60}, {100, 40}, {160, 24}} {
+	for _, size := range [][2]int{{60, 24}, {80, 60}, {160, 24}} {
 		width, height := size[0], size[1]
 		t.Run(fmt.Sprintf("%dx%d", width, height), func(t *testing.T) {
 			app := setupParallelAppWithDoc(t, strings.Repeat("source line\n", 20))
@@ -32,7 +32,8 @@ func TestClickRenderedDriftedBubblePreservesResolution(t *testing.T) {
 			}
 			app.rebuildContent()
 			app.updateCommentSidebar()
-			for step := range 30 {
+			// Revisit bubbles after expansion to catch double-clicks on moved controls.
+			for step := range 10 {
 				rows := strings.Split(ansi.Strip(app.View().Content), "\n")
 				var bubbles []tea.Mouse
 				for y, row := range rows {

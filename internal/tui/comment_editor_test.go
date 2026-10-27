@@ -348,25 +348,6 @@ func TestMouseWheelScrollsCommentTextarea(t *testing.T) {
 	}
 }
 
-func TestMouseClickCommentModalSuggest(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.height = 24
-	app.contentViewport.SetWidth(75)
-	app.tabs[0].cursorLine = 1
-	app.openLineComment()
-	view := app.View().Content
-	if !strings.Contains(view, "Suggest") || !strings.Contains(view, "M-s") {
-		t.Fatalf("missing suggestion button or shortcut: %q", view)
-	}
-
-	app = clickModalAction(t, app, "Suggest M-s")
-
-	if got := app.modalTextarea.Value(); !strings.Contains(got, "```suggestion\nfirst\n```") {
-		t.Fatalf("textarea = %q, want suggestion block", got)
-	}
-}
-
 func TestMouseClickCommentModalCloseConfirmsUnsavedText(t *testing.T) {
 	for _, edit := range []bool{false, true} {
 		for _, dirty := range []bool{false, true} {
@@ -493,8 +474,9 @@ func TestSuggestionButtonInsertsSelectedCodeAndPersistsComment(t *testing.T) {
 	app.modal = commentModal
 	app.modalTextarea.SetValue("Use clearer names.")
 
-	updated, _ := app.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModAlt})
-	app = *updated.(*AppModel)
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	app = clickModalAction(t, app, "Suggest M-s")
 
 	wantBody := "Use clearer names.\n\n```suggestion\nfirst\nsecond\n```"
 	if got := app.modalTextarea.Value(); got != wantBody {

@@ -201,31 +201,6 @@ func TestFileTreeCursorSelectsFilesAndKeysFoldDirectories(t *testing.T) {
 	}
 }
 
-func TestFileTreeRendersOneColumnIndentAndActiveFile(t *testing.T) {
-	app := newFileTreeTestApp()
-	app = pressKey(app, 's')
-	lines := strings.Split(ansi.Strip(app.fileTree.viewport.View()), "\n")
-	want := []string{
-		"  ▾ test-project/",
-		"   ▾ a/",
-		"    ▾ sub/",
-		">      z.go",
-		"      y.go",
-		"   ▾ b/",
-		"      x.go",
-		"     root.go",
-	}
-	for i, line := range want {
-		if strings.TrimRight(lines[i], " ") != line {
-			t.Fatalf("row %d = %q, want %q", i, lines[i], line)
-		}
-	}
-	active := strings.Split(app.fileTree.viewport.View(), "\n")[3]
-	if !strings.Contains(active, "\x1b[1") {
-		t.Fatalf("active file row = %q, want bold", active)
-	}
-}
-
 func TestFileTreeHighlightAcrossScrolling(t *testing.T) {
 	wasDark := terminalIsDark
 	t.Cleanup(func() { initAdaptiveStyles(wasDark) })

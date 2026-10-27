@@ -12,6 +12,7 @@ import (
 
 var terminalRequest string
 var reviewOrigin terminalbinding.Origin
+var terminalRequestTimeout = 3 * time.Second
 
 func init() {
 	terminal := &cobra.Command{Use: "terminal", Short: "Locate a review terminal using a one-time visible marker"}
@@ -52,7 +53,7 @@ func reviewTerminalContext() (reviewMultiplexerContext, error) {
 		reviewOrigin = terminalbinding.CaptureOrigin(os.Getpid())
 		return findMultiplexerContext(), nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), terminalRequestTimeout)
 	defer cancel()
 	target, err := terminalbinding.DefaultStore().Resolve(ctx, terminalRequest, terminalbinding.Snapshot)
 	if err != nil {

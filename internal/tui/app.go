@@ -2675,34 +2675,6 @@ func truncateLeftToWidth(s string, width int) string {
 	return prefix + ansi.Cut(s, stringWidth-width+prefixWidth, stringWidth)
 }
 
-func (m AppModel) reviewScopeLabel() string {
-	if !m.multiFile || m.filePath != "" {
-		return ""
-	}
-	if m.patch != nil {
-		return "Supplied diff"
-	}
-	if m.source != nil {
-		switch m.source.Scope {
-		case "all":
-			return "All"
-		case "staged":
-			return "Staged"
-		case "unstaged":
-			return "Unstaged"
-		case "range":
-			return "Range: " + m.source.Range
-		}
-	}
-	if m.staged {
-		return "Staged"
-	}
-	if m.baseRef == "" || m.baseRef == "HEAD" {
-		return "Working tree"
-	}
-	return "Base: " + m.baseRef
-}
-
 func (m AppModel) renderHeader() string {
 	header, _ := m.renderHeaderWithProgress()
 	return header

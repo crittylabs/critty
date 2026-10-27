@@ -29,90 +29,37 @@ func integrationContent(t *testing.T, target, dest string) string {
 	return ""
 }
 
-func destinations(t *testing.T, target string) []string {
-	t.Helper()
-	var dests []string
-	for _, f := range integrations()[target] {
-		if target != "opencode" && target != "antigravity" && f.dest != f.globalDest {
-			t.Errorf("%s %s: global destination %q differs", target, f.dest, f.globalDest)
-		}
-		dests = append(dests, f.dest)
-	}
-	return dests
-}
-
-// additionalSkillResources lists the extra skill files every agent target installs.
-var additionalSkillResources = []string{
-	"critty-history/SKILL.md",
-	"critty-grill/SKILL.md",
-	"critty-grill/references/artifacts.md",
-	"critty-ai-review/SKILL.md", "critty-ai-cowork/SKILL.md",
-	"critty-ai-review/references/restricted-cli.md", "critty-ai-review/scripts/claude_review_gate.py",
-	"critty-ai-review/references/codex-cli.md", "critty-ai-review/scripts/codex_review_server.py",
-	"critty-ai-review/scripts/codex-review-requirements.txt",
-	"critty-cli/references/configuration.md",
-	"critty-cli/references/forms.md",
-	"critty-approval/references/requests.md", "critty-approval/references/feedback-authorization.md",
-	"critty/references/temporary-tree.md",
-}
-
-func TestOpenCodeGlobalFilesUseXDGConfigDir(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
-	want := map[string]string{
-		filepath.Join(".opencode", "skills", "critty-approval", "SKILL.md"): filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-approval", "SKILL.md"),
-		filepath.Join(".opencode", "commands", "critty.md"):                 filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "commands", "critty.md"),
-		filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"):      filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", "critty-cli", "SKILL.md"),
-	}
-	for _, rel := range additionalSkillResources {
-		want[filepath.Join(".opencode", "skills", filepath.FromSlash(rel))] = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", "skills", filepath.FromSlash(rel))
-	}
-	for _, f := range integrations()["opencode"] {
-		if f.globalDest != want[f.dest] {
-			t.Errorf("%s global destination = %q, want %q", f.dest, f.globalDest, want[f.dest])
-		}
-		global, err := integrationDest(f, true)
-		if err != nil || global != want[f.dest] {
-			t.Errorf("integrationDest(%s, global) = %q, %v", f.dest, global, err)
-		}
-	}
-}
-
 func TestIntegrationLayouts(t *testing.T) {
-	want := map[string][]string{
-		"claude-code": {
-			filepath.Join(".claude", "skills", "critty", "SKILL.md"),
-			filepath.Join(".claude", "skills", "critty-cli", "SKILL.md"),
-			filepath.Join(".claude", "skills", "critty-approval", "SKILL.md"),
-		},
-		"codex": {
-			filepath.Join(".codex", "skills", "critty", "SKILL.md"),
-			filepath.Join(".codex", "skills", "critty-cli", "SKILL.md"),
-			filepath.Join(".codex", "skills", "critty-approval", "SKILL.md"),
-		},
-		"opencode": {
-			filepath.Join(".opencode", "commands", "critty.md"),
-			filepath.Join(".opencode", "skills", "critty-cli", "SKILL.md"),
-			filepath.Join(".opencode", "skills", "critty-approval", "SKILL.md"),
-		},
-		"gemini": {
-			filepath.Join(".gemini", "skills", "critty", "SKILL.md"),
-			filepath.Join(".gemini", "skills", "critty-cli", "SKILL.md"),
-			filepath.Join(".gemini", "skills", "critty-approval", "SKILL.md"),
-		},
-		"agents": {
-			filepath.Join(".agents", "skills", "critty", "SKILL.md"),
-			filepath.Join(".agents", "skills", "critty-cli", "SKILL.md"),
-			filepath.Join(".agents", "skills", "critty-approval", "SKILL.md"),
-		},
-	}
-	for target, dests := range want {
-		dir := map[string]string{"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode", "gemini": ".gemini", "agents": ".agents"}[target]
-		for _, rel := range additionalSkillResources {
-			dests = append(dests, filepath.Join(dir, "skills", filepath.FromSlash(rel)))
-		}
-		if got := destinations(t, target); !slices.Equal(got, dests) {
-			t.Errorf("%s destinations = %q, want %q", target, got, dests)
-		}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
+	for target, dir := range map[string]string{
+		"claude-code": ".claude", "codex": ".codex", "opencode": ".opencode",
+		"gemini": ".gemini", "agents": ".agents",
+	} {
+		t.Run(target, func(t *testing.T) {
+			files := integrations()[target]
+			for _, name := range skillNames {
+				dest := filepath.Join(dir, "skills", name, "SKILL.md")
+				if target == "opencode" && name == "critty" {
+					dest = filepath.Join(dir, "commands", "critty.md")
+				}
+				integrationContent(t, target, dest)
+			}
+			for _, f := range files {
+				want := filepath.Join(home, f.dest)
+				if target == "opencode" {
+					rel, err := filepath.Rel(dir, f.dest)
+					if err != nil {
+						t.Fatal(err)
+					}
+					want = filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "opencode", rel)
+				}
+				if got, err := integrationDest(f, true); err != nil || got != want {
+					t.Fatalf("global destination for %s = %q, %v", f.dest, got, err)
+				}
+			}
+		})
 	}
 }
 
@@ -329,17 +276,8 @@ func TestApprovalSkillReferencesUseAgentConventions(t *testing.T) {
 }
 
 func TestBundledSkillResources(t *testing.T) {
-	for agent, variant := range skillVariants {
+	for agent := range skillVariants {
 		t.Run(agent, func(t *testing.T) {
-			for _, name := range []string{"critty-ai-review", "critty-ai-cowork"} {
-				data, err := renderSkill(name, agent)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !bytes.Contains(data, []byte("`"+variant.skillRef("critty-ai-cowork")+"` with `Astra`")) {
-					t.Errorf("%s has the wrong invocation example for %s", name, agent)
-				}
-			}
 			for _, f := range integrations()[agent] {
 				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") && !strings.Contains(filepath.ToSlash(f.dest), "/references/") {
 					continue

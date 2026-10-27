@@ -39,11 +39,6 @@ func (l *renderedContentLayout) appendSourceBlock(b *strings.Builder, block stri
 	l.appendBlock(b, block, target)
 }
 
-func (l *renderedContentLayout) appendLiteralSourceBlock(b *strings.Builder, block string, target contentMouseTarget) {
-	l.appendSourceBlock(b, block, target)
-	l.textSpans[len(l.textSpans)-1].literal = true
-}
-
 func (l *renderedContentLayout) addTextSpan(row, left, column int, text string, target contentMouseTarget) {
 	if target.line <= 0 || target.annotation || text == "" {
 		return

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,12 +132,8 @@ func TestListenRejectsLiveSocket(t *testing.T) {
 
 func TestWaitAliveTimesOut(t *testing.T) {
 	sock := shortSockPath(t)
-	start := time.Now()
-	if err := WaitAlive(sock, 300*time.Millisecond); err == nil {
-		t.Fatal("expected timeout")
-	}
-	if time.Since(start) > 2*time.Second {
-		t.Error("timeout took too long")
+	if err := WaitAlive(sock, 10*time.Millisecond); err == nil || !strings.Contains(err.Error(), "review session did not start") {
+		t.Fatalf("expected startup timeout, got %v", err)
 	}
 }
 

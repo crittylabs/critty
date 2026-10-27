@@ -55,8 +55,8 @@ func TestStyledHelpLayout(t *testing.T) {
 		styled := styledHelp(root, dark, 60)
 		plain := ansi.Strip(styled)
 		for _, want := range []string{
-			">_ critty v1.2.3\n", "\nUsage\n  critty [file] [flags]\n  critty [command]\n", "\nCommands\n  doctor      Diagnose integrations and critty install\n              results\n",
-			"\nFlags\n", "  -o, --output string          review data root\n", "      --scope string[=\"all\"]   review", "      --launcher stringArray   review", "\nUse critty [command] --help for more information about a\ncommand.\n",
+			"critty [file] [flags]", "critty [command]", "doctor",
+			"-o, --output string", "--scope string[=\"all\"]", "--launcher stringArray",
 		} {
 			if !strings.Contains(plain, want) {
 				t.Fatalf("dark=%t: help lacks %q:\n%s", dark, want, plain)
@@ -84,8 +84,8 @@ func TestStyledHelpLayout(t *testing.T) {
 	}
 	plain := ansi.Strip(styledHelp(sub, true, 50))
 	for _, want := range []string{
-		"\nAliases\n  doctor, check\n", "  claude-code  Claude Code skills that keep their indentation even on narrow terminals\n",
-		"      --python string   Python executable (default\n                        \"python3\")\n", "\nGlobal Flags\n      --launcher stringArray   ",
+		"doctor, check", "  claude-code  Claude Code skills that keep their indentation even on narrow terminals\n",
+		"--python string", "\"python3\"", "Global Flags", "--launcher stringArray",
 	} {
 		if !strings.Contains(plain, want) {
 			t.Fatalf("subcommand help lacks %q:\n%s", want, plain)

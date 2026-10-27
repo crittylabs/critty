@@ -46,7 +46,9 @@ func TestCopyMarkdownSource(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			source := parseMarkdownSource(strings.Split(tt.source, "\n"), nil)
-			if got := source.copyRange(tt.startLine, tt.start, tt.endLine, tt.end); got != tt.want {
+			start := source.offsets[tt.startLine-1] + source.lines[tt.startLine-1].sourceOffset(tt.start, false)
+			end := source.offsets[tt.endLine-1] + source.lines[tt.endLine-1].sourceOffset(tt.end, true)
+			if got := source.copySourceRange(start, end); got != tt.want {
 				t.Fatalf("copied = %q, want %q", got, tt.want)
 			}
 		})

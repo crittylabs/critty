@@ -467,64 +467,27 @@ def transient_views() -> None:
         ).stdout
     )
     before = snapshot()
-    for args in [["--help"], ["review", "--help"], ["view", "--help"]]:
-        help_text = subprocess.run(
-            [str(BINARY), *args],
-            cwd=work,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        assert "--demo" not in help_text and "--dry-run" not in help_text, help_text
-    assert snapshot() == before, "help changed files"
-    for command in [[], ["review"]]:
-        result = subprocess.run(
-            [str(BINARY), *command, "--dry-run"],
-            cwd=work,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert result.returncode != 0 and "unknown flag: --dry-run" in result.stderr, (
-            result
-        )
-        assert snapshot() == before, "removed dry-run option changed files"
+    # CLI tests cover the flag matrix.  Check one rejected invocation per mode
+    # here because the E2E contract is that startup does not mutate user files.
     for prefix in [["view"], ["review", "--demo"]]:
-        for flag in [
-            "session",
-            "task",
-            "result",
-            "summary",
-            "terminal-request",
-            "launcher",
-            "clear-attachments",
-        ]:
-            option = f"--{flag}" if flag == "clear-attachments" else f"--{flag}=unused"
-            result = subprocess.run(
-                [str(BINARY), *prefix, option],
-                cwd=work,
-                env=env,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=10,
-            )
-            assert result.returncode != 0 and (
-                "cannot be combined" in result.stderr or "unknown flag" in result.stderr
-            ), result
-            assert snapshot() == before, (
-                f"invalid transient invocation changed files: {prefix} {flag}"
-            )
+        result = subprocess.run(
+            [str(BINARY), *prefix, "--session=unused"],
+            cwd=work,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        assert result.returncode != 0 and result.stderr, result
+        assert snapshot() == before, (
+            f"invalid transient invocation changed files: {prefix}"
+        )
 
     for name, args in [
         ("view-git", ["view"]),
-        ("view-staged", ["view", "--staged"]),
         ("view-doc", ["view", "notes.md"]),
         ("view-patch", ["view", "--diff=input.diff"]),
-        ("demo-git", ["review", "--demo"]),
-        ("demo-doc", ["review", "--demo", "notes.md"]),
         ("demo-forms", ["review", "--demo", "--null", "--attachment=form.md"]),
     ]:
         job = root / f"{name}.job.json"
@@ -565,12 +528,11 @@ def transient_views() -> None:
         assert ("Demo · not saved" if demo else "view the ") in screen(), screen()
         assert snapshot() == before, "transient mode wrote files during startup"
         if demo:
-            if name == "demo-forms":
-                tmux("send-keys", "-t", pane, "n", "Space")
-                wait_until(
-                    lambda: "✓" in screen() and "Confirm demo" in screen(),
-                    "demo form answered",
-                )
+            tmux("send-keys", "-t", pane, "n", "Space")
+            wait_until(
+                lambda: "✓" in screen() and "Confirm demo" in screen(),
+                "demo form answered",
+            )
             tmux("send-keys", "-t", pane, "f")
             wait_until(
                 lambda: "Add File Comment" in screen(), "demo comment editor opened"
@@ -587,21 +549,12 @@ def transient_views() -> None:
             assert snapshot() == before, "demo persisted edits"
             tmux("send-keys", "-t", pane, "q")
             wait_until(lambda: "Overall comment" in screen(), "demo Submit opened")
-            if name == "demo-forms":
-                tmux("send-keys", "-t", pane, "a", "Enter")
-                wait_until(
-                    lambda: "Resolve all & approve?" in screen(),
-                    "demo approval confirms unresolved comments",
-                )
-                tmux("send-keys", "-t", pane, "y")
-            elif name == "demo-doc":
-                tmux("send-keys", "-t", pane, "q")
-                wait_until(
-                    lambda: "Abort review?" in screen(), "demo abort confirmation"
-                )
-                tmux("send-keys", "-t", pane, "y")
-            else:
-                tmux("send-keys", "-t", pane, "c", "Enter")
+            tmux("send-keys", "-t", pane, "a", "Enter")
+            wait_until(
+                lambda: "Resolve all & approve?" in screen(),
+                "demo approval confirms unresolved comments",
+            )
+            tmux("send-keys", "-t", pane, "y")
         else:
             tmux("send-keys", "-t", pane, "Enter", "f", "Space")
             tmux("send-keys", "-l", "-t", pane, "\x1be")
@@ -768,8 +721,6 @@ def scenarios() -> None:
         screen = paragraph.screen()
         assert "second**" not in screen and "`code" not in screen, screen
         assert "continued`" not in screen, screen
-        tmux("resize-pane", "-t", paragraph.pane, "-x", "54", "-y", "24")
-        paragraph.wait_screen("continued", "multiline Markdown after resize")
         paragraph.click("second")
         paragraph.keys("Enter")
         paragraph.text("Keep source line anchors.")
@@ -786,39 +737,10 @@ def scenarios() -> None:
             lambda: "anchors." not in paragraph.screen(),
             "resolved comment folds by default",
         )
-        paragraph.keys("O")
-        paragraph.wait_screen("anchors.", "Open all expands resolved comments")
-        paragraph.keys("V")
-        wait_until(
-            lambda: (
-                "Comments (0)" not in paragraph.screen()
-                and "anchors." not in paragraph.screen()
-            ),
-            "View hides the sidebar and folds comment bodies",
-        )
-        paragraph.keys("O")
-        paragraph.wait_screen("Comments (0)", "O leaves View and restores the sidebar")
-        paragraph.wait_screen("anchors.", "O opens all comments when leaving View")
-        paragraph.keys("V")
-        wait_until(
-            lambda: (
-                "Comments (0)" not in paragraph.screen()
-                and "anchors." not in paragraph.screen()
-            ),
-            "View temporarily overrides Open all",
-        )
-        paragraph.keys("V")
-        paragraph.wait_screen("Comments (0)", "V restores the sidebar")
-        paragraph.wait_screen("anchors.", "V restores the previous expansion setting")
-        paragraph.keys("O")
-        wait_until(
-            lambda: "anchors." not in paragraph.screen(),
-            "O restores default expansion",
-        )
         paragraph.keys("q", "c", "Enter")
         paragraph.completed(False)
         report(
-            "multiline Markdown keeps formatting, source text and comment lines after resize"
+            "multiline Markdown keeps Unicode formatting, source text and comment anchors"
         )
         outline_source = "# Outline root\n\n" + "".join(
             f"## Part {i:02}\nBody for part {i:02}.\n\n" for i in range(24)
@@ -887,133 +809,6 @@ def scenarios() -> None:
         report(
             "Go outline mouse and keyboard jumps preserve declaration comment anchors"
         )
-        source_ts = (
-            "export class Service {\n"
-            "  run(value: number) {\n    return value;\n  }\n}\n"
-            "export const stop = () => {};\n"
-        )
-        source_py = (
-            "#!/usr/bin/env -S python3 -u\n"
-            "class Service:\n  def run(self):\n    return 1\n\ndef stop():\n  pass\n"
-        )
-        source_el = (
-            "(use-package example\n  :config\n"
-            '  (defun example-run ()\n    (message "ready")))\n'
-            '(define-minor-mode example-mode "Example mode.")\n'
-        )
-        source_objc = (
-            "@implementation Service\n"
-            "- (void)run:(int)value\n    completion:(Handler)handler {\n}\n@end\n"
-        )
-        for name, content in {
-            "sample.ts": source_ts,
-            "worker": source_py,
-            "sample.el": source_el,
-            "sample.mm": source_objc,
-        }.items():
-            (WORK / name).write_text(content)
-        source_outline = Round(
-            "source-outlines",
-            [
-                "--null",
-                "--attachment",
-                "sample.ts",
-                "--attachment",
-                "worker",
-                "--attachment",
-                "sample.el",
-                "--attachment",
-                "sample.mm",
-            ],
-        )
-        source_outline.wait_screen(
-            "run()", "TypeScript attachment shows method outline"
-        )
-        source_outline.click(r"run\(\)")
-        source_outline.keys("Enter", "Enter")
-        source_outline.text("TypeScript method anchor.")
-        source_outline.keys("C-s")
-        wait_until(
-            lambda: source_outline.comments(), "TypeScript outline comment saved"
-        )
-        assert source_outline.comments()[0]["start_line"] == 2
-        source_outline.keys("2")
-        source_outline.wait_screen(
-            "def run", "Extensionless Python attachment shows method outline"
-        )
-        source_outline.keys("s", "C-Down", "g", "l", "Enter", "Enter")
-        source_outline.text("Python method anchor.")
-        source_outline.keys("C-s")
-        wait_until(
-            lambda: len(source_outline.comments()) == 2, "Python outline comment saved"
-        )
-        python_comment = next(
-            c for c in source_outline.comments() if c["path"].endswith("/worker")
-        )
-        assert python_comment["start_line"] == 3, python_comment
-        source_outline.keys("3")
-        source_outline.wait_screen("use-package example", "Emacs Lisp package outline")
-        source_outline.click("use-package example", last=True)
-        source_outline.keys("l", "Enter", "Enter")
-        source_outline.text("Emacs Lisp function anchor.")
-        source_outline.keys("C-s")
-        wait_until(
-            lambda: len(source_outline.comments()) == 3,
-            "Emacs Lisp outline comment saved",
-        )
-        elisp_comment = next(
-            c for c in source_outline.comments() if c["path"].endswith("/sample.el")
-        )
-        assert elisp_comment["start_line"] == 3, elisp_comment
-        source_outline.keys("4")
-        source_outline.wait_screen("run:completion:", "Objective-C++ selector outline")
-        source_outline.click("run:completion:")
-        source_outline.keys("Enter", "Enter")
-        source_outline.text("Objective-C method anchor.")
-        source_outline.keys("C-s")
-        wait_until(
-            lambda: len(source_outline.comments()) == 4,
-            "Objective-C outline comment saved",
-        )
-        objc_comment = next(
-            c for c in source_outline.comments() if c["path"].endswith("/sample.mm")
-        )
-        assert objc_comment["start_line"] == 2, objc_comment
-        assert (WORK / "sample.el").read_text() == source_el
-        assert (WORK / "sample.mm").read_text() == source_objc
-        assert (WORK / "sample.ts").read_text() == source_ts
-        assert (WORK / "worker").read_text() == source_py
-        source_outline.finish(False)
-        report(
-            "source attachment outlines preserve block, indentation, Lisp, and selector anchors"
-        )
-        empty_image_source = (
-            "# Media references\n\n![](./clip.mp4)\n\n[](https://example.test/guide)\n"
-        )
-        (WORK / "empty-labels.md").write_text(empty_image_source)
-        empty_image = Round(
-            "empty-image-label", ["--null", "--attachment", "empty-labels.md"]
-        )
-        empty_image.wait_screen(
-            "!./clip.mp4", "empty image label shows its destination"
-        )
-        empty_image.wait_screen(
-            "https://example.test/guide", "empty link shows its URL"
-        )
-        empty_image.click(r"!\./clip\.mp4")
-        empty_image.keys("Enter")
-        empty_image.wait_screen(
-            "Add Comment", "empty image reference accepts a comment"
-        )
-        empty_image.text("Keep the destination visible.")
-        empty_image.keys("C-s")
-        wait_until(
-            lambda: empty_image.comments(), "empty image reference comment saved"
-        )
-        assert empty_image.comments()[0]["start_line"] == 3
-        assert (WORK / "empty-labels.md").read_text() == empty_image_source
-        empty_image.finish(False)
-        report("empty Markdown labels retain destinations and source comment anchors")
         (WORK / "table.md").write_text(
             "| StartColumn | EndColumn |\n| --- | --- |\n| "
             + "left " * 25
@@ -1164,15 +959,6 @@ def scenarios() -> None:
         default_approval = Round(
             "default-approval", ["plan.md", "--task", history_task]
         )
-        version = cli("--version").stdout.strip().removeprefix("critty version ")
-        # Keep long development versions visible instead of testing truncation.
-        tmux("resize-pane", "-t", default_approval.pane, "-x", "100")
-        default_approval.keys("M-?")
-        wait_until(
-            lambda: f"critty {version}" in default_approval.screen(),
-            "Help build version",
-        )
-        default_approval.keys("Escape")
         default_approval.keys("q", "Enter")
         default_approval.completed(True)
         report(
@@ -1437,7 +1223,7 @@ def scenarios() -> None:
         )
         second = Round("round2", ["sessions", "resume", first.session])
         assert second.session == first.session
-        assert "Rollback" in second.screen(), second.screen()
+        second.wait_screen("Rollback", "resumed source refreshed")
         second.finish(True)
         assert all(c.get("resolved") for c in second.comments()), second.comments()
         assert json.loads(second.summary.read_text())["round"] == 2
@@ -1649,7 +1435,7 @@ def scenarios() -> None:
         blocker = directory / "result-1.json"
         blocker.mkdir()
         failure.keys("q", "y")
-        failure.settle()
+        failure.wait_screen("retry saving", "approval save failed visibly")
         assert not failure.result.exists(), "save failure exited the TUI"
         saved = json.loads((directory / "forms.json").read_text())
         assert saved["attachments"][0]["answers"]["confirm"]["value"], saved

@@ -226,12 +226,6 @@ func annotateInlineChanges(info *DiffInfo, frag *gitdiff.TextFragment, deletedBy
 	}
 }
 
-func inlineDiff(before, after string) ([]InlineSegment, []InlineSegment) {
-	beforeTokens := splitInlineTokens(before)
-	afterTokens := splitInlineTokens(after)
-	return inlineDiffTokens(beforeTokens, afterTokens)
-}
-
 func inlineDiffTokens(beforeTokens, afterTokens []string) ([]InlineSegment, []InlineSegment) {
 	diffs := lcs.DiffLines(beforeTokens, afterTokens)
 	if len(diffs) == 0 {
