@@ -185,7 +185,6 @@ func TestChangeNavigationVisitsTabsWithoutChanges(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(&app.tabs[1])
 			}
-			app.tabs[1].state.Comments = []review.Comment{{ID: "resolved", Scope: "file", Resolved: true}}
 			app.tabs[0].cursorLine = 4
 			for _, step := range []struct {
 				key rune
@@ -204,11 +203,11 @@ func TestChangeNavigationVisitsTabsWithoutChanges(t *testing.T) {
 				}
 			}
 			if app.tab().doc == nil && !app.tab().isBinary {
-				app.tab().state.Comments[0].Resolved = false
+				app.tab().state.Comments = []review.Comment{{ID: "resolved", Scope: "file", Resolved: true}}
 				app.tab().cursorLine = 1
 				app = pressKey(app, 'n')
 				if app.selectedCommentID() != "resolved" {
-					t.Fatal("navigation skipped an unresolved comment on a deleted file")
+					t.Fatal("navigation skipped a resolved comment on a deleted file")
 				}
 			}
 		})
@@ -238,8 +237,8 @@ func TestChangeNavigationVisitsBinaryFiles(t *testing.T) {
 				tab int
 				id  string
 			}{
-				{'n', 1, "file"}, {'n', 1, ""}, {'n', 2, ""}, {'n', 3, ""},
-				{'N', 2, ""}, {'N', 1, ""}, {'N', 1, "file"}, {'N', 0, ""},
+				{'n', 1, "resolved"}, {'n', 1, "file"}, {'n', 1, ""}, {'n', 2, ""}, {'n', 3, ""},
+				{'N', 2, ""}, {'N', 1, ""}, {'N', 1, "file"}, {'N', 1, "resolved"}, {'N', 0, ""},
 			} {
 				app = pressKey(app, step.key)
 				if app.activeTab != step.tab || app.selectedCommentID() != step.id || app.focused != contentPane {
@@ -264,7 +263,7 @@ func TestChangeNavigationVisitsBinaryFiles(t *testing.T) {
 	}
 }
 
-func TestChangeNavigationIncludesUnresolvedComments(t *testing.T) {
+func TestChangeNavigationIncludesAllComments(t *testing.T) {
 	app := newChangeNavigationTestApp()
 	app.tabs[0].state.Comments[1].Resolved = true
 	app.tabs[0].state.Comments = append(app.tabs[0].state.Comments,
@@ -272,7 +271,7 @@ func TestChangeNavigationIncludesUnresolvedComments(t *testing.T) {
 		review.Comment{ID: "inside-hunk", StartLine: 3, EndLine: 3},
 		review.Comment{ID: "file", Scope: "file"})
 	app.tabs[0].changeChunks[0].endLine = 3
-	app.tabs[1].state.Comments = []review.Comment{{ID: "comments-only", Scope: "file"}}
+	app.tabs[1].state.Comments = []review.Comment{{ID: "comments-only", Scope: "file", Resolved: true}}
 	app = pressKey(app, 'N')
 	if app.selectedCommentID() != "file" || app.focused != contentPane {
 		t.Fatal("previous target should be the file comment")
@@ -283,7 +282,7 @@ func TestChangeNavigationIncludesUnresolvedComments(t *testing.T) {
 		id   string
 	}
 	stops := []stop{
-		{0, 0, "file"}, {0, 2, ""}, {0, 2, "first-a"}, {0, 2, "same-line"},
+		{0, 0, "file"}, {0, 2, ""}, {0, 2, "first-a"}, {0, 2, "first-b"}, {0, 2, "same-line"},
 		{0, 3, "inside-hunk"}, {0, 4, ""}, {0, 4, "first-c"},
 		{1, 0, "comments-only"}, {2, 1, ""}, {2, 1, "last-a"},
 		{2, 3, ""}, {2, 3, "last-b"},
@@ -324,8 +323,8 @@ func TestChangeNavigationFromResolvedAndHiddenComments(t *testing.T) {
 	app.tabs[0].cursorOnAnnotation = false
 	app.viewMode = true
 	app = pressKey(app, 'n')
-	if app.viewMode || app.selectedCommentID() != "first-b" {
-		t.Fatal("should reveal the unresolved navigation target")
+	if app.viewMode || app.selectedCommentID() != "first-a" {
+		t.Fatal("should reveal the resolved navigation target")
 	}
 }
 

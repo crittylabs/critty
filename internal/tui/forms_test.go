@@ -23,7 +23,7 @@ func TestFormNavigationTargets(t *testing.T) {
 		key  rune
 		want []string
 	}{
-		{"changes", 'n', []string{"hunk:2", "confirm:2", "inline", "size:3", "publish:5", "hunk:1", "main"}},
+		{"changes", 'n', []string{"hunk:2", "confirm:2", "inline", "size:3", "resolved", "size:4", "publish:5", "hunk:1", "main"}},
 		{"all", ']', []string{"confirm:2", "inline", "size:3", "resolved", "size:4", "publish:5", "main"}},
 		{"unresolved", '}', []string{"confirm:2", "inline", "size:3", "main"}},
 	} {
@@ -123,11 +123,8 @@ func TestRequiredFormNavigationUsesValidHumanAnswers(t *testing.T) {
 			app.activeTab = 0
 			app.tab().cursorLine, app.tab().cursorOnForm = 1, false
 			app = pressKey(app, 'n')
-			if human && app.selectedCommentID() != "main" {
-				t.Fatal("change navigation included answered required items")
-			}
-			if !human && (app.tab().cursorLine != 2 || !app.tab().cursorOnForm) {
-				t.Fatal("change navigation skipped an unanswered required item")
+			if app.tab().cursorLine != 2 || !app.tab().cursorOnForm {
+				t.Fatal("change navigation skipped a required item")
 			}
 			app.activeTab = 0
 			app.tab().cursorLine, app.tab().cursorOnForm = 1, false

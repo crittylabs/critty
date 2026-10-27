@@ -116,7 +116,7 @@ func TestOutlineFooterHints(t *testing.T) {
 			t.Fatalf("source footer: %q", footer)
 		}
 		app.focused = commentPane
-		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || !strings.Contains(footer, "C-↑/↓ tree/outline") {
+		if footer := ansi.Strip(app.renderFooter()); strings.Contains(footer, "M-G") || !strings.Contains(footer, "C-↑/↓ ⇅ tree/outline") {
 			t.Fatalf("Files footer: %q", footer)
 		}
 		app.sidebarView = commentsView

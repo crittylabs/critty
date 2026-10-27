@@ -211,7 +211,7 @@ func (m AppModel) outlineHint() string {
 		return footerKeyStyle.Render("M-G") + " " + footerDescStyle.Render("outline")
 	}
 	if m.sidebarView == filesView {
-		return footerKeyStyle.Render("C-↑/↓") + " " + footerDescStyle.Render("tree/outline")
+		return footerKeyStyle.Render("C-↑/↓") + " " + footerDescStyle.Render("⇅ tree/outline")
 	}
 	return ""
 }

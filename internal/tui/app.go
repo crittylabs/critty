@@ -2495,7 +2495,6 @@ type commentTarget struct {
 	side     string
 	annoIdx  int
 	formID   string
-	required bool
 	first    bool
 }
 
@@ -4214,8 +4213,8 @@ func (m AppModel) renderFooter() string {
 			}
 		}
 		items = []string{
-			k("[/]", "threads/forms"),
-			k("{/}", "unresolved"),
+			k("[/]", "⇅ all items"),
+			k("{/}", "⇅ pending items"),
 			k("s", "sidebar"),
 			k("t", "files/comments"),
 			k("v", "select lines"),
@@ -4230,8 +4229,8 @@ func (m AppModel) renderFooter() string {
 		}
 		if m.multiFile {
 			items = append([]string{
-				k("tab/S-tab", "next/prev tab"),
-				k("n/N", "change/open/form"),
+				k("tab/S-tab", "⇵ tab"),
+				k("n/N", "⇵ all hunks & items"),
 			}, items...)
 		}
 	}
@@ -4345,7 +4344,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	if m.readOnly {
 		return renderHelpGroup("View (read-only)", []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
-			{keys: "up/down,j/k · PgUp/PgDn", desc: "move / scroll"},
+			{keys: "↑/↓,k/j · PgUp/PgDn", desc: "⇅ move / scroll"},
 			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table horizontally; long cells wrap at 40 columns"},
 			{keys: "V · O", desc: "reading view / open all comments"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
@@ -4354,7 +4353,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "M-w", desc: "copy selected text or reference"},
 			{keys: "s/t", desc: "toggle sidebar / view"},
 			{keys: "M-G", desc: "focus outline"},
-			{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · resize outline"},
+			{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline"},
 			{keys: "enter/esc", desc: "outline: return to source"},
 			{keys: "w · S · I", desc: "whitespace / split / images"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
@@ -4367,7 +4366,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "enter", desc: "comment/open"},
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
-		{keys: "M-↑/↓", desc: "move ranked item"},
+		{keys: "M-↑/↓", desc: "⇅ move ranked item"},
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/space · R", desc: "resolve / resolve and go to next"},
@@ -4382,25 +4381,25 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, columnWidth)
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
-		{keys: "↑/↓,j/k", desc: "move"},
+		{keys: "↑/↓,k/j", desc: "⇅ move"},
 		{keys: "←/→,h/l", desc: "scroll table"},
-		{keys: "PgUp/PgDn", desc: "half page"},
-		{keys: "shift+↑/↓,C-u/d", desc: "half page"},
-		{keys: "Home/End,g/G,</>", desc: "top/bottom"},
-		{keys: "[/]", desc: "threads/forms"},
+		{keys: "PgUp/PgDn", desc: "⇅ half page"},
+		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page"},
+		{keys: "Home/End,g/G,</>", desc: "⇅ top/bottom"},
+		{keys: "{/}", desc: "⇅ pending items"},
+		{keys: "[/]", desc: "⇅ all items"},
+		{keys: "n/N", desc: "⇵ all hunks & items"},
+		{keys: "tab/shift+tab", desc: "⇵ file"},
+		{keys: "alt+{/alt+}", desc: "⇅ file"},
+		{keys: "1-9", desc: "file tab"},
 	}, columnWidth)
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
-		{keys: "{/}", desc: "unresolved"},
 		{keys: "/ ?", desc: "search text"},
 		{keys: "M-e/g", desc: "editor/line"},
 		{keys: "M-w", desc: "copy text/ref"},
 		{keys: "M-p", desc: "open file"},
-		{keys: "tab/shift+tab", desc: "next/prev file"},
-		{keys: "alt+}/alt+{", desc: "next/prev file"},
-		{keys: "1-9", desc: "file tab"},
-		{keys: "n/N", desc: "diff/open/form"},
 		{keys: "S · ←/→", desc: "split diff · diff side"},
-		{keys: "↑/↓", desc: "choose file"},
+		{keys: "↑/↓", desc: "⇅ choose file"},
 		{keys: "enter/esc", desc: "open/cancel"},
 	}, columnWidth)
 
@@ -4412,14 +4411,14 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
 		{keys: "V", desc: "toggle reading view: hide sidebar and reduce all comments to bubble markers; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "reset individual folds and toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
-		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
+		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
 		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},
-		{keys: "↑/↓,j/k · ←/→,h/l · enter/esc", desc: "outline: jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
+		{keys: "↑/↓,k/j · ←/→,h/l · enter/esc", desc: "outline: ⇅ jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
-		{keys: "↑/↓,j/k · enter/v/esc · C-PgUp/PgDn", desc: "extend · comment/toggle/cancel selection · scroll thread"},
+		{keys: "↑/↓,k/j · enter/v/esc · C-PgUp/PgDn", desc: "⇅ extend · comment/toggle/cancel selection · ⇅ scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
-		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · choose · accept/save; no @ needed"},
+		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
 		{keys: "←/→ (verdict) · S-tab/↑ · C-s (input)", desc: "select verdict · edit overall comment · save and return to verdict"},
 		{keys: "]/} · [/{ (outside input)", desc: "first thread/form item · last one; braces skip resolved; close without one"},
@@ -4429,7 +4428,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, innerWidth)
 
 	search := renderHelpGroup("Incremental search", []helpItem{
-		{keys: "C-s / C-r", desc: "next / previous match; repeat to wrap"},
+		{keys: "C-s / C-r", desc: "⇵ match; repeat to wrap"},
 		{keys: "enter / esc,C-g/c", desc: "keep match / cancel and return"},
 		{keys: "backspace / C-y", desc: "undo input piece / paste kill ring"},
 		{keys: "C-d / C-w", desc: "add following character / word"},
@@ -4455,7 +4454,7 @@ func renderHostHelp(host string, width int) string {
 		items = []helpItem{
 			{keys: "prefix z", desc: "toggle pane zoom"},
 			{keys: "prefix h/j/k/l", desc: "focus pane left/down/up/right"},
-			{keys: "prefix tab/shift+tab", desc: "next / previous pane"},
+			{keys: "prefix tab/shift+tab", desc: "⇵ pane"},
 			{keys: "prefix ?", desc: "show Herdr keybindings"},
 		}
 	case "Zellij":
@@ -4475,7 +4474,7 @@ func renderHostHelp(host string, width int) string {
 			{keys: "cmd+shift+enter", desc: "toggle pane zoom"},
 			{keys: "cmd+alt+←/↓/↑/→", desc: "focus pane left/down/up/right"},
 			{keys: "cmd+[ / cmd+]", desc: "focus back / forward"},
-			{keys: "cmd+shift+[ / ]", desc: "previous / next tab in pane"},
+			{keys: "cmd+shift+[ / ]", desc: "⇅ tab in pane"},
 		}
 	default:
 		return ""

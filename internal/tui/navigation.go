@@ -201,7 +201,7 @@ func (m *AppModel) reviewTargets(tabIndex int) []commentTarget {
 	seen := map[string]bool{}
 	for _, item := range d.Items {
 		targets = append(targets, commentTarget{
-			formID: item.ID, line: item.Line, required: item.Required,
+			formID: item.ID, line: item.Line,
 			resolved: !item.Required || form.Satisfied(item, d.Answers[item.ID]),
 			first:    !seen[item.ID],
 		})
@@ -233,10 +233,6 @@ func (m *AppModel) reviewTargets(tabIndex int) []commentTarget {
 
 func (target commentTarget) unresolved() bool {
 	return !target.resolved && (target.formID == "" || target.first)
-}
-
-func (target commentTarget) changeStop() bool {
-	return target.unresolved() || target.formID != "" && !target.required
 }
 
 // currentCommentTarget returns the index of the target the user is on: the
@@ -430,11 +426,9 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 		positions[line] = i
 	}
 	var targets []changeTarget
-	hasStop := len(t.changeChunks) > 0
 	if t.isBinary && !t.outsideChanges {
 		// Binary changes have no source lines, but still need a navigation stop.
 		targets = append(targets, changeTarget{position: 0})
-		hasStop = true
 	}
 	for _, chunk := range t.changeChunks {
 		position, ok := positions[m.changeCursor(t, chunk)]
@@ -453,9 +447,8 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 			}
 		}
 		targets = append(targets, changeTarget{position: position, comment: comment})
-		hasStop = hasStop || comment.changeStop()
 	}
-	if !hasStop {
+	if len(targets) == 0 {
 		chunk := changeChunk{}
 		if t.doc != nil && t.doc.HasLine(1) {
 			chunk = changeChunk{startLine: 1, endLine: 1}
@@ -468,8 +461,8 @@ func (m *AppModel) changeTargets(tabIndex int) []changeTarget {
 	return targets
 }
 
-// jumpToChange visits changes, unresolved threads and required forms, and
-// optional form controls, stopping at the beginning and end of the review.
+// jumpToChange visits changes, all threads and form controls, stopping at
+// the beginning and end of the review.
 func (m *AppModel) jumpToChange(step int) bool {
 	currentID := m.selectedCommentID()
 	t := m.tab()
@@ -503,9 +496,6 @@ func (m *AppModel) jumpToChange(step int) bool {
 		}
 		for i := start; i >= 0 && i < len(targets); i += step {
 			target := targets[i]
-			if (target.comment.id != "" || target.comment.formID != "") && !target.comment.changeStop() {
-				continue
-			}
 			if tabIndex == m.activeTab {
 				if current >= 0 {
 					if (i-current)*step <= 0 {
