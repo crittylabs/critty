@@ -82,6 +82,49 @@ func TestReloadDocumentAndAttachments(t *testing.T) {
 	}
 }
 
+func TestReloadPreservesPerFileViewport(t *testing.T) {
+	app := setupAppWithDoc(t, strings.Repeat("source line\n", 100))
+	attachment := filepath.Join(t.TempDir(), "notes.md")
+	if err := os.WriteFile(attachment, []byte(strings.Repeat("note line\n", 100)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := review.ReadAttachedDocuments([]string{attachment})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.addDocuments(docs)
+	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 24})
+	positions := []struct {
+		path         string
+		line, offset int
+	}{{app.filePath, 40, 32}, {docs[0].Path(), 70, 62}}
+	selectFile := func(path string) {
+		t.Helper()
+		for i, tab := range app.tabs {
+			if tab.path == path {
+				app.selectTab(i)
+				return
+			}
+		}
+		t.Fatalf("missing tab %s", path)
+	}
+	for _, position := range positions {
+		selectFile(position.path)
+		app.tab().cursorLine = position.line
+		app.rebuildContent()
+		app.contentViewport.SetYOffset(position.offset)
+	}
+	reloadApp(t, &app)
+	for _, position := range positions {
+		selectFile(position.path)
+		if app.tab().cursorLine != position.line || app.contentViewport.YOffset() != position.offset {
+			t.Fatalf("%s restored line/offset %d/%d, want %d/%d", position.path,
+				app.tab().cursorLine, app.contentViewport.YOffset(), position.line, position.offset)
+		}
+	}
+}
+
 func TestReloadDeferralAndFailure(t *testing.T) {
 	app := setupAppWithDoc(t, "original\n")
 	app.modal = commentModal

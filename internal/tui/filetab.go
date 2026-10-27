@@ -42,6 +42,8 @@ type FileTab struct {
 	changeChunks          []changeChunk                // contiguous groups of changed lines
 	cursorLine            int                          // 1-based
 	cursorSide            string                       // "old" for deleted lines; empty means new side
+	contentOffset         int
+	commentOffset         int
 
 	// Visual selection mode
 	selecting    bool
@@ -99,6 +101,45 @@ func newFileTab(path string, diff *gitpkg.DiffInfo) FileTab {
 		ft.changeChunks = computeChangeChunks(diff)
 	}
 	return ft
+}
+
+func (m *AppModel) saveTabViewport() {
+	if len(m.tabs) == 0 {
+		return
+	}
+	t := m.tab()
+	t.contentOffset = m.contentViewport.YOffset()
+	t.commentOffset = m.commentViewport.YOffset()
+}
+
+func (m *AppModel) activateTab(index int) bool {
+	if index < 0 || index >= len(m.tabs) || m.activeTab == index {
+		return false
+	}
+	m.saveTabViewport()
+	m.activeTab = index
+	return true
+}
+
+// positionTabViewport restores a tab for step zero, or starts directional
+// navigation at its top (positive) or bottom (negative), after rendering.
+func (m *AppModel) positionTabViewport(step int) {
+	if len(m.tabs) == 0 {
+		m.contentViewport.GotoTop()
+		m.commentViewport.GotoTop()
+		return
+	}
+	switch {
+	case step > 0:
+		m.contentViewport.GotoTop()
+		m.commentViewport.GotoTop()
+	case step < 0:
+		m.contentViewport.GotoBottom()
+		m.commentViewport.GotoBottom()
+	default:
+		m.contentViewport.SetYOffset(m.tab().contentOffset)
+		m.commentViewport.SetYOffset(m.tab().commentOffset)
+	}
 }
 
 // ensureHighlightCache populates the Chroma highlight cache if needed.

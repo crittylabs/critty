@@ -117,7 +117,7 @@ func TestPatchZeroContextDeletionNavigation(t *testing.T) {
 	if len(lines) != 2 || lines[0].side != "old" || lines[0].line != 10 {
 		t.Fatalf("selectable lines = %+v", lines)
 	}
-	m.selectChange(0, m.tab().changeChunks[0])
+	m.selectChange(0, m.tab().changeChunks[0], 0)
 	if m.tab().cursorLine != 10 || m.tab().cursorSide != "old" {
 		t.Fatalf("change jump = %d, %s", m.tab().cursorLine, m.tab().cursorSide)
 	}
@@ -129,7 +129,7 @@ func TestChangeNavigationVisitsDeletedLineComments(t *testing.T) {
 		{ID: "old-first", Side: "old", StartLine: 10, EndLine: 10},
 		{ID: "old-second", Side: "old", StartLine: 11, EndLine: 11},
 	}
-	m.selectChange(0, m.tab().changeChunks[0])
+	m.selectChange(0, m.tab().changeChunks[0], 0)
 	for _, id := range []string{"old-first", "old-second", "old-second"} {
 		m = pressKey(m, 'n')
 		if m.selectedCommentID() != id || m.tab().cursorSide != "old" {

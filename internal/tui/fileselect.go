@@ -149,9 +149,7 @@ func (m *AppModel) refreshFileSelect() {
 
 func (m *AppModel) pickFile(row int) {
 	if row >= 0 && row < len(m.fileSelect.matches) {
-		m.activeTab = m.fileSelect.matches[row].index
-		m.rebuildContent()
-		m.updateCommentSidebar()
+		m.selectTab(m.fileSelect.matches[row].index)
 	}
 	m.closeFileSelect()
 }

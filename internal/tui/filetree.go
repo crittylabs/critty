@@ -372,9 +372,9 @@ func (m *AppModel) setTreeCursor(i int) {
 	}
 	row := tree.rows[tree.cursor]
 	if !row.isDir && row.tabIndex != m.activeTab {
-		m.activeTab = row.tabIndex
 		tree.syncedTab = row.tabIndex
-		m.rebuildContent()
+		m.selectTab(row.tabIndex)
+		return
 	}
 	m.updateCommentSidebar()
 }

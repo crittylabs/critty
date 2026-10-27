@@ -269,6 +269,7 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 	if m.err != nil {
 		return nil
 	}
+	m.saveTabViewport()
 	active, offset := "", m.contentViewport.YOffset()
 	var previous FileTab
 	if len(m.tabs) > 0 {
@@ -292,6 +293,7 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 			tab.unread = previous.unread || tabContentChanged(previous, *tab)
 			tab.cursorLine, tab.cursorSide = previous.cursorLine, previous.cursorSide
 			tab.sidebarCursor = previous.sidebarCursor
+			tab.contentOffset, tab.commentOffset = previous.contentOffset, previous.commentOffset
 			delete(old, tab.path)
 		} else {
 			tab.unread = true
@@ -369,6 +371,7 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 	m.recalculateLayout()
 	m.rebuildContent()
 	m.updateCommentSidebar()
+	m.positionTabViewport(0)
 	if len(m.tabs) > 0 && m.tab().path == active {
 		m.contentViewport.SetYOffset(offset)
 		m.scrollToCursor()

@@ -54,6 +54,168 @@ func TestFileTabNavigationKeepsPaneFocus(t *testing.T) {
 	}
 }
 
+func TestFileTabNavigationRestoresViewport(t *testing.T) {
+	for _, kind := range []string{"tab", "number", "click", "picker", "tree"} {
+		t.Run(kind, func(t *testing.T) {
+			app := setupAppWithDoc(t, strings.Repeat("first line\n", 100))
+			second := setupAppWithDoc(t, strings.Repeat("second line\n", 100))
+			second.tab().path = "second.md"
+			second.tab().cursorLine = 3
+			app.tabs = append(app.tabs, second.tabs[0])
+			app.multiFile = true
+			app.contentViewport.SetWidth(80)
+			app.contentViewport.SetHeight(8)
+			app.tab().cursorLine = 40
+			app.rebuildContent()
+			app.contentViewport.SetYOffset(32)
+			selectTab := func(index int) {
+				t.Helper()
+				switch kind {
+				case "tab":
+					mod := tea.KeyMod(0)
+					if index == 0 {
+						mod = tea.ModShift
+					}
+					app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyTab, Mod: mod})
+				case "number":
+					app = pressKey(app, rune('1'+index))
+				case "click":
+					app.selectTab(index)
+				case "picker":
+					app.openFileSelect()
+					for row, match := range app.fileSelect.matches {
+						if match.index == index {
+							app.pickFile(row)
+							break
+						}
+					}
+				case "tree":
+					app.syncFileTree()
+					app.renderFileTree()
+					for row, file := range app.fileTree.rows {
+						if !file.isDir && file.tabIndex == index {
+							app.setTreeCursor(row)
+							break
+						}
+					}
+				}
+				if app.activeTab != index {
+					t.Fatalf("selected tab %d, want %d", app.activeTab, index)
+				}
+			}
+			selectTab(1)
+			if app.tab().cursorLine != 3 || app.contentViewport.YOffset() != 0 {
+				t.Fatalf("new tab cursor/offset = %d/%d, want 3/0", app.tab().cursorLine, app.contentViewport.YOffset())
+			}
+			app.tab().cursorLine = 70
+			app.contentViewport.SetYOffset(62)
+			selectTab(0)
+			if app.tab().cursorLine != 40 || app.contentViewport.YOffset() != 32 {
+				t.Fatalf("first tab cursor/offset = %d/%d, want 40/32", app.tab().cursorLine, app.contentViewport.YOffset())
+			}
+			selectTab(1)
+			if app.tab().cursorLine != 70 || app.contentViewport.YOffset() != 62 {
+				t.Fatalf("second tab cursor/offset = %d/%d, want 70/62", app.tab().cursorLine, app.contentViewport.YOffset())
+			}
+		})
+	}
+}
+
+func TestCrossFileNavigationStartsAtDirectionalEdge(t *testing.T) {
+	for _, key := range []rune{'n', 'N', ']', '[', '}', '{', '/', '?'} {
+		t.Run(string(key), func(t *testing.T) {
+			step := 1
+			if strings.ContainsRune("N[{?", key) {
+				step = -1
+			}
+			app := setupAppWithDoc(t, strings.Repeat("plain\n", 80))
+			lines := strings.Split(strings.Repeat("plain\n", 79)+"plain", "\n")
+			lines[11], lines[39] = "target", "target"
+			target := setupAppWithDoc(t, strings.Join(lines, "\n"))
+			target.tab().path = "target.md"
+			sourceTab, targetTab := 0, 1
+			if step > 0 {
+				app.tabs = append(app.tabs, target.tabs[0])
+			} else {
+				app.tabs = []FileTab{target.tabs[0], app.tabs[0]}
+				sourceTab, targetTab = 1, 0
+			}
+			app.activeTab, app.multiFile = sourceTab, true
+			if key == 'n' || key == 'N' {
+				app.tabs[targetTab].changeChunks = []changeChunk{{startLine: 12, endLine: 12}, {startLine: 40, endLine: 40}}
+			} else if strings.ContainsRune("][}{", key) {
+				app.tabs[targetTab].state.Comments = []review.Comment{
+					{ID: "first", StartLine: 12, EndLine: 12, Body: "first feedback"},
+					{ID: "last", StartLine: 40, EndLine: 40, Body: "last feedback"},
+				}
+			}
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 24})
+			app.selectTab(targetTab)
+			app.tab().cursorLine = 35
+			app.contentViewport.SetYOffset(35)
+			app.selectTab(sourceTab)
+			app.tab().cursorLine = 80
+			if step < 0 {
+				app.tab().cursorLine = 1
+			}
+			app.rebuildContent()
+			app = pressKey(app, key)
+			if key == '/' || key == '?' {
+				app = typeSearch(app, "target")
+			}
+			wantLine := 12
+			if step < 0 {
+				wantLine = 40
+			}
+			if app.activeTab != targetTab || app.tab().cursorLine != wantLine {
+				t.Fatalf("tab/line = %d/%d, want %d/%d", app.activeTab, app.tab().cursorLine, targetTab, wantLine)
+			}
+			r, ok := app.contentRenderedRange("", wantLine, wantLine)
+			if !ok {
+				t.Fatal("target line has no rendered range")
+			}
+			wantOffset := max(0, r.end-app.contentViewport.Height())
+			if step < 0 {
+				wantOffset = r.start
+			}
+			if key == 'n' || key == 'N' {
+				wantOffset = wantLine - chunkScrollPadding - 1
+			}
+			if app.contentViewport.YOffset() != wantOffset {
+				t.Fatalf("offset = %d, want %d from direction %d", app.contentViewport.YOffset(), wantOffset, step)
+			}
+		})
+	}
+}
+
+func TestFileTabNavigationRestoresCommentViewport(t *testing.T) {
+	app := newCommentNavigationTestApp()
+	app.commentViewport.SetHeight(5)
+	for i := range app.tabs {
+		app.tabs[i].state.Comments = nil
+		for j := range 20 {
+			app.tabs[i].state.Comments = append(app.tabs[i].state.Comments, review.Comment{
+				ID: fmt.Sprintf("%d-%d", i, j), Scope: "file", Body: "feedback",
+			})
+		}
+	}
+	app.updateCommentSidebar()
+	app.commentViewport.SetYOffset(10)
+	app.selectTab(1)
+	if app.commentViewport.YOffset() != 0 {
+		t.Fatal("new tab inherited the comment viewport")
+	}
+	app.commentViewport.SetYOffset(20)
+	app.selectTab(0)
+	if app.commentViewport.YOffset() != 10 {
+		t.Fatal("returning to the first tab lost the comment viewport")
+	}
+	app.selectTab(1)
+	if app.commentViewport.YOffset() != 20 {
+		t.Fatal("returning to the second tab lost the comment viewport")
+	}
+}
+
 func TestLineNavigation(t *testing.T) {
 	for _, tt := range []struct {
 		name        string

@@ -273,7 +273,7 @@ func (m *AppModel) currentCommentTarget(targets []commentTarget) int {
 func (m *AppModel) jumpToComment(step int, includeResolved bool) bool {
 	tabIndex, target, ok := m.adjacentComment(step, includeResolved)
 	if ok {
-		m.selectComment(tabIndex, target)
+		m.selectCommentTarget(tabIndex, target, step)
 	}
 	return ok
 }
@@ -305,7 +305,7 @@ func (m *AppModel) jumpFromFinish(step int, includeResolved bool) {
 		return
 	}
 	m.tabs[tabIndex].selecting = false
-	m.selectComment(tabIndex, target)
+	m.selectCommentTarget(tabIndex, target, step)
 }
 
 // endComment returns the first matching target of the review for a forward
@@ -396,7 +396,11 @@ func (m *AppModel) findAdjacentComment(step int, includeResolved, wrap bool) (in
 }
 
 func (m *AppModel) selectComment(tabIndex int, target commentTarget) {
-	m.activeTab = tabIndex
+	m.selectCommentTarget(tabIndex, target, 0)
+}
+
+func (m *AppModel) selectCommentTarget(tabIndex int, target commentTarget, step int) {
+	changed := m.activateTab(tabIndex)
 	t := m.tab()
 	if isGeneralCommentScope(target.scope) && m.viewMode {
 		m.viewMode = false
@@ -409,6 +413,9 @@ func (m *AppModel) selectComment(tabIndex int, target commentTarget) {
 	t.cursorAnnoIdx = target.annoIdx
 	m.rebuildContent()
 	m.updateCommentSidebar()
+	if changed {
+		m.positionTabViewport(step)
+	}
 	m.scrollToCursor()
 }
 
@@ -514,10 +521,10 @@ func (m *AppModel) jumpToChange(step int) bool {
 					m.viewMode = false
 					m.recalculateLayout()
 				}
-				m.selectComment(tabIndex, target.comment)
+				m.selectCommentTarget(tabIndex, target.comment, step)
 			} else {
 				m.focused = contentPane
-				m.selectChange(tabIndex, target.chunk)
+				m.selectChange(tabIndex, target.chunk, step)
 			}
 			return true
 		}
@@ -534,8 +541,8 @@ func (m *AppModel) changeCursor(t *FileTab, chunk changeChunk) lineRef {
 	return lineRef{line: chunk.startLine}
 }
 
-func (m *AppModel) selectChange(tabIndex int, chunk changeChunk) {
-	m.activeTab = tabIndex
+func (m *AppModel) selectChange(tabIndex int, chunk changeChunk, step int) {
+	changed := m.activateTab(tabIndex)
 	t := m.tab()
 	cursor := m.changeCursor(t, chunk)
 	t.cursorLine, t.cursorSide = cursor.line, cursor.side
@@ -544,6 +551,9 @@ func (m *AppModel) selectChange(tabIndex int, chunk changeChunk) {
 	t.cursorAnnoIdx = 0
 	m.rebuildContent()
 	m.updateCommentSidebar()
+	if changed {
+		m.positionTabViewport(step)
+	}
 	m.scrollToChunk(chunk)
 	if t.isBinary {
 		m.contentViewport.SetYOffset(0)

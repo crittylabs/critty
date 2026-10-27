@@ -658,12 +658,20 @@ func (m *AppModel) isearchLand(match isearchMatch, ok bool) {
 		m.rebuildContent()
 		return
 	}
-	m.selectTab(match.tab)
+	changed := m.activateTab(match.tab)
 	t := m.tab()
 	t.cursorLine, t.cursorSide = match.ref.line, match.ref.side
 	t.cursorOnAnnotation, t.cursorAnnoIdx = false, 0
 	t.cursorOnForm = false
 	m.rebuildContent()
+	if changed {
+		m.updateCommentSidebar()
+		step := -1
+		if s.forward {
+			step = 1
+		}
+		m.positionTabViewport(step)
+	}
 	m.scrollToCursor()
 	m.revealTableMatch()
 }

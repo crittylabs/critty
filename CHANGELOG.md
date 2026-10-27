@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- Switching files restores each file's source and Comments sidebar scroll positions during the current run, instead of inheriting the previous file's position.  Cross-file searches and hunk, comment, or form navigation start at the beginning or end of the destination file according to direction.
 - Agent-launched reviews continue to desktop or custom launcher candidates when terminal-marker detection fails or matches multiple panes.  Previously, marker errors stopped startup before fallback launchers could be tried.  SSH restrictions still apply; if all candidates fail, Critty reports both the marker and launcher errors.
 
 ## 1.7.0

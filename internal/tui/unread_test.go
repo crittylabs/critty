@@ -121,7 +121,7 @@ func TestUnreadRenderingAndNavigation(t *testing.T) {
 					case "tree":
 						app.setTreeCursor(row)
 					case "change":
-						app.selectChange(1, changeChunk{startLine: 1, endLine: 1})
+						app.selectChange(1, changeChunk{startLine: 1, endLine: 1}, 0)
 					}
 					if app.activeTab != 1 || app.tabs[1].unread || !app.tabs[2].unread {
 						t.Fatal("opening a tab did not mark only that tab as read")

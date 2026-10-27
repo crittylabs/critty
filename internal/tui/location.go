@@ -44,7 +44,7 @@ func (m *AppModel) focusStartupLocation() {
 		if m.sourcePath(t.path) != m.sourcePath(location.path) {
 			continue
 		}
-		m.activeTab = i
+		changed := m.activateTab(i)
 		m.focused = contentPane
 		if location.line > 0 && t.doc != nil && t.doc.HasLine(location.line) {
 			t.cursorLine, t.cursorSide = location.line, ""
@@ -53,6 +53,9 @@ func (m *AppModel) focusStartupLocation() {
 		}
 		m.rebuildContent()
 		m.updateCommentSidebar()
+		if changed {
+			m.positionTabViewport(1)
+		}
 		m.scrollToCursor()
 		return
 	}
@@ -113,7 +116,7 @@ func (m *AppModel) navigateSource(location sourceLocation) tea.Cmd {
 		if location.line > 0 && (t.doc == nil || !t.doc.HasLine(location.line)) {
 			continue
 		}
-		m.activeTab = i
+		changed := m.activateTab(i)
 		m.focused = contentPane
 		t.selecting, t.cursorOnAnnotation = false, false
 		t.cursorOnForm = false
@@ -126,6 +129,9 @@ func (m *AppModel) navigateSource(location sourceLocation) tea.Cmd {
 		}
 		m.rebuildContent()
 		m.updateCommentSidebar()
+		if changed {
+			m.positionTabViewport(1)
+		}
 		m.scrollToCursor()
 		return nil
 	}

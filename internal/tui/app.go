@@ -1188,18 +1188,10 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.multiFile && !t.selecting {
 		switch {
 		case key.Matches(msg, keys.PrevTab):
-			if m.activeTab > 0 {
-				m.activeTab--
-				m.rebuildContent()
-				m.updateCommentSidebar()
-			}
+			m.selectTab(m.activeTab - 1)
 			return m, nil
 		case key.Matches(msg, keys.NextTab):
-			if m.activeTab < len(m.tabs)-1 {
-				m.activeTab++
-				m.rebuildContent()
-				m.updateCommentSidebar()
-			}
+			m.selectTab(m.activeTab + 1)
 			return m, nil
 		}
 	}
@@ -1208,11 +1200,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// Number keys 1-9 for direct tab access
 		if s := msg.String(); len(s) == 1 && s[0] >= '1' && s[0] <= '9' {
 			idx := int(s[0]-'0') - 1
-			if idx < len(m.tabs) {
-				m.activeTab = idx
-				m.rebuildContent()
-				m.updateCommentSidebar()
-			}
+			m.selectTab(idx)
 			return m, nil
 		}
 	}
@@ -1828,7 +1816,7 @@ func (m *AppModel) resolveThread(id string, advance bool) {
 	}
 	m.persist()
 	if advance && found && hasNext && (nextTab != m.activeTab || next.id != id) {
-		m.selectComment(nextTab, next)
+		m.selectCommentTarget(nextTab, next, 1)
 		return
 	}
 	m.rebuildContent()
@@ -3522,12 +3510,12 @@ func (m *AppModel) handleCommentHeaderClick(region commentHeaderRegion, point te
 }
 
 func (m *AppModel) selectTab(index int) {
-	if index < 0 || index >= len(m.tabs) || m.activeTab == index {
+	if !m.activateTab(index) {
 		return
 	}
-	m.activeTab = index
 	m.rebuildContent()
 	m.updateCommentSidebar()
+	m.positionTabViewport(0)
 }
 
 type modalMouseAction struct {
