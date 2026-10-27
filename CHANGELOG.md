@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Enter unfolds a folded comment, then opens its comment window on the next press, including threads whose source position could not be tracked.  Left/right arrows and `h`/`l` fold/unfold comments before scrolling tables; arrow keys can still switch diff sides when no fold change is needed.  `O` resets individual folds when opening all comments or returning to the default display.
 - Desktop reviews prefer terminals with image previews before falling back to text review.  Add kitty, WezTerm, and Alacritty launchers, Linux Ghostty, and xterm as a final Linux fallback after `xdg-terminal-exec`; Terminal.app and Windows Terminal remain platform fallbacks.  WezTerm and Alacritty also support Windows terminals from WSL.  Explicit launcher order is preserved.
 - The review skill leaves launcher selection to Critty unless the user requests an override.  It observes the chosen launcher, skips further markers after a marker-free launch, and rediscovers the destination when the agent session resumes.  A different terminal preference prompts a configuration proposal, with a CLI override until the setting is saved.
 - Agents can see why a review opened in a particular terminal: `--summary` JSON includes failed launcher candidates and their reasons, any terminal-marker failure, and the concrete launcher.  Startup stderr identifies the final launcher once the review is ready, with `foreground` for direct current-terminal operation; successful fallbacks keep failed attempts out of stderr.

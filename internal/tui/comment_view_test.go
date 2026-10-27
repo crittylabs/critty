@@ -10,6 +10,88 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
+func TestCommentFoldKeys(t *testing.T) {
+	for _, drifted := range []bool{false, true} {
+		for _, resolved := range []bool{false, true} {
+			for _, sidebar := range []bool{false, true} {
+				t.Run(fmt.Sprintf("drifted=%t/resolved=%t/sidebar=%t", drifted, resolved, sidebar), func(t *testing.T) {
+					app := setupAppWithDoc(t, "source\n")
+					app.width, app.height = 120, 40
+					app.recalculateLayout()
+					app.tab().state.Comments = []review.Comment{{ID: "thread", StartLine: 1, EndLine: 1, Body: "thread body", Drifted: drifted, Resolved: resolved}}
+					app.selectComment(0, app.commentTargets(0)[0])
+					if sidebar {
+						app.focused, app.sidebarView = commentPane, commentsView
+						app.updateCommentSidebar()
+					}
+					for _, step := range []struct {
+						key    rune
+						folded bool
+					}{{'h', true}, {tea.KeyLeft, true}, {'l', false}, {tea.KeyRight, false}, {tea.KeyLeft, true}, {tea.KeyEnter, false}} {
+						app = pressKey(app, step.key)
+						if app.modal != noModal || app.threadCollapsed("thread", resolved, drifted, true) != step.folded {
+							t.Fatalf("key %d: modal=%v, folded=%t; want folded=%t", step.key, app.modal, app.threadCollapsed("thread", resolved, drifted, true), step.folded)
+						}
+						view := app.contentViewport.GetContent()
+						if sidebar {
+							view = app.commentViewport.GetContent()
+						}
+						if strings.Contains(ansi.Strip(view), "thread body") == step.folded {
+							t.Fatalf("key %d: rendered body does not match fold state", step.key)
+						}
+					}
+					app = pressKey(app, tea.KeyEnter)
+					if app.modal == noModal || app.editingID != "thread" {
+						t.Fatal("Enter on an unfolded comment did not open its window")
+					}
+					if app.tab().state.Comments[0].Resolved != resolved {
+						t.Fatal("folding changed resolution")
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestCommentFoldKeysPrioritizeFoldingOverTableScroll(t *testing.T) {
+	app := setupAppWithDoc(t, "| First | Second |\n| --- | --- |\n| "+strings.Repeat("wide cell ", 30)+" | end |\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 60, Height: 35})
+	app.tab().state.Comments = []review.Comment{{ID: "table", StartLine: 3, EndLine: 3, Body: "table feedback"}}
+	app.selectComment(0, app.commentTargets(0)[0])
+	app = pressKey(app, 'h')
+	app = pressKey(app, 'l')
+	if app.tableAtLine(3).window.offset != 0 {
+		t.Fatal("unfolding scrolled the table")
+	}
+	app = pressKey(app, 'l')
+	offset := app.tableAtLine(3).window.offset
+	if offset == 0 {
+		t.Fatal("right on an unfolded comment did not scroll the table")
+	}
+	app = pressKey(app, 'h')
+	if app.tableAtLine(3).window.offset != offset {
+		t.Fatal("folding scrolled the table")
+	}
+	app = pressKey(app, 'h')
+	if app.tableAtLine(3).window.offset >= offset {
+		t.Fatal("left on a folded comment did not scroll the table")
+	}
+}
+
+func TestDriftedMouseRespectsKeyboardFolds(t *testing.T) {
+	app := setupAppWithDoc(t, "source\n")
+	app.tab().state.Comments = []review.Comment{{ID: "thread", StartLine: 1, EndLine: 1, Body: "feedback", Drifted: true}}
+	app.selectComment(0, app.commentTargets(0)[0])
+	for _, key := range []rune{'h', 'l'} {
+		app = pressKey(app, key)
+		folded := app.threadCollapsed("thread", false, true, true)
+		app.selectMarker([]string{"thread"})
+		if app.threadCollapsed("thread", false, true, true) == folded || app.modal != noModal {
+			t.Fatal("clicking the marker did not toggle the current keyboard fold state")
+		}
+	}
+}
+
 func TestCommentDisplayKeysAndHelp(t *testing.T) {
 	for _, width := range []int{18, 80} {
 		for _, readOnly := range []bool{false, true} {

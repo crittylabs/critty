@@ -155,10 +155,11 @@ func (m *AppModel) selectMarker(ids []string) {
 		expand := false
 		for _, id := range ids {
 			c, _ := m.driftedComment(id)
-			expand = expand || !m.driftedExpanded(id, c.Resolved)
+			expand = expand || m.threadCollapsed(id, c.Resolved, true, id == selected)
 		}
 		for _, id := range ids {
 			t.expandedDrifted[id] = expand
+			delete(t.foldedComments, id)
 		}
 	}
 	for _, target := range m.commentTargets(m.activeTab) {
@@ -198,7 +199,8 @@ func (m *AppModel) toggleDrifted(id string) {
 	if t.expandedDrifted == nil {
 		t.expandedDrifted = make(map[string]bool)
 	}
-	t.expandedDrifted[id] = !m.driftedExpanded(id, false)
+	t.expandedDrifted[id] = m.threadCollapsed(id, false, true, m.selectedCommentID() == id)
+	delete(t.foldedComments, id)
 	m.rebuildContent()
 	m.updateCommentSidebar()
 	m.scrollToCursor()

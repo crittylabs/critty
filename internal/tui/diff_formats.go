@@ -394,7 +394,7 @@ func (m *AppModel) rebuildDiffContent() {
 	appendAnnotations := func(ref lineRef) {
 		for idx, ann := range m.annotationsAfterLine(ref.line, ref.side) {
 			focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == ref.line && t.cursorSide == ref.side && t.cursorAnnoIdx == idx
-			if ann.drifted && !m.driftedExpanded(ann.id, ann.resolved) && (!focused || !ann.resolved) {
+			if ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
 				continue
 			}
 			box, button := m.renderAnnotationBox(ann, max(1, width-gutterWidth), focused)

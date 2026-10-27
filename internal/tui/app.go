@@ -1039,7 +1039,10 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.focused == commentPane && m.sidebarView == filesView && !t.selecting && m.handleFilesSidebarKey(msg) {
 		return m, nil
 	}
-	if m.focused == contentPane && !t.cursorOnAnnotation && t.cursorSide == "" &&
+	if m.handleCommentKey(msg) {
+		return m, nil
+	}
+	if m.focused == contentPane && t.cursorSide == "" &&
 		(msg.String() == "left" || msg.String() == "right" || msg.String() == "h" || msg.String() == "l") {
 		if table := m.tableAtLine(t.cursorLine); table != nil {
 			direction := 1
@@ -1239,19 +1242,6 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.PrevComment):
 			m.jumpToCommentOrFinish(-1, true)
 			return m, nil
-		}
-	}
-
-	if id := m.selectedCommentID(); id != "" {
-		if _, drifted := m.driftedComment(id); drifted {
-			if key.Matches(msg, keys.Confirm) {
-				m.toggleDrifted(id)
-				return m, nil
-			}
-			if msg.String() == "e" {
-				m.openCommentThread(id)
-				return m, nil
-			}
 		}
 	}
 
@@ -1829,6 +1819,7 @@ func (m *AppModel) resolveThread(id string, advance bool) {
 			c.ResolvedRound = round
 			c.UpdatedAt = review.Now()
 			delete(t.expandedDrifted, id)
+			delete(t.foldedComments, id)
 		}
 		break
 	}
@@ -2605,10 +2596,7 @@ func (m *AppModel) updateCommentSidebar() {
 
 	for idx, it := range t.sidebarItems {
 		isSelected := m.focused == commentPane && idx == t.sidebarCursor
-		collapsed := m.commentCollapsed(it.resolved, isSelected)
-		if it.drifted {
-			collapsed = m.viewMode || !m.driftedExpanded(it.id, it.resolved) && (!isSelected || !it.resolved)
-		}
+		collapsed := m.threadCollapsed(it.id, it.resolved, it.drifted, isSelected)
 		var item strings.Builder
 
 		var lineInfo string
@@ -4218,10 +4206,12 @@ func (m AppModel) renderFooter() string {
 		}
 	} else {
 		enterAction := "comment"
-		comment, drifted := m.driftedComment(m.selectedCommentID())
-		drifted = drifted && !comment.Resolved
-		if drifted {
-			enterAction = "toggle thread"
+		if id := m.selectedCommentID(); id != "" {
+			comment, drifted := m.driftedComment(id)
+			enterAction = "open thread"
+			if m.threadCollapsed(id, comment.Resolved, drifted, true) {
+				enterAction = "unfold thread"
+			}
 		}
 		items = []string{
 			k("[/]", "threads/forms"),
@@ -4232,8 +4222,8 @@ func (m AppModel) renderFooter() string {
 			k("enter", enterAction),
 			k("f", "file comment"),
 		}
-		if drifted {
-			items = append(items, k("e", "edit/reply"))
+		if m.selectedCommentID() != "" {
+			items = append(items, k("←/→,h/l", "fold/unfold"))
 		}
 		if len(t.state.Comments) > 0 {
 			items = append(items, k("r/space/R", "resolve/+next"))
@@ -4416,10 +4406,12 @@ func (m AppModel) renderHelp(innerWidth int) string {
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, general, "  ", navigation, "  ", codeReview)
 	contexts := renderHelpGroup("Selection and dialogs", []helpItem{
+		{keys: "enter (comment)", desc: "unfold a folded thread; otherwise open its comment window"},
+		{keys: "←/→,h/l (comment)", desc: "fold/unfold first; otherwise scroll the table or switch diff sides with arrow keys"},
 		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
 		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
 		{keys: "V", desc: "toggle reading view: hide sidebar and fold all comments; leaving restores the previous expansion setting"},
-		{keys: "O", desc: "toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
+		{keys: "O", desc: "reset individual folds and toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
 		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},
 		{keys: "↑/↓,j/k · ←/→,h/l · enter/esc", desc: "outline: jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},

@@ -57,6 +57,7 @@ type FileTab struct {
 	cursorOnForm       bool
 	cursorAnnoIdx      int
 	expandedDrifted    map[string]bool
+	foldedComments     map[string]bool
 
 	// Placeholder tabs
 	isBinary  bool

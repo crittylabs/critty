@@ -187,7 +187,7 @@ func (m *AppModel) rebuildContent() {
 		layout.appendBlock(&b, "", contentMouseTarget{})
 	}
 	appendAnnotation := func(ann annotation, focused bool, target contentMouseTarget) {
-		if ann.drifted && !m.driftedExpanded(ann.id, ann.resolved) && (!focused || !ann.resolved) {
+		if ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
 			return
 		}
 		box, button := m.renderAnnotationBox(ann, boxWidth, focused)
@@ -508,10 +508,7 @@ func (m *AppModel) rebuildContent() {
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
 func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused bool) (string, commentHeaderRegion) {
-	collapsed := m.commentCollapsed(ann.resolved, focused)
-	if ann.drifted && m.driftedExpanded(ann.id, ann.resolved) && !m.viewMode {
-		collapsed = false
-	}
+	collapsed := m.threadCollapsed(ann.id, ann.resolved, ann.drifted, focused)
 	var lineLabel string
 	if isGeneralCommentScope(ann.scope) {
 		lineLabel = "File"
