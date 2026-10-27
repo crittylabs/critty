@@ -2,18 +2,21 @@
 
 ## Unreleased
 
+## 1.8.0
+
 ### Changed
 
-- Reviewers can use `n`/`N` to visit all hunks, comment threads, and form controls, including resolved threads and answered items.  Footer hints distinguish pending items, all items, and all hunks & items; Keyboard Help groups these shortcuts and file switching under Navigation.
-- Enter unfolds a folded comment, then opens its comment window on the next press, including threads whose source position could not be tracked.  Left/right arrows and `h`/`l` fold/unfold comments before scrolling tables; arrow keys can still switch diff sides when no fold change is needed.  `O` resets individual folds when opening all comments or returning to the default display.  Reading view (`V`) reduces all comments, including unresolved threads, to bubble markers without changing their saved expansion state.
-- Desktop reviews prefer terminals with image previews before falling back to text review.  Add kitty, WezTerm, and Alacritty launchers, Linux Ghostty, and xterm as a final Linux fallback after `xdg-terminal-exec`; Terminal.app and Windows Terminal remain platform fallbacks.  WezTerm and Alacritty also support Windows terminals from WSL.  Explicit launcher order is preserved.
-- The review skill leaves launcher selection to Critty unless the user requests an override.  It observes the chosen launcher, skips further markers after a marker-free launch, and rediscovers the destination when the agent session resumes.  A different terminal preference prompts a configuration proposal, with a CLI override until the setting is saved.
-- Agents can see why a review opened in a particular terminal: `--summary` JSON includes failed launcher candidates and their reasons, any terminal-marker failure, and the concrete launcher.  Startup stderr identifies the final launcher once the review is ready, with `foreground` for direct current-terminal operation; successful fallbacks keep failed attempts out of stderr.
-
-### Fixed
-
-- Switching files restores each file's source and Comments sidebar scroll positions during the current run, instead of inheriting the previous file's position.  Cross-file searches and hunk, comment, or form navigation start at the beginning or end of the destination file according to direction.
-- Agent-launched reviews continue to desktop or custom launcher candidates when terminal-marker detection fails or matches multiple panes.  Previously, marker errors stopped startup before fallback launchers could be tried.  SSH restrictions still apply; if all candidates fail, Critty reports both the marker and launcher errors.
+- **UI and UX refinements**:
+  - **Compact tab bar**: Gain two rows for documents and code.  Tabs no longer jump sideways when many files are open, and colors are easier to read.  Unread dots flag updated tabs.
+  - **More informative Files tree**: Entries show the same review indicators as tab titles, making pending comments and unanswered form items easier to find.
+  - **Clearer navigation**: `n`/`N` visits all hunks and review items, including resolved threads and answered items.  Help and footer hints are easier to follow.
+  - **Fold comments with arrow keys**: Use left/right arrows to fold or unfold comments.  Enter now opens comments whose original source location cannot be tracked.
+  - **Focus on reading**: View mode (`V`) minimizes every comment to a speech-bubble marker so you can focus on documents and code.
+  - **Per-tab scroll positions**: Each tab remembers its document and Comments sidebar scroll positions.
+- **Launcher refinements**:
+  - **More desktop terminals**: Desktop reviews prefer terminals with image previews.  New launchers support kitty, WezTerm, and Alacritty; Ghostty also works on Linux.  WezTerm and Alacritty also work with Windows terminals from WSL; xterm is the final Linux fallback after `xdg-terminal-exec`.  Explicit launcher order takes precedence.  See [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers).
+  - **Reliable fallback**: Marker lookup failures, including ambiguous matches, no longer stop reviews from trying desktop or custom launchers.  SSH restrictions still apply.
+  - **Steadier launcher selection**: Updated review skills help Critty consistently select a suitable launcher and guide users to configure a preferred terminal.  Startup messages and review summaries explain launcher choices and fallback failures.
 
 ## 1.7.0
 

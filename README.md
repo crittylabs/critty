@@ -15,11 +15,11 @@ You can review a diff, file, or document on its own.  Your agent can also attach
 
 When your agent needs your input, it prepares the request and opens a review in Critty.  Comment on individual lines, answer questions, confirm details, or authorize actions.  Your comments and answers go back to the agent.
 
-If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for the full list.
+If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for the full list.
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/a4889092-18a3-4ce7-829e-fe7049a464f5
+https://github.com/user-attachments/assets/8bce362f-f53f-4711-b6d3-47cf93df0c84
 
 For example:
 
@@ -47,7 +47,7 @@ For example:
 - **Inline image previews** — compare image changes, attach images alongside review documents, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
 - **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.
-- **Navigation and editing** — search across files as you type, follow file and comment references, and open source in your preferred editor.
+- **Navigation and editing** — search across files as you type, follow file and comment references, and return to each file where you left off.  Compact tabs leave more room for the document.
 - **Text Selection and Copying** — select text from documents and diffs to reuse it, preserving Markdown formatting and link targets.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
 - **Scriptable and Crit-compatible** — automate comments with a [Crit](https://crit.md/)-compatible review format and resume saved sessions.
@@ -142,7 +142,7 @@ Critty opens a review pane or tab in the detected multiplexer, or a new window o
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-https://github.com/user-attachments/assets/ae71a3ff-708e-4b13-a5d2-7e334abc14a7
+https://github.com/user-attachments/assets/8afbb65f-e001-4a67-ab34-7c3afac65a4e
 
 For a manual review:
 
@@ -157,6 +157,8 @@ critty plan design.md         # A versioned plan
 <a id="review-navigation"></a>
 
 Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
+
+Compact tabs leave two more rows for the document.  Each tab remembers your reading position in the document and Comments sidebar.  The Files tree shows pending comments and unanswered items.  Use `V` for full-width reading with all comments reduced to bubble markers.
 
 Word-level highlights estimate corresponding lines even when a change also adds or removes lines.  Side-by-side view uses the same matches.  Very long lines and expensive searches keep full-line highlighting so reviews stay responsive.
 
@@ -288,77 +290,77 @@ Videos and screenshots captured with v1.7.0 candidates.
 
 Jump through source declarations and Markdown headings, then inspect an attached image.  `M-G` focuses the outline; Enter returns to the source.
 
-https://github.com/user-attachments/assets/87719a49-f561-4832-9e02-d6d00cf88309
+https://github.com/user-attachments/assets/b647a70b-8206-4402-857b-330ee6a214c6
 
-![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/011565e7-5544-4028-859f-cb2ba203b262)
+![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/22e5987a-53d3-4f32-91a1-792d610bc3d5)
 
-![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/d1252fef-4b0d-47b8-b072-32732f7714be)
+![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/91781b73-e5d8-47a1-be89-3b822c70badb)
 
 ### Code review with inline comments
 
-https://github.com/user-attachments/assets/ae71a3ff-708e-4b13-a5d2-7e334abc14a7
+https://github.com/user-attachments/assets/8afbb65f-e001-4a67-ab34-7c3afac65a4e
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/d77f6402-bd93-4e83-a375-7f599ab2fca8)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/1d93a68b-a4d2-4a0f-91da-f51928cbf018)
 
 ### Review round trips with Claude Code
 
-https://github.com/user-attachments/assets/e858029a-6e37-4ae7-856e-def321b83164
+https://github.com/user-attachments/assets/56724c09-7ffa-4521-bfe6-9452be423e4e
 
 ### Review round trips with Codex
 
-https://github.com/user-attachments/assets/0a465ba6-42af-4352-b982-0648cce07d83
+https://github.com/user-attachments/assets/ecc84f8b-3ab9-4d22-80e7-f1e2e854e992
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-https://github.com/user-attachments/assets/d1dfb811-f9fd-46d0-9140-ad60c00f8801
+https://github.com/user-attachments/assets/418bb5b9-e31e-42ab-9abd-075127fe643c
 
 ### Following live review updates
 
 Watch follows file edits and marks changed background tabs.  Follow a file reference from an attachment to inspect the updated source.
 
-https://github.com/user-attachments/assets/185be8f2-693f-46cb-a408-0ff17b6ea497
+https://github.com/user-attachments/assets/a01e9427-1963-4771-ac00-b42e6de94900
 
 ### Reviewing a document
 
-https://github.com/user-attachments/assets/fb33d590-13dc-4012-8a9e-54b2925e9ed6
+https://github.com/user-attachments/assets/1b66b800-df61-4ee0-8424-0b39fb68bba7
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/d99ab5f1-9cfc-43af-aa45-c0df2d3f4d83)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/3268a1ce-0a8a-4a32-ac7d-39d803673cef)
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/35f2d6c2-dcd6-4edd-8651-ef041d4c69f6)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/07954969-1d1b-452b-853f-9dd834c57208)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/7b4ba84a-19f5-475b-8777-6487b325b2e6)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/c93ac410-3def-4f3c-a7b5-c72581e7c98c)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/3c195e0a-2cb9-41bd-af79-ec1486b1b35e)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/4ae61333-45d5-42b1-9e8b-d698cb0cc9de)
 
 ### Answering a questionnaire with form widgets
 
 See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/c56702b7-1298-437a-b631-2a474083751b)
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/28bd80aa-e323-4198-9c8b-47be3c760708)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/2b22f664-7e86-4ad2-b3b7-927f7a6c8309)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/db36474c-6ebe-4554-af8c-c2e497bd0f21)
 
 ### Approval checks for unfinished items
 
-![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/5db8cb35-6030-4d98-9f79-dfae2a55febd)
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/7fab4e15-c81e-4062-9720-e19f3bf718aa)
 
 ### Incremental search
 
-![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/9b4fdfb8-1e74-4541-bf14-f96071d8efe5)
+![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/19fbf244-9aef-47fa-b26f-cd2bdfe46045)
 
 ## Contributing
 

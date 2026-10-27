@@ -3149,6 +3149,9 @@ func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
 		}
 	}
 	label := labels[i].text
+	if m.tabs[i].unread {
+		label = m.tabs[i].unreadMarker() + lipgloss.NewStyle().Foreground(style.GetForeground()).Render(label)
+	}
 	if width > 0 {
 		if width < 3 {
 			style = style.Padding(0)

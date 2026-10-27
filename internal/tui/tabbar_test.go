@@ -148,7 +148,7 @@ func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
 	}
 }
 
-func TestTabTitlesOmitUnreadMarkers(t *testing.T) {
+func TestTabTitlesShowOnlyUnreadMarkers(t *testing.T) {
 	for _, unread := range []bool{false, true} {
 		app := newFileTreeTestApp()
 		app.activeTab = 1
@@ -156,6 +156,9 @@ func TestTabTitlesOmitUnreadMarkers(t *testing.T) {
 		app.tabs[0].unread = unread
 		tab := app.renderTab(app.tabLabels(), 0)
 		want := " note.md "
+		if unread {
+			want = " ● note.md "
+		}
 		if caption := ansi.Strip(tab); caption != want {
 			t.Fatalf("unread=%t: caption = %q, want %q", unread, caption, want)
 		}
