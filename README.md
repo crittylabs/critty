@@ -15,7 +15,7 @@ You can review a diff, file, or document on its own.  Your agent can also attach
 
 When your agent needs your input, it prepares the request and opens a review in Critty.  Comment on individual lines, answer questions, confirm details, or authorize actions.  Your comments and answers go back to the agent.
 
-If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for the full list.
+If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/references/terminals.md#review-launchers) for the full list.
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
@@ -106,7 +106,7 @@ In v1.3.0, user settings move to `~/.config/critty/config.toml` and project `.cr
 
 In tmux, floating panes require version 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use a supported multiplexer for agent reviews, or run Critty directly.
 
-After setting up or switching your terminal or multiplexer, run `critty doctor` there to check review launchers and local image forwarding settings.  See the [launcher reference](internal/cli/skill/critty-cli/SKILL.md#review-launchers) for configuration and supported terminals.
+After setting up or switching your terminal or multiplexer, run `critty doctor` there to check review launchers and local image forwarding settings.  See the [launcher reference](internal/cli/skill/critty-cli/references/terminals.md#review-launchers) for configuration and supported terminals.
 
 #### Image previews
 
@@ -128,7 +128,7 @@ When using Codex in a supported multiplexer, start it through Critty so reviews 
 critty codex
 ```
 
-Alternatively, put the bundled `codex` wrapper ahead of Codex on your `PATH`.  Run `critty doctor` to inspect wrapper and terminal-filter detection.  For an end-to-end binding test, use the [marker-based doctor check](internal/cli/skill/critty-cli/SKILL.md#environment-diagnostics).  See [terminal-filter integration](docs/terminal-filter.md) for setup.
+Alternatively, put the bundled `codex` wrapper ahead of Codex on your `PATH`.  Run `critty doctor` to inspect wrapper and terminal-filter detection.  For an end-to-end binding test, use the [marker-based doctor check](internal/cli/skill/critty-cli/references/terminals.md#environment-diagnostics).  See [terminal-filter integration](docs/terminal-filter.md) for setup.
 
 ## Basic workflow
 
@@ -174,13 +174,13 @@ critty sessions resume <id>      # Continue a saved review
 
 The list shows each review's status and local start time.  Resume from any checkout of the same Git project, even after deleting the original worktree.  Git reviews use the current checkout, while comments, replies, attachments, and answers carry forward.  Changed inputs require fresh confirmations and consents.
 
-Saved text remains available when an original document is missing or a file is outside the current changes.  Plans and supplied diffs keep their saved snapshots; unavailable binary data cannot be restored.  Older sessions need the original checkout or its Git registration to identify the project.  See `critty sessions --help` for sorting, stopping, and removing sessions, and the [session reference](internal/cli/skill/critty-cli/SKILL.md#targeting-a-session-or-plan) for details.
+Saved text remains available when an original document is missing or a file is outside the current changes.  Plans and supplied diffs keep their saved snapshots; unavailable binary data cannot be restored.  Older sessions need the original checkout or its Git registration to identify the project.  See `critty sessions --help` for sorting, stopping, and removing sessions, and the [session reference](internal/cli/skill/critty-cli/references/sessions.md#targeting-a-session-or-plan) for details.
 
 ### Live Review Updates
 
 Keep a review open while files change.  Click **Reload** to refresh the current Git scope, document, and file-backed attachments, or turn on **Watch** to follow edits automatically.  Watch starts off; agents can enable it with `--watch`.  Updates wait while you edit, select text, search, or use a dialog.  Updated background tabs show an unread dot until opened.
 
-Saved plans, supplied diffs, and committed comparisons keep their snapshots.  File-backed attachments can still update.  Changed review inputs require fresh confirmations and consents.  See the [live source reference](internal/cli/skill/critty-cli/SKILL.md#live-sources) for limits.
+Saved plans, supplied diffs, and committed comparisons keep their snapshots.  File-backed attachments can still update.  Changed review inputs require fresh confirmations and consents.  See the [live source reference](internal/cli/skill/critty-cli/references/inputs.md#live-sources) for limits.
 
 ### Text Selection and Copying
 
@@ -200,7 +200,7 @@ Review binary plists and text in other encodings as readable UTF-8 through your 
 textconv_drivers = ["plist", "cp932"]
 ```
 
-Conversions are disabled by default.  Comments on converted files refer to the converted text and its line numbers.  Agents receive the converter's name and command with the feedback to help locate the original content and preserve its format when editing.  See [configuration](docs/configuration.md) and [Git text conversions](internal/cli/skill/critty-cli/SKILL.md#git-text-conversions) for driver setup and limitations.
+Conversions are disabled by default.  Comments on converted files refer to the converted text and its line numbers.  Agents receive the converter's name and command with the feedback to help locate the original content and preserve its format when editing.  See [configuration](docs/configuration.md) and [Git text conversions](internal/cli/skill/critty-cli/references/inputs.md#git-text-conversions) for driver setup and limitations.
 
 ### Review changes outside Git
 

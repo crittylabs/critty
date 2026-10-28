@@ -164,55 +164,59 @@ func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
 	}
 }
 
-func TestOpenCodeCommandLinksReachInstalledFiles(t *testing.T) {
-	for _, global := range []bool{false, true} {
-		t.Run(fmt.Sprintf("global=%v", global), func(t *testing.T) {
-			home := t.TempDir()
-			t.Setenv("HOME", home)
-			t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
-			t.Chdir(t.TempDir())
-			files := integrations()["opencode"]
-			var command string
-			for _, f := range files {
-				if err := installIntegrationFile(f, global); err != nil {
-					t.Fatal(err)
+func TestInstalledSkillLinksAndSize(t *testing.T) {
+	for _, agent := range []string{"claude-code", "codex", "opencode", "gemini", "agents", "antigravity"} {
+		for _, global := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/global=%v", agent, global), func(t *testing.T) {
+				home := t.TempDir()
+				t.Setenv("HOME", home)
+				t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+				t.Chdir(t.TempDir())
+				files := integrations()[agent]
+				for _, f := range files {
+					if err := installIntegrationFile(f, global); err != nil {
+						t.Fatal(err)
+					}
 				}
-				if filepath.Base(f.dest) == "critty.md" {
-					var err error
-					command, err = integrationDest(f, global)
+				for _, f := range files {
+					if filepath.Ext(f.dest) != ".md" {
+						continue
+					}
+					dest, err := integrationDest(f, global)
+					if err != nil {
+						t.Fatal(err)
+					}
+					data, err := os.ReadFile(dest)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if filepath.Base(dest) == "SKILL.md" && len(data) > 24_000 {
+						t.Errorf("%s exceeds the Antigravity entrypoint limit: %d bytes", dest, len(data))
+					}
+					doc := parser.New().Parse(data)
+					err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+						link, ok := n.(*ast.Link)
+						if !entering || !ok {
+							return ast.WalkContinue, nil
+						}
+						u, err := url.Parse(link.Destination.Value(data))
+						if err != nil {
+							return ast.WalkStop, err
+						}
+						if u.IsAbs() || u.Host != "" || u.Path == "" {
+							return ast.WalkContinue, nil
+						}
+						if _, err := os.Stat(filepath.Join(filepath.Dir(dest), filepath.FromSlash(u.Path))); err != nil {
+							t.Errorf("%s: broken link %q: %v", dest, link.Destination.Value(data), err)
+						}
+						return ast.WalkContinue, nil
+					})
 					if err != nil {
 						t.Fatal(err)
 					}
 				}
-			}
-			data, err := os.ReadFile(command)
-			if err != nil {
-				t.Fatal(err)
-			}
-			doc := parser.New().Parse(data)
-			links := 0
-			err = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-				link, ok := n.(*ast.Link)
-				if !entering || !ok {
-					return ast.WalkContinue, nil
-				}
-				u, err := url.Parse(link.Destination.Value(data))
-				if err != nil {
-					return ast.WalkStop, err
-				}
-				if u.IsAbs() || u.Host != "" || u.Path == "" {
-					return ast.WalkContinue, nil
-				}
-				links++
-				if _, err := os.Stat(filepath.Join(filepath.Dir(command), filepath.FromSlash(u.Path))); err != nil {
-					t.Errorf("broken command link %q: %v", link.Destination.Value(data), err)
-				}
-				return ast.WalkContinue, nil
 			})
-			if err != nil || links == 0 {
-				t.Fatalf("check command links: count=%d, error=%v", links, err)
-			}
-		})
+		}
 	}
 }
 
