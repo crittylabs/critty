@@ -96,7 +96,7 @@ Install the skills for your agent.  The table shows how to start a review; use `
 
 The `agy` target also accepts `antigravity`.  Omit `--user` to install for the current project.  Use `critty install agents` for shared skills, or `critty install all` for all agent-specific integrations except legacy Gemini CLI.  Choose shared skills or agent-specific variants to avoid duplicate skill names.
 
-Rerun the installer with `--force` after upgrading to refresh the bundled skills and commands.  In v1.2.0, Codex skills use `.codex/skills` in projects and `~/.codex/skills` for users; remove obsolete copies from `.agents/skills` if needed.  When migrating from TCrit, use the new binary and skill names; see the [changelog](CHANGELOG.md) for migration details.
+Rerun the installer with `--force` after upgrading to refresh the bundled skills and commands.  For Antigravity CLI, run `critty install --user --force agy`; v1.8.1 splits detailed instructions into linked reference files so the skills fit its size limit.  In v1.2.0, Codex skills use `.codex/skills` in projects and `~/.codex/skills` for users; remove obsolete copies from `.agents/skills` if needed.  When migrating from TCrit, use the new binary and skill names; see the [changelog](CHANGELOG.md) for migration details.
 
 After installing or upgrading the skills, run `critty doctor` from your project to check for missing or outdated integration files.
 

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.8.1
+
+### Fixed
+
+- **Antigravity CLI reviews**: Skills now load within the agent's size limit, with detailed instructions in linked references.  After upgrading, run `critty install --user --force agy` to refresh them.
+- **Noninteractive terminal handling**: Agent command terminals such as Antigravity CLI's no longer cause unnecessary response waits or misleading warnings in `critty doctor`.  Reviews avoid opening directly in these terminals, and terminal discovery can use the parent terminal instead.
+
 ## 1.8.0
 
 ### Changed
