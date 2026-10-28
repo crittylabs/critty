@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -165,15 +166,18 @@ func environmentForTerminal(ctx reviewMultiplexerContext) ([]envVar, error) {
 
 // fallbackTTY reports the controlling terminal of this process or its nearest
 // ancestor, then SSH_TTY.  Hooks often run detached from the terminal that
-// started their agent.
+// started their agent, and tool runners such as Antigravity allocate a
+// foreground TERM=dumb PTY for command capture while the agent process holds
+// the user's real controlling terminal.
 func fallbackTTY() string {
-	if tty := processTTY(os.Getpid()); tty != "" {
-		return tty
+	ownTTY := processTTY(os.Getpid())
+	if ownTTY != "" && tui.InteractiveTerminal() {
+		return ownTTY
 	}
 	seen := make(map[int]bool)
 	for pid := parentProcessID(); pid > 1 && !seen[pid]; {
 		seen[pid] = true
-		if tty := processTTY(pid); tty != "" {
+		if tty := processTTY(pid); tty != "" && tty != ownTTY {
 			return tty
 		}
 		ppid, err := inspectProcess(pid)

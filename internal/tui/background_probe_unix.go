@@ -17,6 +17,9 @@ import (
 // timeout, so command output is not delayed by a silent terminal.  Both files
 // must be terminals; any failure reports a dark background, the TUI default.
 func HasDarkBackground(in, out *os.File, timeout time.Duration) bool {
+	if !InteractiveTerminal() {
+		return true
+	}
 	fd := int(in.Fd())
 	if !term.IsTerminal(fd) || !term.IsTerminal(int(out.Fd())) {
 		return true

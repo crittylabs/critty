@@ -90,6 +90,9 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 		return fmt.Errorf("--watch requires a live document, Git scope, or file-backed attachment")
 	}
 	// Stdin may contain a patch.  Always read interaction from the foreground TTY.
+	if !tui.InteractiveTerminal() {
+		return fmt.Errorf("this mode requires an interactive foreground terminal")
+	}
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
 		return fmt.Errorf("this mode requires a foreground terminal: %w", err)

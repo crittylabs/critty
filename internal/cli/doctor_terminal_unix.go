@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/internal/tui"
 	"github.com/tklauser/ps"
 	"golang.org/x/sys/unix"
 )
@@ -23,6 +24,9 @@ func probeCurrentTerminalMarker(origin terminalbinding.Origin) (result markerPro
 	foreground, err := unix.IoctlGetInt(int(tty.Fd()), unix.TIOCGPGRP)
 	if err != nil || foreground != unix.Getpgrp() {
 		return markerProbeResult{Reason: "current TTY is not owned by this foreground process"}, nil
+	}
+	if !tui.InteractiveTerminal() {
+		return markerProbeResult{Reason: "current TTY is a dumb terminal"}, nil
 	}
 	target, err := terminalbinding.FromEnvironment()
 	if err != nil {

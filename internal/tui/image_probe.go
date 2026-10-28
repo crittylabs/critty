@@ -2,12 +2,22 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/parser"
 )
+
+// InteractiveTerminal reports whether the current TERM supports interactive
+// terminal UI and escape-sequence probes. Agent tool runners such as
+// Antigravity allocate a foreground PTY with TERM=dumb to capture output.
+func InteractiveTerminal() bool {
+	termName := strings.TrimSpace(os.Getenv("TERM"))
+	return termName != "" && !strings.EqualFold(termName, "dumb")
+}
 
 // ImageCapability records an actual terminal probe, or why it was skipped.
 type ImageCapability struct {

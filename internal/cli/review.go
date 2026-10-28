@@ -21,6 +21,7 @@ import (
 	"github.com/crittylabs/critty/internal/history"
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/tui"
 )
 
 var reviewCode bool
@@ -279,7 +280,7 @@ func runReviewFlow(cfg *config.Config, sess *review.Session, mode *reviewMode) (
 		return runReviewCycle(cfg, sess, sock, mode.launch)
 	}
 
-	if term.IsTerminal(int(os.Stdin.Fd())) || mode.patch != nil {
+	if tui.InteractiveTerminal() && (term.IsTerminal(int(os.Stdin.Fd())) || mode.patch != nil) {
 		fmt.Fprintln(os.Stderr, "launcher: foreground")
 		mode.launch.Launcher = "foreground"
 		payload, err := runTUISession(cfg, sess, mode, false)

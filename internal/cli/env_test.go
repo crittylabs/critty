@@ -223,6 +223,22 @@ func TestTerminalEnvironmentFallsBackToAncestorTTY(t *testing.T) {
 		t.Fatalf("terminalEnvironment() = %v, %v", got, err)
 	}
 
+	ownPID := fmt.Sprintf("%d", os.Getpid())
+	ttys[ownPID] = "ttys018"
+	ttys["400"] = "ttys018"
+	t.Setenv("TERM", "dumb")
+	got, err = terminalEnvironment()
+	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/ttys005"}, {"CRITTY_SSH", "1"}}) {
+		t.Fatalf("dumb terminal fallback = %v, %v", got, err)
+	}
+	t.Setenv("TERM", "xterm-256color")
+	got, err = terminalEnvironment()
+	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/ttys018"}, {"CRITTY_SSH", "1"}}) {
+		t.Fatalf("interactive terminal ownTTY = %v, %v", got, err)
+	}
+	delete(ttys, ownPID)
+	ttys["400"] = "??"
+
 	delete(ttys, "300")
 	got, err = terminalEnvironment()
 	if err != nil || !slices.Equal(got, []envVar{{"TTY", "/dev/pts/9"}, {"CRITTY_SSH", "1"}}) {

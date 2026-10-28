@@ -87,6 +87,7 @@ class DoctorImagesTest(unittest.TestCase):
             "busy",
             "background",
             "unselected",
+            "dumb",
         ):
             with self.subTest(mode=mode):
                 self.check_pty(mode)
@@ -107,7 +108,11 @@ class DoctorImagesTest(unittest.TestCase):
                     os._exit(os.waitstatus_to_exitcode(status))
                 os.setpgrp()
             env = dict(self.env)
-            if mode in ("encoded", "unselected"):
+            if mode == "dumb":
+                env["TERM"] = "dumb"
+                env["TMUX"] = "/not-running,123,0"
+                env["TMUX_PANE"] = "%1"
+            elif mode in ("encoded", "unselected"):
                 env["TMUX"] = "/not-running,123,0"
                 env["TMUX_PANE"] = "%1"
                 env["PATH"] = str(self.tmux_bin) + os.pathsep + env["PATH"]
@@ -158,13 +163,23 @@ class DoctorImagesTest(unittest.TestCase):
             self.assertEqual(before, termios.tcgetattr(master), "TTY was not restored")
             output = report.read_bytes()
             self.assertNotIn(b"\x1b", output)
-            item = self.terminal_result(json.loads(output))
+            report_data = json.loads(output)
+            item = self.terminal_result(report_data)
             expected = "ok" if mode in ("supported", "encoded", "lost-two") else "warn"
-            if mode in ("busy", "background", "unselected"):
+            if mode in ("busy", "background", "unselected", "dumb"):
                 expected = "info"
             self.assertEqual(item["status"], expected, item)
-            if mode in ("busy", "background", "unselected"):
+            if mode in ("busy", "background", "unselected", "dumb"):
                 self.assertTrue(item["message"].startswith("skipped:"), item)
+            if mode == "dumb":
+                self.assertEqual(data, b"")
+                marker = next(
+                    x for x in report_data["checks"] if x["check"] == "terminal/marker"
+                )
+                self.assertEqual(marker["status"], "info", marker)
+                self.assertEqual(
+                    marker["message"], "skipped: current TTY is a dumb terminal"
+                )
             if mode == "silent":
                 self.assertEqual(len(seen), 3)
         finally:
