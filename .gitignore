@@ -3,3 +3,7 @@
 
 # Local Claude Code config
 .claude/
+
+# macOS / scratch
+.DS_Store
+/tmp/
