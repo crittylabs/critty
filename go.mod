@@ -11,7 +11,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.4.1
 	github.com/bluekeyes/go-gitdiff v0.9.0
 	github.com/charmbracelet/colorprofile v0.4.3
-	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
+	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gofrs/flock v0.13.1
@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/tklauser/ps v0.0.4
-	github.com/yuin/goldmark/v2 v2.1.6
+	github.com/yuin/goldmark/v2 v2.1.9
 	golang.org/x/image v0.47.0
 	golang.org/x/net v0.61.0
 	golang.org/x/sys v0.49.0
