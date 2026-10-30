@@ -29,11 +29,13 @@ For changes and supporting documents:
 critty review --staged --attachment APPROVAL.md --attachment PUBLICATION.md
 ```
 
-For documents only, replace `--staged` with `--null`.  Attach only the files the request needs.  Add `--result RESULT.json` for a form; omit it for ordinary approval.
+For documents only, replace `--staged` with `--null`.  Attach only the files the request needs.  Add `--result <directory>/answers-round-1.json` for a form; omit it for ordinary approval.  Use a fresh result and summary path for each invocation.
 
 Follow `/critty` to launch, wait, read feedback, and reopen the same session.  Retain the invocation, working directory, session and round, reviewed diff/source and attachment snapshots, complete output, and any form result.  On later rounds, pass the complete ordered attachment list and form result option again, preserving previous results first.
 
-Answer clarification questions in comments first.  When an attachment must change, follow [saved answers](../critty-cli/references/forms.md#saved-answers) and preserve stable IDs and unchanged definitions for answers still relevant.  Check the current round's result before reporting that answers survived.  If a revision requires fresh confirmation or consent, explain what must be checked again; source checkmarks and past answers cannot supply it.
+Answer clarification questions in comments first.  Before editing or replacing any reviewed input, follow the [revision checklist](../critty-cli/references/forms.md#before-revising-a-form): preserve the completed round, compare the proposed inputs, and tell the reviewer which answers will survive and which permissions need fresh consent.  Stable IDs alone do not preserve consent after reviewed content changes.  Keep progress updates outside reviewed inputs when they do not change the requested decision.
+
+Read the new round's result before reporting that answers survived.  Carry prior selections into preparation through a separate record or comment, keeping them separate from source checkmarks and current execution permission.  Past answers cannot supply fresh consent.
 
 When an approved or requested action crosses a host permission gate, or human feedback requests a new action, read [authorization evidence](references/feedback-authorization.md).  A Comment or Reject can contain a new request without approving the reviewed content.
 
