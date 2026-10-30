@@ -1,6 +1,11 @@
 package tui
 
-import "charm.land/lipgloss/v2"
+import (
+	"path/filepath"
+	"strings"
+
+	"charm.land/lipgloss/v2"
+)
 
 type tabBarItem struct {
 	text        string
@@ -23,8 +28,8 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 	maximum := max(1, (capacity-shares+1)/shares)
 	for i := range labels {
 		limit := maximum
-		if i == m.activeTab && labels[i].indicators != "" {
-			limit = max(limit, min(capacity, lipgloss.Width(labels[i].indicators)+2))
+		if i == m.activeTab {
+			limit = max(limit, min(capacity, m.minimumTabWidth(labels, i)))
 		}
 		labels[i].rendered = m.renderTabWithin(labels, i, limit, false)
 		labels[i].width = lipgloss.Width(labels[i].rendered)
@@ -80,11 +85,11 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		x += width + 1
 	}
 	if capacity < 2*overflows+1 {
-		appendItem(m.renderTabWidth(labels, m.activeTab, min(capacity, maximum)), m.activeTab, false)
+		appendItem(m.renderTabWidth(labels, m.activeTab, capacity), m.activeTab, false)
 		return items
 	}
 	coreWidth := prefix[end] - prefix[start] + end - start - 1
-	minimumActive := min(labels[m.activeTab].width, max(3, lipgloss.Width(labels[m.activeTab].indicators)+2))
+	minimumActive := min(labels[m.activeTab].width, m.minimumTabWidth(labels, m.activeTab))
 	budget := max(overflows, capacity-coreWidth+labels[m.activeTab].width-minimumActive-overflows)
 	leftWidth, rightWidth = fitTabOverflowWidths(leftWidth, rightWidth, budget)
 	activeWidth := min(labels[m.activeTab].width, capacity-coreWidth+labels[m.activeTab].width-leftWidth-rightWidth-overflows)
@@ -136,6 +141,19 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		appendItem(m.renderTabOverflowWidth(m.tabOverflowText(len(labels)-end, false), rightWidth, false), end, true)
 	}
 	return items
+}
+
+// The current filename takes priority over neighboring tabs and overflow labels.
+func (m *AppModel) minimumTabWidth(labels []tabLabel, i int) int {
+	name := strings.TrimSuffix(labels[i].text, labels[i].suffix)
+	if labels[i].path != "" {
+		name = filepath.Base(labels[i].path)
+	}
+	width := lipgloss.Width(name+labels[i].suffix) + m.tabStyle(i).GetHorizontalFrameSize()
+	if m.tabs[i].unread {
+		width += lipgloss.Width(m.tabs[i].unreadMarker())
+	}
+	return width
 }
 
 func fitTabOverflowWidths(left, right, budget int) (int, int) {

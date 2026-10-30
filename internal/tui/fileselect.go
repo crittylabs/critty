@@ -263,7 +263,7 @@ func (m AppModel) fileSelectModalContent(width, maxRows int) (string, []modalMou
 	for row := start; row < end; row++ {
 		match := s.matches[row]
 		t := &m.tabs[match.index]
-		line := ansi.Truncate(renderFileRow(t.displayPath(), match.positions, t.changeSummary(), row == s.selected), width, "…")
+		line := ansi.Truncate(renderFileRow(t.displayPath(), match.positions, t.changeSummary(m.width > 0 && m.width < 100), row == s.selected), width, "…")
 		top := strings.Count(content, "\n")
 		regions = append(regions, modalMouseRegion{
 			rect:   mouseRect{top: top, bottom: top + 1, right: width},

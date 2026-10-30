@@ -3121,7 +3121,7 @@ func (m *AppModel) tabLabels() []tabLabel {
 			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
 		}
 		suffix := ""
-		if counts := t.changeSummary(); counts != "" {
+		if counts := t.changeSummary(m.width > 0 && m.width < 100); counts != "" {
 			suffix += " " + counts
 		}
 		if indicators[i] != "" {

@@ -73,7 +73,7 @@ func TestOverflowTabsAnchorAndPreviewNeighbors(t *testing.T) {
 			if !left.overflow || !right.overflow || left.left != 2 || right.left+right.width != tc.width-2 {
 				t.Fatalf("overflow controls are not pinned to the pane edges: %+v", items)
 			}
-			if !strings.HasPrefix(ansi.Strip(left.text), fmt.Sprintf(" … %d more", left.target+1)) || !strings.HasSuffix(ansi.Strip(right.text), fmt.Sprintf("%d more … ", len(app.tabs)-right.target)) {
+			if !strings.HasPrefix(ansi.Strip(left.text), fmt.Sprintf(" … %d more", left.target+1)) || !strings.Contains(ansi.Strip(right.text), fmt.Sprintf("%d more", len(app.tabs)-right.target)) || !strings.HasSuffix(ansi.Strip(right.text), "… ") {
 				t.Fatalf("overflow text is not aligned to its outer edge: %q / %q", left.text, right.text)
 			}
 			if tc.preview {
@@ -171,7 +171,7 @@ func TestTabPathsExpandWithinTheirPaneShare(t *testing.T) {
 		{88, 4, "internal/server/file.go", "int/server/file.go"},
 		{120, 4, "internal/server/file.go", "internal/server/file.go"},
 		{80, 4, "éclair/界面/file.go", "écl/界面/file.go"},
-		{44, 4, "internal/server/file.go", "…ile.go"},
+		{44, 4, "internal/server/file.go", "file.go"},
 		{40, 1, "internal/server/file.go", "internal/server/file.go"},
 		{60, 2, "internal/server/file.go", "internal/server/file.go"},
 		{84, 3, "internal/server/file.go", "internal/server/file.go"},
@@ -202,7 +202,7 @@ func TestTabWidthSharesFitWithoutUnnecessaryOverflow(t *testing.T) {
 			app.tabs = make([]FileTab, count)
 			for i := range app.tabs {
 				app.tabs[i] = template
-				app.tabs[i].path = strings.Repeat("long-", 40) + fmt.Sprintf("%d.go", i)
+				app.tabs[i].path = strings.Repeat("long/", 40) + fmt.Sprintf("%d.go", i)
 			}
 			app.viewMode, app.width = true, 120
 			limit := (app.width - 4 - min(count, 4) + 1) / min(count, 4)
@@ -235,5 +235,60 @@ func TestExpandedTabReservesUnreadCountsAndComments(t *testing.T) {
 	plain := ansi.Strip(item)
 	if lipgloss.Width(item) > (app.width-4)/4 || !strings.Contains(plain, "●") || !strings.Contains(plain, "file.go (+1 -1) 💬") {
 		t.Fatalf("expanded tab lost its filename or indicators: %q", plain)
+	}
+}
+
+func TestActiveTabKeepsFilenameBeforeNeighbors(t *testing.T) {
+	for _, width := range []int{80, 99, 100, 120} {
+		for _, active := range []int{0, 3, 6} {
+			t.Run(fmt.Sprint(width, "/", active), func(t *testing.T) {
+				app := overflowTabTestApp()
+				app.width, app.activeTab = width, active
+				app.viewMode = false
+				for i := range app.tabs {
+					app.tabs[i].path = fmt.Sprintf("internal/server/file_%d_test.go", i)
+					app.tabs[i].changedLines = map[int]bool{1: true}
+					app.tabs[i].deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "old"}}}
+				}
+				filename := fmt.Sprintf("file_%d_test.go", active)
+				if active == 3 {
+					filename = "界é_test.go"
+					app.tabs[active].path = "internal/server/" + filename
+					app.tabs[active].unread = true
+					app.tabs[active].state = &fileReview{Comments: []review.Comment{{Scope: "file"}}}
+				}
+				wantSummary := "(+1 -1)"
+				if width < 100 {
+					wantSummary = "+-"
+				}
+				app.syncFileTree()
+				for i, row := range app.fileTree.rows {
+					if !row.isDir && row.tabIndex == active && !strings.Contains(ansi.Strip(app.treeRowText(i, app.tabIndicators())), wantSummary) {
+						t.Fatalf("tree summary did not follow screen width %d", width)
+					}
+				}
+				found := false
+				for _, item := range app.tabBarItems() {
+					if item.target == active && !item.overflow {
+						found = true
+						runes, styles := renderedCells(item.text)
+						for cell, r := range runes {
+							if r == '+' && !sameColor(styles[cell].Fg, tabAddedCount.GetForeground()) || r == '-' && !sameColor(styles[cell].Fg, tabDeletedCount.GetForeground()) {
+								t.Fatal("change markers lost their colors")
+							}
+						}
+						if !strings.Contains(ansi.Strip(item.text), wantSummary) {
+							t.Fatalf("wrong summary at width %d: %q", width, ansi.Strip(item.text))
+						}
+						if !strings.Contains(ansi.Strip(item.text), filename) {
+							t.Fatalf("active tab lost its filename: %q", ansi.Strip(item.text))
+						}
+					}
+				}
+				if !found {
+					t.Fatal("active tab is missing")
+				}
+			})
+		}
 	}
 }

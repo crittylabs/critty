@@ -281,7 +281,7 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 		text += m.branchLabel(lipgloss.NewStyle().Foreground(textSecondary))
 	}
 	if !row.isDir {
-		if counts := m.tabs[row.tabIndex].changeSummary(); counts != "" {
+		if counts := m.tabs[row.tabIndex].changeSummary(m.width > 0 && m.width < 100); counts != "" {
 			text += " " + counts
 		}
 		if indicator := indicators[row.tabIndex]; indicator != "" {

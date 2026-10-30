@@ -245,8 +245,8 @@ func computeChangeChunks(diff *gitpkg.DiffInfo) []changeChunk {
 	return chunks
 }
 
-// changeSummary combines file status and line counts inside neutral parentheses.
-func (t *FileTab) changeSummary() string {
+// changeSummary combines file status and line counts, or just colored markers.
+func (t *FileTab) changeSummary(compact bool) string {
 	if t.attachment != nil {
 		return ""
 	}
@@ -268,20 +268,34 @@ func (t *FileTab) changeSummary() string {
 		}
 	}
 	if t.isBinary {
+		if compact {
+			return strings.Join(counts, "")
+		}
 		return tabCountDelimiter.Render("(") + strings.Join(counts, " ") + tabCountDelimiter.Render(")")
 	}
 	if n := len(t.changedLines); n > 0 {
-		counts = append(counts, tabAddedCount.Render(fmt.Sprintf("+%d", n)))
+		text := "+"
+		if !compact {
+			text = fmt.Sprintf("+%d", n)
+		}
+		counts = append(counts, tabAddedCount.Render(text))
 	}
 	deleted := 0
 	for _, lines := range t.deletedAfter {
 		deleted += len(lines)
 	}
 	if deleted > 0 {
-		counts = append(counts, tabDeletedCount.Render(fmt.Sprintf("-%d", deleted)))
+		text := "-"
+		if !compact {
+			text = fmt.Sprintf("-%d", deleted)
+		}
+		counts = append(counts, tabDeletedCount.Render(text))
 	}
 	if len(counts) == 0 {
 		return ""
+	}
+	if compact {
+		return strings.Join(counts, "")
 	}
 	return tabCountDelimiter.Render("(") + strings.Join(counts, " ") + tabCountDelimiter.Render(")")
 }

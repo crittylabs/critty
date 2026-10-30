@@ -139,6 +139,9 @@ func (p *pathDisplay) renderTab(path string, base lipgloss.Style, bold bool, roo
 	}
 	slash := separator.Bold(false).Render("/")
 	prefix := strings.Join(parts, slash) + slash
+	if width > 0 && width < lipgloss.Width(prefix)+lipgloss.Width(filepath.Base(relative)) {
+		return formatter.renderWithin(relative, base, true, bold, width)
+	}
 	if width > 0 {
 		width = max(1, width-lipgloss.Width(prefix))
 	}
@@ -205,6 +208,10 @@ func (p *pathDisplay) renderWithin(path string, base lipgloss.Style, tab, fileBo
 		rendered.WriteString(style.Render(part))
 	}
 	if tab && width > 0 {
+		filename := parts[len(parts)-1]
+		if nameWidth := lipgloss.Width(filename); width >= nameWidth && width < nameWidth+2 {
+			return base.Bold(fileBold).Render(filename)
+		}
 		return truncateLeftToWidth(rendered.String(), width)
 	}
 	return rendered.String()
