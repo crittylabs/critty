@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image/color"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -124,6 +123,7 @@ type AppModel struct {
 	activeTab  int
 	multiFile  bool // true when in code review mode
 	fileSelect fileSelectState
+	paths      *pathDisplay
 
 	// Single-file mode (legacy)
 	filePath         string
@@ -326,6 +326,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		topic:            cfg.Topic,
 		version:          cfg.Version,
 		filePath:         filePath,
+		paths:            newPathDisplay(),
 		documentSnapshot: cfg.DocumentSnapshot,
 		tabs:             []FileTab{tab},
 		activeTab:        0,
@@ -423,6 +424,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		tabs:            tabs,
 		activeTab:       0,
 		multiFile:       true,
+		paths:           newPathDisplay(),
 		split:           cfg.Split,
 		session:         cfg.Session,
 		author:          cfg.Author,
@@ -2686,10 +2688,11 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 	}
 	t := m.tab()
 	displayPath := t.displayPath()
+	pathNote := ""
 	if t.attachment != nil {
 		displayPath = t.attachment.Source
 		if t.attachment.Removed {
-			displayPath += " (history, read-only)"
+			pathNote = " (history, read-only)"
 		}
 	} else if m.filePath != "" && t.path != overallCommentsPath {
 		displayPath = m.filePath
@@ -2707,13 +2710,20 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 		suffix = fmt.Sprintf("  %s L%d-%d%s", selLabel, start, end, deleted)
 	} else if t.doc != nil {
 		var position string
+		positionStyle := headerPathStyle.Foreground(headerPathCyan)
 		if t.cursorSide == "old" {
-			position = fmt.Sprintf("L%d (deleted)", t.cursorLine)
+			position = positionStyle.Render(fmt.Sprintf("L%d (deleted)", t.cursorLine))
 		} else {
-			position = fmt.Sprintf("L%d/%d", t.cursorLine, t.doc.LineCount())
+			slash := headerPathStyle.Foreground(headerPathSeparator).Bold(true).Render("/")
+			position = positionStyle.Render(fmt.Sprintf("L%d", t.cursorLine)) + slash +
+				positionStyle.Render(fmt.Sprintf("%d", t.doc.LineCount()))
 		}
-		suffix = " " + headerPathStyle.Foreground(lipgloss.Cyan).Render(position)
+		suffix = " " + position
 	}
+	if t.path != overallCommentsPath {
+		displayPath = m.paths.render(displayPath, headerPathStyle, false, true)
+	}
+	suffix = pathNote + suffix
 	headerWidth := max(0, m.width-headerStyle.GetHorizontalFrameSize())
 	progress, regions := m.layoutProgressCounts(0, 0, -1)
 	progress = " " + progress
@@ -3071,13 +3081,14 @@ func (m *AppModel) tabLabels() []tabLabel {
 	labels := make([]tabLabel, len(m.tabs))
 	indicators := m.tabIndicators()
 	for i, t := range m.tabs {
-		label := abbreviatedTabPath(t.displayPath())
+		label := t.displayPath()
 		if t.attachment != nil {
 			label = t.attachment.Name
+		} else if t.path != overallCommentsPath {
+			label = m.paths.render(label, m.tabStyle(i), true, i == m.activeTab)
 		}
-		start := strings.LastIndexByte(label, '/') + 1
-		if i == m.activeTab {
-			label = label[:start] + ansi.NewStyle().Bold().String() + label[start:] + ansi.NewStyle().Normal().Underline(false).String()
+		if i == m.activeTab && (t.attachment != nil || t.path == overallCommentsPath) {
+			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
 		}
 		if counts := t.changeSummary(); counts != "" {
 			label += " " + counts
@@ -3090,26 +3101,11 @@ func (m *AppModel) tabLabels() []tabLabel {
 	return labels
 }
 
-func abbreviatedTabPath(path string) string {
-	parts := strings.Split(filepath.ToSlash(path), "/")
-	for i, part := range parts[:len(parts)-1] {
-		for j, r := range part {
-			if unicode.IsLetter(r) || unicode.IsNumber(r) {
-				if end := j + utf8.RuneLen(r); end < len(part) {
-					parts[i] = ansi.NewStyle().Italic(true).String() + part[:end] + ansi.NewStyle().Italic(false).String()
-				}
-				break
-			}
-		}
-	}
-	return strings.Join(parts, "/")
-}
-
 func (m *AppModel) renderTab(labels []tabLabel, i int) string {
 	return m.renderTabWidth(labels, i, 0)
 }
 
-func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
+func (m *AppModel) tabStyle(i int) lipgloss.Style {
 	style := inactiveTabStyle
 	if i == m.activeTab {
 		style = activeTabStyle
@@ -3120,6 +3116,11 @@ func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
 			style = style.Foreground(activeAttachmentColor)
 		}
 	}
+	return style
+}
+
+func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
+	style := m.tabStyle(i)
 	label := labels[i].text
 	if m.tabs[i].unread {
 		label = m.tabs[i].unreadMarker() + lipgloss.NewStyle().Foreground(style.GetForeground()).Render(label)

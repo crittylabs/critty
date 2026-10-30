@@ -79,10 +79,15 @@ var (
 	commentBorderColor        = lipgloss.BrightBlack
 	commentFocusedBorderColor = lipgloss.BrightBlue
 
+	headerBackground    = lipgloss.Color("#C1A8CE")
+	headerForeground    = lipgloss.Color("#26182E")
+	headerPathCyan      = lipgloss.Color("#00758F")
+	headerPathSeparator = lipgloss.Color("#81608E")
+
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.BrightWhite).
-			Background(accent).
+			Foreground(headerForeground).
+			Background(headerBackground).
 			Padding(0, 1)
 
 	reviewBarStyle = lipgloss.NewStyle().
@@ -91,8 +96,8 @@ var (
 
 	headerPathStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.BrightWhite).
-			Background(accent)
+			Foreground(headerForeground).
+			Background(headerBackground)
 
 	commentStyle = lipgloss.NewStyle().
 			Foreground(muted).

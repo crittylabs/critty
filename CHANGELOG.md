@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Clearer file paths**: Headers and tabs abbreviate your home directory as `~`, show directories in cyan with muted slashes, and keep Git and worktree root names in full in tabs.  Headers highlight paths from the root onward in purple, with darker cyan text for contrast.
+
 ## 1.8.1
 
 ### Fixed
