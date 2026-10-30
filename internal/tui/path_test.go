@@ -10,7 +10,86 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestProjectTreePaths(t *testing.T) {
+	parent := t.TempDir()
+	repo := filepath.Join(parent, "project")
+	worktree := filepath.Join(parent, "worktree")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(worktree, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worktree, ".git"), []byte("gitdir: ../metadata\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, cwd, path, want string
+	}{
+		{"absolute", repo, filepath.Join(repo, "internal", "a.go"), "internal/a.go"},
+		{"subdirectory", filepath.Join(repo, "internal"), filepath.Join(repo, "internal", "a.go"), "internal/a.go"},
+		{"relative", repo, "internal/a.go", "internal/a.go"},
+		{"linked worktree", worktree, filepath.Join(worktree, "a.go"), "a.go"},
+		{"non-git", parent, filepath.Join(parent, "notes", "a.md"), "notes/a.md"},
+		{"outside", repo, filepath.Join(parent, "a.go"), filepath.Join(parent, "a.go")},
+		{"sibling prefix", repo, repo + "-other/a.go", repo + "-other/a.go"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &pathDisplay{cwd: tc.cwd, roots: make(map[string]bool)}
+			if got := p.treePath(tc.path); got != tc.want {
+				t.Fatalf("tree path = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTabLabelsKeepOnlyNecessaryRootPrefixes(t *testing.T) {
+	parent := t.TempDir()
+	first, second := filepath.Join(parent, "alpha", "project"), filepath.Join(parent, "alpine", "project")
+	worktree := filepath.Join(parent, "project.fix")
+	for _, root := range []string{first, second} {
+		if err := os.MkdirAll(filepath.Join(root, ".git"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(worktree, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worktree, ".git"), []byte("gitdir: ../metadata\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	app := newFileTreeTestApp()
+	app.paths = &pathDisplay{cwd: first, roots: make(map[string]bool)}
+	source := filepath.Join(first, "internal", "tui", "a.go")
+	app.tabs = []FileTab{
+		{path: source},
+		{path: filepath.Join(first, "README.md")},
+		{path: overallCommentsPath},
+		{path: "attachments/check.md", attachment: &review.AttachedDocument{Name: "check.md", Source: filepath.Join(second, "check.md")}},
+	}
+	assertLabel := func(index int, want string) {
+		t.Helper()
+		if got := ansi.Strip(app.tabLabels()[index].text); got != want {
+			t.Fatalf("tab %d = %q, want %q", index, got, want)
+		}
+	}
+	assertLabel(0, "i/t/a.go")
+	assertLabel(1, "README.md")
+	app.tabs = append(app.tabs, FileTab{path: filepath.Join(second, "internal", "tui", "a.go")})
+	assertLabel(0, "alpha/project/i/t/a.go")
+	assertLabel(4, "alpine/project/i/t/a.go")
+	app.tabs = append(app.tabs, FileTab{path: filepath.Join(worktree, "a.go")})
+	assertLabel(5, "project.fix/a.go")
+	app.tabs = app.tabs[:4]
+	assertLabel(0, "i/t/a.go")
+	if app.tabs[0].path != source {
+		t.Fatal("tab labels changed the source path")
+	}
+}
 
 func TestPathDisplayRepositoryBoundaries(t *testing.T) {
 	home := t.TempDir()

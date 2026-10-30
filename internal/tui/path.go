@@ -37,9 +37,13 @@ func (p *pathDisplay) isRoot(dir string) bool {
 }
 
 func (p *pathDisplay) insideRepository(dir string) bool {
+	return p.repositoryRoot(dir) != ""
+}
+
+func (p *pathDisplay) repositoryRoot(dir string) string {
 	for dir != "" {
 		if p.isRoot(dir) {
-			return true
+			return dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -47,7 +51,95 @@ func (p *pathDisplay) insideRepository(dir string) bool {
 		}
 		dir = parent
 	}
-	return false
+	return ""
+}
+
+func (p *pathDisplay) treePath(path string) string {
+	if p == nil || p.cwd == "" || !filepath.IsAbs(path) {
+		return path
+	}
+	base := p.cwd
+	if root := p.repositoryRoot(base); root != "" {
+		base = root
+	}
+	relative, err := filepath.Rel(base, path)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return path
+	}
+	return filepath.ToSlash(relative)
+}
+
+func (p *pathDisplay) fileRoot(path string) string {
+	if p == nil || p.cwd == "" {
+		return ""
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(p.cwd, path)
+	}
+	if root := p.repositoryRoot(filepath.Dir(path)); root != "" {
+		return root
+	}
+	if within(p.cwd, path) {
+		return p.cwd
+	}
+	return filepath.Dir(path)
+}
+
+func rootLabel(root string, roots []string) string {
+	label := filepath.Base(root)
+	for parent := filepath.Dir(root); ; parent = filepath.Dir(parent) {
+		duplicate := false
+		for _, other := range roots {
+			if other != root && strings.HasSuffix(filepath.ToSlash(other), "/"+label) {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			return label
+		}
+		if filepath.Dir(parent) == parent {
+			return filepath.ToSlash(root)
+		}
+		label = filepath.ToSlash(filepath.Join(filepath.Base(parent), label))
+	}
+}
+
+func tabPathStyles(base lipgloss.Style) (lipgloss.Style, lipgloss.Style) {
+	ld := lipgloss.LightDark(terminalIsDark)
+	base = base.Padding(0)
+	return base.Foreground(ld(lipgloss.Color("#00535F"), lipgloss.Color("#73B8C5"))),
+		base.Foreground(ld(lipgloss.Color("#696E78"), lipgloss.Color("#9FA6B2")))
+}
+
+func (p *pathDisplay) renderTab(path string, base lipgloss.Style, bold bool, roots []string) string {
+	if len(roots) < 2 && !filepath.IsAbs(path) {
+		return p.render(path, base, true, bold)
+	}
+	root := p.fileRoot(path)
+	if root == "" {
+		return p.render(path, base, true, bold)
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(p.cwd, path)
+	}
+	relative, err := filepath.Rel(root, path)
+	if err != nil {
+		return p.render(path, base, true, bold)
+	}
+	formatter := *p
+	formatter.cwd = root
+	label := formatter.render(relative, base, true, bold)
+	if len(roots) < 2 {
+		return label
+	}
+	directory, separator := tabPathStyles(base)
+	parts := strings.Split(rootLabel(root, roots), "/")
+	for i, part := range parts {
+		parts[i] = directory.Bold(true).Render(part)
+	}
+	slash := separator.Bold(false).Render("/")
+	return strings.Join(parts, slash) + slash + label
 }
 
 func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold bool) string {
@@ -63,9 +155,9 @@ func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold boo
 		dir = filepath.VolumeName(path) + string(filepath.Separator)
 	}
 	parts := strings.Split(filepath.ToSlash(path), "/")
-	ld := lipgloss.LightDark(terminalIsDark)
-	separator := ld(lipgloss.Color("#696E78"), lipgloss.Color("#9FA6B2"))
-	directory := ld(lipgloss.Color("#00535F"), lipgloss.Color("#73B8C5"))
+	directoryStyle, separatorStyle := tabPathStyles(base)
+	separator := separatorStyle.GetForeground()
+	directory := directoryStyle.GetForeground()
 	if !tab {
 		directory = headerPathCyan
 		separator = headerPathSeparator

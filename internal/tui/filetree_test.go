@@ -2,6 +2,8 @@ package tui
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +15,62 @@ import (
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestFileTreeAbsolutePathsUseProjectHierarchy(t *testing.T) {
+	root := newGitRepo(t)
+	subdir := filepath.Join(root, "internal")
+	if err := os.Mkdir(subdir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	paths := []string{
+		filepath.Join(root, "internal", "api", "z.go"),
+		filepath.Join(root, "internal", "a.go"),
+		filepath.Join(root, "root.go"),
+	}
+	for _, cwd := range []string{root, subdir} {
+		t.Run(filepath.Base(cwd), func(t *testing.T) {
+			t.Chdir(cwd)
+			app := newFileTreeTestApp()
+			app.tabs = app.tabs[:len(paths)]
+			for i, path := range paths {
+				app.tabs[i].path = path
+			}
+			app.fileTree = newFileTree()
+			app.orderTabsByTree()
+			app.syncFileTree()
+			if label := ansi.Strip(app.tabLabels()[0].text); label != "i/a/z.go" {
+				t.Fatalf("single-root tab includes redundant ancestors: %q", label)
+			}
+			var names []string
+			for _, row := range app.fileTree.rows {
+				names = append(names, row.name)
+			}
+			if got := strings.Join(names, "/"); got != "test-project/internal/api/z.go/a.go/root.go" {
+				t.Fatalf("tree includes redundant ancestors: %s", got)
+			}
+			for i, path := range paths {
+				if app.tabs[i].path != path {
+					t.Fatal("tree ordering changed source paths")
+				}
+			}
+			app.toggleTreeDir(1)
+			app.activeTab = 2
+			app.syncFileTree()
+			app.activeTab = 0
+			app.syncFileTree()
+			if app.fileTree.collapsed["internal"] || app.fileTree.collapsed["internal/api"] {
+				t.Fatal("following an absolute-path tab did not unfold its displayed ancestors")
+			}
+			if got := app.fileTree.rows[app.fileTree.cursor].path; got != paths[0] {
+				t.Fatalf("selected source path = %q, want %q", got, paths[0])
+			}
+			app.setTreeCursor(len(app.fileTree.rows) - 1)
+			if app.activeTab != 2 || app.tab().path != paths[2] {
+				t.Fatal("selecting a tree file opened the wrong source")
+			}
+		})
+	}
+}
 
 func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
 	files := []gitpkg.FileChange{

@@ -136,6 +136,19 @@ func visibleTreeRows(root *treeNode, collapsed map[string]bool) []treeRow {
 	return rows
 }
 
+func unfoldTreeTab(node *treeNode, tabIndex int, collapsed map[string]bool) bool {
+	if !node.isDir {
+		return node.tabIndex == tabIndex
+	}
+	for _, child := range node.children {
+		if unfoldTreeTab(child, tabIndex, collapsed) {
+			delete(collapsed, node.path)
+			return true
+		}
+	}
+	return false
+}
+
 // reviewFileTree keeps attachment order separate from directory-first paths.
 func (m *AppModel) reviewFileTree() *treeNode {
 	var paths []string
@@ -154,7 +167,7 @@ func (m *AppModel) reviewFileTree() *treeNode {
 			}
 			attachments.children = append(attachments.children, &treeNode{name: name, path: t.path, tabIndex: i})
 		} else {
-			paths = append(paths, t.path)
+			paths = append(paths, m.paths.treePath(t.path))
 			indices = append(indices, i)
 		}
 	}
@@ -163,6 +176,7 @@ func (m *AppModel) reviewFileTree() *treeNode {
 	remap = func(node *treeNode) {
 		if !node.isDir {
 			node.tabIndex = indices[node.tabIndex]
+			node.path = m.tabs[node.tabIndex].path
 		}
 		for _, child := range node.children {
 			remap(child)
@@ -211,18 +225,7 @@ func (m *AppModel) syncFileTree() {
 	}
 	tree.root = m.reviewFileTree()
 	if tree.syncedTab != m.activeTab {
-		delete(tree.collapsed, "")
-		if m.tabs[m.activeTab].attachment != nil {
-			if m.tabs[m.activeTab].attachment.Removed {
-				delete(tree.collapsed, attachmentHistoryPath)
-			} else {
-				delete(tree.collapsed, "\x00attachments")
-			}
-		}
-		parts := strings.Split(strings.Trim(filepath.ToSlash(m.tabs[m.activeTab].path), "/"), "/")
-		for j := 1; j < len(parts); j++ {
-			delete(tree.collapsed, strings.Join(parts[:j], "/"))
-		}
+		unfoldTreeTab(tree.root, m.activeTab, tree.collapsed)
 	}
 	tree.rows = visibleTreeRows(tree.root, tree.collapsed)
 	if tree.syncedTab != m.activeTab {

@@ -3080,12 +3080,21 @@ type tabLabel struct {
 func (m *AppModel) tabLabels() []tabLabel {
 	labels := make([]tabLabel, len(m.tabs))
 	indicators := m.tabIndicators()
+	var roots []string
+	for _, tab := range m.tabs {
+		if tab.attachment != nil || tab.path == overallCommentsPath {
+			continue
+		}
+		if root := m.paths.fileRoot(tab.path); root != "" && !slices.Contains(roots, root) {
+			roots = append(roots, root)
+		}
+	}
 	for i, t := range m.tabs {
 		label := t.displayPath()
 		if t.attachment != nil {
 			label = t.attachment.Name
 		} else if t.path != overallCommentsPath {
-			label = m.paths.render(label, m.tabStyle(i), true, i == m.activeTab)
+			label = m.paths.renderTab(label, m.tabStyle(i), i == m.activeTab, roots)
 		}
 		if i == m.activeTab && (t.attachment != nil || t.path == overallCommentsPath) {
 			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
