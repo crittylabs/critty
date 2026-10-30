@@ -3075,6 +3075,9 @@ type tabLabel struct {
 	rendered   string
 	width      int
 	indicators string
+	path       string
+	roots      []string
+	suffix     string
 }
 
 func (m *AppModel) tabLabels() []tabLabel {
@@ -3091,27 +3094,26 @@ func (m *AppModel) tabLabels() []tabLabel {
 	}
 	for i, t := range m.tabs {
 		label := t.displayPath()
+		path := ""
 		if t.attachment != nil {
 			label = t.attachment.Name
 		} else if t.path != overallCommentsPath {
-			label = m.paths.renderTab(label, m.tabStyle(i), i == m.activeTab, roots)
+			path = label
+			label = m.paths.renderTab(label, m.tabStyle(i), i == m.activeTab, roots, 0)
 		}
 		if i == m.activeTab && (t.attachment != nil || t.path == overallCommentsPath) {
 			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
 		}
+		suffix := ""
 		if counts := t.changeSummary(); counts != "" {
-			label += " " + counts
+			suffix += " " + counts
 		}
 		if indicators[i] != "" {
-			label += " " + indicators[i]
+			suffix += " " + indicators[i]
 		}
-		labels[i] = tabLabel{text: label, indicators: indicators[i]}
+		labels[i] = tabLabel{text: label + suffix, indicators: indicators[i], path: path, roots: roots, suffix: suffix}
 	}
 	return labels
-}
-
-func (m *AppModel) renderTab(labels []tabLabel, i int) string {
-	return m.renderTabWidth(labels, i, 0)
 }
 
 func (m *AppModel) tabStyle(i int) lipgloss.Style {
@@ -3129,8 +3131,23 @@ func (m *AppModel) tabStyle(i int) lipgloss.Style {
 }
 
 func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
+	return m.renderTabWithin(labels, i, width, true)
+}
+
+func (m *AppModel) renderTabWithin(labels []tabLabel, i, width int, fill bool) string {
 	style := m.tabStyle(i)
 	label := labels[i].text
+	if width > 0 && labels[i].path != "" {
+		padding := style.GetHorizontalFrameSize()
+		if width < 3 {
+			padding = 0
+		}
+		budget := width - padding - ansi.StringWidth(labels[i].suffix)
+		if m.tabs[i].unread {
+			budget -= ansi.StringWidth(m.tabs[i].unreadMarker())
+		}
+		label = m.paths.renderTab(labels[i].path, style, i == m.activeTab, labels[i].roots, max(1, budget)) + labels[i].suffix
+	}
 	if m.tabs[i].unread {
 		label = m.tabs[i].unreadMarker() + lipgloss.NewStyle().Foreground(style.GetForeground()).Render(label)
 	}
@@ -3138,7 +3155,11 @@ func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
 		if width < 3 {
 			style = style.Padding(0)
 		}
-		style = style.Width(width)
+		allocated := width
+		if !fill {
+			allocated = min(width, ansi.StringWidth(label)+style.GetHorizontalFrameSize())
+		}
+		style = style.Width(allocated)
 		available := max(1, width-style.GetHorizontalFrameSize())
 		if ansi.StringWidth(label) > available {
 			indicators := labels[i].indicators

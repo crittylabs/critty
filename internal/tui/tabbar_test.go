@@ -8,6 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -43,11 +44,14 @@ func TestAttachmentTabColorMatchesFilesAcrossFocusAndClipping(t *testing.T) {
 
 func overflowTabTestApp() AppModel {
 	app := newFileTreeTestApp()
-	app.tabs = app.tabs[:3]
-	app.tabs[0].path = strings.Repeat("left-", 12) + "file.go"
-	app.tabs[1].path = "current.go"
-	app.tabs[2].path = strings.Repeat("right-", 12) + "file.go"
-	app.activeTab = 1
+	template := app.tabs[0]
+	app.tabs = make([]FileTab, 7)
+	for i := range app.tabs {
+		app.tabs[i] = template
+		app.tabs[i].path = strings.Repeat("long-", 12) + fmt.Sprintf("%d.go", i)
+	}
+	app.tabs[3].path = "current.go"
+	app.activeTab = 3
 	app.viewMode = true
 	return app
 }
@@ -59,7 +63,7 @@ func TestOverflowTabsAnchorAndPreviewNeighbors(t *testing.T) {
 		preview bool
 	}{
 		{"partial neighbors", 64, true},
-		{"space absorbed by overflow", 41, false},
+		{"space absorbed by overflow", 37, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app := overflowTabTestApp()
@@ -69,19 +73,19 @@ func TestOverflowTabsAnchorAndPreviewNeighbors(t *testing.T) {
 			if !left.overflow || !right.overflow || left.left != 2 || right.left+right.width != tc.width-2 {
 				t.Fatalf("overflow controls are not pinned to the pane edges: %+v", items)
 			}
-			if !strings.HasPrefix(ansi.Strip(left.text), " … 1 more") || !strings.HasSuffix(ansi.Strip(right.text), "1 more … ") {
+			if !strings.HasPrefix(ansi.Strip(left.text), fmt.Sprintf(" … %d more", left.target+1)) || !strings.HasSuffix(ansi.Strip(right.text), fmt.Sprintf("%d more … ", len(app.tabs)-right.target)) {
 				t.Fatalf("overflow text is not aligned to its outer edge: %q / %q", left.text, right.text)
 			}
 			if tc.preview {
-				if len(items) != 5 || items[1].target != 0 || items[3].target != 2 {
+				if len(items) < 5 || items[1].overflow || items[len(items)-2].overflow {
 					t.Fatalf("missing adjacent previews: %+v", items)
 				}
-				for _, item := range []tabBarItem{items[1], items[3]} {
-					if !strings.HasSuffix(ansi.Strip(item.text), "… ") {
-						t.Fatalf("neighbor does not end in an ellipsis: %q", item.text)
+				for _, item := range []tabBarItem{items[1], items[len(items)-2]} {
+					if !strings.Contains(ansi.Strip(item.text), "…") || item.width >= (tc.width-4)/4 {
+						t.Fatalf("neighbor is not a clipped preview: %q", item.text)
 					}
 				}
-			} else if len(items) != 3 || left.width != 11 || right.width != 12 {
+			} else if len(items) != 3 {
 				t.Fatalf("unused preview space was not absorbed by overflow controls: %+v", items)
 			}
 		})
@@ -92,25 +96,32 @@ func TestMouseClickOverflowPreviewsAndExpandedControls(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		width    int
-		item     int
-		target   int
+		right    bool
 		overflow bool
 	}{
-		{"left preview", 64, 1, 0, false},
-		{"right preview", 64, 3, 2, false},
-		{"left expanded control", 41, 0, 0, true},
-		{"right expanded control", 41, 2, 2, true},
+		{"left preview", 64, false, false},
+		{"right preview", 64, true, false},
+		{"left expanded control", 37, false, true},
+		{"right expanded control", 37, true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app := overflowTabTestApp()
 			app.width = tc.width
-			item := app.tabBarItems()[tc.item]
+			items := app.tabBarItems()
+			index := 0
+			if !tc.overflow {
+				index++
+			}
+			if tc.right {
+				index = len(items) - 1 - index
+			}
+			item := items[index]
 			if item.overflow != tc.overflow {
 				t.Fatalf("unexpected tab kind: %+v", item)
 			}
 			app = clickMouse(app, item.left+item.width-1, app.headerHeight())
-			if app.activeTab != tc.target {
-				t.Fatalf("active tab = %d, want %d", app.activeTab, tc.target)
+			if app.activeTab != item.target {
+				t.Fatalf("active tab = %d, want %d", app.activeTab, item.target)
 			}
 		})
 	}
@@ -120,7 +131,7 @@ func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
 	app := overflowTabTestApp()
 	app.tabs[0].path = strings.Repeat("界é", 12) + ".go"
 	for _, width := range []int{8, 9, 18, 40, 41, 42, 63, 64, 65, 120} {
-		for active := range app.tabs {
+		for _, active := range []int{0, len(app.tabs) / 2, len(app.tabs) - 1} {
 			t.Run(fmt.Sprintf("width=%d/active=%d", width, active), func(t *testing.T) {
 				app.width, app.activeTab = width, active
 				items := app.tabBarItems()
@@ -140,10 +151,89 @@ func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
 				if !foundActive {
 					t.Fatalf("current tab is not visible: %+v", items)
 				}
+				if last := items[len(items)-1]; last.overflow && last.left+last.width != width-2 {
+					t.Fatalf("Unicode clipping moved the overflow control: %+v", items)
+				}
 				if row := app.renderTabBar(); lipgloss.Height(row) != 1 || lipgloss.Width(row) != width {
 					t.Fatalf("tab row does not fit the pane: %q", row)
 				}
 			})
 		}
+	}
+}
+
+func TestTabPathsExpandWithinTheirPaneShare(t *testing.T) {
+	for _, tc := range []struct {
+		width, tabs int
+		path, want  string
+	}{
+		{64, 4, "internal/server/file.go", "i/se/file.go"},
+		{88, 4, "internal/server/file.go", "int/server/file.go"},
+		{120, 4, "internal/server/file.go", "internal/server/file.go"},
+		{80, 4, "éclair/界面/file.go", "écl/界面/file.go"},
+		{44, 4, "internal/server/file.go", "…ile.go"},
+		{40, 1, "internal/server/file.go", "internal/server/file.go"},
+		{60, 2, "internal/server/file.go", "internal/server/file.go"},
+		{84, 3, "internal/server/file.go", "internal/server/file.go"},
+	} {
+		t.Run(fmt.Sprint(tc.width, "/", tc.tabs, "/", tc.path), func(t *testing.T) {
+			app := newFileTreeTestApp()
+			app.tabs = app.tabs[:tc.tabs]
+			app.tabs[0].path = tc.path
+			app.viewMode, app.width = true, tc.width
+			labels := app.tabLabels()
+			limit := (tc.width - 4 - tc.tabs + 1) / tc.tabs
+			item := app.renderTabWithin(labels, 0, limit, false)
+			if lipgloss.Width(item) > limit {
+				t.Fatalf("tab exceeds its pane share: %q", item)
+			}
+			if got := strings.TrimSpace(ansi.Strip(item)); got != tc.want {
+				t.Fatalf("path = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTabWidthSharesFitWithoutUnnecessaryOverflow(t *testing.T) {
+	for _, count := range []int{1, 2, 3, 4, 5} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			app := newFileTreeTestApp()
+			template := app.tabs[0]
+			app.tabs = make([]FileTab, count)
+			for i := range app.tabs {
+				app.tabs[i] = template
+				app.tabs[i].path = strings.Repeat("long-", 40) + fmt.Sprintf("%d.go", i)
+			}
+			app.viewMode, app.width = true, 120
+			limit := (app.width - 4 - min(count, 4) + 1) / min(count, 4)
+			items := app.tabBarItems()
+			for _, item := range items {
+				if item.overflow && count <= 4 {
+					t.Fatal("tab spacing caused unnecessary overflow")
+				}
+				if !item.overflow && item.width > limit {
+					t.Fatalf("tab exceeds its pane share: %+v", item)
+				}
+			}
+			if count <= 4 && len(items) != count {
+				t.Fatalf("only %d of %d tabs fit", len(items), count)
+			}
+		})
+	}
+}
+
+func TestExpandedTabReservesUnreadCountsAndComments(t *testing.T) {
+	app := newFileTreeTestApp()
+	app.tabs = app.tabs[:1]
+	app.tabs[0].path = "internal/server/file.go"
+	app.tabs[0].unread = true
+	app.tabs[0].changedLines = map[int]bool{1: true}
+	app.tabs[0].deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "old"}}}
+	app.tabs[0].state.Comments = []review.Comment{{Scope: "file"}}
+	app.viewMode, app.width = true, 116
+	item := app.renderTabWithin(app.tabLabels(), 0, (app.width-4)/4, false)
+	plain := ansi.Strip(item)
+	if lipgloss.Width(item) > (app.width-4)/4 || !strings.Contains(plain, "●") || !strings.Contains(plain, "file.go (+1 -1) 💬") {
+		t.Fatalf("expanded tab lost its filename or indicators: %q", plain)
 	}
 }

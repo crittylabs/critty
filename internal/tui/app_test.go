@@ -84,7 +84,7 @@ func TestTabCommentMarkers(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app.tabs[0].state = tt.state
-			rendered := ansi.Strip(app.renderTab(app.tabLabels(), 0))
+			rendered := ansi.Strip(app.renderTabWidth(app.tabLabels(), 0, 0))
 			if got := strings.Contains(rendered, "💬"); got != tt.want {
 				t.Fatalf("tab bubble presence = %t, want %t", got, tt.want)
 			}
@@ -975,7 +975,7 @@ func TestTabBackgroundCoversLabelAndLeavesGapsClear(t *testing.T) {
 					app.activeTab = 0
 					style = activeTabStyle
 				}
-				tab := app.renderTab(app.tabLabels(), 0)
+				tab := app.renderTabWidth(app.tabLabels(), 0, 0)
 				plain := ansi.Strip(tab)
 				if !strings.HasPrefix(plain, " a/s/z.go (+1 -1) 💬 ") || strings.HasPrefix(plain, "  ") {
 					t.Fatalf("tab padding or label changed: %q", plain)
@@ -1114,7 +1114,7 @@ func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
 			t.Errorf("%s foreground = %v on a light background, want bright black", name, got)
 		}
 	}
-	tab := app.renderTab(app.tabLabels(), 0)
+	tab := app.renderTabWidth(app.tabLabels(), 0, 0)
 	runes, styles := renderedCells(tab)
 	var blackText strings.Builder
 	for i, r := range runes {

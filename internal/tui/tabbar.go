@@ -19,8 +19,14 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		return nil
 	}
 	prefix := make([]int, len(labels)+1)
+	shares := min(len(labels), 4)
+	maximum := max(1, (capacity-shares+1)/shares)
 	for i := range labels {
-		labels[i].rendered = m.renderTab(labels, i)
+		limit := maximum
+		if i == m.activeTab && labels[i].indicators != "" {
+			limit = max(limit, min(capacity, lipgloss.Width(labels[i].indicators)+2))
+		}
+		labels[i].rendered = m.renderTabWithin(labels, i, limit, false)
 		labels[i].width = lipgloss.Width(labels[i].rendered)
 		prefix[i+1] = prefix[i] + labels[i].width
 	}
@@ -74,7 +80,7 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		x += width + 1
 	}
 	if capacity < 2*overflows+1 {
-		appendItem(m.renderTabWidth(labels, m.activeTab, capacity), m.activeTab, false)
+		appendItem(m.renderTabWidth(labels, m.activeTab, min(capacity, maximum)), m.activeTab, false)
 		return items
 	}
 	coreWidth := prefix[end] - prefix[start] + end - start - 1

@@ -19,8 +19,7 @@ func TestMouseClickSelectsFileTab(t *testing.T) {
 	if app = clickMouse(app, 20, app.headerHeight()+app.tabBarHeight()); app.activeTab != 0 {
 		t.Fatalf("click below the tab bar selected tab %d", app.activeTab)
 	}
-	labels := app.tabLabels()
-	firstWidth := lipgloss.Width(app.renderTab(labels, 0))
+	firstWidth := app.tabBarItems()[0].width
 	if app = clickMouse(app, firstWidth+2, app.headerHeight()); app.activeTab != 0 {
 		t.Fatalf("click in the tab gap selected tab %d", app.activeTab)
 	}
@@ -79,17 +78,15 @@ func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
 			app := newApp()
 			items := app.tabBarItems()
 			item := items[0]
-			want := app.activeTab - 1
 			if tt.right {
 				item = items[len(items)-1]
-				want = app.activeTab + 1
 			}
 			if !item.overflow {
 				t.Fatal("test setup did not overflow on both sides")
 			}
 			app = clickMouse(app, item.left+min(1, item.width-1), app.headerHeight())
-			if app.activeTab != want {
-				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, want)
+			if app.activeTab != item.target {
+				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, item.target)
 			}
 		})
 	}

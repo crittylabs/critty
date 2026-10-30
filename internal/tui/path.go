@@ -112,26 +112,25 @@ func tabPathStyles(base lipgloss.Style) (lipgloss.Style, lipgloss.Style) {
 		base.Foreground(ld(lipgloss.Color("#696E78"), lipgloss.Color("#9FA6B2")))
 }
 
-func (p *pathDisplay) renderTab(path string, base lipgloss.Style, bold bool, roots []string) string {
+func (p *pathDisplay) renderTab(path string, base lipgloss.Style, bold bool, roots []string, width int) string {
 	if len(roots) < 2 && !filepath.IsAbs(path) {
-		return p.render(path, base, true, bold)
+		return p.renderWithin(path, base, true, bold, width)
 	}
 	root := p.fileRoot(path)
 	if root == "" {
-		return p.render(path, base, true, bold)
+		return p.renderWithin(path, base, true, bold, width)
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(p.cwd, path)
 	}
 	relative, err := filepath.Rel(root, path)
 	if err != nil {
-		return p.render(path, base, true, bold)
+		return p.renderWithin(path, base, true, bold, width)
 	}
 	formatter := *p
 	formatter.cwd = root
-	label := formatter.render(relative, base, true, bold)
 	if len(roots) < 2 {
-		return label
+		return formatter.renderWithin(relative, base, true, bold, width)
 	}
 	directory, separator := tabPathStyles(base)
 	parts := strings.Split(rootLabel(root, roots), "/")
@@ -139,10 +138,18 @@ func (p *pathDisplay) renderTab(path string, base lipgloss.Style, bold bool, roo
 		parts[i] = directory.Bold(true).Render(part)
 	}
 	slash := separator.Bold(false).Render("/")
-	return strings.Join(parts, slash) + slash + label
+	prefix := strings.Join(parts, slash) + slash
+	if width > 0 {
+		width = max(1, width-lipgloss.Width(prefix))
+	}
+	return prefix + formatter.renderWithin(relative, base, true, bold, width)
 }
 
 func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold bool) string {
+	return p.renderWithin(path, base, tab, fileBold, 0)
+}
+
+func (p *pathDisplay) renderWithin(path string, base lipgloss.Style, tab, fileBold bool, width int) string {
 	base = base.Padding(0)
 	if p == nil {
 		p = &pathDisplay{}
@@ -155,6 +162,10 @@ func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold boo
 		dir = filepath.VolumeName(path) + string(filepath.Separator)
 	}
 	parts := strings.Split(filepath.ToSlash(path), "/")
+	display := parts
+	if tab {
+		display = p.tabPathParts(parts, dir, home, width)
+	}
 	directoryStyle, separatorStyle := tabPathStyles(base)
 	separator := separatorStyle.GetForeground()
 	directory := directoryStyle.GetForeground()
@@ -183,8 +194,8 @@ func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold boo
 		style := styleFor(dir)
 		if i < len(parts)-1 {
 			style = style.Foreground(directory).Bold(root)
-			if tab && !root {
-				short := abbreviateDirectory(part)
+			if tab {
+				short := display[i]
 				style = style.Italic(short != part)
 				part = short
 			}
@@ -193,7 +204,46 @@ func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold boo
 		}
 		rendered.WriteString(style.Render(part))
 	}
+	if tab && width > 0 {
+		return truncateLeftToWidth(rendered.String(), width)
+	}
 	return rendered.String()
+}
+
+func (p *pathDisplay) tabPathParts(parts []string, dir string, home bool, width int) []string {
+	display := append([]string(nil), parts...)
+	for i, part := range parts[:len(parts)-1] {
+		if home && i == 0 {
+			dir = p.home
+		} else {
+			dir = filepath.Join(dir, part)
+		}
+		if !p.isRoot(dir) {
+			display[i] = abbreviateDirectory(part)
+		}
+	}
+	remaining := width - lipgloss.Width(strings.Join(display, "/"))
+	for i := len(parts) - 2; i >= 0 && remaining > 0; i-- {
+		current := lipgloss.Width(display[i])
+		expanded := directoryPrefix(parts[i], current+remaining)
+		remaining -= lipgloss.Width(expanded) - current
+		display[i] = expanded
+	}
+	return display
+}
+
+func directoryPrefix(part string, width int) string {
+	graphemes := uniseg.NewGraphemes(part)
+	used, end := 0, 0
+	for graphemes.Next() {
+		next := lipgloss.Width(graphemes.Str())
+		if used+next > width {
+			break
+		}
+		used += next
+		_, end = graphemes.Positions()
+	}
+	return part[:end]
 }
 
 func abbreviateDirectory(part string) string {
