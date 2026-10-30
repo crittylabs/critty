@@ -355,3 +355,28 @@ func TestDiffFileDeletedFileAnchorsBeforeFirstLine(t *testing.T) {
 		}
 	}
 }
+
+func TestCurrentBranch(t *testing.T) {
+	dir := newRepo(t)
+	runGit(t, dir, "symbolic-ref", "HEAD", "refs/heads/feature/sidebar")
+	check := func(want string) {
+		t.Helper()
+		got, err := CurrentBranch()
+		if err != nil || got != want {
+			t.Fatalf("CurrentBranch() = %q, %v; want %q", got, err, want)
+		}
+	}
+	check("feature/sidebar")
+	runGit(t, dir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-qm", "Initial")
+	check("feature/sidebar")
+	runGit(t, dir, "checkout", "--detach", "-q")
+	check("HEAD")
+	worktree := filepath.Join(t.TempDir(), "linked")
+	runGit(t, dir, "worktree", "add", "-qb", "linked", worktree)
+	t.Chdir(worktree)
+	check("linked")
+	t.Chdir(t.TempDir())
+	if _, err := CurrentBranch(); err == nil {
+		t.Fatal("CurrentBranch succeeded outside a repository")
+	}
+}

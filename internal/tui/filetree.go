@@ -277,6 +277,9 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 		icon = m.tabs[row.tabIndex].unreadMarker()
 	}
 	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon) + style.Render(label)
+	if row.isDir && row.path == "" {
+		text += m.branchLabel(lipgloss.NewStyle().Foreground(textSecondary))
+	}
 	if !row.isDir {
 		if counts := m.tabs[row.tabIndex].changeSummary(); counts != "" {
 			text += " " + counts

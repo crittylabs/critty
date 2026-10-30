@@ -384,3 +384,20 @@ func TestWatchQueuedStateSurvivesUpdate(t *testing.T) {
 		t.Fatal("queued reload did not survive the model update")
 	}
 }
+
+func TestReloadBranchWithoutContentChanges(t *testing.T) {
+	dir := newGitRepo(t)
+	if err := os.WriteFile("notes.md", []byte("# Notes\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp("notes.md", AppConfig{Project: "sample"})
+	app, _ = updateApp(app, docRenderedMsg{})
+	app.width, app.height = 100, 30
+	reloadApp(t, &app)
+	before := app.branch
+	runGitIn(t, dir, "symbolic-ref", "HEAD", "refs/heads/feature/sidebar")
+	reloadApp(t, &app)
+	if before == app.branch || app.branch != "feature/sidebar" {
+		t.Fatalf("branch after reload = %q, before %q", app.branch, before)
+	}
+}

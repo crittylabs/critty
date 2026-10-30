@@ -60,7 +60,7 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 		if lipgloss.Width(bar) != width {
 			t.Fatalf("width %d: bar does not fit the terminal: %q", width, bar)
 		}
-		if !strings.HasSuffix(strings.TrimRight(ansi.Strip(bar), " "), " Submit q") {
+		if !strings.Contains(ansi.Strip(bar), "Submit q") {
 			t.Fatalf("width %d: Submit button was truncated: %q", width, bar)
 		}
 	}
@@ -1174,7 +1174,7 @@ func TestReadOnlyViewer(t *testing.T) {
 	}
 	app.locationError = ""
 	plain := ansi.Strip(app.View().Content)
-	if !strings.Contains(plain, "view the document.") || strings.Contains(plain, "read-only") || strings.Contains(plain, "review the") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
+	if !strings.Contains(plain, "View the document.") || strings.Contains(plain, "read-only") || strings.Contains(plain, "Review the") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
 		t.Fatalf("missing read-only UI: %s", plain)
 	}
 	editorMessage(&app, tea.KeyPressMsg{Code: '/'})
@@ -1193,5 +1193,87 @@ func TestReadOnlyViewer(t *testing.T) {
 	_, cmd = pressKeyCmd(app, 'q')
 	if !isQuit(cmd) {
 		t.Fatal("q did not quit the viewer")
+	}
+}
+
+func TestProjectBranchLabels(t *testing.T) {
+	for _, branch := range []string{"", "feature/sidebar", "HEAD", "feature/界e\u0301"} {
+		t.Run(branch, func(t *testing.T) {
+			app := NewApp("main.go", AppConfig{Project: "sample", Branch: branch, Topic: "Review"})
+			app.syncFileTree()
+			bar := ansi.Strip(app.renderReviewBar())
+			root := ansi.Strip(app.treeRowText(0, app.tabIndicators()))
+			wantBar, wantRoot := "sample · Review", "sample/"
+			if branch != "" {
+				wantBar = "sample (" + branch + ") · Review"
+				wantRoot += " (" + branch + ")"
+			}
+			if !strings.Contains(bar, wantBar) || !strings.Contains(root, wantRoot) {
+				t.Fatalf("branch label: header %q, tree %q", bar, root)
+			}
+			for _, width := range []int{30, 60, 100} {
+				app.width = width
+				for _, line := range strings.Split(app.renderReviewBar(), "\n") {
+					if lipgloss.Width(line) > width {
+						t.Fatalf("header exceeds width %d: %q", width, line)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestProjectBranchDoesNotRepeatTopic(t *testing.T) {
+	app := NewApp("main.go", AppConfig{Project: "sample", Branch: "main", Topic: "main"})
+	if bar := ansi.Strip(app.renderReviewBar()); strings.Count(bar, "main") != 1 {
+		t.Fatalf("branch repeated as topic: %q", bar)
+	}
+}
+
+func TestReviewDescriptionWraps(t *testing.T) {
+	for _, readOnly := range []bool{false, true} {
+		app := setupAppWithDoc(t, "line\n")
+		app.project, app.branch = "sample", "feature/sidebar"
+		app.readOnly = readOnly
+		action := "Review the document."
+		if readOnly {
+			action = "View the document."
+		}
+		for _, width := range []int{40, 54, 160} {
+			app.width = width
+			lines := strings.Split(ansi.Strip(app.renderReviewBar()), "\n")
+			button := "Submit q"
+			if readOnly {
+				button = "Close q"
+			}
+			found := false
+			for _, line := range lines {
+				if strings.Contains(line, button) {
+					found = true
+					if !strings.HasSuffix(line, button+" ") || lipgloss.Width(line) != width {
+						t.Fatalf("buttons are not right aligned at width %d: %q", width, line)
+					}
+				}
+			}
+			if !found {
+				t.Fatalf("button missing at width %d: %q", width, lines)
+			}
+			if width == 160 {
+				if len(lines) != 1 || !strings.Contains(lines[0], action) {
+					t.Fatalf("wide header = %q", lines)
+				}
+			} else if len(lines) < 2 || !strings.HasPrefix(lines[1], "* "+strings.Fields(action)[0]) {
+				t.Fatalf("width %d: description missing its second-line marker: %q", width, lines)
+			}
+		}
+	}
+}
+
+func TestReviewButtonsStayRightOnSecondLine(t *testing.T) {
+	app := NewCodeReviewApp(nil, "", AppConfig{Project: strings.Repeat("project", 6), Branch: "feature/sidebar"})
+	app.width = 90
+	lines := strings.Split(ansi.Strip(app.renderReviewBar()), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[1], "* Review") || !strings.Contains(lines[1], "Split:") || !strings.HasSuffix(lines[1], "Submit q ") || lipgloss.Width(lines[1]) != app.width {
+		t.Fatalf("second-line buttons are not right aligned: %q", lines)
 	}
 }

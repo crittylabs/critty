@@ -72,6 +72,7 @@ type AppConfig struct {
 	Documents        []review.AttachedDocument
 	DocumentSnapshot *review.SnapshotFile
 	Project          string
+	Branch           string
 	Topic            string
 	Version          string
 	Session          *review.Session
@@ -112,6 +113,7 @@ type AppModel struct {
 	answerMode    bool
 	attachments   map[string]review.AttachedDocument
 	project       string
+	branch        string
 	topic         string
 	version       string
 	width, height int
@@ -323,6 +325,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
 		project:          cfg.Project,
+		branch:           cfg.Branch,
 		topic:            cfg.Topic,
 		version:          cfg.Version,
 		filePath:         filePath,
@@ -419,6 +422,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
 		project:         cfg.Project,
+		branch:          cfg.Branch,
 		topic:           cfg.Topic,
 		version:         cfg.Version,
 		tabs:            tabs,
@@ -2801,25 +2805,25 @@ func (m AppModel) renderReviewBar() string {
 	text := renderBrand() + reviewBarStyle.Render(" ")
 	if m.project != "" {
 		text += reviewBarStyle.Bold(true).Render(headerLabel(m.project))
-		if m.topic != "" {
+		text += m.branchLabel(reviewBarStyle.Foreground(textSecondary))
+		if m.topic != "" && m.topic != m.branch {
 			text += reviewBarStyle.Render(" · " + headerLabel(m.topic))
 		}
-		text += reviewBarStyle.Render(" — ")
 	} else if m.topic != "" {
-		text += reviewBarStyle.Render(headerLabel(m.topic) + " — ")
+		text += reviewBarStyle.Render(headerLabel(m.topic))
 	}
 	if !m.readOnly && m.session != nil && m.session.InMemory() {
-		text += reviewBarStyle.Bold(true).Render("Demo · not saved · ")
+		text += reviewBarStyle.Bold(true).Render(" · Demo · not saved")
 	}
-	action := "review"
+	action := "Review"
 	if m.readOnly {
-		action = "view"
+		action = "View"
 	}
-	text += reviewBarStyle.Render(action + " the ")
+	description := reviewBarStyle.Render(action + " the ")
 	if style, ok := scopeWordStyle(scope); ok {
-		text += style.Render(scope) + reviewBarStyle.Render(" ")
+		description += style.Render(scope) + reviewBarStyle.Render(" ")
 	}
-	text += reviewBarStyle.Render(subject)
+	description += reviewBarStyle.Render(subject)
 	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.submitButton()}
 	var rows []string
 	row := ""
@@ -2837,33 +2841,45 @@ func (m AppModel) renderReviewBar() string {
 		row += button
 	}
 	rows = append(rows, row)
-	for i := range rows {
-		if m.width > 0 {
-			rows[i] += reviewBarStyle.Render(strings.Repeat(" ", max(0, m.width-lipgloss.Width(rows[i]))))
-		}
+	inline := text + reviewBarStyle.Render(" — ") + description
+	if m.width <= 0 {
+		return inline + reviewBarStyle.Render(" ") + row
 	}
-	right := row
-	if m.width <= 0 || lipgloss.Width(right) < m.width {
-		right += reviewBarStyle.Render(" ")
+	fullRow := func(value string) string {
+		return reviewBarStyle.Width(m.width).Render(ansi.Truncate(value, m.width, "…"))
 	}
 	if len(rows) > 1 {
-		return strings.Join(rows, "\n")
+		lines := []string{fullRow(text), fullRow(reviewBarStyle.Render("* ") + description)}
+		for _, row := range rows {
+			lines = append(lines, fullRow(reviewBarStyle.Render(strings.Repeat(" ", max(0, m.width-lipgloss.Width(row))))+row))
+		}
+		return strings.Join(lines, "\n")
 	}
-	if m.width <= 0 {
-		return text + reviewBarStyle.Render(" ") + right
+	right := row
+	if lipgloss.Width(right) < m.width {
+		right += reviewBarStyle.Render(" ")
 	}
-	available := m.width - lipgloss.Width(right) - 1
-	if m.width >= 60 && lipgloss.Width(text) > available {
-		return reviewBarStyle.Width(m.width).Render(ansi.Truncate(text, m.width, "…")) + "\n" + reviewBarStyle.Width(m.width).Render(right)
+	available := max(0, m.width-lipgloss.Width(right)-1)
+	withButtons := func(left string) string {
+		left = ansi.Truncate(left, available, "…")
+		gap := max(0, m.width-lipgloss.Width(left)-lipgloss.Width(right))
+		return left + reviewBarStyle.Render(strings.Repeat(" ", gap)) + right
 	}
-	if available < 1 {
-		return right
+	if lipgloss.Width(inline) <= available {
+		return withButtons(inline)
 	}
-	if lipgloss.Width(text) > available {
-		text = ansi.Truncate(text, max(0, available-1), "") + reviewBarStyle.Render("…")
+	continued := reviewBarStyle.Render("* ") + description
+	if lipgloss.Width(text) <= available {
+		return withButtons(text) + "\n" + fullRow(continued)
 	}
-	gap := m.width - lipgloss.Width(text) - lipgloss.Width(right)
-	return text + reviewBarStyle.Render(strings.Repeat(" ", gap)) + right
+	return fullRow(text) + "\n" + withButtons(continued)
+}
+
+func (m AppModel) branchLabel(style lipgloss.Style) string {
+	if m.branch == "" {
+		return ""
+	}
+	return style.Bold(false).Render(" (" + headerLabel(m.branch) + ")")
 }
 
 func headerLabel(value string) string {

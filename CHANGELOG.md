@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **Branch context**: The header and Files tree show the current Git branch beside the project name, including linked worktrees.  Reloading refreshes the branch label.  When the header is crowded, its review or view description moves to a separate second line.
 - **Clearer file paths**: Headers and tabs abbreviate your home directory as `~` and show directories in cyan with muted slashes.  Headers highlight paths from the Git or worktree root onward in purple.  The Files tree and tabs omit redundant ancestor directories for files opened by absolute path.  Tabs omit the root for a single project and retain distinguishable root names when multiple projects or worktrees are open.  Tab paths expand to use their share of the pane: one tab can use the full width, two or three share it, and four or more use about a quarter each.  Narrow tabs keep the filename's end visible, while pending review indicators take priority.
 
 ## 1.8.1

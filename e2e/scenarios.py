@@ -525,7 +525,7 @@ def transient_views() -> None:
             lambda demo=demo: ("Submit q" if demo else "Close q") in screen(),
             "transient UI rendered",
         )
-        assert ("Demo · not saved" if demo else "view the ") in screen(), screen()
+        assert ("Demo · not saved" if demo else "View the ") in screen(), screen()
         assert snapshot() == before, "transient mode wrote files during startup"
         if demo:
             tmux("send-keys", "-t", pane, "n", "Space")

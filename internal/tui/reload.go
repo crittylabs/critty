@@ -143,14 +143,17 @@ func (m *AppModel) requestReload(force bool) tea.Cmd {
 func readReloadInputs(source *gitpkg.ReviewSource, filePath string, frozen bool, patch *gitpkg.Patch, docs []review.AttachedDocument, branch, previous string, force bool) (*AppModel, string, error) {
 	hash := sha256.New()
 	encoder := json.NewEncoder(hash)
+	currentBranch, branchErr := gitpkg.CurrentBranch()
+	if err := encoder.Encode(currentBranch); err != nil {
+		return nil, "", err
+	}
 	var files []gitpkg.FileChange
 	if source != nil {
 		if branch != "" && source.Scope != "range" {
-			current, err := gitpkg.CurrentBranch()
-			if err != nil {
-				return nil, "", err
+			if branchErr != nil {
+				return nil, "", branchErr
 			}
-			if current != branch {
+			if currentBranch != branch {
 				return nil, "", fmt.Errorf("review belongs to branch %s", branch)
 			}
 		}
@@ -213,7 +216,7 @@ func readReloadInputs(source *gitpkg.ReviewSource, filePath string, frozen bool,
 			docs[i] = next
 		}
 	}
-	cfg := AppConfig{Documents: docs, Source: source, Patch: patch}
+	cfg := AppConfig{Documents: docs, Source: source, Patch: patch, Branch: currentBranch}
 	var next AppModel
 	if filePath != "" {
 		next = NewApp(filePath, cfg)
@@ -367,6 +370,7 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 	m.viewAttention = nil
 	m.commentImages, m.imageBodies = nil, nil
 	m.fileTree.syncedTab = -1
+	m.branch = msg.model.branch
 	m.reload.fingerprint, m.reload.err = msg.fingerprint, nil
 	m.recalculateLayout()
 	m.rebuildContent()

@@ -15,6 +15,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/crittylabs/critty/internal/config"
+	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/prompt"
 	"github.com/crittylabs/critty/internal/review"
@@ -37,7 +38,9 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	finishCh := make(chan tui.FinishEvent, 4)
+	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
+		Branch:           branch,
 		Context:          ctx,
 		Watch:            reviewWatch,
 		Documents:        documents.Documents,

@@ -412,6 +412,9 @@ func IsGitRepo() bool {
 
 // CurrentBranch returns the current branch name, or "HEAD" when detached.
 func CurrentBranch() (string, error) {
+	if out, err := gitCommand("symbolic-ref", "--quiet", "--short", "HEAD"); err == nil {
+		return strings.TrimSpace(out), nil
+	}
 	out, err := gitCommand("rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", err
