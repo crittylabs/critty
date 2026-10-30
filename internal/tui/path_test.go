@@ -242,3 +242,35 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 		}
 	}
 }
+
+func TestHeaderPathWeightStartsAtProjectRoot(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, prefix string
+		home               string
+		git                bool
+	}{
+		{name: "absolute", path: "/prefix/proj/reldir/file.ext", prefix: "/prefix/", git: true},
+		{name: "home", path: "/prefix/proj/reldir/file.ext", prefix: "~/", home: "/prefix", git: true},
+		{name: "relative", path: "reldir/file.ext", git: true},
+		{name: "outside", path: "/outside/file.ext", prefix: "/outside/", git: true},
+		{name: "non-git", path: "/prefix/proj/reldir/file.ext", prefix: "/prefix/"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &pathDisplay{cwd: "/prefix/proj", home: tc.home, roots: map[string]bool{"/prefix/proj": tc.git}}
+			path := p.render(tc.path, headerPathStyle, false, true)
+			rendered := headerStyle.Render(inlineBackground(headerPathStyle, headerPathStyle.Render(path)))
+			runes, styles := renderedCells(rendered)
+			plain := string(runes)
+			start := strings.Index(plain, ansi.Strip(path))
+			if start < 0 {
+				t.Fatalf("missing path: %q", plain)
+			}
+			for i, r := range []rune(ansi.Strip(path)) {
+				want := i >= len([]rune(tc.prefix))
+				if got := styles[start+i].Attrs&uv.AttrBold != 0; got != want {
+					t.Fatalf("character %d (%c) bold=%t, want %t: %q", i, r, got, want, plain)
+				}
+			}
+		})
+	}
+}

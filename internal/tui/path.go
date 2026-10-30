@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/rivo/uniseg"
 )
 
@@ -177,13 +178,17 @@ func (p *pathDisplay) renderWithin(path string, base lipgloss.Style, tab, fileBo
 		separator = headerPathSeparator
 	}
 	styleFor := func(dir string) lipgloss.Style {
-		style := base.Bold(false)
+		inside := !tab && (p.insideRepository(dir) || p.cwd != "" && within(p.cwd, dir))
+		style := base.Bold(inside)
 		if !tab && p.insideRepository(dir) {
 			style = style.Background(lipgloss.Color("#D2BDDF")).Foreground(headerForeground)
 		}
 		return style
 	}
 	var rendered strings.Builder
+	if !tab {
+		rendered.WriteString(ansi.NewStyle().Normal().String())
+	}
 	for i, part := range parts {
 		if i > 0 {
 			rendered.WriteString(styleFor(dir).Foreground(separator).Render("/"))
@@ -196,7 +201,7 @@ func (p *pathDisplay) renderWithin(path string, base lipgloss.Style, tab, fileBo
 		root := p.isRoot(dir)
 		style := styleFor(dir)
 		if i < len(parts)-1 {
-			style = style.Foreground(directory).Bold(root)
+			style = style.Foreground(directory).Bold(root || style.GetBold())
 			if tab {
 				short := display[i]
 				style = style.Italic(short != part)
