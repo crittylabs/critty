@@ -7,6 +7,10 @@
 - **Branch context**: The header and Files tree show the current Git branch beside the project name, including linked worktrees.  Reloading refreshes the branch label.  When the header is crowded, its review or view description moves to a separate second line.
 - **Clearer file paths**: Headers and tabs abbreviate your home directory as `~` and show directories in cyan with muted slashes.  Headers highlight paths from the Git or worktree root onward in purple.  The Files tree and tabs omit redundant ancestor directories for files opened by absolute path.  Tabs omit the root for a single project and retain distinguishable root names when multiple projects or worktrees are open.  Tab paths expand to use their share of the pane: one tab can use the full width, two or three share it, and four or more use about a quarter each.  The current tab reserves room for its filename and review indicators before neighboring tabs, exceeding its normal share when needed.  Terminals narrower than 100 columns show colored change markers instead of line counts in tabs, the Files tree, and the file picker.
 
+### Fixed
+
+- **Readable syntax highlighting**: Characters the syntax highlighter cannot classify use ordinary text colors instead of dark error backgrounds, including punctuation in TOML multiline strings.
+
 ## 1.8.1
 
 ### Fixed

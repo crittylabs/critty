@@ -2,9 +2,13 @@ package tui
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
@@ -58,6 +62,46 @@ func TestCodeHighlighterKeepsLineCountWithBareCR(t *testing.T) {
 	for i, line := range got {
 		if plain := ansi.Strip(line); plain != want[i] {
 			t.Errorf("line %d: %q, want %q", i+1, plain, want[i])
+		}
+	}
+}
+
+func TestLexerErrorsUsePlainTextWithoutBackground(t *testing.T) {
+	const source = "[tasks.sample]\nrun = '''\nprintf 'sample: %s\\n' \"$value\"\n'''\n"
+	var parsed map[string]any
+	if err := toml.Unmarshal([]byte(source), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		lexer := codeLexer("sample.toml", source)
+		iterator, err := lexer.Tokenise(nil, source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		errors := ""
+		for token := iterator(); token != chroma.EOF; token = iterator() {
+			if token.Type == chroma.Error {
+				errors += token.Value
+			}
+		}
+		lines := newCodeHighlighter(lexer)(source)
+		if got := strings.Join(lines, "\n") + "\n"; ansi.Strip(got) != source {
+			t.Fatalf("highlighting changed source: %q", got)
+		}
+		_, plain := renderedCells(newCodeHighlighter(nil)("x")[0])
+		runes, styles := renderedCells(lines[2])
+		for i, r := range runes {
+			if r == ':' || r == '%' {
+				if strings.ContainsRune(errors, r) && !sameColor(styles[i].Fg, plain[0].Fg) {
+					t.Errorf("dark=%t: lexer error %c does not use plain text color", dark, r)
+				}
+				if styles[i].Bg != nil {
+					t.Errorf("dark=%t: lexer error %c has background %v", dark, r, styles[i].Bg)
+				}
+			}
 		}
 	}
 }

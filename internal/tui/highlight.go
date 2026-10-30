@@ -47,8 +47,17 @@ func newCodeHighlighter(lexer chroma.Lexer) func(string) []string {
 			return raw
 		}
 
+		// Lexer failures can flag valid constructs, such as TOML multiline
+		// strings.  Render them as text rather than syntax diagnostics.
+		readable := func() chroma.Token {
+			token := iterator()
+			if token.Type == chroma.Error {
+				token.Type = chroma.Text
+			}
+			return token
+		}
 		var buf bytes.Buffer
-		if err := formatter.Format(&buf, style, iterator); err != nil {
+		if err := formatter.Format(&buf, style, readable); err != nil {
 			return raw
 		}
 
