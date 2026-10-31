@@ -26,6 +26,7 @@ import (
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/searchhistory"
 )
 
 type pane int
@@ -77,9 +78,11 @@ type AppConfig struct {
 	Topic            string
 	Version          string
 	Session          *review.Session
-	Author           string
-	Split            bool
-	Watch            bool
+	// SearchHistory persists search queries for the project; nil keeps them in memory.
+	SearchHistory *searchhistory.Store
+	Author        string
+	Split         bool
+	Watch         bool
 	// Staged reads code-review files and diffs from the Git index.
 	Staged    bool
 	Patch     *gitpkg.Patch
@@ -197,6 +200,8 @@ type AppModel struct {
 	locationError        string
 	notice               footerNotice
 	isearch              isearchState
+	searchHistory        *searchhistory.Store
+	searchRing           []searchhistory.Entry // saved queries, oldest first
 
 	err error
 }
@@ -323,6 +328,8 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	m := AppModel{
 		readOnly:         cfg.ReadOnly,
 		isearch:          isearchState{isearchOptions: isearchOptions{allFiles: true}},
+		searchHistory:    cfg.SearchHistory,
+		searchRing:       loadSearchRing(cfg.SearchHistory),
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
 		project:          cfg.Project,
@@ -420,6 +427,8 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	m := AppModel{
 		readOnly:        cfg.ReadOnly,
 		isearch:         isearchState{isearchOptions: isearchOptions{allFiles: true}},
+		searchHistory:   cfg.SearchHistory,
+		searchRing:      loadSearchRing(cfg.SearchHistory),
 		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
 		project:         cfg.Project,
@@ -851,13 +860,15 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseClickMsg:
 		m.killRing.interrupt()
-		if m.handleISearchMouse(msg.Mouse()) {
-			return m, nil
+		if handled, cmd := m.handleISearchMouse(msg.Mouse()); handled {
+			return m, cmd
 		}
+		var cmd tea.Cmd
 		if m.isearch.active && m.modal == noModal && msg.Mouse().Button == tea.MouseLeft {
-			m.exitISearch(false)
+			cmd = m.exitISearch(false)
 		}
-		return m.handleMouseClick(msg)
+		model, clickCmd := m.handleMouseClick(msg)
+		return model, tea.Batch(cmd, clickCmd)
 	case tea.MouseMotionMsg:
 		m.killRing.interrupt()
 		return m.handleMouseMotion(msg)
@@ -1004,13 +1015,26 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	t := m.tab()
 	if m.textSelection.active && msg.String() != "alt+w" && !key.Matches(msg, keys.Cancel) {
 		m.clearTextSelection()
 	}
-	if m.isearch.active && m.handleISearchKey(msg) {
-		return m, nil
+	if m.isearch.active {
+		handled, cmd := m.handleISearchKey(msg)
+		if handled {
+			return m, cmd
+		}
+		if cmd != nil {
+			// The key left the search; keep its save notice while handling the key.
+			model, next := m.handleReviewKey(msg)
+			return model, tea.Batch(cmd, next)
+		}
 	}
+	return m.handleReviewKey(msg)
+}
+
+// handleReviewKey handles a key outside dialogs and search mode.
+func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	t := m.tab()
 	switch msg.String() {
 	case "ctrl+s", "/", "ctrl+r", "?":
 		if t.doc != nil {
@@ -4412,6 +4436,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "backspace / C-y", desc: "undo input piece / paste kill ring"},
 		{keys: "C-d / C-w", desc: "add following character / word"},
 		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
+		{keys: "M-p / M-n", desc: "older / newer query from project search history"},
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
 	help := columns + "\n\n" + search + "\n\n" + contexts

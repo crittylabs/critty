@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/searchhistory"
 )
 
 var reviewTopic string
@@ -68,6 +70,30 @@ func reviewGitCommonDir(root string) string {
 		return common
 	}
 	return ""
+}
+
+// searchHistoryStore identifies the project as `critty sessions` does, so
+// worktrees of one repository share saved search queries.
+func searchHistoryStore(root string, sess *review.Session) *searchhistory.Store {
+	common := ""
+	if sess != nil {
+		common = sess.Meta.GitCommonDir
+	}
+	if common == "" {
+		common = reviewGitCommonDir(root)
+	}
+	if common != "" {
+		return searchhistory.Open("git:" + common)
+	}
+	if root == "" {
+		if cwd, err := os.Getwd(); err == nil {
+			root = cwd
+		}
+	}
+	if root == "" {
+		return nil
+	}
+	return searchhistory.Open("directory:" + canonicalProjectDirectory(root))
 }
 
 func gitProjectName(common string) string {

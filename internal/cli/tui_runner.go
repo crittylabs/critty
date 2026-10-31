@@ -50,6 +50,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		Topic:            reviewTopicLabel(sess, mode),
 		Version:          versionString(),
 		Session:          sess,
+		SearchHistory:    searchHistoryStore(cfg.ProjectRoot, sess),
 		Author:           cfg.Author,
 		Split:            cfg.Split,
 		Staged:           mode.staged,

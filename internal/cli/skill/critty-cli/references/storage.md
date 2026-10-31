@@ -2,7 +2,7 @@
 
 ## Local storage and command effects
 
-Critty is a local CLI and human review TUI, not a hosted review service.  Review data lives under `$XDG_STATE_HOME/critty` (default `~/.local/state/critty`).  Review processes communicate through local Unix sockets.  The built-in review and comment commands do not upload review contents or publish repository changes.
+Critty is a local CLI and human review TUI, not a hosted review service.  Review data lives under `$XDG_STATE_HOME/critty` (default `~/.local/state/critty`).  Incremental search queries typed in the TUI are saved there per repository as well.  Review processes communicate through local Unix sockets.  The built-in review and comment commands do not upload review contents or publish repository changes.
 
 For editing settings or locating custom prompts, read [configuration](configuration.md).  It covers TOML paths, precedence, and prompt overrides.
 

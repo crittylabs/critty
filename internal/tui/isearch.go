@@ -12,6 +12,8 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/crittylabs/critty/internal/searchhistory"
 )
 
 // isearchMatch locates a match among a tab's visual lines.  Matches stay
@@ -105,15 +107,16 @@ func (m AppModel) isearchControls(top int) (string, []isearchMouseRegion) {
 	return b.String(), regions
 }
 
-func (m *AppModel) handleISearchMouse(mouse tea.Mouse) bool {
+func (m *AppModel) handleISearchMouse(mouse tea.Mouse) (bool, tea.Cmd) {
 	if m.modal != noModal || len(m.tabs) == 0 || mouse.Button != tea.MouseLeft {
-		return false
+		return false, nil
 	}
 	_, layout := m.renderReviewScreen()
 	for _, region := range layout.isearchRegions {
 		if !region.rect.contains(mouse) {
 			continue
 		}
+		var cmd tea.Cmd
 		switch region.action {
 		case isearchStart:
 			if !m.isearch.active {
@@ -124,9 +127,9 @@ func (m *AppModel) handleISearchMouse(mouse tea.Mouse) bool {
 		case isearchNext:
 			m.isearchRepeat(true)
 		case isearchKeep:
-			m.exitISearch(false)
+			cmd = m.exitISearch(false)
 		case isearchCancel:
-			m.exitISearch(true)
+			cmd = m.exitISearch(true)
 		case isearchCaseFold:
 			m.isearch.prefix = false
 			m.toggleISearch("i")
@@ -134,17 +137,30 @@ func (m *AppModel) handleISearchMouse(mouse tea.Mouse) bool {
 			m.isearch.prefix = false
 			m.toggleISearch("m")
 		}
-		return true
+		return true, cmd
 	}
-	return false
+	return false, nil
 }
 
 // isearchOptions persist from one search to the next during a run.
 type isearchOptions struct {
-	lastQuery string
-	mode      isearchMode
-	caseFold  bool // ignore case always instead of smart case
-	allFiles  bool // search every tab, as Emacs multi-file isearch does
+	mode     isearchMode
+	caseFold bool // ignore case always instead of smart case
+	allFiles bool // search every tab, as Emacs multi-file isearch does
+}
+
+var isearchModeNames = map[isearchMode]string{isearchRegexp: "regexp", isearchLiteral: "literal", isearchWord: "word"}
+
+func (mode isearchMode) String() string { return isearchModeNames[mode] }
+
+// parseISearchMode reads a saved mode name; unknown names mean regexp.
+func parseISearchMode(name string) isearchMode {
+	for mode, known := range isearchModeNames {
+		if known == name {
+			return mode
+		}
+	}
+	return isearchRegexp
 }
 
 // isearchState holds an incremental search modeled on Emacs isearch: each
@@ -157,6 +173,7 @@ type isearchState struct {
 	prefix   bool // M-s was pressed and awaits a toggle key
 	query    string
 	history  []string       // queries before each typed or captured unit
+	ring     int            // 1-based position from the newest recalled history entry, or 0
 	re       *regexp.Regexp // nil while the query is empty or invalid
 	invalid  bool
 	failing  bool
@@ -372,21 +389,23 @@ func (m *AppModel) startISearch(forward bool) {
 
 // handleISearchKey handles a key in search mode.  It reports false after
 // leaving the mode for a key that the review should handle instead.
-func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
+func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if m.isearch.prefix {
 		m.isearch.prefix = false
 		m.toggleISearch(msg.String())
-		return true
+		return true, nil
 	}
 	switch msg.String() {
 	case "ctrl+s", "ctrl+r":
 		m.isearchRepeat(msg.String() == "ctrl+s")
 	case "alt+s":
 		m.isearch.prefix = true
+	case "alt+p", "alt+n":
+		m.isearchRecall(msg.String() == "alt+p")
 	case "enter":
-		m.exitISearch(false)
+		return true, m.exitISearch(false)
 	case "ctrl+g", "ctrl+c", "esc":
-		m.exitISearch(true)
+		return true, m.exitISearch(true)
 	case "backspace", "ctrl+h":
 		m.isearchDeleteUnit()
 	case "ctrl+d":
@@ -397,12 +416,68 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) bool {
 		m.isearchPaste(m.killRing.current())
 	default:
 		if msg.Text == "" || msg.Mod&(tea.ModCtrl|tea.ModAlt|tea.ModSuper) != 0 {
-			m.exitISearch(false)
-			return false
+			return false, m.exitISearch(false)
 		}
 		m.isearchAppend(msg.Text)
 	}
-	return true
+	return true, nil
+}
+
+// isearchRecall replaces the query with an older or newer entry from the
+// project's search history, restoring its mode and case folding, as Emacs
+// does for `M-p` and `M-n`.  Both directions wrap around the ring.
+func (m *AppModel) isearchRecall(older bool) {
+	s := &m.isearch
+	n := len(m.searchRing)
+	if n == 0 {
+		return
+	}
+	switch {
+	case older:
+		s.ring = s.ring%n + 1
+	case s.ring <= 1:
+		s.ring = n
+	default:
+		s.ring--
+	}
+	s.history = append(s.history, s.query)
+	m.applyISearchEntry(m.searchRing[n-s.ring])
+}
+
+func (m *AppModel) applyISearchEntry(entry searchhistory.Entry) {
+	s := &m.isearch
+	s.query, s.mode, s.caseFold = entry.Query, parseISearchMode(entry.Mode), entry.CaseFold
+	m.recalculateLayout()
+	m.isearchFromOrigin()
+}
+
+// recordISearch adds the finished query to the project's search history and
+// saves it unless the review is a demo.  It returns a notice for a failed save.
+func (m *AppModel) recordISearch() tea.Cmd {
+	s := m.isearch
+	entry := searchhistory.Entry{Query: s.query, Mode: s.mode.String(), CaseFold: s.caseFold}
+	m.searchRing = searchhistory.Push(m.searchRing, entry)
+	if m.searchHistory == nil || (m.session != nil && m.session.InMemory()) {
+		return nil
+	}
+	ring, err := m.searchHistory.Add(entry)
+	if err != nil {
+		return m.flashNotice("Search history not saved: " + err.Error())
+	}
+	m.searchRing = ring
+	return nil
+}
+
+// loadSearchRing reads the saved history, starting empty when unavailable.
+func loadSearchRing(store *searchhistory.Store) []searchhistory.Entry {
+	if store == nil {
+		return nil
+	}
+	ring, err := store.Load()
+	if err != nil {
+		return nil
+	}
+	return ring
 }
 
 // toggleISearch applies a toggle key typed after M-s and searches again.
@@ -586,12 +661,12 @@ func (m *AppModel) isearchRepeat(forward bool) {
 	s := &m.isearch
 	if s.query == "" {
 		s.forward = forward
-		if s.lastQuery == "" {
+		if len(m.searchRing) == 0 {
 			return
 		}
 		s.history = append(s.history, s.query)
-		s.query = s.lastQuery
-		m.isearchFromOrigin()
+		s.ring = 1
+		m.applyISearchEntry(m.searchRing[len(m.searchRing)-1])
 		return
 	}
 	if s.re == nil {
@@ -705,19 +780,21 @@ func (m *AppModel) restoreISearchOrigin() {
 
 // exitISearch leaves search mode, keeping the cursor at the match or, when
 // cancelled, restoring it to the origin.
-func (m *AppModel) exitISearch(cancel bool) {
+func (m *AppModel) exitISearch(cancel bool) tea.Cmd {
 	s := &m.isearch
+	var cmd tea.Cmd
 	if s.query != "" {
-		s.lastQuery = s.query
+		cmd = m.recordISearch()
 	}
 	s.active, s.re = false, nil
 	m.recalculateLayout()
 	if cancel {
 		m.restoreISearchOrigin()
-		return
+		return cmd
 	}
 	m.rebuildContent()
 	m.scrollToCursor()
+	return cmd
 }
 
 // isearchDecorator returns a function that highlights search matches in a

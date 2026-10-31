@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Project search history**: Incremental search remembers queries per repository, shared across its worktrees, and restores each query's regexp, word, and case-folding settings.  Press `M-p` / `M-n` in search mode to recall older or newer queries, or `C-s C-s` for the most recent one.  Queries are saved under `$XDG_STATE_HOME/critty`; demos keep them in memory only.
+
 ### Changed
 
 - **Branch context**: The current Git branch appears beside the project name, making reviews across worktrees easier to distinguish.

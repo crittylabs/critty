@@ -9,6 +9,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/searchhistory"
 )
 
 const isearchDoc = "alpha\nbeta\nalphabet\ngamma\nalpha\n"
@@ -781,5 +784,93 @@ func TestISearchYanksCommentEditorKill(t *testing.T) {
 	app = ctrlKey(app, 'y')
 	if app.isearch.query != "betabeta" || len(app.killRing.entries) != 1 || app.killRing.entries[0] != "beta" {
 		t.Fatalf("query=%q ring=%v after repeated yank", app.isearch.query, app.killRing.entries)
+	}
+}
+
+func altKey(app AppModel, code rune) AppModel {
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: code, Mod: tea.ModAlt})
+	return app
+}
+
+func TestISearchRecallsProjectHistory(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app.searchRing = []searchhistory.Entry{
+		{Query: "gamma", Mode: "literal", CaseFold: true},
+		{Query: "alpha", Mode: "word"},
+	}
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "be")
+	app = altKey(app, 'p')
+	if s := app.isearch; s.query != "alpha" || s.mode != isearchWord || s.caseFold {
+		t.Fatalf("M-p recalled %q mode %v caseFold %v", s.query, s.mode, s.caseFold)
+	}
+	assertCursor(t, app, 1)
+	app = altKey(app, 'p')
+	if s := app.isearch; s.query != "gamma" || s.mode != isearchLiteral || !s.caseFold {
+		t.Fatalf("second M-p recalled %q mode %v caseFold %v", s.query, s.mode, s.caseFold)
+	}
+	assertCursor(t, app, 4)
+	app = altKey(app, 'p')
+	if app.isearch.query != "alpha" {
+		t.Fatalf("M-p past the oldest entry recalled %q, want wrap to the newest", app.isearch.query)
+	}
+	app = altKey(app, 'n')
+	if app.isearch.query != "gamma" {
+		t.Fatalf("M-n after wrapping recalled %q", app.isearch.query)
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	if app.isearch.query != "alpha" {
+		t.Fatalf("backspace restored %q, want the query before the last recall", app.isearch.query)
+	}
+}
+
+func TestISearchSavesAndRestoresProjectHistory(t *testing.T) {
+	app := newISearchApp(t, 1)
+	store := searchhistory.Open("git:/repo/.git")
+	app.searchHistory = store
+	app = ctrlKey(app, 's')
+	app = altKey(app, 's')
+	app = typeSearch(app, "w")
+	app = altKey(app, 's')
+	app = typeSearch(app, "i")
+	app = typeSearch(app, "beta")
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "gamma")
+	app = ctrlKey(app, 'g')
+	want := []searchhistory.Entry{{Query: "beta", Mode: "word", CaseFold: true}, {Query: "gamma", Mode: "word", CaseFold: true}}
+	saved, err := store.Load()
+	if err != nil || len(saved) != 2 || saved[0] != want[0] || saved[1] != want[1] {
+		t.Fatalf("saved = %+v, %v", saved, err)
+	}
+
+	restarted := setupAppWithDoc(t, isearchDoc)
+	restarted.searchHistory, restarted.searchRing = store, loadSearchRing(store)
+	restarted, _ = updateApp(restarted, tea.WindowSizeMsg{Width: 100, Height: 30})
+	restarted = ctrlKey(restarted, 's')
+	restarted = ctrlKey(restarted, 's')
+	if s := restarted.isearch; s.query != "gamma" || s.mode != isearchWord || !s.caseFold {
+		t.Fatalf("C-s C-s recalled %q mode %v caseFold %v", s.query, s.mode, s.caseFold)
+	}
+	assertCursor(t, restarted, 4)
+	restarted = altKey(restarted, 'p')
+	if restarted.isearch.query != "beta" {
+		t.Fatalf("M-p after C-s C-s recalled %q", restarted.isearch.query)
+	}
+}
+
+func TestISearchDemoKeepsHistoryInMemory(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app.session = review.NewMemorySession()
+	store := searchhistory.Open("git:/repo/.git")
+	app.searchHistory = store
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "beta")
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if saved, err := store.Load(); err != nil || saved != nil {
+		t.Fatalf("demo saved %+v, %v", saved, err)
+	}
+	if len(app.searchRing) != 1 || app.searchRing[0].Query != "beta" {
+		t.Fatalf("ring = %+v", app.searchRing)
 	}
 }
