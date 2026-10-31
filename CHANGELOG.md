@@ -6,6 +6,7 @@
 
 - **Branch context**: The current Git branch appears beside the project name, making reviews across worktrees easier to distinguish.
 - **Compact, readable file navigation**: File navigation stays readable in small terminals by omitting redundant path components and making important parts of project paths stand out.  When space is tight, colored change markers replace line counts.
+- **Faster large reviews**: Moving the cursor through a file re-renders in a few milliseconds even for thousands of lines, and word diffs of Markdown no longer re-render their changed lines on every keystroke.  Reviews with several large files highlight them concurrently at startup, and the Files sidebar outline reuses the syntax highlighting pass instead of lexing the file again.
 
 ### Fixed
 
