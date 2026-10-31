@@ -194,11 +194,25 @@ The outline below the Files tree lets you jump to Markdown headings or source de
 
 ### Review plists and other encodings
 
-Review binary plists and text in other encodings as readable UTF-8 through your existing Git `textconv` drivers.  Enable their names in Critty's global or project TOML configuration, for example:
+Review binary plists and text in other encodings as readable UTF-8 through Git `textconv` drivers.  For example, on macOS, configure a plist converter in your repository:
+
+```sh
+git config diff.plist.textconv 'plutil -convert xml1 -o -'
+```
+
+Add this rule to `.gitattributes` to select it for plist files:
+
+```gitattributes
+*.plist diff=plist
+```
+
+Then enable the driver in Critty's project `.critty.toml` or global `~/.config/critty/config.toml`:
 
 ```toml
-textconv_drivers = ["plist", "cp932"]
+textconv_drivers = ["plist"]
 ```
+
+Run `critty review` to review Git changes to these files as XML, including binary plists.  The original files keep their format.  Other formats and encodings work the same way with a converter that outputs UTF-8 text.
 
 Conversions are disabled by default.  Comments on converted files refer to the converted text and its line numbers.  Agents receive the converter's name and command with the feedback to help locate the original content and preserve its format when editing.  See [configuration](docs/configuration.md) and [Git text conversions](internal/cli/skill/critty-cli/references/inputs.md#git-text-conversions) for driver setup and limitations.
 
