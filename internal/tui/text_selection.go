@@ -310,6 +310,8 @@ func (m *AppModel) prepareTextSpans() {
 				if !measured {
 					value = ansi.Strip(display)
 				}
+			} else if plain, _, ok := t.displayLineInfo(span.ref.line - 1); ok && span.ref.side != "old" && span.source == "" {
+				value = plain
 			} else {
 				value = displaySourceText(value)
 			}

@@ -434,7 +434,7 @@ func (m *AppModel) rebuildDiffContent() {
 			left, lt := m.diffCell(row.before, leftWidth, true, gutter)
 			right, rt := m.diffCell(row.after, rightWidth, false, gutter)
 			for i := 0; i < max(len(left), len(right)); i++ {
-				l, r := "", ""
+				var l, r diffCellRow
 				if i < len(left) {
 					l = left[i]
 				}
@@ -450,12 +450,12 @@ func (m *AppModel) rebuildDiffContent() {
 				if lt.passive {
 					sourceTarget.side, sourceTarget.line = "old", row.before.oldLine
 				}
-				layout.addTextSpan(start, 0, 0, l, sourceTarget)
-				if l != "" {
+				layout.addCellSpan(start, 0, 0, l, sourceTarget)
+				if l.text != "" {
 					layout.textSpans[len(layout.textSpans)-1].source = row.before.text
 				}
-				layout.addTextSpan(start, leftWidth+3, 1, r, rt)
-				layout.appendBlock(&b, fitDiffCell(l, leftWidth)+" │ "+fitDiffCell(r, rightWidth), target)
+				layout.addCellSpan(start, leftWidth+3, 1, r, rt)
+				layout.appendBlock(&b, l.fit(leftWidth)+" │ "+r.fit(rightWidth), target)
 				for len(layout.columns) <= start {
 					layout.columns = append(layout.columns, diffMouseRow{})
 				}
@@ -488,6 +488,31 @@ func updateDiffRange(ranges map[int]renderedRange, line, row int) {
 
 func fitDiffCell(text string, width int) string {
 	return ansi.Truncate(text, max(1, width), "") + strings.Repeat(" ", max(0, width-ansi.StringWidth(text)))
+}
+
+// diffCellRow is one display row of a diff cell.  plain and width are set
+// when the row was not wrapped, so the layout needs no ANSI passes for it.
+type diffCellRow struct {
+	text, plain string
+	width       int
+}
+
+func (r diffCellRow) fit(width int) string {
+	if r.plain == "" || r.width > width {
+		return fitDiffCell(r.text, width)
+	}
+	return r.text + strings.Repeat(" ", width-r.width)
+}
+
+// addCellSpan records the row's selectable text, using the known plain text
+// when the cell row was not wrapped.
+func (l *renderedContentLayout) addCellSpan(row, left, column int, cell diffCellRow, target contentMouseTarget) {
+	if cell.plain == "" || target.line <= 0 || target.annotation {
+		l.addTextSpan(row, left, column, cell.text, target)
+		return
+	}
+	l.textSpans = append(l.textSpans, contentTextSpan{row: row, left: left + gutterWidth, column: column,
+		ref: lineRef{line: target.line, side: target.side}, text: cell.plain})
 }
 
 // diffGutter holds the gutter renderings and annotation counts shared by every
@@ -526,7 +551,7 @@ func (m *AppModel) diffGutter(t *FileTab) diffGutter {
 	return g
 }
 
-func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffGutter) ([]string, contentMouseTarget) {
+func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffGutter) ([]diffCellRow, contentMouseTarget) {
 	if line == nil {
 		return nil, contentMouseTarget{}
 	}
@@ -582,19 +607,23 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 	textWidth := max(1, width-gutterWidth-1)
 	decorate := m.isearchDecorator(ref)
 	var rows []string
+	plain, plainWidth := "", 0 // known for an unwrapped row only
 	if t.isMarkdown {
 		oldSide := before || ref.side == "old"
 		sourceLine := ref.line
 		if before && ref.side != "old" {
 			sourceLine = line.oldLine
 		}
-		content, _, contentWidth, measured := t.markdownDisplayLineInfo(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
+		content, contentPlain, contentWidth, measured := t.markdownDisplayLineInfo(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
 		if ref.side == "old" && len(line.inline) == 0 {
 			content = inlineBackground(diffDeletedLineBg, content)
 		} else if line.changed && len(line.inline) == 0 {
 			content = inlineBackground(diffChangedLineBg, content)
 		}
 		rows = markdownDisplayRowsMeasured(content, textWidth, contentWidth, measured, decorate)
+		if measured && decorate == nil && contentWidth <= textWidth {
+			plain, plainWidth = contentPlain, contentWidth
+		}
 	} else if ref.side == "old" {
 		rows = deletedDisplayLines(line.text, line.styled, line.inline, false, textWidth, decorate)
 	} else if len(line.inline) > 0 {
@@ -604,8 +633,9 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		if decorate != nil {
 			text, _ = decorate(text)
 		}
-		if _, lineWidth, ok := t.displayLineInfo(ref.line - 1); ok && decorate == nil && lineWidth <= textWidth {
+		if linePlain, lineWidth, ok := t.displayLineInfo(ref.line - 1); ok && decorate == nil && lineWidth <= textWidth {
 			rows = []string{text}
+			plain, plainWidth = linePlain, lineWidth
 		} else {
 			rows = strings.Split(lipgloss.Wrap(text, textWidth, ""), "\n")
 		}
@@ -615,6 +645,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 			}
 		}
 	}
+	cells := make([]diffCellRow, len(rows))
 	for i, text := range rows {
 		if selected {
 			text = inlineBackground(selectedLineBg, ansi.Strip(text))
@@ -622,10 +653,10 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 			text = inlineBackground(sidebarHighlightBg, ansi.Strip(text))
 		}
 		if i == 0 {
-			rows[i] = marker + num + " " + text
+			cells[i] = diffCellRow{text: marker + num + " " + text, plain: plain, width: gutterWidth + plainWidth}
 		} else {
-			rows[i] = " " + continuationGutter + " " + text
+			cells[i] = diffCellRow{text: " " + continuationGutter + " " + text}
 		}
 	}
-	return rows, target
+	return cells, target
 }

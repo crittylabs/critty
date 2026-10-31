@@ -49,6 +49,9 @@ func needsDisplayEscape(r rune) bool {
 
 func documentDisplayLine(t *FileTab, index int, fallback string) string {
 	if !t.isMarkdown && t.chromaLines != nil && index < len(t.chromaLines) {
+		if index < len(t.plainLines) {
+			return t.chromaLines[index] // already display-ready from highlightSource
+		}
 		return displaySourceText(t.chromaLines[index])
 	}
 	return displaySourceText(fallback)
