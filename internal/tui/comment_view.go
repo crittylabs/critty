@@ -2,7 +2,7 @@ package tui
 
 import tea "charm.land/bubbletea/v2"
 
-func (m AppModel) threadCollapsed(id string, resolved, drifted, focused bool) bool {
+func (m *AppModel) threadCollapsed(id string, resolved, drifted, focused bool) bool {
 	if m.viewMode {
 		return true
 	}

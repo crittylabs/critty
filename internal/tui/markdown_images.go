@@ -351,7 +351,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m AppModel) renderMarkdownImages(line int, before bool) string {
+func (m *AppModel) renderMarkdownImages(line int, before bool) string {
 	if !m.images.enabled || m.images.hidden {
 		return ""
 	}
