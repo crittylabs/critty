@@ -205,16 +205,7 @@ func (ft *FileTab) highlightDeleted() {
 	highlight := newCodeHighlighter(ft.lexer)
 	ft.deletedLineCache = make(map[int][]string, len(ft.deletedAfter))
 	for afterLine, dels := range ft.deletedAfter {
-		highlighted := make([]string, len(dels))
-		for i, del := range dels {
-			hl := highlight(del.Content)
-			if len(hl) > 0 {
-				highlighted[i] = hl[0]
-			} else {
-				highlighted[i] = del.Content
-			}
-		}
-		ft.deletedLineCache[afterLine] = highlighted
+		ft.deletedLineCache[afterLine] = highlightDeletedLines(highlight, dels)
 	}
 }
 
@@ -245,6 +236,26 @@ func (ft *FileTab) renderLineNumber(n int) string {
 		ft.lineNumbers = append(ft.lineNumbers, lineNumStyle.Render(strconv.Itoa(len(ft.lineNumbers))))
 	}
 	return ft.lineNumbers[n]
+}
+
+// Deleted lines of one hunk are contiguous in the old file, so tokenise them
+// together like the surrounding source: multi-line constructs keep their
+// styling and each hunk costs one lexer pass.  Fall back to one pass per line
+// when the lexer reflows the block.
+func highlightDeletedLines(highlight func(string) []string, dels []gitpkg.DeletedLine) []string {
+	contents := make([]string, len(dels))
+	for i, del := range dels {
+		contents[i] = del.Content
+	}
+	if hl := highlight(strings.Join(contents, "\n") + "\n"); len(hl) == len(dels) {
+		return hl
+	}
+	for i, content := range contents {
+		if hl := highlight(content); len(hl) > 0 {
+			contents[i] = hl[0]
+		}
+	}
+	return contents
 }
 
 func (t *FileTab) unreadMarker() string {
