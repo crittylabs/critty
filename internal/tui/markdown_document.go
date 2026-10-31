@@ -44,16 +44,42 @@ type markdownToken struct {
 }
 
 type markdownLine struct {
-	source        string
-	tokens        []markdownToken
-	cells         [][2]int
-	tableSep      bool
-	literal       bool
-	rendered      string
-	renderedPlain string
-	renderedWidth int
-	renderedDark  bool
-	renderedSet   bool
+	source   string
+	tokens   []markdownToken
+	cells    [][2]int
+	tableSep bool
+	literal  bool
+	// plainRender caches the rendering without word-diff segments, and
+	// inlineRender the one for the segments it was last rendered with.
+	plainRender, inlineRender markdownRender
+}
+
+type markdownRender struct {
+	text, plain string
+	width       int
+	dark, set   bool
+	with        markdownInlineKey
+}
+
+func (line *markdownLine) cacheSlot(key markdownInlineKey) *markdownRender {
+	if key.n == 0 {
+		return &line.plainRender
+	}
+	return &line.inlineRender
+}
+
+// markdownInlineKey identifies a word-diff segment slice by its backing
+// array, which diff information keeps stable while a tab is displayed.
+type markdownInlineKey struct {
+	first *gitpkg.InlineSegment
+	n     int
+}
+
+func inlineKey(inline []gitpkg.InlineSegment) markdownInlineKey {
+	if len(inline) == 0 {
+		return markdownInlineKey{}
+	}
+	return markdownInlineKey{&inline[0], len(inline)}
 }
 
 type markdownEdit struct {
@@ -315,9 +341,11 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 }
 
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
-	cacheable := len(inline) == 0 && len(links) == 0
-	if cacheable && line.renderedSet && line.renderedDark == terminalIsDark {
-		return line.rendered
+	key := inlineKey(inline)
+	cacheable := len(links) == 0
+	slot := line.cacheSlot(key)
+	if cacheable && slot.set && slot.dark == terminalIsDark && slot.with == key {
+		return slot.text
 	}
 	var b strings.Builder
 	segmentIndex, segmentStart := 0, 0
@@ -382,8 +410,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		result = highlightMarkdownBlock(result)
 	}
 	if cacheable {
-		line.rendered, line.renderedDark, line.renderedSet = result, terminalIsDark, true
-		line.renderedPlain, line.renderedWidth = ansi.Strip(result), ansi.StringWidth(result)
+		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, set: true, with: key}
 	}
 	return result
 }
@@ -531,14 +558,29 @@ func (t *FileTab) markdownDisplayLine(line int, before bool, fallback string, in
 
 // markdownDisplayLineInfo renders a document line and also returns its plain
 // text and display width when the cached rendering was reused.
-func (t *FileTab) markdownDisplayLineInfo(line int, fallback string, images []linkSpan) (display, plain string, width int, measured bool) {
-	display = t.markdownDisplayLine(line, false, fallback, nil, images)
-	if t.markdown != nil && line > 0 && line <= len(t.markdown.after.lines) {
-		if cached := &t.markdown.after.lines[line-1]; cached.renderedSet && cached.rendered == display {
-			return display, cached.renderedPlain, cached.renderedWidth, true
+func (t *FileTab) markdownDisplayLineInfo(line int, before bool, fallback string, inline []gitpkg.InlineSegment, images []linkSpan) (display, plain string, width int, measured bool) {
+	display = t.markdownDisplayLine(line, before, fallback, inline, images)
+	if t.markdown != nil {
+		source := t.markdown.after
+		if before {
+			source = t.markdown.before
+		}
+		if source != nil && line > 0 && line <= len(source.lines) {
+			if cached := source.lines[line-1].cacheSlot(inlineKey(inline)); cached.set && cached.text == display {
+				return display, cached.plain, cached.width, true
+			}
 		}
 	}
 	return display, "", 0, false
+}
+
+// markdownDisplayRowsMeasured wraps a rendered line, skipping the wrapping
+// pass when its measured width already fits.
+func markdownDisplayRowsMeasured(content string, width, contentWidth int, measured bool, decorate func(string) (string, bool)) []string {
+	if measured && decorate == nil && contentWidth <= width {
+		return []string{content}
+	}
+	return markdownDisplayRows(content, width, decorate)
 }
 
 func markdownDisplayRows(content string, width int, decorate func(string) (string, bool)) []string {

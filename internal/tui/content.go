@@ -265,11 +265,11 @@ func (m *AppModel) rebuildContent() {
 			decorate := m.isearchDecorator(lineRef{side: "old", line: del.OldLineNum})
 			var rows []string
 			if isMarkdown {
-				content := t.markdownDisplayLine(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
+				content, _, width, measured := t.markdownDisplayLineInfo(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
 				if len(del.Inline) == 0 {
 					content = inlineBackground(diffDeletedLineBg, content)
 				}
-				rows = markdownDisplayRows(content, textWidth, decorate)
+				rows = markdownDisplayRowsMeasured(content, textWidth, width, measured, decorate)
 			} else {
 				rows = deletedDisplayLines(del.Content, cached, del.Inline, false, textWidth, decorate)
 			}
@@ -368,7 +368,8 @@ func (m *AppModel) rebuildContent() {
 		if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
 			var rows []string
 			if isMarkdown {
-				rows = markdownDisplayRows(t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false)), textWidth, decorate)
+				content, _, width, measured := t.markdownDisplayLineInfo(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false))
+				rows = markdownDisplayRowsMeasured(content, textWidth, width, measured, decorate)
 			} else {
 				rows = inlineDiffDisplayLines(inlineChanges, false, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
 			}
@@ -463,7 +464,7 @@ func (m *AppModel) rebuildContent() {
 			var width int
 			var measured bool
 			if isMarkdown {
-				displayLine, plain, width, measured = t.markdownDisplayLineInfo(lineNum, line, m.documentLinkSpans(lineNum, false))
+				displayLine, plain, width, measured = t.markdownDisplayLineInfo(lineNum, false, line, nil, m.documentLinkSpans(lineNum, false))
 			} else if t.attachment != nil && !t.isCode {
 				displayLine = linkedDisplayLine(line, m.documentLinkSpans(lineNum, false), displaySourceText)
 			} else {

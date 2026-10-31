@@ -305,7 +305,11 @@ func (m *AppModel) prepareTextSpans() {
 			}
 			raw := value
 			if t.isMarkdown {
-				value = ansi.Strip(t.markdownDisplayLine(span.ref.line, span.ref.side == "old", value, nil, nil))
+				display, plain, _, measured := t.markdownDisplayLineInfo(span.ref.line, span.ref.side == "old", value, nil, nil)
+				value = plain
+				if !measured {
+					value = ansi.Strip(display)
+				}
 			} else {
 				value = displaySourceText(value)
 			}
