@@ -75,10 +75,11 @@ type FileTab struct {
 	// Cached rendering data (computed once per tab switch, not per keystroke)
 	highlighted      bool // language detection and highlight caches are current
 	lexer            chroma.Lexer
-	chromaLines      []string // display-ready syntax-highlighted lines (nil for markdown)
-	plainLines       []string // display text without styling, parallel to chromaLines
-	displayWidths    []int    // display widths of chromaLines
-	lineNumbers      []string // default gutter rendering of each line number
+	outlineMask      *outlineMask // masked source from the highlight pass, nil when unavailable
+	chromaLines      []string     // display-ready syntax-highlighted lines (nil for markdown)
+	plainLines       []string     // display text without styling, parallel to chromaLines
+	displayWidths    []int        // display widths of chromaLines
+	lineNumbers      []string     // default gutter rendering of each line number
 	lineNumbersDark  bool
 	deletedLineCache map[int][]string // pre-highlighted deleted line content, keyed by afterLine
 	isMarkdown       bool
@@ -186,10 +187,16 @@ func (ft *FileTab) detectLanguage() {
 	ft.isCode = isCodeLexer(ft.lexer)
 }
 
-// highlightSource renders the document once and keeps display-ready lines
-// with their plain text and widths, so rebuilds need no further passes.
+// highlightSource renders the document once and keeps display-ready lines,
+// their plain text and widths, and the masked source the outline reads.
 func (ft *FileTab) highlightSource() {
-	ft.chromaLines = newCodeHighlighter(ft.lexer)(ft.doc.Content)
+	var mask *outlineMask
+	var observers []func(chroma.Token)
+	if language := outlineLanguage(ft.lexer); language != "" && language != "ruby" && ft.doc.Known == nil {
+		mask = newOutlineMask(language, ft.doc.Content)
+		observers = append(observers, mask.observe)
+	}
+	ft.chromaLines = newCodeHighlighter(ft.lexer, observers...)(ft.doc.Content)
 	ft.plainLines = make([]string, len(ft.chromaLines))
 	ft.displayWidths = make([]int, len(ft.chromaLines))
 	for i, line := range ft.chromaLines {
@@ -198,6 +205,10 @@ func (ft *FileTab) highlightSource() {
 		if i < len(ft.doc.Lines) {
 			ft.plainLines[i] = displaySourceText(ft.doc.Lines[i])
 		}
+	}
+	ft.outlineMask = nil
+	if mask != nil {
+		ft.outlineMask = mask.finish()
 	}
 }
 
@@ -214,7 +225,7 @@ func (ft *FileTab) highlightDeleted() {
 func (ft *FileTab) resetHighlightCache() {
 	ft.highlighted = false
 	ft.chromaLines, ft.plainLines, ft.displayWidths = nil, nil, nil
-	ft.deletedLineCache = nil
+	ft.deletedLineCache, ft.outlineMask = nil, nil
 }
 
 // displayLineInfo returns the plain text and display width of a cached

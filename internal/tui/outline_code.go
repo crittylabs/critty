@@ -20,7 +20,10 @@ var outlineRubyHeredoc = regexp.MustCompile("^<<-?[\"'`]?([a-zA-Z_][a-zA-Z0-9_]*
 var outlineCppRaw = regexp.MustCompile(`(?:u8|u|U|L)?R"([^\s()\\]{0,16})\(`)
 
 func codeOutlineLanguage(path, source string) string {
-	lexer := codeLexer(path, source)
+	return outlineLanguage(codeLexer(path, source))
+}
+
+func outlineLanguage(lexer chroma.Lexer) string {
 	if lexer == nil {
 		return ""
 	}
@@ -41,16 +44,86 @@ func (t *FileTab) ensureCodeOutline() *codeOutlineCache {
 	if c := t.codeOutline; c != nil && c.doc == t.doc && c.path == t.path && c.content == t.doc.Content && c.partial == (t.doc.Known != nil) {
 		return c
 	}
-	language := codeOutlineLanguage(t.path, t.doc.Content)
+	lexer := t.lexer
+	if lexer == nil {
+		lexer = codeLexer(t.path, t.doc.Content)
+	}
+	language := outlineLanguage(lexer)
 	if language == "" {
 		return nil
 	}
 	c := &codeOutlineCache{doc: t.doc, path: t.path, content: t.doc.Content, partial: t.doc.Known != nil}
-	c.rows = parseOutlineDocument(t.doc, func(source string, offset int) []outlineHeading {
-		return parseCodeOutline(language, source, offset)
-	})
+	if mask := t.outlineMask; mask != nil && mask.language == language && mask.source == t.doc.Content && t.doc.Known == nil {
+		c.rows = parseMaskedOutline(language, mask.code, 0)
+	} else {
+		c.rows = parseOutlineDocument(t.doc, func(source string, offset int) []outlineHeading {
+			return parseCodeOutline(language, source, offset)
+		})
+	}
 	t.codeOutline = c
 	return c
+}
+
+// outlineMask collects the masked source during a highlight pass so the
+// outline needs no second lexer pass over the same document.
+type outlineMask struct {
+	language, source, code string
+	b                      strings.Builder
+}
+
+func newOutlineMask(language, source string) *outlineMask {
+	m := &outlineMask{language: language, source: source}
+	m.b.Grow(len(source))
+	return m
+}
+
+func (m *outlineMask) observe(token chroma.Token) {
+	maskToken(&m.b, token)
+}
+
+func (m *outlineMask) finish() *outlineMask {
+	m.code = maskRawStrings(m.language, m.source, m.b.String())
+	return m
+}
+
+// maskToken blanks comment and string data while keeping byte offsets and
+// physical lines.
+func maskToken(b *strings.Builder, token chroma.Token) {
+	if token.Type.InCategory(chroma.Comment) || token.Type.InSubCategory(chroma.LiteralString) {
+		for _, c := range []byte(token.Value) {
+			if c != '\n' && c != '\r' && c != '\t' {
+				c = ' '
+			}
+			b.WriteByte(c)
+		}
+	} else {
+		b.WriteString(token.Value)
+	}
+}
+
+// maskRawStrings hides C++ raw string literals, which the lexers leave as code.
+func maskRawStrings(language, source, code string) string {
+	if language != "cpp" && language != "objective-c" {
+		return code
+	}
+	masked := []byte(code)
+	end := 0
+	for _, m := range outlineCppRaw.FindAllStringSubmatchIndex(source, -1) {
+		if m[0] < end || m[1] > len(masked) || masked[m[0]] == ' ' {
+			continue
+		}
+		terminator := ")" + source[m[2]:m[3]] + "\""
+		end = len(masked)
+		if i := strings.Index(source[m[1]:], terminator); i >= 0 {
+			end = min(end, m[1]+i+len(terminator))
+		}
+		for j := m[0]; j < end; j++ {
+			if masked[j] != '\n' && masked[j] != '\r' {
+				masked[j] = ' '
+			}
+		}
+	}
+	return string(masked)
 }
 
 // Gaps in a supplied diff must not carry lexical or nesting state across runs.
@@ -101,38 +174,9 @@ func outlineCode(language, source string) string {
 				heredocs[line] = m[1]
 			}
 		}
-		if token.Type.InCategory(chroma.Comment) || token.Type.InSubCategory(chroma.LiteralString) {
-			for _, c := range []byte(token.Value) {
-				if c != '\n' && c != '\r' && c != '\t' {
-					c = ' '
-				}
-				b.WriteByte(c)
-			}
-		} else {
-			b.WriteString(token.Value)
-		}
+		maskToken(&b, token)
 	}
-	code := b.String()
-	if language == "cpp" || language == "objective-c" {
-		masked := []byte(code)
-		end := 0
-		for _, m := range outlineCppRaw.FindAllStringSubmatchIndex(source, -1) {
-			if m[0] < end || m[1] > len(masked) || masked[m[0]] == ' ' {
-				continue
-			}
-			terminator := ")" + source[m[2]:m[3]] + "\""
-			end = len(masked)
-			if i := strings.Index(source[m[1]:], terminator); i >= 0 {
-				end = min(end, m[1]+i+len(terminator))
-			}
-			for j := m[0]; j < end; j++ {
-				if masked[j] != '\n' && masked[j] != '\r' {
-					masked[j] = ' '
-				}
-			}
-		}
-		code = string(masked)
-	}
+	code := maskRawStrings(language, source, b.String())
 	if len(heredocs) > 0 {
 		// Chroma marks Ruby heredoc openers but does not consume their bodies.
 		original, masked := strings.Split(source, "\n"), strings.Split(code, "\n")
@@ -163,7 +207,12 @@ type codeDeclaration struct {
 }
 
 func parseCodeOutline(language, source string, offset int) []outlineHeading {
-	code := outlineCode(language, source)
+	return parseMaskedOutline(language, outlineCode(language, source), offset)
+}
+
+// parseMaskedOutline extracts declarations from source whose comments and
+// strings were already masked by outlineCode or a highlight pass.
+func parseMaskedOutline(language, code string, offset int) []outlineHeading {
 	lines := strings.Split(code, "\n")
 	var rows []outlineHeading
 	type scope struct {

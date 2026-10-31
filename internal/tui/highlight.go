@@ -22,8 +22,9 @@ func isCodeLexer(lexer chroma.Lexer) bool {
 }
 
 // newCodeHighlighter reuses the selected lexer.  Each call independently
-// tokenises content and returns lines with ANSI styling.
-func newCodeHighlighter(lexer chroma.Lexer) func(string) []string {
+// tokenises content and returns lines with ANSI styling.  Observers receive
+// every token of the pass, so other consumers need no second pass.
+func newCodeHighlighter(lexer chroma.Lexer, observers ...func(chroma.Token)) func(string) []string {
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}
@@ -51,6 +52,9 @@ func newCodeHighlighter(lexer chroma.Lexer) func(string) []string {
 		// strings.  Render them as text rather than syntax diagnostics.
 		readable := func() chroma.Token {
 			token := iterator()
+			for _, observe := range observers {
+				observe(token)
+			}
 			if token.Type == chroma.Error {
 				token.Type = chroma.Text
 			}
