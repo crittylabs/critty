@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -774,28 +775,41 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = err
 			return m, nil
 		}
-		// Load documents and existing review comments for each tab
+		// Load documents and existing review comments for each tab.  Syntax
+		// highlighting dominates startup for large files, so source tabs are
+		// highlighted concurrently; Markdown parsing stays on this goroutine.
 		for i := range m.tabs {
 			t := &m.tabs[i]
 			t.state = &fileReview{Comments: m.sessionComments(t.path)}
-			if t.isBinary {
-				continue
-			}
-			if t.outsideChanges {
+			if t.isBinary || t.outsideChanges {
 				continue
 			}
 			if t.isDeleted {
 				t.doc = &document.Document{Path: t.path}
-				t.ensureHighlightCache()
-				if lines := m.visualLines(t); len(lines) > 0 {
-					t.cursorLine, t.cursorSide = lines[0].line, lines[0].side
-				}
+			} else {
+				doc, _ := m.loadDocument(t.path)
+				t.doc = doc
+			}
+		}
+		var wg sync.WaitGroup
+		for i := range m.tabs {
+			t := &m.tabs[i]
+			if t.isBinary || t.outsideChanges {
 				continue
 			}
-			doc, _ := m.loadDocument(t.path)
-			t.doc = doc
-			t.ensureHighlightCache()
-			if m.patch != nil || m.alternateDiff(t) {
+			if markdownPath(t.path) {
+				t.ensureHighlightCache()
+				continue
+			}
+			wg.Go(t.ensureHighlightCache)
+		}
+		wg.Wait()
+		for i := range m.tabs {
+			t := &m.tabs[i]
+			if t.isBinary || t.outsideChanges {
+				continue
+			}
+			if t.isDeleted || m.patch != nil || m.alternateDiff(t) {
 				if lines := m.visualLines(t); len(lines) > 0 {
 					t.cursorLine, t.cursorSide = lines[0].line, lines[0].side
 				}
