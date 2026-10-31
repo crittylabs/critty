@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -418,6 +419,7 @@ func (m *AppModel) rebuildDiffContent() {
 	}
 	appendAnnotations(lineRef{})
 	hunks := diffHunks(t)
+	gutter := m.diffGutter(t)
 	if len(hunks) == 0 {
 		layout.appendBlock(&b, "  No textual changes.", contentMouseTarget{})
 	}
@@ -429,8 +431,8 @@ func (m *AppModel) rebuildDiffContent() {
 		leftWidth := (width - 3) / 2
 		rightWidth := width - 3 - leftWidth
 		for _, row := range hunk {
-			left, lt := m.diffCell(row.before, leftWidth, "-", true)
-			right, rt := m.diffCell(row.after, rightWidth, "+", false)
+			left, lt := m.diffCell(row.before, leftWidth, true, gutter)
+			right, rt := m.diffCell(row.after, rightWidth, false, gutter)
 			for i := 0; i < max(len(left), len(right)); i++ {
 				l, r := "", ""
 				if i < len(left) {
@@ -488,7 +490,43 @@ func fitDiffCell(text string, width int) string {
 	return ansi.Truncate(text, max(1, width), "") + strings.Repeat(" ", max(0, width-ansi.StringWidth(text)))
 }
 
-func (m *AppModel) diffCell(line *diffLine, width int, marker string, before bool) ([]string, contentMouseTarget) {
+// diffGutter holds the gutter renderings and annotation counts shared by every
+// cell of one diff rebuild.
+type diffGutter struct {
+	markers      gutterMarkers
+	annotated    map[int]int // comments covering each new-side line
+	oldAnnotated map[int]int // comments covering each old-side line
+	selStart     int
+	selEnd       int
+	selSide      string
+	hlStart      int
+	hlEnd        int
+	hlSide       string
+}
+
+func (m *AppModel) diffGutter(t *FileTab) diffGutter {
+	g := diffGutter{markers: renderGutterMarkers(), annotated: map[int]int{}, oldAnnotated: map[int]int{}}
+	if t.state != nil {
+		for _, c := range t.state.Comments {
+			if isGeneralCommentScope(c.Scope) || commentDrifted(t, c) {
+				continue
+			}
+			lines := g.annotated
+			if c.Side == "old" {
+				lines = g.oldAnnotated
+			}
+			for l := c.StartLine; l <= c.EndAt(); l++ {
+				lines[l]++
+			}
+		}
+	}
+	g.selStart, g.selEnd = m.selectionRange()
+	g.selSide = m.selectionSide()
+	g.hlStart, g.hlEnd, g.hlSide = m.highlightedCommentLines()
+	return g
+}
+
+func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffGutter) ([]string, contentMouseTarget) {
 	if line == nil {
 		return nil, contentMouseTarget{}
 	}
@@ -500,51 +538,46 @@ func (m *AppModel) diffCell(line *diffLine, width int, marker string, before boo
 	if passive {
 		n = line.oldLine
 	}
-	selectedStart, selectedEnd := m.selectionRange()
-	selected := t.selecting && m.selectionSide() == ref.side && ref.line >= selectedStart && ref.line <= selectedEnd
-	hs, he, side := m.highlightedCommentLines()
-	highlighted := side == ref.side && hs > 0 && ref.line >= hs && ref.line <= he
+	selected := t.selecting && gutter.selSide == ref.side && ref.line >= gutter.selStart && ref.line <= gutter.selEnd
+	highlighted := gutter.hlSide == ref.side && gutter.hlStart > 0 && ref.line >= gutter.hlStart && ref.line <= gutter.hlEnd
 	cursor := !passive && t.cursorLine == ref.line && t.cursorSide == ref.side
-	markStyle, numStyle := lipgloss.NewStyle(), lineNumStyle
+	marker := " "
 	if line.changed {
+		marker = gutter.markers.added
 		if ref.side == "old" {
-			markStyle, numStyle = diffDeletedGutter, diffDeletedLineNum
-		} else {
-			markStyle = diffAddedGutter
+			marker = gutter.markers.deleted
 		}
-	} else {
-		marker = " "
 	}
 	if !passive {
+		counts := gutter.annotated
+		if ref.side == "old" {
+			counts = gutter.oldAnnotated
+		}
 		switch {
 		case cursor && !t.cursorOnAnnotation:
-			marker, markStyle = ">", cursorMarker
+			marker = gutter.markers.cursor
 		case selected:
-			marker, markStyle = "|", selectedMarker
+			marker = gutter.markers.selected
 		case highlighted:
-			marker, markStyle = ">", cursorMarker
+			marker = gutter.markers.cursor
 		case m.hoveredGutterLine == ref.line && m.hoveredGutterSide == ref.side:
-			marker, markStyle = ">", commentGutterMarker
-		default:
-			count := 0
-			if t.state != nil {
-				for _, c := range t.state.Comments {
-					if !isGeneralCommentScope(c.Scope) && !commentDrifted(t, c) && c.Side == ref.side && c.StartLine <= ref.line && c.EndAt() >= ref.line {
-						count++
-					}
-				}
-			}
-			if count > 1 {
-				marker, markStyle = "◆", gutterOverlap
-			} else if count == 1 {
-				marker, markStyle = "■", annotationGutter
-			}
+			marker = gutter.markers.hovered
+		case counts[ref.line] > 1:
+			marker = gutter.markers.overlap
+		case counts[ref.line] == 1:
+			marker = gutter.markers.annotated
 		}
 	}
-	if cursor {
-		numStyle = cursorLineNumStyle
-	} else if selected {
-		numStyle = selectedLineNumStyle
+	var num string
+	switch {
+	case cursor:
+		num = cursorLineNumStyle.Render(strconv.Itoa(n))
+	case selected:
+		num = selectedLineNumStyle.Render(strconv.Itoa(n))
+	case line.changed && ref.side == "old":
+		num = diffDeletedLineNum.Render(strconv.Itoa(n))
+	default:
+		num = t.renderLineNumber(n)
 	}
 	textWidth := max(1, width-gutterWidth-1)
 	decorate := m.isearchDecorator(ref)
@@ -555,13 +588,13 @@ func (m *AppModel) diffCell(line *diffLine, width int, marker string, before boo
 		if before && ref.side != "old" {
 			sourceLine = line.oldLine
 		}
-		content := t.markdownDisplayLine(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
+		content, _, contentWidth, measured := t.markdownDisplayLineInfo(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
 		if ref.side == "old" && len(line.inline) == 0 {
 			content = inlineBackground(diffDeletedLineBg, content)
 		} else if line.changed && len(line.inline) == 0 {
 			content = inlineBackground(diffChangedLineBg, content)
 		}
-		rows = markdownDisplayRows(content, textWidth, decorate)
+		rows = markdownDisplayRowsMeasured(content, textWidth, contentWidth, measured, decorate)
 	} else if ref.side == "old" {
 		rows = deletedDisplayLines(line.text, line.styled, line.inline, false, textWidth, decorate)
 	} else if len(line.inline) > 0 {
@@ -571,7 +604,11 @@ func (m *AppModel) diffCell(line *diffLine, width int, marker string, before boo
 		if decorate != nil {
 			text, _ = decorate(text)
 		}
-		rows = strings.Split(lipgloss.Wrap(text, textWidth, ""), "\n")
+		if _, lineWidth, ok := t.displayLineInfo(ref.line - 1); ok && decorate == nil && lineWidth <= textWidth {
+			rows = []string{text}
+		} else {
+			rows = strings.Split(lipgloss.Wrap(text, textWidth, ""), "\n")
+		}
 		if line.changed {
 			for i := range rows {
 				rows[i] = inlineBackground(diffChangedLineBg, rows[i])
@@ -585,9 +622,9 @@ func (m *AppModel) diffCell(line *diffLine, width int, marker string, before boo
 			text = inlineBackground(sidebarHighlightBg, ansi.Strip(text))
 		}
 		if i == 0 {
-			rows[i] = fmt.Sprintf("%s%s %s", markStyle.Render(marker), numStyle.Render(fmt.Sprint(n)), text)
+			rows[i] = marker + num + " " + text
 		} else {
-			rows[i] = fmt.Sprintf(" %s %s", continuationGutter, text)
+			rows[i] = " " + continuationGutter + " " + text
 		}
 	}
 	return rows, target
