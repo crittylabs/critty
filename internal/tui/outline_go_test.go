@@ -51,7 +51,7 @@ func TestGoOutlineCacheAndPartialSource(t *testing.T) {
 func TestGoOutlineSourceTrackingAndNavigation(t *testing.T) {
 	app := outlineTestApp(t, "package p\ntype Server struct{}\n\nfunc (s *Server) Serve() {\n println(1)\n}\n\nfunc Stop() {}\n")
 	app.tab().path, app.tab().isMarkdown = "test.go", false
-	app.tab().chromaLines = nil
+	app.tab().resetHighlightCache()
 	app.rebuildContent()
 	for _, tc := range []struct{ line, active int }{{1, -1}, {2, 0}, {5, 1}, {8, 2}} {
 		app.tab().cursorLine = tc.line

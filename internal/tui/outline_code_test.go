@@ -95,7 +95,7 @@ func TestCodeOutlineIgnoresCommentsAndStrings(t *testing.T) {
 func TestCodeOutlineNavigation(t *testing.T) {
 	app := outlineTestApp(t, "class Service:\n  def run(self):\n    pass\n\ndef stop():\n  pass\n")
 	app.tab().path, app.tab().isMarkdown = "sample.py", false
-	app.tab().chromaLines = nil
+	app.tab().resetHighlightCache()
 	app.rebuildContent()
 	if len(app.outline.rows) != 3 {
 		t.Fatalf("source outline not connected to the sidebar: %+v", app.outline.rows)

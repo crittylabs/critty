@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/extension"
 	extast "github.com/yuin/goldmark/v2/extension/ast"
@@ -43,14 +44,16 @@ type markdownToken struct {
 }
 
 type markdownLine struct {
-	source       string
-	tokens       []markdownToken
-	cells        [][2]int
-	tableSep     bool
-	literal      bool
-	rendered     string
-	renderedDark bool
-	renderedSet  bool
+	source        string
+	tokens        []markdownToken
+	cells         [][2]int
+	tableSep      bool
+	literal       bool
+	rendered      string
+	renderedPlain string
+	renderedWidth int
+	renderedDark  bool
+	renderedSet   bool
 }
 
 type markdownEdit struct {
@@ -380,6 +383,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 	}
 	if cacheable {
 		line.rendered, line.renderedDark, line.renderedSet = result, terminalIsDark, true
+		line.renderedPlain, line.renderedWidth = ansi.Strip(result), ansi.StringWidth(result)
 	}
 	return result
 }
@@ -523,6 +527,18 @@ func (t *FileTab) markdownDisplayLine(line int, before bool, fallback string, in
 	// Standalone deleted lines and test fixtures may have no document cache.
 	source = parseMarkdownSource([]string{fallback}, nil)
 	return source.lines[0].render(inline, base, changed, images)
+}
+
+// markdownDisplayLineInfo renders a document line and also returns its plain
+// text and display width when the cached rendering was reused.
+func (t *FileTab) markdownDisplayLineInfo(line int, fallback string, images []linkSpan) (display, plain string, width int, measured bool) {
+	display = t.markdownDisplayLine(line, false, fallback, nil, images)
+	if t.markdown != nil && line > 0 && line <= len(t.markdown.after.lines) {
+		if cached := &t.markdown.after.lines[line-1]; cached.renderedSet && cached.rendered == display {
+			return display, cached.renderedPlain, cached.renderedWidth, true
+		}
+	}
+	return display, "", 0, false
 }
 
 func markdownDisplayRows(content string, width int, decorate func(string) (string, bool)) []string {

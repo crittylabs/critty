@@ -36,7 +36,7 @@ func TestAttachmentReferences(t *testing.T) {
 			app, _ := formTestAppWithContent(t, tc.body+"\n")
 			if tc.path != "" {
 				app.tab().path = "attachments/a/" + tc.path
-				app.tab().chromaLines = nil
+				app.tab().resetHighlightCache()
 				app.tab().ensureHighlightCache()
 			}
 			app.tabs[1].doc = document.FromContent("target.md", []byte("one\ntwo\n"))
@@ -97,7 +97,7 @@ func TestSourceAttachmentKeepsHighlightingWithoutLinks(t *testing.T) {
 	app, _ := formTestAppWithContent(t, source)
 	tab := app.tab()
 	tab.path = "attachments/a/example.go"
-	tab.chromaLines = nil
+	tab.resetHighlightCache()
 	tab.ensureHighlightCache()
 	app.tabs[1].state.Comments = []review.Comment{{ID: "c_abcdef", StartLine: 2, Body: "target"}}
 	app.rebuildContent()

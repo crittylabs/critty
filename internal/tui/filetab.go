@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+
+	"github.com/alecthomas/chroma/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/internal/git"
 
@@ -69,7 +73,13 @@ type FileTab struct {
 	outsideChanges bool
 
 	// Cached rendering data (computed once per tab switch, not per keystroke)
-	chromaLines      []string         // syntax-highlighted lines (nil for markdown)
+	highlighted      bool // language detection and highlight caches are current
+	lexer            chroma.Lexer
+	chromaLines      []string // display-ready syntax-highlighted lines (nil for markdown)
+	plainLines       []string // display text without styling, parallel to chromaLines
+	displayWidths    []int    // display widths of chromaLines
+	lineNumbers      []string // default gutter rendering of each line number
+	lineNumbersDark  bool
 	deletedLineCache map[int][]string // pre-highlighted deleted line content, keyed by afterLine
 	isMarkdown       bool
 	isCode           bool
@@ -142,25 +152,58 @@ func (m *AppModel) positionTabViewport(step int) {
 	}
 }
 
-// ensureHighlightCache populates the Chroma highlight cache if needed.
-// Call this once after loading a tab's document, not on every rebuild.
+// ensureHighlightCache populates the language and highlight caches if
+// needed.  Call this once after loading a tab's document, not on every
+// rebuild.
 func (ft *FileTab) ensureHighlightCache() {
-	if ft.doc == nil || ft.chromaLines != nil {
+	if ft.doc == nil {
 		return
 	}
-	ext := strings.ToLower(filepath.Ext(ft.path))
-	ft.isMarkdown = ext == ".md" || ext == ".markdown"
-	lexer := codeLexer(ft.path, ft.doc.Content)
-	ft.isCode = isCodeLexer(lexer)
-	if ft.isMarkdown {
-		ft.ensureMarkdownCache()
-		return
+	if !ft.highlighted {
+		ft.highlighted = true
+		ft.detectLanguage()
+		if ft.isMarkdown {
+			ft.ensureMarkdownCache()
+			return
+		}
+		ft.highlightSource()
 	}
-	highlight := newCodeHighlighter(lexer)
-	ft.chromaLines = highlight(ft.doc.Content)
+	if !ft.isMarkdown && ft.deletedLineCache == nil {
+		ft.highlightDeleted()
+	}
+}
 
-	// Pre-highlight deleted lines
-	ft.deletedLineCache = make(map[int][]string)
+func markdownPath(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".md" || ext == ".markdown"
+}
+
+// detectLanguage selects the lexer once per document so repeated highlight
+// passes and the outline share it.
+func (ft *FileTab) detectLanguage() {
+	ft.isMarkdown = markdownPath(ft.path)
+	ft.lexer = codeLexer(ft.path, ft.doc.Content)
+	ft.isCode = isCodeLexer(ft.lexer)
+}
+
+// highlightSource renders the document once and keeps display-ready lines
+// with their plain text and widths, so rebuilds need no further passes.
+func (ft *FileTab) highlightSource() {
+	ft.chromaLines = newCodeHighlighter(ft.lexer)(ft.doc.Content)
+	ft.plainLines = make([]string, len(ft.chromaLines))
+	ft.displayWidths = make([]int, len(ft.chromaLines))
+	for i, line := range ft.chromaLines {
+		line = displaySourceText(line)
+		ft.chromaLines[i], ft.displayWidths[i] = line, ansi.StringWidth(line)
+		if i < len(ft.doc.Lines) {
+			ft.plainLines[i] = displaySourceText(ft.doc.Lines[i])
+		}
+	}
+}
+
+func (ft *FileTab) highlightDeleted() {
+	highlight := newCodeHighlighter(ft.lexer)
+	ft.deletedLineCache = make(map[int][]string, len(ft.deletedAfter))
 	for afterLine, dels := range ft.deletedAfter {
 		highlighted := make([]string, len(dels))
 		for i, del := range dels {
@@ -173,6 +216,35 @@ func (ft *FileTab) ensureHighlightCache() {
 		}
 		ft.deletedLineCache[afterLine] = highlighted
 	}
+}
+
+// resetHighlightCache discards the highlight caches so the next
+// ensureHighlightCache call recomputes them, such as after a recolor.
+func (ft *FileTab) resetHighlightCache() {
+	ft.highlighted = false
+	ft.chromaLines, ft.plainLines, ft.displayWidths = nil, nil, nil
+	ft.deletedLineCache = nil
+}
+
+// displayLineInfo returns the plain text and display width of a cached
+// source line, or ok false when the line must be measured after rendering.
+func (ft *FileTab) displayLineInfo(index int) (plain string, width int, ok bool) {
+	if ft.isMarkdown || index >= len(ft.displayWidths) || index >= len(ft.plainLines) {
+		return "", 0, false
+	}
+	return ft.plainLines[index], ft.displayWidths[index], true
+}
+
+// renderLineNumber caches the default gutter rendering of a line number
+// until the color scheme changes.
+func (ft *FileTab) renderLineNumber(n int) string {
+	if ft.lineNumbersDark != terminalIsDark {
+		ft.lineNumbers, ft.lineNumbersDark = nil, terminalIsDark
+	}
+	for len(ft.lineNumbers) <= n {
+		ft.lineNumbers = append(ft.lineNumbers, lineNumStyle.Render(strconv.Itoa(len(ft.lineNumbers))))
+	}
+	return ft.lineNumbers[n]
 }
 
 func (t *FileTab) unreadMarker() string {

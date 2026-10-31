@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -132,6 +133,7 @@ func (m *AppModel) rebuildContent() {
 	if textWidth < 10 {
 		textWidth = 10
 	}
+	markers := renderGutterMarkers()
 
 	// Use cached syntax highlighting
 	isMarkdown := t.isMarkdown
@@ -233,20 +235,20 @@ func (m *AppModel) rebuildContent() {
 			isSelected := t.selecting && selSide == "old" && del.OldLineNum >= selStart && del.OldLineNum <= selEnd
 			isSidebarHighlight := sidebarHighlightSide == "old" && del.OldLineNum >= sidebarHighlightStart && del.OldLineNum <= sidebarHighlightEnd
 
-			marker := diffDeletedGutter.Render("-")
+			marker := markers.deleted
 			switch {
 			case del.OldLineNum == m.hoveredGutterLine && m.hoveredGutterSide == "old":
-				marker = commentGutterMarker.Render(">")
+				marker = markers.hovered
 			case isCursor && !t.cursorOnAnnotation:
-				marker = cursorMarker.Render(">")
+				marker = markers.cursor
 			case isSelected:
-				marker = selectedMarker.Render("|")
+				marker = markers.selected
 			case isSidebarHighlight:
-				marker = cursorMarker.Render(">")
+				marker = markers.cursor
 			case oldAnnotatedLines[del.OldLineNum] > 1:
-				marker = gutterOverlap.Render("◆")
+				marker = markers.overlap
 			case oldAnnotatedLines[del.OldLineNum] == 1:
-				marker = annotationGutter.Render("■")
+				marker = markers.annotated
 			}
 
 			numStyle := diffDeletedLineNum
@@ -325,39 +327,42 @@ func (m *AppModel) rebuildContent() {
 		// Marker column
 		var marker string
 		if lineNum == m.hoveredGutterLine && m.hoveredGutterSide == "" {
-			marker = commentGutterMarker.Render(">")
+			marker = markers.hovered
 		} else if isCursor && !t.cursorOnAnnotation {
-			marker = cursorMarker.Render(">")
+			marker = markers.cursor
 		} else if isSelected {
-			marker = selectedMarker.Render("|")
+			marker = markers.selected
 		} else if isSidebarHighlight {
-			marker = cursorMarker.Render(">")
+			marker = markers.cursor
 		} else if count, ok := annotatedLines[lineNum]; ok && count > 0 {
 			if count > 1 {
-				marker = gutterOverlap.Render("◆")
+				marker = markers.overlap
 			} else {
-				marker = annotationGutter.Render("■")
+				marker = markers.annotated
 			}
 		} else if isChanged {
-			marker = diffAddedGutter.Render("+")
+			marker = markers.added
 		} else {
 			marker = " "
 		}
 
 		// Line number
-		numStyle := lineNumStyle
-		if isCursor {
-			numStyle = cursorLineNumStyle
-		} else if isSelected {
-			numStyle = selectedLineNumStyle
+		numStr := t.renderLineNumber(lineNum)
+		if rank := m.rankMove(t, lineNum); isCursor || isSelected || rank != 0 {
+			numStyle := lineNumStyle
+			if isCursor {
+				numStyle = cursorLineNumStyle
+			} else if isSelected {
+				numStyle = selectedLineNumStyle
+			}
+			switch rank {
+			case -1:
+				numStyle = numStyle.Background(rankMovedUp.GetBackground())
+			case 1:
+				numStyle = numStyle.Background(rankMovedDown.GetBackground())
+			}
+			numStr = numStyle.Render(strconv.Itoa(lineNum))
 		}
-		switch m.rankMove(t, lineNum) {
-		case -1:
-			numStyle = numStyle.Background(rankMovedUp.GetBackground())
-		case 1:
-			numStyle = numStyle.Background(rankMovedDown.GetBackground())
-		}
-		numStr := numStyle.Render(fmt.Sprintf("%d", lineNum))
 
 		// Check if this line is part of a table block
 		if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
@@ -453,13 +458,20 @@ func (m *AppModel) rebuildContent() {
 				layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
 			}
 		} else {
-			// Get the display content: Chroma-highlighted or raw
-			displayLine := documentDisplayLine(t, i, line)
-
+			// Get the display content: Markdown, linked text, or Chroma-highlighted
+			var displayLine, plain string
+			var width int
+			var measured bool
 			if isMarkdown {
-				displayLine = t.markdownDisplayLine(lineNum, false, line, nil, m.documentLinkSpans(lineNum, false))
+				displayLine, plain, width, measured = t.markdownDisplayLineInfo(lineNum, line, m.documentLinkSpans(lineNum, false))
 			} else if t.attachment != nil && !t.isCode {
 				displayLine = linkedDisplayLine(line, m.documentLinkSpans(lineNum, false), displaySourceText)
+			} else {
+				displayLine = documentDisplayLine(t, i, line)
+				plain, width, measured = t.displayLineInfo(i)
+			}
+			if !measured {
+				width = ansi.StringWidth(displayLine)
 			}
 			displayLine = highlight(displayLine)
 			if isSelected {
@@ -470,13 +482,20 @@ func (m *AppModel) rebuildContent() {
 				displayLine = inlineBackground(diffChangedLineBg, displayLine)
 			}
 
-			wrapped := lipgloss.Wrap(displayLine, textWidth, "")
-			wrappedLines := strings.Split(wrapped, "\n")
-			for wi, wl := range wrappedLines {
-				if wi == 0 {
-					layout.appendSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, wl), lineTarget)
-				} else {
-					layout.appendSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, wl), lineTarget)
+			// Styling only adds escape sequences, so a line that fits needs
+			// no wrapping pass and its plain text is already known.
+			if width <= textWidth {
+				if decorate != nil {
+					plain = ""
+				}
+				layout.appendSourceRow(&b, marker+numStr+" "+displayLine, plain, lineTarget)
+			} else {
+				for wi, wl := range strings.Split(lipgloss.Wrap(displayLine, textWidth, ""), "\n") {
+					if wi == 0 {
+						layout.appendSourceBlock(&b, marker+numStr+" "+wl, lineTarget)
+					} else {
+						layout.appendSourceBlock(&b, " "+continuationGutter+" "+wl, lineTarget)
+					}
 				}
 			}
 		}
@@ -733,6 +752,20 @@ func highlightMarkdownWith(line string, inline func(string) string) string {
 	}
 
 	return inline(line)
+}
+
+// gutterMarkers holds the one-column gutter markers rendered once per rebuild.
+type gutterMarkers struct {
+	hovered, cursor, selected, overlap, annotated, added, deleted string
+}
+
+func renderGutterMarkers() gutterMarkers {
+	return gutterMarkers{
+		hovered: commentGutterMarker.Render(">"), cursor: cursorMarker.Render(">"),
+		selected: selectedMarker.Render("|"), overlap: gutterOverlap.Render("◆"),
+		annotated: annotationGutter.Render("■"), added: diffAddedGutter.Render("+"),
+		deleted: diffDeletedGutter.Render("-"),
+	}
 }
 
 func inlineBackground(style lipgloss.Style, content string) string {

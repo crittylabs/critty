@@ -39,6 +39,18 @@ func (l *renderedContentLayout) appendSourceBlock(b *strings.Builder, block stri
 	l.appendBlock(b, block, target)
 }
 
+// appendSourceRow records one unwrapped source row whose plain text is
+// already known, skipping the ANSI passes that recover it from the block.
+func (l *renderedContentLayout) appendSourceRow(b *strings.Builder, block, plain string, target contentMouseTarget) {
+	if plain == "" || target.line <= 0 || target.annotation {
+		l.appendSourceBlock(b, block, target)
+		return
+	}
+	l.textSpans = append(l.textSpans, contentTextSpan{row: len(l.rows), left: gutterWidth,
+		ref: lineRef{line: target.line, side: target.side}, text: plain})
+	l.appendBlock(b, block, target)
+}
+
 func (l *renderedContentLayout) addTextSpan(row, left, column int, text string, target contentMouseTarget) {
 	if target.line <= 0 || target.annotation || text == "" {
 		return

@@ -740,7 +740,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		initAdaptiveStyles(msg.IsDark())
 		for i := range m.tabs {
 			if recolor && m.tabs[i].chromaLines != nil {
-				m.tabs[i].chromaLines, m.tabs[i].deletedLineCache = nil, nil
+				m.tabs[i].resetHighlightCache()
 				m.tabs[i].ensureHighlightCache()
 			}
 		}

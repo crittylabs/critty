@@ -164,7 +164,7 @@ func TestOutlineRefreshAndFallback(t *testing.T) {
 	}
 	app.tab().path = "outline.md"
 	app.tab().isMarkdown = true
-	app.tab().chromaLines = nil
+	app.tab().resetHighlightCache()
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 50, Height: 10})
 	if app.commentViewport.Height() < 6 && app.outline.viewport.Height() != 0 {
 		t.Fatal("outline crowded the file tree in a small terminal")
