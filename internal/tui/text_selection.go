@@ -256,15 +256,17 @@ func (m *AppModel) copySelectedText() tea.Cmd {
 	m.textSelection = contentTextSelection{}
 	m.recalculateLayout()
 	m.rebuildContent()
+	m.locationError = copiedTextNotice
 	return m.copyText(text)
 }
+
+const copiedTextNotice = "Copied text to kill ring and system clipboard"
 
 // copyText puts text on the kill ring and the system clipboard.
 func (m *AppModel) copyText(text string) tea.Cmd {
 	m.killRing.interrupt()
 	m.killRing.add(text, false)
 	m.killRing.interrupt()
-	m.locationError = "Copied text to kill ring and system clipboard"
 	return tea.SetClipboard(text)
 }
 
@@ -276,6 +278,33 @@ func (m *AppModel) copyLineEditorSelection(editor *lineEditor) tea.Cmd {
 	}
 	editor.clearSelection()
 	m.recalculateLayout()
+	m.locationError = copiedTextNotice
+	return m.copyText(text)
+}
+
+// modalSelectedText returns the text selected in the open dialog's focused
+// input: a single-line field or the comment editor.
+func (m *AppModel) modalSelectedText() string {
+	if editor := m.focusedLineEditor(); editor != nil {
+		return editor.selectedText()
+	}
+	if m.isTextModal() && m.modalTextarea.Focused() {
+		return m.modalTextarea.SelectedText()
+	}
+	return ""
+}
+
+// copyModalSelection copies the open dialog's selection and clears it.
+func (m *AppModel) copyModalSelection() tea.Cmd {
+	if editor := m.focusedLineEditor(); editor != nil {
+		return m.copyLineEditorSelection(editor)
+	}
+	text := m.modalSelectedText()
+	if text == "" {
+		return nil
+	}
+	m.modalTextarea.ClearSelection()
+	m.clipboardStatus = copiedTextNotice
 	return m.copyText(text)
 }
 

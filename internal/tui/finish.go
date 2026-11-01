@@ -186,6 +186,9 @@ func (m *AppModel) requestFinishAbort() (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
+		return m, cmd
+	}
 	switch msg.String() {
 	case "esc":
 		m.closeFinishModal()

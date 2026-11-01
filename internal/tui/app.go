@@ -184,6 +184,7 @@ type AppModel struct {
 	modalInitial         string // textarea value when the current text modal opened
 	modalOpenedAt        time.Time
 	modalOpeningClick    tea.Mouse
+	editorDragging       bool // a mouse selection in the comment editor is in progress
 	modalReferenceOffset int
 	helpOffset           int
 	discardReturn        modalType
@@ -309,15 +310,30 @@ func (m *AppModel) tab() *FileTab {
 	return &m.tabs[m.activeTab]
 }
 
+// newModalTextarea creates the comment editor shared by the text dialogs.
+func newModalTextarea() textarea.Model {
+	ta := textarea.New()
+	ta.KeyMap = modalTextareaKeyMap()
+	ta.SetVirtualCursor(false)
+	ta.SetStyles(modalTextareaStyles(terminalIsDark))
+	ta.Placeholder = "Type your comment..."
+	ta.ShowLineNumbers = false
+	return ta
+}
+
+// modalTextareaStyles highlights selections like the rest of the TUI.
+func modalTextareaStyles(isDark bool) textarea.Styles {
+	styles := textarea.DefaultStyles(isDark)
+	styles.Focused.Selection = textSelectionBg
+	styles.Blurred.Selection = textSelectionBg
+	return styles
+}
+
 func NewApp(filePath string, cfg AppConfig) AppModel {
 	if cfg.ReadOnly {
 		cfg.Session = nil
 	}
-	ta := textarea.New()
-	ta.KeyMap = modalTextareaKeyMap()
-	ta.SetVirtualCursor(false)
-	ta.Placeholder = "Type your comment..."
-	ta.ShowLineNumbers = false
+	ta := newModalTextarea()
 
 	tab := FileTab{
 		path:       filePath,
@@ -366,11 +382,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	if cfg.ReadOnly {
 		cfg.Session = nil
 	}
-	ta := textarea.New()
-	ta.KeyMap = modalTextareaKeyMap()
-	ta.SetVirtualCursor(false)
-	ta.Placeholder = "Type your comment..."
-	ta.ShowLineNumbers = false
+	ta := newModalTextarea()
 
 	tabs := make([]FileTab, 0, len(files))
 	for _, f := range files {
@@ -754,7 +766,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tabs[i].ensureHighlightCache()
 			}
 		}
-		m.modalTextarea.SetStyles(textarea.DefaultStyles(msg.IsDark()))
+		m.modalTextarea.SetStyles(modalTextareaStyles(msg.IsDark()))
 		if len(m.tabs) > 0 && m.tab().state != nil {
 			m.rebuildContent()
 			m.updateCommentSidebar()
@@ -2266,6 +2278,9 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.clipboardStatus = ""
+	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
+		return m, cmd
+	}
 	if msg.String() == "alt+o" && m.modalFocus == 0 {
 		return m, m.openReferenceAtCursor()
 	}
@@ -3317,10 +3332,10 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal == noModal && m.textSelection.active {
 		m.clearTextSelection()
 	}
-	if editor := m.focusedLineEditor(); editor != nil && editor.hasSelection() && m.modal != noModal {
+	if m.modal != noModal && m.modalSelectedText() != "" {
 		_, layout := m.renderReviewScreen()
 		if layout.hasCopyTextButton && layout.copyTextButton.contains(mouse) {
-			return m, m.copyLineEditorSelection(editor)
+			return m, m.copyModalSelection()
 		}
 	}
 	if m.modal != noModal && m.clickedModalDismiss(mouse) {
@@ -3652,33 +3667,63 @@ func (m *AppModel) handleTextModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// focusTextareaAt places the editor cursor under the mouse and starts a
+// selection that a drag extends.
 func (m *AppModel) focusTextareaAt(mouse tea.Mouse, rect mouseRect) {
-	viewRow := m.editorTextRow(mouse.Y - rect.top)
-	if viewRow < 0 {
+	x, y, ok := m.textareaPoint(mouse, rect)
+	if !ok {
 		return
 	}
-	targetRow := m.modalTextarea.ScrollYOffset() + viewRow
-	m.modalTextarea.MoveToBegin()
-	for range targetRow {
-		line, column := m.modalTextarea.Line(), m.modalTextarea.Column()
-		m.modalTextarea.CursorDown()
-		if m.modalTextarea.Line() == line && m.modalTextarea.Column() == column {
-			break
-		}
-	}
-
-	lineInfo := m.modalTextarea.LineInfo()
-	textX := max(0, mouse.X-rect.left-lipgloss.Width(m.modalTextarea.Prompt))
-	lines := strings.Split(m.modalTextarea.Value(), "\n")
-	line := []rune(lines[m.modalTextarea.Line()])
-	column := lineInfo.StartColumn
-	end := min(len(line), lineInfo.StartColumn+lineInfo.Width)
-	for column < end && ansi.StringWidth(string(line[lineInfo.StartColumn:column+1])) <= textX {
-		column++
-	}
-	m.modalTextarea.SetCursorColumn(column)
+	m.modalTextarea.BeginSelection(x, y)
+	m.editorDragging = true
 	m.modalFocus = 0
 	m.modalTextarea.Focus()
+}
+
+// textareaPoint maps a mouse position to editor coordinates, clamping to
+// the visible rows and skipping image preview rows.
+func (m *AppModel) textareaPoint(mouse tea.Mouse, rect mouseRect) (x, y int, ok bool) {
+	viewRow := min(max(mouse.Y-rect.top, 0), max(0, rect.bottom-rect.top-1))
+	row := m.editorTextRow(viewRow)
+	if row < 0 {
+		return 0, 0, false
+	}
+	return mouse.X - rect.left, row, true
+}
+
+// textareaRegion returns the comment editor's mouse region in the dialog.
+func (m *AppModel) textareaRegion() (mouseRect, bool) {
+	for _, region := range m.modalMouseRegions() {
+		if region.action.textarea {
+			return region.rect, true
+		}
+	}
+	return mouseRect{}, false
+}
+
+// dragTextarea extends the editor's mouse selection to the pointer.
+func (m *AppModel) dragTextarea(mouse tea.Mouse) {
+	if rect, ok := m.textareaRegion(); ok {
+		if x, y, ok := m.textareaPoint(mouse, rect); ok {
+			m.modalTextarea.ExtendSelection(x, y)
+		}
+	}
+}
+
+// handleTextareaSelectionKey handles keys acting on the editor's selection:
+// `M-w` copies it and `esc` cancels it.
+func (m *AppModel) handleTextareaSelectionKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if !m.modalTextarea.Focused() || !m.modalTextarea.HasSelection() {
+		return false, nil
+	}
+	switch msg.String() {
+	case "alt+w":
+		return true, m.copyModalSelection()
+	case "esc":
+		m.modalTextarea.ClearSelection()
+		return true, nil
+	}
+	return false, nil
 }
 
 func (m *AppModel) handleDiscardChangesModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
@@ -3714,6 +3759,12 @@ func (m *AppModel) handleDeleteConfirmModalMouse(mouse tea.Mouse) (tea.Model, te
 }
 
 func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	if m.editorDragging {
+		if m.isTextModal() {
+			m.dragTextarea(msg.Mouse())
+		}
+		return m, nil
+	}
 	if editor := m.focusedLineEditor(); editor != nil && editor.dragging {
 		if left, width, ok := m.lineEditorColumns(); ok {
 			editor.drag(msg.Mouse().X-left, width)
@@ -3769,6 +3820,14 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 }
 
 func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	if m.editorDragging {
+		m.editorDragging = false
+		if m.isTextModal() {
+			m.dragTextarea(msg.Mouse())
+			m.modalTextarea.EndSelection()
+		}
+		return m, nil
+	}
 	if editor := m.focusedLineEditor(); editor != nil && editor.dragging {
 		if left, width, ok := m.lineEditorColumns(); ok {
 			editor.drag(msg.Mouse().X-left, width)
@@ -4203,8 +4262,18 @@ func (m *AppModel) renderTabBar() string {
 const footerMinHeight = 22
 
 // renderFooter renders the key hints and the Help button, or "" when the
-// terminal is too short for them.
+// terminal is too short for them.  A selection in a dialog's input shows
+// the Copy button at the hints' height, so the dialog does not move.
 func (m AppModel) renderFooter() string {
+	hints := m.renderFooterHints()
+	if m.modal != noModal && m.modalSelectedText() != "" {
+		footer := ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
+		return footer + strings.Repeat("\n", strings.Count(hints, "\n"))
+	}
+	return hints
+}
+
+func (m AppModel) renderFooterHints() string {
 	k := func(key, desc string) string {
 		return footerKeyStyle.Render(keyHintNames.Replace(key)) + " " + footerDescStyle.Render(desc)
 	}
@@ -4212,9 +4281,6 @@ func (m AppModel) renderFooter() string {
 		return footerStyle.Width(m.width).Render("Reload failed: " + headerLabel(m.reload.err.Error()))
 	}
 	if m.modal == noModal && m.hasTextSelection() {
-		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
-	}
-	if editor := m.focusedLineEditor(); editor != nil && editor.hasSelection() && m.modal != noModal {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
@@ -4455,6 +4521,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,k/j · enter/v/esc · C-PgUp/PgDn", desc: "⇅ extend · comment/toggle/cancel selection · ⇅ scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
+		{keys: "drag · S-←/→/↑/↓ · M-w · esc (comment editor)", desc: "select text with the mouse or keyboard · copy the selection · cancel it"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},

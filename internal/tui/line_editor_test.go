@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -190,5 +191,62 @@ func TestLineEditorPastesClipboardTextWithCtrlV(t *testing.T) {
 	app, _ = updateApp(app, lineEditorPasteMsg{id: app.clipboardID - 1, text: "stale"})
 	if app.fileSelect.input.Value() != "x y ab" {
 		t.Fatalf("a stale clipboard result changed the value to %q", app.fileSelect.input.Value())
+	}
+}
+
+func TestCommentEditorSelectsAndCopiesWithMouse(t *testing.T) {
+	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+	app.modal = commentModal
+	app.modalTextarea.SetValue("hello world")
+	app.modalTextarea.Focus()
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	// Status lines move the editor, so locate it before every gesture.
+	drag := func(from, to int, release bool) {
+		rect, ok := app.textareaRegion()
+		if !ok {
+			t.Fatal("textarea region missing")
+		}
+		left := rect.left + lipgloss.Width(app.modalTextarea.Prompt)
+		app = pressMouse(app, left+from, rect.top)
+		app = moveMouse(app, left+to, rect.top)
+		if release {
+			app = releaseMouse(app, left+to, rect.top)
+		}
+	}
+	before, _ := app.textareaRegion()
+	drag(6, 11, false)
+	if !app.editorDragging || app.modalTextarea.SelectedText() != "world" {
+		t.Fatalf("drag: dragging %v selected %q", app.editorDragging, app.modalTextarea.SelectedText())
+	}
+	rect, _ := app.textareaRegion()
+	if rect != before {
+		t.Fatalf("the editor moved from %+v to %+v when the selection appeared", before, rect)
+	}
+	app = releaseMouse(app, rect.left+lipgloss.Width(app.modalTextarea.Prompt)+11, rect.top)
+	if app.editorDragging || app.modalTextarea.SelectedText() != "world" {
+		t.Fatalf("release: dragging %v selected %q", app.editorDragging, app.modalTextarea.SelectedText())
+	}
+	if footer := ansi.Strip(app.renderFooter()); !strings.Contains(footer, "Copy text") {
+		t.Fatalf("footer = %q", footer)
+	}
+	app, cmd := updateApp(app, tea.KeyPressMsg{Code: 'w', Mod: tea.ModAlt})
+	if cmd == nil || app.killRing.current() != "world" || app.modalTextarea.HasSelection() || app.modal != commentModal {
+		t.Fatalf("M-w: cmd %v ring %q selected %v modal %v", cmd != nil, app.killRing.current(), app.modalTextarea.HasSelection(), app.modal)
+	}
+
+	drag(0, 5, true)
+	app = pressKey(app, tea.KeyEscape)
+	if app.modal != commentModal || app.modalTextarea.HasSelection() {
+		t.Fatalf("esc with a selection: modal %v selected %v", app.modal, app.modalTextarea.HasSelection())
+	}
+	drag(0, 5, true)
+	app = typeSearch(app, "bye")
+	if app.modalTextarea.Value() != "bye world" {
+		t.Fatalf("typing over the selection gave %q", app.modalTextarea.Value())
+	}
+	drag(1, 1, true)
+	if app.modalTextarea.HasSelection() || app.modalTextarea.Column() != 1 {
+		t.Fatalf("plain click: selected %v column %d", app.modalTextarea.HasSelection(), app.modalTextarea.Column())
 	}
 }
