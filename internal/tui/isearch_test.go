@@ -1,9 +1,9 @@
 package tui
 
 import (
-	"regexp"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
@@ -58,7 +58,7 @@ func TestISearchSmartCase(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := re.MatchString(tt.text); got != tt.want {
+		if got := len(re.findAll(tt.text)) > 0; got != tt.want {
 			t.Errorf("%q matches %q = %v, want %v", tt.query, tt.text, got, tt.want)
 		}
 	}
@@ -327,7 +327,11 @@ func assertISearchHighlight(t *testing.T, content, text string, current bool) {
 
 func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
 	styled := "\x1b[31mfoo bar baz\x1b[0m"
-	out, ok := highlightISearch(styled, findNonEmpty(regexp.MustCompile("bar|baz"), ansi.Strip(styled)), 1)
+	re, err := compileSearch("bar|baz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, ok := highlightISearch(styled, re.findAll(ansi.Strip(styled)), 1)
 	if !ok {
 		t.Fatal("no match reported")
 	}
@@ -971,4 +975,31 @@ func TestISearchExitAppliesPendingEdit(t *testing.T) {
 	if len(app.searchRing) != 1 || app.searchRing[0].Query != "beta" {
 		t.Fatalf("ring = %+v, want the edited query recorded", app.searchRing)
 	}
+}
+
+func TestISearchBacktrackingSyntaxAndTimeout(t *testing.T) {
+	re, err := isearchOptions{}.compile(`([a-z])\1(?=c)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := re.findAll("xaab aac"); len(got) != 1 || got[0][0] != 5 || got[0][1] != 7 {
+		t.Fatalf("backreference with lookahead matched %v, want [[5 7]]", got)
+	}
+
+	defer func(previous time.Duration) { isearchMatchTimeout = previous }(isearchMatchTimeout)
+	isearchMatchTimeout = time.Millisecond
+	app := setupAppWithDoc(t, strings.Repeat("a", 40)+"c\nbeta\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	app = ctrlKey(app, 's')
+	app.isearchPaste(`(a+)+b`)
+	if !app.isearch.re.timedOut.Load() || app.isearch.found {
+		t.Fatalf("catastrophic pattern: timedOut %v found %v", app.isearch.re.timedOut.Load(), app.isearch.found)
+	}
+	if footer := ansi.Strip(app.renderFooter()); !strings.Contains(footer, "[match timed out]") {
+		t.Fatalf("footer = %q", footer)
+	}
+	app = ctrlKey(app, 'g')
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "beta")
+	assertCursor(t, app, 2) // a fresh query searches again
 }

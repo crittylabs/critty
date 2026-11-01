@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync/atomic"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -14,9 +16,72 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/dlclark/regexp2/v2"
 
 	"github.com/crittylabs/critty/internal/searchhistory"
 )
+
+// isearchMatchTimeout bounds one match attempt.  Backtracking lets queries
+// use backreferences and lookaround, but a catastrophic pattern must not
+// freeze the TUI.
+var isearchMatchTimeout = 100 * time.Millisecond
+
+// searchRegexp is a compiled query.  Once an attempt times out, matching
+// stops for the rest of that query, so the delay is paid once per edit
+// rather than on every line.
+type searchRegexp struct {
+	re       *regexp2.Regexp
+	timedOut atomic.Bool
+}
+
+// compileSearch compiles a pattern in RE2-compatible syntax extended with
+// backreferences and lookaround.
+func compileSearch(pattern string) (*searchRegexp, error) {
+	re, err := regexp2.Compile(pattern, regexp2.RE2)
+	if err != nil {
+		return nil, err
+	}
+	re.MatchTimeout = isearchMatchTimeout
+	return &searchRegexp{re: re}, nil
+}
+
+// find returns the first match in s as byte offsets.
+func (r *searchRegexp) find(s string) []int {
+	if r.timedOut.Load() {
+		return nil
+	}
+	m, err := r.re.FindStringMatch(s)
+	if err != nil {
+		r.timedOut.Store(true)
+		return nil
+	}
+	if m == nil {
+		return nil
+	}
+	start, length := m.ByteRange()
+	return []int{start, start + length}
+}
+
+// findAll returns the nonempty matches in s as byte offsets; empty matches
+// cannot be shown or stepped over.
+func (r *searchRegexp) findAll(s string) [][]int {
+	if r.timedOut.Load() {
+		return nil
+	}
+	var locs [][]int
+	m, err := r.re.FindStringMatch(s)
+	for m != nil && err == nil {
+		if start, length := m.ByteRange(); length > 0 {
+			locs = append(locs, []int{start, start + length})
+		}
+		m, err = r.re.FindNextMatch(m)
+	}
+	if err != nil {
+		r.timedOut.Store(true)
+		return nil
+	}
+	return locs
+}
 
 // isearchMatch locates a match among a tab's visual lines.  Matches stay
 // within one line.
@@ -192,10 +257,10 @@ type isearchState struct {
 	forward  bool
 	prefix   bool // M-s was pressed and awaits a toggle key
 	query    string
-	history  []string       // queries before each typed or captured unit
-	ring     int            // 1-based position from the newest recalled history entry, or 0
-	editing  bool           // the query is being edited in a line editor
-	re       *regexp.Regexp // nil while the query is empty or invalid
+	history  []string      // queries before each typed or captured unit
+	ring     int           // 1-based position from the newest recalled history entry, or 0
+	editing  bool          // the query is being edited in a line editor
+	re       *searchRegexp // nil while the query is empty or invalid
 	invalid  bool
 	failing  bool
 	wrapped  bool
@@ -212,7 +277,7 @@ type isearchState struct {
 	originOnForm       bool
 	originAnnoIdx      int
 	originOffset       int
-	markdownRE         *regexp.Regexp
+	markdownRE         *searchRegexp
 	markdownHighlights map[*markdownSource]map[int][]markdownSearchHighlight
 }
 
@@ -237,7 +302,7 @@ func (o isearchOptions) caseSensitive(query string) bool {
 }
 
 // compile builds the pattern for a query in the current mode.
-func (o isearchOptions) compile(query string) (*regexp.Regexp, error) {
+func (o isearchOptions) compile(query string) (*searchRegexp, error) {
 	pattern := query
 	switch o.mode {
 	case isearchLiteral:
@@ -248,7 +313,7 @@ func (o isearchOptions) compile(query string) (*regexp.Regexp, error) {
 	if !o.caseSensitive(query) {
 		pattern = "(?i)" + pattern
 	}
-	return regexp.Compile(pattern)
+	return compileSearch(pattern)
 }
 
 // wordPattern matches the words of a query separated by any nonword
@@ -276,13 +341,13 @@ func (s isearchState) findMatches(text string) [][]int {
 		return nil
 	}
 	if s.mode != isearchWord {
-		return findNonEmpty(s.re, text)
+		return s.re.findAll(text)
 	}
 	first, _ := utf8.DecodeRuneInString(s.query)
 	last, _ := utf8.DecodeLastRuneInString(s.query)
 	var locs [][]int
 	for offset := 0; offset < len(text); {
-		loc := s.re.FindStringIndex(text[offset:])
+		loc := s.re.find(text[offset:])
 		if loc == nil {
 			break
 		}
@@ -297,18 +362,6 @@ func (s isearchState) findMatches(text string) [][]int {
 			// A rejected match may overlap a later valid one.
 			_, size := utf8.DecodeRuneInString(text[start:])
 			offset = start + size
-		}
-	}
-	return locs
-}
-
-// findNonEmpty returns the nonempty matches of re in s; empty matches cannot
-// be shown or stepped over.
-func findNonEmpty(re *regexp.Regexp, s string) [][]int {
-	var locs [][]int
-	for _, loc := range re.FindAllStringIndex(s, -1) {
-		if loc[1] > loc[0] {
-			locs = append(locs, loc)
 		}
 	}
 	return locs
@@ -350,6 +403,9 @@ func (m *AppModel) isearchMatches() []isearchMatch {
 				matches = append(matches, isearchMatch{tab: tab, ref: ref, index: i, start: loc[0], end: loc[1], ordinal: ordinal})
 			}
 		}
+	}
+	if m.isearch.re.timedOut.Load() {
+		return nil
 	}
 	return matches
 }
@@ -1163,6 +1219,8 @@ func (m AppModel) isearchPrompt() (string, int) {
 	switch {
 	case s.invalid:
 		status = " [incomplete input]"
+	case s.re != nil && s.re.timedOut.Load():
+		status = " [match timed out]"
 	case s.re != nil && allFiles:
 		status = fmt.Sprintf(" (%d/%d, file %d/%d)", s.position, s.count, s.file, s.files)
 	case s.re != nil:

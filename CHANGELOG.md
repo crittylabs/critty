@@ -5,6 +5,7 @@
 ### Added
 
 - **Project search history**: Incremental search remembers queries per repository, shared across its worktrees, and restores each query's regexp, word, and case-folding settings.  Press `M-p` / `M-n` in search mode to recall older or newer queries, or `C-s C-s` for the most recent one.  Queries are saved under `$XDG_STATE_HOME/critty`; demos keep them in memory only.
+- **Backreferences and lookaround in search**: Regexp search now runs on the [regexp2](https://github.com/dlclark/regexp2) engine in RE2-compatible mode, so existing patterns keep working and queries such as `([a-z])\1` or `foo(?=bar)` match.  A pattern that backtracks for too long on a very long line stops after a short timeout and shows `[match timed out]`.
 - **Edit the search query**: Press `M-e` in search mode to edit the query with the usual line-editing keys and the kill ring instead of deleting back to the change.  `enter`, `C-s`, or `C-r` resumes the search with the edited text, `esc` keeps the previous query, and `M-p` / `M-n` recall history while editing.
 
 ### Changed
