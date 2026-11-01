@@ -8,6 +8,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
@@ -47,6 +49,7 @@ const (
 	isearchInput
 	isearchCaseFold
 	isearchFiles
+	isearchEdit
 )
 
 type isearchMouseRegion struct {
@@ -73,6 +76,10 @@ func (m AppModel) isearchControls(top int) (string, []isearchMouseRegion) {
 	if m.isearchAllFiles() {
 		filesLabel = "Files:all"
 	}
+	editLabel := "Edit"
+	if m.isearch.editing {
+		editLabel = "Done"
+	}
 	for _, spec := range []struct {
 		label, hint string
 		action      isearchMouseAction
@@ -81,6 +88,7 @@ func (m AppModel) isearchControls(top int) (string, []isearchMouseRegion) {
 		{"Next", "C-s", isearchNext},
 		{"Keep", "RET", isearchKeep},
 		{"Cancel", "ESC", isearchCancel},
+		{editLabel, "M-e", isearchEdit},
 		{caseLabel, "M-s i", isearchCaseFold},
 		{filesLabel, "M-s m", isearchFiles},
 	} {
@@ -117,11 +125,23 @@ func (m *AppModel) handleISearchMouse(mouse tea.Mouse) (bool, tea.Cmd) {
 			continue
 		}
 		var cmd tea.Cmd
+		if m.isearch.editing && region.action != isearchInput {
+			m.finishISearchEdit(false)
+			if region.action == isearchEdit {
+				return true, nil
+			}
+		}
 		switch region.action {
 		case isearchStart:
 			if !m.isearch.active {
 				m.startISearch(true)
 			}
+		case isearchInput:
+			if m.isearch.editing {
+				m.isearchInput.SetCursor(m.isearchEditIndex(mouse.X))
+			}
+		case isearchEdit:
+			cmd = m.startISearchEdit()
 		case isearchPrevious:
 			m.isearchRepeat(false)
 		case isearchNext:
@@ -174,6 +194,7 @@ type isearchState struct {
 	query    string
 	history  []string       // queries before each typed or captured unit
 	ring     int            // 1-based position from the newest recalled history entry, or 0
+	editing  bool           // the query is being edited in a line editor
 	re       *regexp.Regexp // nil while the query is empty or invalid
 	invalid  bool
 	failing  bool
@@ -390,6 +411,9 @@ func (m *AppModel) startISearch(forward bool) {
 // handleISearchKey handles a key in search mode.  It reports false after
 // leaving the mode for a key that the review should handle instead.
 func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	if m.isearch.editing {
+		return m.handleISearchEditKey(msg)
+	}
 	if m.isearch.prefix {
 		m.isearch.prefix = false
 		m.toggleISearch(msg.String())
@@ -400,6 +424,8 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.isearchRepeat(msg.String() == "ctrl+s")
 	case "alt+s":
 		m.isearch.prefix = true
+	case "alt+e":
+		return true, m.startISearchEdit()
 	case "alt+p", "alt+n":
 		m.isearchRecall(msg.String() == "alt+p")
 	case "enter":
@@ -427,10 +453,21 @@ func (m *AppModel) handleISearchKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 // project's search history, restoring its mode and case folding, as Emacs
 // does for `M-p` and `M-n`.  Both directions wrap around the ring.
 func (m *AppModel) isearchRecall(older bool) {
+	entry, ok := m.isearchRingStep(older)
+	if !ok {
+		return
+	}
+	m.isearch.history = append(m.isearch.history, m.isearch.query)
+	m.applyISearchEntry(entry)
+}
+
+// isearchRingStep moves the ring position one entry older or newer and
+// returns the entry there.
+func (m *AppModel) isearchRingStep(older bool) (searchhistory.Entry, bool) {
 	s := &m.isearch
 	n := len(m.searchRing)
 	if n == 0 {
-		return
+		return searchhistory.Entry{}, false
 	}
 	switch {
 	case older:
@@ -440,8 +477,144 @@ func (m *AppModel) isearchRecall(older bool) {
 	default:
 		s.ring--
 	}
-	s.history = append(s.history, s.query)
-	m.applyISearchEntry(m.searchRing[n-s.ring])
+	return m.searchRing[n-s.ring], true
+}
+
+// startISearchEdit opens the query in a line editor, as Emacs does for
+// `M-e`, so the user can move within it instead of deleting back to a point.
+func (m *AppModel) startISearchEdit() tea.Cmd {
+	m.isearchInput = textinput.New()
+	m.isearchInput.SetVirtualCursor(false)
+	m.isearchInput.Prompt = ""
+	m.isearchInput.SetValue(m.isearch.query)
+	m.isearchInput.CursorEnd()
+	m.isearch.editing, m.isearch.prefix = true, false
+	m.recalculateLayout()
+	return m.isearchInput.Focus()
+}
+
+// handleISearchEditKey handles a key while the query is being edited.
+func (m *AppModel) handleISearchEditKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
+	s := &m.isearch
+	switch msg.String() {
+	case "enter", "alt+e":
+		m.finishISearchEdit(false)
+	case "ctrl+s", "ctrl+r":
+		s.forward = msg.String() == "ctrl+s"
+		m.finishISearchEdit(true)
+	case "esc", "ctrl+g", "ctrl+c":
+		s.editing = false
+		m.isearchInput.Blur()
+		m.recalculateLayout()
+		m.rebuildContent()
+	case "alt+p", "alt+n":
+		if entry, ok := m.isearchRingStep(msg.String() == "alt+p"); ok {
+			s.mode, s.caseFold = parseISearchMode(entry.Mode), entry.CaseFold
+			m.isearchInput.SetValue(entry.Query)
+			m.isearchInput.CursorEnd()
+			m.recalculateLayout()
+		}
+	case "ctrl+y":
+		m.isearchEditInsert(m.killRing.current())
+	default:
+		kill, backward := isearchEditKill(msg, m.isearchInput.KeyMap)
+		before := []rune(m.isearchInput.Value())
+		var cmd tea.Cmd
+		m.isearchInput, cmd = m.isearchInput.Update(msg)
+		if kill {
+			start := m.isearchInput.Position()
+			if removed := len(before) - utf8.RuneCountInString(m.isearchInput.Value()); removed > 0 {
+				m.killRing.add(string(before[start:start+removed]), backward)
+			} else {
+				m.killRing.yank = nil
+			}
+		}
+		return true, cmd
+	}
+	return true, nil
+}
+
+// isearchEditKill reports whether a key kills text in the query editor and
+// whether it kills backward, so the kill ring can record the removed text.
+func isearchEditKill(msg tea.KeyPressMsg, bindings textinput.KeyMap) (kill, backward bool) {
+	if key.Matches(msg, bindings.DeleteBeforeCursor, bindings.DeleteWordBackward) {
+		return true, true
+	}
+	return key.Matches(msg, bindings.DeleteAfterCursor, bindings.DeleteWordForward), false
+}
+
+// isearchEditInsert inserts text at the editor cursor.
+func (m *AppModel) isearchEditInsert(text string) {
+	text = sanitizeISearchText(text)
+	if text == "" {
+		return
+	}
+	value, pos := []rune(m.isearchInput.Value()), m.isearchInput.Position()
+	m.isearchInput.SetValue(string(value[:pos]) + text + string(value[pos:]))
+	m.isearchInput.SetCursor(pos + utf8.RuneCountInString(text))
+}
+
+// finishISearchEdit resumes the search with the edited query.  A changed
+// query searches again from the origin; an unchanged one steps to the next
+// match when repeat is set, as `C-s` and `C-r` do in the editor.
+func (m *AppModel) finishISearchEdit(repeat bool) {
+	s := &m.isearch
+	s.editing = false
+	m.isearchInput.Blur()
+	text := m.isearchInput.Value()
+	m.recalculateLayout()
+	switch {
+	case text != s.query:
+		s.history = append(s.history, s.query)
+		s.query = text
+		m.isearchFromOrigin()
+	case repeat:
+		m.isearchRepeat(s.forward)
+	default:
+		m.rebuildContent()
+	}
+}
+
+// isearchEditWindow returns the first visible rune of the edited query and
+// the cursor column within the available width, keeping the cursor visible.
+func isearchEditWindow(value []rune, pos, available int) (start, cursorX int) {
+	start = min(pos, len(value))
+	for start > 0 {
+		width := ansi.StringWidth(string(value[start-1]))
+		if cursorX+width > available-1 {
+			break
+		}
+		start--
+		cursorX += width
+	}
+	return start, cursorX
+}
+
+// isearchEditLayout returns the rendered prefix, the first visible rune of
+// the edited query, and the available width for it.
+func (m AppModel) isearchEditLayout(label string) (prefix string, start, available int) {
+	value := []rune(m.isearchInput.Value())
+	inputWidth := min(ansi.StringWidth(string(value)), max(2, m.width/2))
+	prefix = ansi.Truncate(label, max(0, m.width-inputWidth-1), "…")
+	available = max(0, m.width-ansi.StringWidth(prefix)-1)
+	start, _ = isearchEditWindow(value, m.isearchInput.Position(), available)
+	return prefix, start, available
+}
+
+// isearchEditIndex maps a footer column to a rune index in the edited query.
+func (m AppModel) isearchEditIndex(column int) int {
+	prefix, start, _ := m.isearchEditLayout(m.isearchPromptLabel())
+	value := []rune(m.isearchInput.Value())
+	x := ansi.StringWidth(prefix)
+	for start < len(value) {
+		width := ansi.StringWidth(string(value[start]))
+		if x+width > column {
+			break
+		}
+		x += width
+		start++
+	}
+	return start
 }
 
 func (m *AppModel) applyISearchEntry(entry searchhistory.Entry) {
@@ -516,8 +689,16 @@ func (m *AppModel) isearchAppend(text string) {
 
 // isearchPaste keeps terminal pastes and kill-ring entries on one prompt row.
 func (m *AppModel) isearchPaste(text string) {
+	if text = sanitizeISearchText(text); text != "" {
+		m.isearchAppend(text)
+	}
+}
+
+// sanitizeISearchText folds pasted line breaks and tabs into spaces and
+// drops other control characters and styling.
+func sanitizeISearchText(text string) string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
-	text = strings.Map(func(r rune) rune {
+	return strings.Map(func(r rune) rune {
 		switch r {
 		case '\n', '\r', '\t':
 			return ' '
@@ -527,9 +708,6 @@ func (m *AppModel) isearchPaste(text string) {
 		}
 		return r
 	}, ansi.Strip(text))
-	if text != "" {
-		m.isearchAppend(text)
-	}
 }
 
 // isearchDeleteUnit removes the last typed or captured unit, as Emacs does
@@ -782,6 +960,9 @@ func (m *AppModel) restoreISearchOrigin() {
 // cancelled, restoring it to the origin.
 func (m *AppModel) exitISearch(cancel bool) tea.Cmd {
 	s := &m.isearch
+	if s.editing {
+		m.finishISearchEdit(false)
+	}
 	var cmd tea.Cmd
 	if s.query != "" {
 		cmd = m.recordISearch()
@@ -912,22 +1093,27 @@ func (m AppModel) renderISearchPrompt() string {
 }
 
 // isearchPrompt returns the prompt and the terminal cursor's display column.
-func (m AppModel) isearchPrompt() (string, int) {
-	if m.width <= 0 {
-		return "", 0
-	}
+// isearchLabel describes the search as Emacs isearch-message-prefix does
+// and reports whether the search is failing.
+func (m AppModel) isearchLabel() (string, bool) {
 	s := m.isearch
-	// Describe the search as Emacs isearch-message-prefix does.
-	failing := s.failing && s.re != nil
+	failing := s.failing && s.re != nil && !s.editing
+	query := s.query
+	if s.editing {
+		query = m.isearchInput.Value()
+	}
 	var words []string
+	if s.editing {
+		words = append(words, "edit")
+	}
 	if failing {
 		words = append(words, "failing")
 	}
-	if s.wrapped {
+	if s.wrapped && !s.editing {
 		words = append(words, "wrapped")
 	}
 	switch {
-	case s.caseSensitive(s.query):
+	case s.caseSensitive(query):
 		words = append(words, "case-sensitive")
 	case s.caseFold:
 		words = append(words, "case-insensitive")
@@ -938,8 +1124,7 @@ func (m AppModel) isearchPrompt() (string, int) {
 	case isearchWord:
 		words = append(words, "word")
 	}
-	allFiles := m.isearchAllFiles()
-	if allFiles {
+	if m.isearchAllFiles() {
 		words = append(words, "multi-file")
 	}
 	words = append(words, "I-search")
@@ -947,11 +1132,33 @@ func (m AppModel) isearchPrompt() (string, int) {
 		words = append(words, "backward")
 	}
 	label := strings.Join(words, " ")
-	label = strings.ToUpper(label[:1]) + label[1:]
-	labelStyle := isearchPromptStyle
+	return strings.ToUpper(label[:1]) + label[1:], failing
+}
+
+// isearchPromptLabel renders the styled label that precedes the query.
+func (m AppModel) isearchPromptLabel() string {
+	label, failing := m.isearchLabel()
+	style := isearchPromptStyle
 	if failing {
-		labelStyle = isearchFailingStyle
+		style = isearchFailingStyle
 	}
+	return style.Render(label+":") + " "
+}
+
+func (m AppModel) isearchPrompt() (string, int) {
+	if m.width <= 0 {
+		return "", 0
+	}
+	s := m.isearch
+	rendered := m.isearchPromptLabel()
+	if s.editing {
+		prefix, start, available := m.isearchEditLayout(rendered)
+		value := []rune(m.isearchInput.Value())
+		_, cursorX := isearchEditWindow(value, m.isearchInput.Position(), available)
+		text := ansi.Truncate(string(value[start:]), available, "")
+		return prefix + text, ansi.StringWidth(prefix) + cursorX
+	}
+	allFiles := m.isearchAllFiles()
 	var status string
 	switch {
 	case s.invalid:
@@ -967,7 +1174,7 @@ func (m AppModel) isearchPrompt() (string, int) {
 	// Keep the input end visible and reserve a cell for the real terminal cursor.
 	queryWidth := ansi.StringWidth(s.query)
 	inputWidth := min(queryWidth, max(2, m.width/2))
-	prefix := ansi.Truncate(labelStyle.Render(label+":")+" ", max(0, m.width-inputWidth-1), "…")
+	prefix := ansi.Truncate(rendered, max(0, m.width-inputWidth-1), "…")
 	available := max(0, m.width-ansi.StringWidth(prefix)-1)
 	query := s.query
 	for queryWidth > available && query != "" {

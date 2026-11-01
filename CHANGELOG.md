@@ -5,6 +5,7 @@
 ### Added
 
 - **Project search history**: Incremental search remembers queries per repository, shared across its worktrees, and restores each query's regexp, word, and case-folding settings.  Press `M-p` / `M-n` in search mode to recall older or newer queries, or `C-s C-s` for the most recent one.  Queries are saved under `$XDG_STATE_HOME/critty`; demos keep them in memory only.
+- **Edit the search query**: Press `M-e` in search mode to edit the query with the usual line-editing keys and the kill ring instead of deleting back to the change.  `enter`, `C-s`, or `C-r` resumes the search with the edited text, `esc` keeps the previous query, and `M-p` / `M-n` recall history while editing.
 
 ### Changed
 

@@ -200,6 +200,7 @@ type AppModel struct {
 	locationError        string
 	notice               footerNotice
 	isearch              isearchState
+	isearchInput         textinput.Model // query editor opened with `M-e`
 	searchHistory        *searchhistory.Store
 	searchRing           []searchhistory.Entry // saved queries, oldest first
 
@@ -881,13 +882,23 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyPressMsg:
 		kill, _ := killDirection(msg, m.modalTextarea.KeyMap)
-		if !m.isTextModal() || m.modalFocus != 0 || (!kill && msg.String() != "ctrl+y" && msg.String() != "alt+y" && msg.String() != "alt+w") {
+		editing := m.isTextModal() && m.modalFocus == 0
+		if m.isearch.editing {
+			kill, _ = isearchEditKill(msg, m.isearchInput.KeyMap)
+			editing = true
+		}
+		if !editing || (!kill && msg.String() != "ctrl+y" && msg.String() != "alt+y" && msg.String() != "alt+w") {
 			m.killRing.interrupt()
 		}
 		return m.handleKeyPress(msg)
 	case tea.PasteMsg:
 		if m.isearch.active && m.modal == noModal {
 			m.killRing.interrupt()
+			if m.isearch.editing {
+				var cmd tea.Cmd
+				m.isearchInput, cmd = m.isearchInput.Update(msg)
+				return m, cmd
+			}
 			m.isearchPaste(msg.Content)
 			return m, nil
 		}
@@ -4437,6 +4448,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "C-d / C-w", desc: "add following character / word"},
 		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
 		{keys: "M-p / M-n", desc: "older / newer query from project search history"},
+		{keys: "M-e", desc: "edit the query (line editing, kill ring); enter/C-s/C-r resume, esc keeps the previous query"},
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
 	help := columns + "\n\n" + search + "\n\n" + contexts

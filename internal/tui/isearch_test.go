@@ -874,3 +874,101 @@ func TestISearchDemoKeepsHistoryInMemory(t *testing.T) {
 		t.Fatalf("ring = %+v", app.searchRing)
 	}
 }
+
+func TestISearchEditorResumesWithEditedQuery(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "bet")
+	assertCursor(t, app, 2)
+	app = altKey(app, 'e')
+	if !app.isearch.editing || app.isearchInput.Value() != "bet" {
+		t.Fatalf("M-e did not open the editor with the query: editing %v, value %q", app.isearch.editing, app.isearchInput.Value())
+	}
+	if prompt := ansi.Strip(app.renderFooter()); !strings.Contains(prompt, "Edit regexp I-search: bet") || !strings.Contains(prompt, "Done") {
+		t.Fatalf("editor footer = %q", prompt)
+	}
+	app = ctrlKey(app, 'a')
+	app = typeSearch(app, "alpha")
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if app.isearch.editing || app.isearch.query != "alphabet" {
+		t.Fatalf("enter left editing %v with query %q", app.isearch.editing, app.isearch.query)
+	}
+	assertCursor(t, app, 3)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	if app.isearch.query != "bet" {
+		t.Fatalf("backspace restored %q, want the query before editing", app.isearch.query)
+	}
+	assertCursor(t, app, 2)
+}
+
+func TestISearchEditorCancelKillRingAndRepeat(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "alpha")
+	assertCursor(t, app, 1)
+	app = altKey(app, 'e')
+	app = typeSearch(app, "x")
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if app.isearch.editing || app.isearch.query != "alpha" {
+		t.Fatalf("esc left editing %v with query %q", app.isearch.editing, app.isearch.query)
+	}
+
+	app = altKey(app, 'e')
+	app = ctrlKey(app, 'a')
+	app = ctrlKey(app, 'k')
+	if app.isearchInput.Value() != "" || app.killRing.current() != "alpha" {
+		t.Fatalf("C-k left %q with kill ring %q", app.isearchInput.Value(), app.killRing.current())
+	}
+	app = ctrlKey(app, 'y')
+	if app.isearchInput.Value() != "alpha" || app.isearchInput.Position() != 5 {
+		t.Fatalf("C-y gave %q at %d", app.isearchInput.Value(), app.isearchInput.Position())
+	}
+	app = ctrlKey(app, 's')
+	if app.isearch.editing || app.isearch.query != "alpha" {
+		t.Fatalf("C-s left editing %v with query %q", app.isearch.editing, app.isearch.query)
+	}
+	assertCursor(t, app, 3) // unchanged query steps to the next match
+}
+
+func TestISearchEditorRecallsHistoryAndTracksWideCursor(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app.searchRing = []searchhistory.Entry{{Query: "gamma", Mode: "literal"}}
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "日本")
+	app = altKey(app, 'e')
+	prompt, x := app.isearchPrompt()
+	if x != ansi.StringWidth(prompt) {
+		t.Fatalf("cursor x = %d, want the prompt end %d", x, ansi.StringWidth(prompt))
+	}
+	app = ctrlKey(app, 'b')
+	if _, moved := app.isearchPrompt(); moved != x-2 {
+		t.Fatalf("cursor x after C-b = %d, want %d", moved, x-2)
+	}
+	if got := app.isearchEditIndex(x - 1); got != 1 {
+		t.Fatalf("click between the wide characters mapped to index %d, want 1", got)
+	}
+	app = altKey(app, 'p')
+	if s := app.isearch; app.isearchInput.Value() != "gamma" || s.mode != isearchLiteral {
+		t.Fatalf("M-p in the editor gave %q mode %v", app.isearchInput.Value(), s.mode)
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if app.isearch.query != "gamma" {
+		t.Fatalf("query = %q", app.isearch.query)
+	}
+	assertCursor(t, app, 4)
+}
+
+func TestISearchExitAppliesPendingEdit(t *testing.T) {
+	app := newISearchApp(t, 1)
+	app = ctrlKey(app, 's')
+	app = typeSearch(app, "bet")
+	app = altKey(app, 'e')
+	app = typeSearch(app, "a")
+	app, _ = updateApp(app, tea.MouseClickMsg{Button: tea.MouseLeft, X: 2, Y: 2})
+	if app.isearch.active || app.isearch.editing {
+		t.Fatalf("clicking the content left active %v editing %v", app.isearch.active, app.isearch.editing)
+	}
+	if len(app.searchRing) != 1 || app.searchRing[0].Query != "beta" {
+		t.Fatalf("ring = %+v, want the edited query recorded", app.searchRing)
+	}
+}
