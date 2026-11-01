@@ -186,6 +186,10 @@ type AppModel struct {
 	modalOpeningClick    tea.Mouse
 	editorDragging       bool // a mouse selection in the comment editor is in progress
 	editorUndo           *editSnapshot
+	reviewUndo           []reviewEdit // resolves and deletes, oldest first
+	reviewRedo           []reviewEdit
+	redoing              bool // a redo is replaying an edit
+	finishFromResolve    bool // `R` opened the finish dialog with no thread left
 	modalReferenceOffset int
 	helpOffset           int
 	discardReturn        modalType
@@ -1063,6 +1067,14 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // handleReviewKey handles a key outside dialogs and search mode.
 func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.tab()
+	switch {
+	case isUndoKey(msg.String()):
+		m.undoReview()
+		return m, nil
+	case msg.String() == "ctrl+y":
+		m.redoReview()
+		return m, nil
+	}
 	switch msg.String() {
 	case "ctrl+s", "/", "ctrl+r", "?":
 		if t.doc != nil {
@@ -1799,38 +1811,15 @@ func (m *AppModel) modalDelete(targetIndex int) {
 		return
 	}
 	target := targets[targetIndex]
-	for i, c := range t.state.Comments {
-		if c.ID != m.editingID {
-			continue
-		}
-		if target.replyID == "" {
-			t.state.Comments = append(t.state.Comments[:i], t.state.Comments[i+1:]...)
-		} else {
-			for j, reply := range c.Replies {
-				if reply.ID == target.replyID {
-					t.state.Comments[i].Replies = append(c.Replies[:j], c.Replies[j+1:]...)
-					t.state.Comments[i].UpdatedAt = review.Now()
-					break
-				}
-			}
-		}
-		break
-	}
+	id := m.editingID
 	m.editingID = ""
 	m.editingReplyID = ""
 	m.modalInitial = ""
 	m.discardReturn = noModal
 	m.deleteReturn = noModal
-	m.persist()
 	m.modal = noModal
 	m.modalTextarea.Blur()
-	t.cursorOnAnnotation = false
-	t.cursorAnnoIdx = 0
-	if t.cursorLine == 0 {
-		m.moveCursorBy(t, 1, 1)
-	}
-	m.rebuildContent()
-	m.updateCommentSidebar()
+	m.deleteFromThread(m.activeTab, id, target.replyID)
 }
 
 // toggleResolve flips a comment's resolution state, stamping ResolvedRound
@@ -1867,6 +1856,12 @@ func (m *AppModel) resolveThread(id string, advance bool) {
 		}
 		c := &t.state.Comments[i]
 		found = true
+		before := *c
+		defer func() {
+			if before.Resolved != c.Resolved {
+				m.recordReviewEdit(reviewEdit{kind: resolveEdit, path: t.path, comment: before, advance: advance})
+			}
+		}()
 		switch {
 		case c.Resolved && advance:
 			// Already resolved: leave it and just move on.
@@ -1899,6 +1894,7 @@ func (m *AppModel) resolveThread(id string, advance bool) {
 	// No unresolved thread is left to advance to: move on to submitting.
 	if advance && found {
 		m.openFinishModal()
+		m.finishFromResolve = true
 	}
 }
 
@@ -4481,7 +4477,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "M-↑/↓", desc: "⇅ move ranked item"},
 		{keys: "v/space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
-		{keys: "r/space · R", desc: "resolve / resolve and go to next"},
+		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},
 		{keys: "V · O", desc: "reading view / open all"},
 		{keys: "w · I", desc: "WS changes · images"},
 		{keys: "F5/M-r", desc: "reload sources"},
@@ -4529,8 +4525,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,k/j · enter/v/esc · C-PgUp/PgDn", desc: "⇅ extend · comment/toggle/cancel selection · ⇅ scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
-		{keys: "drag · S-←/→/↑/↓ · M-w · esc (comment editor)", desc: "select text with the mouse or keyboard · copy the selection · cancel it"},
-		{keys: "C-z, C-/ (editors)", desc: "restore the text before the last deletion, overwrite, or paste; again returns to the edited text"},
+		{keys: "drag,S-arrows · M-w · C-v · C-z (editors)", desc: "select text · copy it · paste clipboard text · undo the last deletion, overwrite, or paste; esc cancels the selection"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
@@ -4539,7 +4534,6 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "space (form checkbox)", desc: "unchecked: check and edit input; checked: uncheck, keep input draft"},
 		{keys: "r/esc (forms)", desc: "review/cancel"},
 		{keys: "tab · enter (dialog counters)", desc: "focus count · jump to first pending/completed item"},
-		{keys: "click · drag · M-w · C-v (input fields)", desc: "move the cursor · select text · copy it · paste clipboard text; esc cancels the selection"},
 	}, innerWidth)
 
 	search := renderHelpGroup("Incremental search", []helpItem{
