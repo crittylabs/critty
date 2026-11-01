@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -145,26 +144,28 @@ func (m *AppModel) navigateSource(location sourceLocation) tea.Cmd {
 	return nil
 }
 
+const gotoLinePrompt = "Line: "
+
 func (m *AppModel) openGotoLine() tea.Cmd {
-	m.lineInput = textinput.New()
-	m.lineInput.SetStyles(textinput.DefaultStyles(terminalIsDark))
-	m.lineInput.SetVirtualCursor(false)
-	m.lineInput.Prompt = "Line: "
-	m.lineInput.Placeholder = strconv.Itoa(max(1, m.tab().cursorLine))
-	m.lineInput.CharLimit = 20
-	m.lineInput.SetWidth(max(1, min(24, m.width-16)))
+	m.lineInput = newLineEditor("", 20)
 	m.modal, m.modalFocus, m.locationError = gotoLineModal, 0, ""
 	return m.lineInput.Focus()
 }
 
 func (m *AppModel) handleLocationModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "esc" || msg.String() == "ctrl+c" {
+		if m.lineInput.hasSelection() {
+			m.lineInput.clearSelection()
+			return m, nil
+		}
 		m.modal, m.locationError = noModal, ""
 		m.lineInput.Blur()
 		return m, nil
 	}
 	if m.modal == gotoLineModal {
 		switch msg.String() {
+		case "alt+w":
+			return m, m.copyLineEditorSelection(&m.lineInput)
 		case "enter":
 			if m.modalFocus == 2 {
 				m.modal = noModal
@@ -179,9 +180,7 @@ func (m *AppModel) handleLocationModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 			m.lineInput.Blur()
 			return m, nil
 		}
-		var cmd tea.Cmd
-		m.lineInput, cmd = m.lineInput.Update(msg)
-		return m, cmd
+		return m, m.editLineEditor(&m.lineInput, msg)
 	}
 	switch msg.String() {
 	case "y", "Y":
@@ -221,8 +220,8 @@ func (m *AppModel) handleLocationModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd
 			case 0:
 				m.modalFocus = 0
 				cmd := m.lineInput.Focus()
-				cursor := m.lineInput.Cursor()
-				m.lineInput.SetCursor(m.lineInput.Position() + mouse.X - region.rect.left - cursor.X)
+				left, width := lineEditorColumns(gotoLinePrompt, region.rect)
+				m.lineInput.click(mouse.X-left, width)
 				return m, cmd
 			case 1:
 				return m, m.submitGotoLine()
@@ -249,7 +248,8 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 	if m.modal == gotoLineModal {
 		title, closeRegion := modalTitle("Go to line", width)
 		prefix := title + "\n"
-		content := prefix + m.lineInput.View() + "\n\n"
+		text, _ := m.lineInput.view(max(1, width-lipgloss.Width(gotoLinePrompt)), strconv.Itoa(max(1, m.tab().cursorLine)))
+		content := prefix + gotoLinePrompt + text + "\n\n"
 		if m.locationError != "" {
 			content += lipgloss.Wrap(m.locationError, max(1, width), "") + "\n\n"
 		}

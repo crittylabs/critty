@@ -7,7 +7,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -19,8 +18,10 @@ type fileMatch struct {
 	positions []int // byte offsets of matched runes in the tab path
 }
 
+const fileSelectPrompt = "> "
+
 type fileSelectState struct {
-	input    textinput.Model
+	input    lineEditor
 	query    string
 	matches  []fileMatch
 	selected int
@@ -108,13 +109,7 @@ func rankFileMatches(paths []string, query string) []fileMatch {
 }
 
 func (m *AppModel) openFileSelect() tea.Cmd {
-	input := textinput.New()
-	input.SetStyles(textinput.DefaultStyles(terminalIsDark))
-	input.SetVirtualCursor(false)
-	input.Prompt = "> "
-	input.Placeholder = "file name"
-	input.SetWidth(max(1, m.modalInnerWidth()-lipgloss.Width(input.Prompt)))
-	m.fileSelect = fileSelectState{input: input}
+	m.fileSelect = fileSelectState{input: newLineEditor("", 0)}
 	m.refreshFileSelect()
 	m.modal = fileSelectModal
 	return m.fileSelect.input.Focus()
@@ -158,7 +153,13 @@ func (m *AppModel) handleFileSelectModal(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 	s := &m.fileSelect
 	switch msg.String() {
 	case "esc", "ctrl+c":
+		if s.input.hasSelection() {
+			s.input.clearSelection()
+			break
+		}
 		m.closeFileSelect()
+	case "alt+w":
+		return m, m.copyLineEditorSelection(&s.input)
 	case "enter":
 		m.pickFile(s.selected)
 	case "down", "ctrl+n":
@@ -170,8 +171,7 @@ func (m *AppModel) handleFileSelectModal(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 			s.selected = (s.selected + n - 1) % n
 		}
 	default:
-		var cmd tea.Cmd
-		s.input, cmd = s.input.Update(msg)
+		cmd := m.editLineEditor(&s.input, msg)
 		m.refreshFileSelect()
 		return m, cmd
 	}
@@ -188,10 +188,8 @@ func (m *AppModel) handleFileSelectMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if region.action.lineInput {
-			cursor := m.fileSelect.input.Cursor()
-			if cursor != nil {
-				m.fileSelect.input.SetCursor(m.fileSelect.input.Position() + mouse.X - region.rect.left - cursor.X)
-			}
+			left, width := lineEditorColumns(fileSelectPrompt, region.rect)
+			m.fileSelect.input.click(mouse.X-left, width)
 			return m, nil
 		}
 		if region.action.pick {
@@ -253,7 +251,8 @@ func (m AppModel) fileSelectModalContent(width, maxRows int) (string, []modalMou
 	s := m.fileSelect
 	title, closeRegion := modalTitle("Open file", width)
 	prefix := title + "\n"
-	content := prefix + s.input.View() + "\n\n"
+	text, _ := s.input.view(max(1, width-lipgloss.Width(fileSelectPrompt)), "file name")
+	content := prefix + fileSelectPrompt + text + "\n\n"
 	regions := []modalMouseRegion{{
 		rect:   mouseRect{top: strings.Count(prefix, "\n"), bottom: strings.Count(prefix, "\n") + 1, right: width},
 		action: modalMouseAction{lineInput: true},

@@ -121,6 +121,9 @@ var (
 	footerDescStyle = lipgloss.NewStyle().
 			Foreground(muted)
 
+	lineEditorPlaceholderStyle = lipgloss.NewStyle().
+					Foreground(muted)
+
 	helpHeadingStyle = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(lipgloss.BrightYellow)
@@ -432,6 +435,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	modalBtnNormal = modalBtnNormal.Background(buttonBackground)
 	commentStyle = commentStyle.Foreground(textSecondary)
 	footerDescStyle = footerDescStyle.Foreground(textSecondary)
+	lineEditorPlaceholderStyle = lineEditorPlaceholderStyle.Foreground(textSecondary)
 	helpDescriptionStyle = helpDescriptionStyle.Foreground(textPrimary)
 	helpLegendStyle = helpLegendStyle.Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue))
 	inlineCommentBox = inlineCommentBox.Foreground(textSecondary)

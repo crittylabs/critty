@@ -253,14 +253,84 @@ func (m *AppModel) copySelectedText() tea.Cmd {
 	if text == "" {
 		return nil
 	}
+	m.textSelection = contentTextSelection{}
+	m.recalculateLayout()
+	m.rebuildContent()
+	return m.copyText(text)
+}
+
+// copyText puts text on the kill ring and the system clipboard.
+func (m *AppModel) copyText(text string) tea.Cmd {
 	m.killRing.interrupt()
 	m.killRing.add(text, false)
 	m.killRing.interrupt()
 	m.locationError = "Copied text to kill ring and system clipboard"
-	m.textSelection = contentTextSelection{}
-	m.recalculateLayout()
-	m.rebuildContent()
 	return tea.SetClipboard(text)
+}
+
+// copyLineEditorSelection copies the selected text of a single-line input.
+func (m *AppModel) copyLineEditorSelection(editor *lineEditor) tea.Cmd {
+	text := editor.selectedText()
+	if text == "" {
+		return nil
+	}
+	editor.clearSelection()
+	m.recalculateLayout()
+	return m.copyText(text)
+}
+
+// focusedLineEditor returns the single-line input receiving keys, if any.
+func (m *AppModel) focusedLineEditor() *lineEditor {
+	switch {
+	case m.modal == gotoLineModal:
+		return &m.lineInput
+	case m.modal == fileSelectModal:
+		return &m.fileSelect.input
+	case m.modal == noModal && m.isearch.active && m.isearch.editing:
+		return &m.isearchInput
+	}
+	return nil
+}
+
+// lineEditorColumns returns the screen column where the focused input's
+// text starts and its width.
+func (m *AppModel) lineEditorColumns() (left, width int, ok bool) {
+	switch {
+	case m.modal == gotoLineModal || m.modal == fileSelectModal:
+		prompt := gotoLinePrompt
+		if m.modal == fileSelectModal {
+			prompt = fileSelectPrompt
+		}
+		for _, region := range m.modalMouseRegions() {
+			if region.action.lineInput {
+				left, width = lineEditorColumns(prompt, region.rect)
+				return left, width, true
+			}
+		}
+		return 0, 0, false
+	case m.isearch.active && m.isearch.editing:
+		left, width = m.isearchEditColumns()
+		return left, width, true
+	}
+	return 0, 0, false
+}
+
+// lineEditorColumns returns where an input's text starts within its region
+// and the width left after the prompt.
+func lineEditorColumns(prompt string, rect mouseRect) (left, width int) {
+	promptWidth := lipgloss.Width(prompt)
+	return rect.left + promptWidth, max(1, rect.right-rect.left-promptWidth)
+}
+
+// lineEditorCursor returns the terminal cursor of an input relative to its
+// region, or nil when it is not focused.
+func lineEditorCursor(editor lineEditor, prompt string, rect mouseRect) *tea.Cursor {
+	_, width := lineEditorColumns(prompt, rect)
+	c := editor.cursor(width)
+	if c != nil {
+		c.X += lipgloss.Width(prompt)
+	}
+	return c
 }
 
 func (m AppModel) copyTextButton() string {

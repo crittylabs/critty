@@ -174,7 +174,7 @@ func TestGotoLineInputClickMovesCursor(t *testing.T) {
 				if !region.action.lineInput {
 					continue
 				}
-				app, _ = clickMouseCmd(app, region.rect.left+len(app.lineInput.Prompt)+tc.x, region.rect.top)
+				app, _ = clickMouseCmd(app, region.rect.left+len(gotoLinePrompt)+tc.x, region.rect.top)
 				if app.modalFocus != 0 || !app.lineInput.Focused() || app.lineInput.Position() != tc.want {
 					t.Fatalf("input focus = %d, cursor = %d; want focused input at %d", app.modalFocus, app.lineInput.Position(), tc.want)
 				}

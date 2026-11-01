@@ -15,7 +15,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
-	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -195,12 +194,12 @@ type AppModel struct {
 	finishSaveFailed     bool
 	finishDraft          string
 	finishVerdict        review.Verdict
-	lineInput            textinput.Model
+	lineInput            lineEditor
 	pendingLocation      sourceLocation
 	locationError        string
 	notice               footerNotice
 	isearch              isearchState
-	isearchInput         textinput.Model // query editor opened with `M-e`
+	isearchInput         lineEditor // query editor opened with `M-e`
 	searchHistory        *searchhistory.Store
 	searchRing           []searchhistory.Entry // saved queries, oldest first
 
@@ -850,6 +849,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.finishClipboardImage(msg)
 		return m, cmd
 
+	case lineEditorPasteMsg:
+		return m, m.finishLineEditorPaste(msg)
+
 	case editorFinishedMsg:
 		m.killRing.interrupt()
 		m.finishExternalEdit(msg)
@@ -883,8 +885,8 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		kill, _ := killDirection(msg, m.modalTextarea.KeyMap)
 		editing := m.isTextModal() && m.modalFocus == 0
-		if m.isearch.editing {
-			kill, _ = isearchEditKill(msg, m.isearchInput.KeyMap)
+		if editor := m.focusedLineEditor(); editor != nil {
+			kill, _ = lineEditorKill(msg, editor.input.KeyMap)
 			editing = true
 		}
 		if !editing || (!kill && msg.String() != "ctrl+y" && msg.String() != "alt+y" && msg.String() != "alt+w") {
@@ -895,9 +897,8 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isearch.active && m.modal == noModal {
 			m.killRing.interrupt()
 			if m.isearch.editing {
-				var cmd tea.Cmd
-				m.isearchInput, cmd = m.isearchInput.Update(msg)
-				return m, cmd
+				m.isearchInput.paste(msg.Content)
+				return m, nil
 			}
 			m.isearchPaste(msg.Content)
 			return m, nil
@@ -905,14 +906,14 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	if m.modal == gotoLineModal {
-		m.lineInput, cmd = m.lineInput.Update(msg)
-		return m, cmd
-	}
-	if m.modal == fileSelectModal {
-		m.fileSelect.input, cmd = m.fileSelect.input.Update(msg)
-		m.refreshFileSelect()
-		return m, cmd
+	if m.modal == gotoLineModal || m.modal == fileSelectModal {
+		if paste, ok := msg.(tea.PasteMsg); ok {
+			m.focusedLineEditor().paste(paste.Content)
+			if m.modal == fileSelectModal {
+				m.refreshFileSelect()
+			}
+		}
+		return m, nil
 	}
 	if m.isTextModal() && m.modalFocus == 0 {
 		before := m.modalTextarea.Value()
@@ -3028,18 +3029,18 @@ func (m AppModel) View() tea.View {
 }
 
 func (m AppModel) placeModalCursor(v *tea.View, regions []modalMouseRegion) {
-	cursor := m.editorCursor()
-	switch m.modal {
-	case gotoLineModal:
-		cursor = m.lineInput.Cursor()
-	case fileSelectModal:
-		cursor = m.fileSelect.input.Cursor()
-	}
-	if c := cursor; c != nil {
-		for _, region := range regions {
-			if !region.action.textarea && !region.action.lineInput {
-				continue
-			}
+	for _, region := range regions {
+		if !region.action.textarea && !region.action.lineInput {
+			continue
+		}
+		c := m.editorCursor()
+		switch m.modal {
+		case gotoLineModal:
+			c = lineEditorCursor(m.lineInput, gotoLinePrompt, region.rect)
+		case fileSelectModal:
+			c = lineEditorCursor(m.fileSelect.input, fileSelectPrompt, region.rect)
+		}
+		if c != nil {
 			c.X += region.rect.left
 			c.Y += region.rect.top
 			if c.X >= max(0, region.rect.left) && c.X < min(m.width, region.rect.right) &&
@@ -3315,6 +3316,12 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	}
 	if m.modal == noModal && m.textSelection.active {
 		m.clearTextSelection()
+	}
+	if editor := m.focusedLineEditor(); editor != nil && editor.hasSelection() && m.modal != noModal {
+		_, layout := m.renderReviewScreen()
+		if layout.hasCopyTextButton && layout.copyTextButton.contains(mouse) {
+			return m, m.copyLineEditorSelection(editor)
+		}
 	}
 	if m.modal != noModal && m.clickedModalDismiss(mouse) {
 		return m.handleKeyPress(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -3707,6 +3714,12 @@ func (m *AppModel) handleDeleteConfirmModalMouse(mouse tea.Mouse) (tea.Model, te
 }
 
 func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd) {
+	if editor := m.focusedLineEditor(); editor != nil && editor.dragging {
+		if left, width, ok := m.lineEditorColumns(); ok {
+			editor.drag(msg.Mouse().X-left, width)
+		}
+		return m, nil
+	}
 	if m.outline.dragging {
 		if m.modal == noModal && msg.Mouse().Button == tea.MouseLeft && !m.viewMode && m.sidebarView == filesView {
 			m.resizeOutlineAt(msg.Mouse().Y)
@@ -3756,6 +3769,14 @@ func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
 }
 
 func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.Cmd) {
+	if editor := m.focusedLineEditor(); editor != nil && editor.dragging {
+		if left, width, ok := m.lineEditorColumns(); ok {
+			editor.drag(msg.Mouse().X-left, width)
+		}
+		editor.release()
+		m.recalculateLayout()
+		return m, nil
+	}
 	if m.outline.dragging {
 		m.outline.dragging = false
 		return m, nil
@@ -4193,6 +4214,9 @@ func (m AppModel) renderFooter() string {
 	if m.modal == noModal && m.hasTextSelection() {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
+	if editor := m.focusedLineEditor(); editor != nil && editor.hasSelection() && m.modal != noModal {
+		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
+	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
 		return m.renderFooterItems([]string{m.footerHelpButton(), m.outlineHint(), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close"), m.searchHint()})
 	}
@@ -4439,6 +4463,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "space (form checkbox)", desc: "unchecked: check and edit input; checked: uncheck, keep input draft"},
 		{keys: "r/esc (forms)", desc: "review/cancel"},
 		{keys: "tab · enter (dialog counters)", desc: "focus count · jump to first pending/completed item"},
+		{keys: "click · drag · M-w · C-v (input fields)", desc: "move the cursor · select text · copy it · paste clipboard text; esc cancels the selection"},
 	}, innerWidth)
 
 	search := renderHelpGroup("Incremental search", []helpItem{
@@ -4448,7 +4473,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "C-d / C-w", desc: "add following character / word"},
 		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
 		{keys: "M-p / M-n", desc: "older / newer query from project search history"},
-		{keys: "M-e", desc: "edit the query (line editing, kill ring); enter/C-s/C-r resume, esc keeps the previous query"},
+		{keys: "M-e", desc: "edit the query (line editing, kill ring); enter/C-s/C-r resume, esc keeps the previous query; drag to select, M-w copies"},
 		{keys: "terminal paste", desc: "paste text into the query"},
 	}, innerWidth)
 	help := columns + "\n\n" + search + "\n\n" + contexts

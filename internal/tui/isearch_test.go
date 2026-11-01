@@ -948,7 +948,8 @@ func TestISearchEditorRecallsHistoryAndTracksWideCursor(t *testing.T) {
 	if _, moved := app.isearchPrompt(); moved != x-2 {
 		t.Fatalf("cursor x after C-b = %d, want %d", moved, x-2)
 	}
-	if got := app.isearchEditIndex(x - 1); got != 1 {
+	left, width := app.isearchEditColumns()
+	if got := app.isearchInput.indexAt(x-1-left, width); got != 1 {
 		t.Fatalf("click between the wide characters mapped to index %d, want 1", got)
 	}
 	app = altKey(app, 'p')
