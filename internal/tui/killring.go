@@ -103,13 +103,7 @@ func (m *AppModel) updateKillRing(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		}
 	} else {
 		r.yank.index = (r.yank.index + 1) % len(r.entries)
-		m.modalTextarea.SetValue(r.yank.base)
-		m.modalTextarea.MoveToBegin()
-		for m.modalTextarea.Line() < r.yank.row {
-			m.modalTextarea.CursorEnd()
-			m.modalTextarea.CursorDown()
-		}
-		m.modalTextarea.SetCursorColumn(r.yank.column)
+		m.setTextareaValueAt(r.yank.base, r.yank.row, r.yank.column)
 	}
 	var cmd tea.Cmd
 	cmd = m.updateModalTextarea(tea.PasteMsg{Content: r.entries[r.yank.index]})

@@ -125,7 +125,7 @@ func (m *AppModel) finishExternalEdit(msg editorFinishedMsg) {
 			return
 		}
 	}
-	m.modalTextarea.SetValue(text)
+	m.replaceTextareaValue(text)
 	if m.pathInputType() != "" {
 		m.resizePathInput()
 	}

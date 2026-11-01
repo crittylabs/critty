@@ -185,6 +185,7 @@ type AppModel struct {
 	modalOpenedAt        time.Time
 	modalOpeningClick    tea.Mouse
 	editorDragging       bool // a mouse selection in the comment editor is in progress
+	editorUndo           *editSnapshot
 	modalReferenceOffset int
 	helpOffset           int
 	discardReturn        modalType
@@ -951,6 +952,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if !m.isTextModal() {
+		m.editorUndo = nil
+	}
 	if m.err != nil {
 		if m.finishSaveFailed && (msg.String() == "enter" || msg.String() == "y") {
 			return m.doFinish()
@@ -2030,7 +2034,7 @@ func (m *AppModel) insertSuggestion() {
 	if body != "" {
 		body += "\n\n"
 	}
-	m.modalTextarea.SetValue(body + "```suggestion\n" + code + "\n```")
+	m.replaceTextareaValue(body + "```suggestion\n" + code + "\n```")
 	m.modalFocus = 0
 	m.modalTextarea.Focus()
 	m.modalTextarea.CursorStart()
@@ -2280,6 +2284,10 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.clipboardStatus = ""
 	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
 		return m, cmd
+	}
+	if isUndoKey(msg.String()) && m.modalFocus == 0 {
+		m.undoTextarea()
+		return m, nil
 	}
 	if msg.String() == "alt+o" && m.modalFocus == 0 {
 		return m, m.openReferenceAtCursor()
@@ -4522,6 +4530,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "↑/↓,k/j · enter/v/esc · C-PgUp/PgDn", desc: "⇅ extend · comment/toggle/cancel selection · ⇅ scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "drag · S-←/→/↑/↓ · M-w · esc (comment editor)", desc: "select text with the mouse or keyboard · copy the selection · cancel it"},
+		{keys: "C-z, C-/ (editors)", desc: "restore the text before the last deletion, overwrite, or paste; again returns to the edited text"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},

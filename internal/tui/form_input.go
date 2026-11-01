@@ -44,8 +44,11 @@ func (m *AppModel) updateModalTextarea(msg tea.Msg) tea.Cmd {
 			msg = tea.PasteMsg{Content: text}
 		}
 	}
+	before := m.textareaSnapshot()
 	var cmd tea.Cmd
 	m.modalTextarea, cmd = m.modalTextarea.Update(msg)
+	_, pasted := msg.(tea.PasteMsg)
+	m.recordTextareaEdit(before, pasted)
 	if m.pathInputType() != "" {
 		m.resizePathInput()
 	}

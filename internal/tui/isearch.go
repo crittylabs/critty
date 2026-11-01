@@ -576,7 +576,7 @@ func (m *AppModel) handleISearchEditKey(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case "alt+p", "alt+n":
 		if entry, ok := m.isearchRingStep(msg.String() == "alt+p"); ok {
 			s.mode, s.caseFold = parseISearchMode(entry.Mode), entry.CaseFold
-			m.isearchInput.SetValue(entry.Query)
+			m.isearchInput.replace(entry.Query)
 			m.recalculateLayout()
 		}
 	default:

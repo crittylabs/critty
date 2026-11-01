@@ -250,3 +250,139 @@ func TestCommentEditorSelectsAndCopiesWithMouse(t *testing.T) {
 		t.Fatalf("plain click: selected %v column %d", app.modalTextarea.HasSelection(), app.modalTextarea.Column())
 	}
 }
+
+func TestLineEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
+	app := setupAppWithDoc(t, "one")
+	app.width, app.height = 80, 24
+	app.recalculateLayout()
+	app.openFileSelect()
+	app = typeSearch(app, "abc")
+	app = ctrlKey(app, 'a')
+	app = ctrlKey(app, 'k')
+	if app.fileSelect.input.Value() != "" {
+		t.Fatalf("C-k left %q", app.fileSelect.input.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.fileSelect.input.Value() != "abc" || app.fileSelect.input.Position() != 0 || app.fileSelect.query != "abc" {
+		t.Fatalf("C-z gave %q at %d (query %q)", app.fileSelect.input.Value(), app.fileSelect.input.Position(), app.fileSelect.query)
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: '_', Mod: tea.ModCtrl})
+	if app.fileSelect.input.Value() != "" {
+		t.Fatalf("undoing the undo gave %q", app.fileSelect.input.Value())
+	}
+	app = ctrlKey(app, 'z')
+	app.fileSelect.input.click(0, 40)
+	app.fileSelect.input.drag(2, 40)
+	app.fileSelect.input.release()
+	app = typeSearch(app, "xy")
+	if app.fileSelect.input.Value() != "xyc" {
+		t.Fatalf("typing over the selection gave %q", app.fileSelect.input.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.fileSelect.input.Value() != "abc" {
+		t.Fatalf("C-z after overwriting gave %q", app.fileSelect.input.Value())
+	}
+	app = typeSearch(app, "d")
+	app = ctrlKey(app, 'z')
+	if app.fileSelect.input.Value() != "xyc" {
+		t.Fatalf("typing does not replace the snapshot: C-z gave %q", app.fileSelect.input.Value())
+	}
+}
+
+func TestCommentEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
+	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+	app.modal = commentModal
+	app.modalTextarea.SetValue("hello world")
+	app.modalTextarea.Focus()
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	if app.modalTextarea.Value() != "hello worl" {
+		t.Fatalf("backspace left %q", app.modalTextarea.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.modalTextarea.Value() != "hello world" || app.modalTextarea.Column() != 11 {
+		t.Fatalf("C-z gave %q at column %d", app.modalTextarea.Value(), app.modalTextarea.Column())
+	}
+	app = ctrlKey(app, 'z')
+	if app.modalTextarea.Value() != "hello worl" {
+		t.Fatalf("undoing the undo gave %q", app.modalTextarea.Value())
+	}
+	app = ctrlKey(app, 'z')
+	rect, _ := app.textareaRegion()
+	left := rect.left + lipgloss.Width(app.modalTextarea.Prompt)
+	app = pressMouse(app, left+6, rect.top)
+	app = moveMouse(app, left+11, rect.top)
+	app = releaseMouse(app, left+11, rect.top)
+	app = typeSearch(app, "there")
+	if app.modalTextarea.Value() != "hello there" {
+		t.Fatalf("typing over the selection gave %q", app.modalTextarea.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.modalTextarea.Value() != "hello world" {
+		t.Fatalf("C-z after overwriting gave %q", app.modalTextarea.Value())
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEscape})
+	app = pressKey(app, 'y')
+	app = pressKey(app, 'n')
+	if app.modal != noModal {
+		t.Fatalf("modal = %v", app.modal)
+	}
+	app.modal = commentModal
+	app.modalTextarea.SetValue("fresh")
+	app.modalTextarea.Focus()
+	app = ctrlKey(app, 'z')
+	if app.modalTextarea.Value() != "fresh" {
+		t.Fatalf("a snapshot from an earlier dialog applied: %q", app.modalTextarea.Value())
+	}
+}
+
+func TestUndoRestoresPastes(t *testing.T) {
+	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+	app.modal = commentModal
+	app.modalTextarea.SetValue("hello")
+	app.modalTextarea.Focus()
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	app, _ = updateApp(app, tea.PasteMsg{Content: " world"})
+	if app.modalTextarea.Value() != "hello world" {
+		t.Fatalf("paste gave %q", app.modalTextarea.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.modalTextarea.Value() != "hello" {
+		t.Fatalf("C-z after a paste gave %q", app.modalTextarea.Value())
+	}
+	app.killRing.add(" there", false)
+	app.killRing.interrupt()
+	app = ctrlKey(app, 'y')
+	if app.modalTextarea.Value() != "hello there" {
+		t.Fatalf("C-y gave %q", app.modalTextarea.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.modalTextarea.Value() != "hello" {
+		t.Fatalf("C-z after a yank gave %q", app.modalTextarea.Value())
+	}
+
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEscape})
+	app = pressKey(app, 'y')
+	app = pressKey(app, 'n')
+	app.openFileSelect()
+	app = typeSearch(app, "ab")
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
+	app, _ = updateApp(app, lineEditorPasteMsg{id: app.clipboardID, text: "cd"})
+	if app.fileSelect.input.Value() != "abcd" {
+		t.Fatalf("C-v gave %q", app.fileSelect.input.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.fileSelect.input.Value() != "ab" || app.fileSelect.query != "ab" {
+		t.Fatalf("C-z after C-v gave %q (query %q)", app.fileSelect.input.Value(), app.fileSelect.query)
+	}
+	app = ctrlKey(app, 'y')
+	if app.fileSelect.input.Value() != "ab there" {
+		t.Fatalf("C-y gave %q", app.fileSelect.input.Value())
+	}
+	app = ctrlKey(app, 'z')
+	if app.fileSelect.input.Value() != "ab" {
+		t.Fatalf("C-z after C-y gave %q", app.fileSelect.input.Value())
+	}
+}

@@ -24,6 +24,47 @@ type lineEditor struct {
 	anchor    int  // rune index where a mouse selection started
 	selecting bool // the text between anchor and the cursor is selected
 	dragging  bool // the mouse button is still held
+	undo      *lineSnapshot
+}
+
+// lineSnapshot is the text and cursor before a deletion, overwrite, or paste.
+type lineSnapshot struct {
+	value string
+	pos   int
+}
+
+func (e lineEditor) snapshot() lineSnapshot {
+	return lineSnapshot{value: e.input.Value(), pos: e.input.Position()}
+}
+
+// record keeps the snapshot taken before an edit when text was removed or
+// replaced.
+func (e *lineEditor) record(before lineSnapshot) {
+	if destructiveEdit(before.value, e.input.Value(), before.pos) {
+		e.undo = &before
+	}
+}
+
+// replace sets the text as an undoable change.
+func (e *lineEditor) replace(value string) {
+	before := e.snapshot()
+	e.SetValue(value)
+	e.record(before)
+}
+
+// undoEdit restores the text before the last deletion, overwrite, or paste
+// and keeps the current text so the undo can be undone.
+func (e *lineEditor) undoEdit() bool {
+	snap := e.undo
+	if snap == nil {
+		return false
+	}
+	current := e.snapshot()
+	e.input.SetValue(snap.value)
+	e.input.SetCursor(snap.pos)
+	e.clearSelection()
+	e.undo = &current
+	return true
 }
 
 func newLineEditor(value string, limit int) lineEditor {
@@ -97,16 +138,21 @@ func (e *lineEditor) deleteSelection() {
 	e.clearSelection()
 }
 
-// insert places text at the cursor, replacing any selection.
+// insert places pasted or yanked text at the cursor, replacing any
+// selection.  The result is undoable even when nothing was replaced,
+// since a paste is as easy to trigger by mistake as a deletion.
 func (e *lineEditor) insert(text string) {
+	before := e.snapshot()
 	e.deleteSelection()
 	e.clearSelection()
-	if text == "" {
-		return
+	if text != "" {
+		value, pos := []rune(e.input.Value()), e.input.Position()
+		e.input.SetValue(string(value[:pos]) + text + string(value[pos:]))
+		e.input.SetCursor(pos + utf8.RuneCountInString(text))
 	}
-	value, pos := []rune(e.input.Value()), e.input.Position()
-	e.input.SetValue(string(value[:pos]) + text + string(value[pos:]))
-	e.input.SetCursor(pos + utf8.RuneCountInString(text))
+	if e.input.Value() != before.value {
+		e.undo = &before
+	}
 }
 
 // paste inserts pasted text with line breaks and tabs folded into spaces.
@@ -138,6 +184,8 @@ func (e *lineEditor) edit(msg tea.KeyPressMsg, ring *killRing) tea.Cmd {
 		e.insert(sanitizeLineText(ring.current()))
 		return nil
 	}
+	snap := e.snapshot()
+	defer e.record(snap)
 	if e.hasSelection() {
 		switch {
 		case key.Matches(msg, bindings.DeleteCharacterBackward, bindings.DeleteCharacterForward):
@@ -173,6 +221,11 @@ type lineEditorPasteMsg struct {
 // editLineEditor applies a key to an input.  `C-v` reads the system
 // clipboard as text, since these fields take no images.
 func (m *AppModel) editLineEditor(editor *lineEditor, msg tea.KeyPressMsg) tea.Cmd {
+	if isUndoKey(msg.String()) {
+		editor.undoEdit()
+		m.killRing.interrupt()
+		return nil
+	}
 	if msg.String() != "ctrl+v" {
 		return editor.edit(msg, &m.killRing)
 	}
