@@ -47,8 +47,8 @@ For example:
 - **Inline image previews** — compare image changes, attach images alongside review documents, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
 - **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.
-- **Navigation and editing** — search across files as you type, follow file and comment references, and return to each file where you left off.  Compact tabs leave more room for the document.
-- **Text Selection and Copying** — select text from documents and diffs to reuse it, preserving Markdown formatting and link targets.
+- **Navigation and editing** — search across files as you type with regular expressions, word search, and a per-project query history; follow file and comment references; and return to each file where you left off.  Compact tabs leave more room for the document.
+- **Text Selection and Copying** — select text from documents, diffs, and input fields to reuse it, preserving Markdown formatting and link targets.  Undo a stray resolve, deletion, or edit with `C-z`.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
 - **Scriptable and Crit-compatible** — automate comments with a [Crit](https://crit.md/)-compatible review format and resume saved sessions.
 
@@ -156,7 +156,7 @@ critty plan design.md         # A versioned plan
 
 <a id="review-navigation"></a>
 
-Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
+Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Press `C-z` to undo a resolve or a deleted comment and return to it, and `C-y` to redo it.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
 Compact tabs leave two more rows for the document.  Each tab remembers your reading position in the document and Comments sidebar.  The Files tree shows pending comments and unanswered items.  Use `V` for full-width reading with all comments reduced to bubble markers.
 
@@ -186,9 +186,11 @@ Saved plans, supplied diffs, and committed comparisons keep their snapshots.  Fi
 
 Drag across text in a document or diff, then press `M-w` or click **Copy text**.  Copies contain the source text, with wrapped rows joined and gutters and annotations left out.  Markdown retains its formatting and link targets, even when selecting part of a link label.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.
 
+Input fields select the same way: drag in the comment editor or a single-line input, copy with `M-w` or **Copy text**, paste the clipboard with `C-v`, and press `C-z` to undo the last deletion, overwrite, or paste.
+
 Without a text selection, `M-w` copies a file reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, `M-o` follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
 
-Search covers all review files by default.  Use the **Files** button or `M-s m` during search to restrict it to the current file.  Selecting lines keeps search in that file.
+Search covers all review files by default.  Use the **Files** button or `M-s m` during search to restrict it to the current file.  Selecting lines keeps search in that file.  Regular expressions support backreferences and lookaround.  Press `M-e` to edit a long query in place, and `M-p` / `M-n` to recall earlier queries; Critty remembers them per repository, with their regexp, word, and case settings, across its worktrees.
 
 The outline below the Files tree lets you jump to Markdown headings or source declarations, including in attachments.  Source outlines support Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Known file names and shebangs such as `#!/usr/bin/env ruby` identify scripts without a language suffix for both syntax highlighting and outlines; `env -S` is also supported.  Go uses its standard parser; other languages use lightweight rules for conventionally formatted code and may miss or misidentify unusual syntax.  Entries stay in source order, with nesting where available.  See Keyboard Help for navigation and resizing.
 
