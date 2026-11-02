@@ -45,7 +45,7 @@ Set `launchers` to an ordered TOML array in the global or project configuration,
 | Linux | Ghostty, kitty, Rio, WezTerm, Alacritty, `xdg-terminal-exec`, xterm |
 | WSL | Windows Rio, WezTerm, Alacritty, Windows Terminal |
 
-The client's terminal is preferred within its image-capability tier; system fallbacks stay last.  Detection uses `TERMINAL_APP`, `TERM_PROGRAM`, and terminal-specific environment hints.  Explicit launcher order overrides this preference.  The named launchers open new windows regardless of the current terminal.  General graphics support, such as Sixel, does not guarantee Critty image previews; the lower-priority terminals remain useful for text review.
+The client's terminal is preferred within its image-capability tier; system fallbacks stay last.  Detection uses `TERMINAL_APP`, `TERM_PROGRAM`, and terminal-specific environment hints; a herdr-core terminal reports `herdr-app` rather than the `ghostty` that herdr-core sets in `TERM_PROGRAM`.  Explicit launcher order overrides this preference.  The named launchers open new windows regardless of the current terminal.  General graphics support, such as Sixel, does not guarantee Critty image previews; the lower-priority terminals remain useful for text review.
 
 macOS scripted launchers bring the new window to the front.  Ghostty on macOS requires its 1.3+ AppleScript API; Linux uses its CLI.  Rio, WezTerm, Alacritty, and kitty use their CLIs on PATH, with a fallback to their application bundles under `/Applications` and `~/Applications` on macOS.  They require no remote-control setting.  CLI launchers leave window cleanup to the terminal; settings may retain the window after the review exits, and cleanup never quits an existing application.
 

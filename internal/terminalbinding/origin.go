@@ -30,6 +30,11 @@ func CaptureOrigin(pid int) Origin {
 }
 
 func terminalApplication(getenv func(string) string) string {
+	// herdr-core sets TERM_PROGRAM=ghostty for the terminals it runs, which
+	// the Herdr desktop app shows; Ghostty itself is not involved.
+	if getenv("HC_TERMINAL_ID") != "" {
+		return "herdr-app"
+	}
 	for _, key := range []string{"TERMINAL_APP", "TERM_PROGRAM"} {
 		switch strings.ToLower(getenv(key)) {
 		case "rio", "rioterm":

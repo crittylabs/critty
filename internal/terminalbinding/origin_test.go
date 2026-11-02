@@ -43,6 +43,7 @@ func TestTerminalHints(t *testing.T) {
 		want string
 	}{
 		{map[string]string{"TERMINAL_APP": "Ghostty"}, "ghostty"},
+		{map[string]string{"HC_TERMINAL_ID": "t7", "TERM_PROGRAM": "ghostty"}, "herdr-app"},
 		{map[string]string{"TERM_PROGRAM": "rio"}, "rio"},
 		{map[string]string{"TERMINAL_APP": "Rio"}, "rio"},
 		{map[string]string{"TERM_PROGRAM": "iTerm.app"}, "iterm"},
