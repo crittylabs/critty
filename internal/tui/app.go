@@ -512,7 +512,7 @@ func (m AppModel) Init() tea.Cmd {
 	if m.reload.watch && m.CanWatch() {
 		tick = m.startWatch()
 	}
-	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, tick)
+	return tea.Batch(m.loadDocuments(), tea.RequestBackgroundColor, m.reportProgramStatus(), tick)
 }
 
 func (m AppModel) loadDocuments() tea.Cmd {

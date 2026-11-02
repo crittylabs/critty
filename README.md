@@ -17,6 +17,8 @@ When your agent needs your input, it prepares the request and opens a review in 
 
 If you chat with your agent in a terminal multiplexer, such as tmux, the Herdr desktop app or Herdr TUI, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/references/terminals.md#review-launchers) for the full list.
 
+While a review waits for you, Critty tells the terminal it is blocked on a question through the Program Status Protocol (OSC 7501).  Terminals and agent inboxes that read it, such as the Herdr desktop app, cmux, iTerm2, and kitty, mark the review as needing attention; inside tmux, enable `allow-passthrough` so the report reaches the outer terminal.
+
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
 https://github.com/user-attachments/assets/8bce362f-f53f-4711-b6d3-47cf93df0c84

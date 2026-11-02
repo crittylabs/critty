@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -103,6 +104,9 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 	}
 	defer tty.Close()
 	_, err = tea.NewProgram(model, tea.WithInput(tty), tea.WithOutput(tty)).Run()
+	if reviewDemo {
+		_, _ = io.WriteString(tty, tui.ProgramStatusClear())
+	}
 	return err
 }
 

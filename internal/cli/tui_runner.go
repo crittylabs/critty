@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -71,6 +72,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		return nil, fmt.Errorf("--watch requires a live document, Git scope, or file-backed attachment")
 	}
 	var options []tea.ProgramOption
+	var output io.Writer = os.Stdout
 	if mode.patch != nil && !serving {
 		tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 		if err != nil {
@@ -82,6 +84,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 			}
 		}()
 		options = append(options, tea.WithInput(tty), tea.WithOutput(tty))
+		output = tty
 	}
 	p := tea.NewProgram(model, options...)
 
@@ -133,6 +136,8 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	}()
 
 	finalModel, runErr := p.Run()
+	// The TUI reported a waiting review; its record ends with the process.
+	_, _ = io.WriteString(output, tui.ProgramStatusClear())
 	switch app := finalModel.(type) {
 	case tui.AppModel:
 		if err := app.SaveUnsubmittedDraft(); err != nil {
