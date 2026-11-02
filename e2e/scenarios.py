@@ -35,7 +35,7 @@ def environment() -> dict[str, str]:
     env = {
         k: v
         for k, v in os.environ.items()
-        if not k.startswith(("HERDR_", "TMUX", "CRITTY_"))
+        if not k.startswith(("HERDR_", "HC_TERMINAL_", "TMUX", "CRITTY_"))
     }
     env.update(
         XDG_STATE_HOME=str(STATE),

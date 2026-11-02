@@ -24,7 +24,7 @@ Hide
 
 # Detach from the recording host's multiplexer, use the demo build and an
 # isolated review state, and start a private tmux server for the recording.
-Type "unset TMUX TMUX_PANE NO_COLOR; export COLORTERM=truecolor; unset -m 'HERDR_*'; export TAPE_DIR=$PWD DEMO_DIR=${DEMO_DIR:-${${TMPDIR:-/tmp}%/}/critty-demo}; export XDG_STATE_HOME=$DEMO_DIR/state PATH=$DEMO_DIR/bin:$PATH; cd $DEMO_DIR/work; clear"
+Type "unset TMUX TMUX_PANE NO_COLOR; export COLORTERM=truecolor; unset -m 'HERDR_*' 'HC_TERMINAL_*'; export TAPE_DIR=$PWD DEMO_DIR=${DEMO_DIR:-${${TMPDIR:-/tmp}%/}/critty-demo}; export XDG_STATE_HOME=$DEMO_DIR/state PATH=$DEMO_DIR/bin:$PATH; cd $DEMO_DIR/work; clear"
 Enter
 Type "tmux -L demo -f $TAPE_DIR/tmux.conf new -s demo"
 Enter

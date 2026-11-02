@@ -229,6 +229,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkDesktopLaunchers(runtime.GOOS, origin, func(name string) error {
 				return (&desktopLaunch{name: name, origin: origin}).check()
 			})
+			r.checkHerdrApp()
 			if err := r.write(cmd.OutOrStdout(), asJSON); err != nil {
 				return err
 			}
@@ -550,6 +551,42 @@ func (r *doctorReport) checkDesktopLaunchers(platform string, origin terminalbin
 		}
 		r.add("launchers/"+name, "ok", "available (window creation is not tested)", "")
 	}
+}
+
+// The Herdr desktop app shows reviews as tabs only for terminals it runs.
+// Reported only where the app or herdr-core is present.
+func (r *doctorReport) checkHerdrApp() {
+	const check = "launchers/herdr-app"
+	terminal := os.Getenv("HC_TERMINAL_ID")
+	_, hcErr := lookPath("hc")
+	appBin, appErr := lookPath("herdr-app")
+	if hcErr != nil && appErr != nil && terminal == "" {
+		return
+	}
+	if hcErr != nil {
+		r.add(check, "warn", "hc not found on PATH", "Install herdr-core, which the Herdr desktop app installs, and make `hc` available on PATH.")
+		return
+	}
+	if appErr != nil {
+		r.add(check, "warn", "herdr-app not found on PATH", "Install the Herdr desktop app; opening it links `herdr-app` into ~/.local/bin.")
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := commandOutput(exec.CommandContext(ctx, appBin, "status")); err != nil {
+		r.add(check, "info", "no Herdr window is open", "Open the Herdr desktop app; reviews started from its terminals open as tabs there.")
+		return
+	}
+	if terminal == "" {
+		r.add(check, "info", "Herdr window is open; this terminal is not run by herdr-core", "Run `critty doctor` from a terminal inside the Herdr desktop app to check its placement.")
+		return
+	}
+	space, _, err := herdrAppPlace(herdrAppContext{socket: terminalbinding.HCSocketPath(), terminal: terminal})
+	if err != nil {
+		r.add(check, "warn", err.Error(), "Reviews from a terminal that herdr-core runs outside a window fall back to a desktop terminal; start the agent from a tab in the app.")
+		return
+	}
+	r.add(check, "ok", "terminal "+terminal+" is shown in space "+space+" (tab creation is not tested)", "")
 }
 
 func init() { rootCmd.AddCommand(newDoctorCommand()) }

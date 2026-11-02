@@ -512,3 +512,57 @@ func TestDoctorDesktopLaunchers(t *testing.T) {
 		})
 	}
 }
+
+func TestDoctorHerdrApp(t *testing.T) {
+	origLook, origOutput := lookPath, commandOutput
+	t.Cleanup(func() { lookPath, commandOutput = origLook, origOutput })
+	t.Setenv("HC_TERMINAL_SOCKET", "/core.sock")
+	for _, tc := range []struct {
+		name, terminal, record string
+		missing                map[string]bool
+		window                 bool
+		status, message        string
+	}{
+		{"absent host", "", "", map[string]bool{"hc": true, "herdr-app": true}, false, "", ""},
+		{"missing hc", "", "", map[string]bool{"hc": true}, false, "warn", "hc not found"},
+		{"missing app", "t3", "", map[string]bool{"herdr-app": true}, false, "warn", "herdr-app not found"},
+		{"no window", "t3", "", nil, false, "info", "no Herdr window"},
+		{"outside core", "", "", nil, true, "info", "not run by herdr-core"},
+		{"hidden terminal", "t3", `{"address":"t3","labels":{}}`, nil, true, "warn", "not shown in a Herdr window"},
+		{"shown terminal", "t3", `{"address":"t3","labels":{"herdr.space":"sp1","herdr.tab":"tb1"}}`, nil, true, "ok", "shown in space sp1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("HC_TERMINAL_ID", tc.terminal)
+			lookPath = func(name string) (string, error) {
+				if tc.missing[name] {
+					return "", fmt.Errorf("%s not installed", name)
+				}
+				return "/bin/" + name, nil
+			}
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				switch {
+				case cmd.Path == "/bin/herdr-app" && cmd.Args[1] == "status":
+					if !tc.window {
+						return nil, fmt.Errorf("no Herdr window")
+					}
+					return []byte(`{"space":"sp1"}`), nil
+				case cmd.Path == "/bin/hc" && cmd.Args[1] == "get":
+					return []byte(tc.record), nil
+				}
+				return nil, fmt.Errorf("unexpected command: %v", cmd.Args)
+			}
+			r := doctorReport{}
+			r.checkHerdrApp()
+			if tc.status == "" {
+				if len(r.Checks) != 0 {
+					t.Fatalf("reported outside a Herdr host: %+v", r.Checks)
+				}
+				return
+			}
+			d := diagnosticFor(t, r, "launchers/herdr-app")
+			if d.Status != tc.status || !strings.Contains(d.Message, tc.message) {
+				t.Fatalf("diagnostic = %+v", d)
+			}
+		})
+	}
+}

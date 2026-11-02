@@ -35,7 +35,7 @@ def environment(root: Path) -> dict[str, str]:
     env = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("HERDR_", "TMUX", "CRITTY_"))
+        if not key.startswith(("HERDR_", "HC_TERMINAL_", "TMUX", "CRITTY_"))
         and key not in ("NO_COLOR", "CLICOLOR", "CLICOLOR_FORCE", "FORCE_COLOR")
     }
     env.update(

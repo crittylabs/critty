@@ -45,7 +45,7 @@ class DoctorImagesTest(unittest.TestCase):
         cls.env = {
             k: v
             for k, v in os.environ.items()
-            if not k.startswith(("TMUX", "HERDR_", "CRITTY_"))
+            if not k.startswith(("TMUX", "HERDR_", "HC_TERMINAL_", "CRITTY_"))
         }
         cls.env.update(
             HOME=str(cls.root / "home"),

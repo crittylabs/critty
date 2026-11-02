@@ -83,7 +83,7 @@ CI tests stable and rolling preview builds from `tmux/tmux-builds` on Ubuntu and
 
 Use `e2e/native_terminal.py` inside the native terminal for isolated checks with saved stdout, stderr, and exit results.  Read its command help before launching; window closure alone does not indicate failure.
 
-Agent tool calls may implicitly set `NO_COLOR`; do not propagate it to user terminals unless intentional.  For manual previews and captures, reuse the environment setup in `e2e/native_terminal.py` or `e2e/tmux_launchers.py`.  Ad-hoc launches must drop `TMUX*`, `HERDR_*`, `CRITTY_*`, and `NO_COLOR`, keep `XDG_STATE_HOME` under a short `/tmp` directory because macOS limits socket paths to about 104 bytes, and pass `--launcher mux` when Critty must render in the current PTY.
+Agent tool calls may implicitly set `NO_COLOR`; do not propagate it to user terminals unless intentional.  For manual previews and captures, reuse the environment setup in `e2e/native_terminal.py` or `e2e/tmux_launchers.py`.  Ad-hoc launches must drop `TMUX*`, `HERDR_*`, `HC_TERMINAL_*`, `CRITTY_*`, and `NO_COLOR`, keep `XDG_STATE_HOME` under a short `/tmp` directory because macOS limits socket paths to about 104 bytes, and pass `--launcher mux` when Critty must render in the current PTY.
 
 See the README for installing the binary and the agent skills, and `CHANGELOG.md` for changes by release.
 

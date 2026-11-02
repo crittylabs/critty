@@ -40,8 +40,8 @@ func programStatusText(text string, limit int) string {
 	return base64.StdEncoding.EncodeToString([]byte(text))
 }
 
-func programStatusBlocked(title, msg string) string {
-	pairs := []string{"state=blocked", "kind=question", "app=" + programStatusApp}
+func programStatusBlocked(kind, title, msg string) string {
+	pairs := []string{"state=blocked", "kind=" + kind, "app=" + programStatusApp}
 	if title != "" {
 		pairs = append(pairs, "title="+programStatusText(title, programStatusTitleMax))
 	}
@@ -64,7 +64,22 @@ func (m AppModel) programStatusReport() string {
 	if m.topic != "" && m.topic != m.branch {
 		msg = m.topic
 	}
-	return programStatusBlocked(title, msg)
+	return programStatusBlocked(m.programStatusKind(), title, msg)
+}
+
+// programStatusKind distinguishes an approval request, which carries consent
+// items, from a review that asks for comments or answers.
+func (m AppModel) programStatusKind() string {
+	if m.forms != nil {
+		for _, d := range m.forms.Documents {
+			for _, item := range d.Items {
+				if item.Consent {
+					return "permission"
+				}
+			}
+		}
+	}
+	return "question"
 }
 
 // reportProgramStatus tells the terminal a reviewer is needed.  Read-only

@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestProgramStatusReport(t *testing.T) {
@@ -28,6 +31,21 @@ func TestProgramStatusReport(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
 	if got := ProgramStatusClear(); !strings.HasPrefix(got, "\x1bPtmux;\x1b\x1b]7501;state=clear") {
 		t.Fatalf("clear inside tmux = %q", got)
+	}
+}
+
+func TestProgramStatusKindFollowsConsentItems(t *testing.T) {
+	m := AppModel{}
+	if got := m.programStatusKind(); got != "question" {
+		t.Fatalf("kind without forms = %q", got)
+	}
+	m.forms = &review.FormState{Documents: []review.FormDocument{{Items: []form.Item{{ID: "note"}}}}}
+	if got := m.programStatusKind(); got != "question" {
+		t.Fatalf("kind without consent = %q", got)
+	}
+	m.forms.Documents[0].Items = append(m.forms.Documents[0].Items, form.Item{ID: "push", Consent: true})
+	if got := m.programStatusKind(); got != "permission" {
+		t.Fatalf("kind with consent = %q", got)
 	}
 }
 

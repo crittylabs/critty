@@ -23,6 +23,7 @@ class NativeTerminalTest(unittest.TestCase):
             NO_COLOR="1",
             FORCE_COLOR="1",
             HERDR_TEST="inherited",
+            HC_TERMINAL_TEST="inherited",
             TMUX="inherited",
             CRITTY_TEST="inherited",
             TERM="native-test",
@@ -69,7 +70,7 @@ class NativeTerminalTest(unittest.TestCase):
                 "import os,sys,json; "
                 "print(json.dumps({'tty':[os.isatty(i) for i in range(3)],"
                 "'env':{k:v for k,v in os.environ.items() if k in "
-                "['NO_COLOR','FORCE_COLOR','HERDR_TEST','TMUX','CRITTY_TEST',"
+                "['NO_COLOR','FORCE_COLOR','HERDR_TEST','HC_TERMINAL_TEST','TMUX','CRITTY_TEST',"
                 "'TERM','TERM_PROGRAM','XDG_STATE_HOME']}}),flush=True); "
                 "print('日本語のstderr',file=sys.stderr,flush=True); sys.exit(3)",
                 output,

@@ -30,7 +30,7 @@ def verify(binary: Path, tmux_binary: Path) -> None:
         env = {
             key: value
             for key, value in os.environ.items()
-            if not key.startswith(("TMUX", "HERDR_", "CRITTY_")) and key != "NO_COLOR"
+            if not key.startswith(("TMUX", "HERDR_", "HC_TERMINAL_", "CRITTY_")) and key != "NO_COLOR"
         }
         env.update(
             PATH=f"{root / 'bin'}:{env['PATH']}",
