@@ -48,7 +48,7 @@ func (t Target) Validate() error {
 		}
 	case "herdr":
 		if t.Tab == "" || t.Workspace == "" || strings.HasPrefix(t.Pane, "-") {
-			return fmt.Errorf("incomplete Herdr target")
+			return fmt.Errorf("incomplete Herdr TUI target")
 		}
 	case "cmux":
 		if t.Workspace == "" || strings.HasPrefix(t.Pane, "-") || strings.HasPrefix(t.Workspace, "-") {

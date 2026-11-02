@@ -4560,13 +4560,13 @@ func renderHostHelp(host string, width int) string {
 			{keys: "prefix @", desc: "toggle floating / tiled pane"},
 			{keys: "prefix ;", desc: "return to previous pane"},
 		}
-	case "Herdr":
-		title = "Herdr controls (default bindings; prefix: C-b)"
+	case "Herdr TUI":
+		title = "Herdr TUI controls (default bindings; prefix: C-b)"
 		items = []helpItem{
 			{keys: "prefix z", desc: "toggle pane zoom"},
 			{keys: "prefix h/j/k/l", desc: "focus pane left/down/up/right"},
 			{keys: "prefix tab/shift+tab", desc: "⇵ pane"},
-			{keys: "prefix ?", desc: "show Herdr keybindings"},
+			{keys: "prefix ?", desc: "show Herdr TUI keybindings"},
 		}
 	case "Zellij":
 		title = "Zellij controls (default bindings)"

@@ -155,7 +155,7 @@ func spawnTUIHerdrTab(mode *reviewMode, herdr herdrContext) (herdrLaunch, error)
 	if err != nil {
 		return herdrLaunch{}, fmt.Errorf("herdr binary not found on PATH: %w", err)
 	}
-	tuiCmd, err := buildTUICommand(mode, "Herdr")
+	tuiCmd, err := buildTUICommand(mode, "Herdr TUI")
 	if err != nil {
 		return herdrLaunch{}, err
 	}
@@ -172,7 +172,7 @@ func spawnTUIHerdrTab(mode *reviewMode, herdr herdrContext) (herdrLaunch, error)
 	}
 	out, err := commandOutput(herdr.command(herdrBin, args...))
 	if err != nil {
-		return herdrLaunch{}, fmt.Errorf("failed to create Herdr tab: %w", err)
+		return herdrLaunch{}, fmt.Errorf("failed to create Herdr TUI tab: %w", err)
 	}
 
 	var response struct {
@@ -186,28 +186,28 @@ func spawnTUIHerdrTab(mode *reviewMode, herdr herdrContext) (herdrLaunch, error)
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(out, &response); err != nil {
-		return herdrLaunch{}, fmt.Errorf("parsing Herdr tab response: %w", err)
+		return herdrLaunch{}, fmt.Errorf("parsing Herdr TUI tab response: %w", err)
 	}
 	launch := herdrLaunch{context: herdr, bin: herdrBin, tab: response.Result.Tab.TabID, sourceTab: herdr.tab}
 	if launch.tab == "" {
-		return herdrLaunch{}, fmt.Errorf("missing tab or pane ID in Herdr tab response")
+		return herdrLaunch{}, fmt.Errorf("missing tab or pane ID in Herdr TUI tab response")
 	}
 	if response.Result.RootPane.PaneID == "" {
 		launch.close()
 		launch.restoreFocus()
-		return herdrLaunch{}, fmt.Errorf("missing tab or pane ID in Herdr tab response")
+		return herdrLaunch{}, fmt.Errorf("missing tab or pane ID in Herdr TUI tab response")
 	}
 
 	if err := runCommand(herdr.command(herdrBin, "pane", "run", response.Result.RootPane.PaneID, "exec "+tuiCmd)); err != nil {
 		launch.close()
-		return herdrLaunch{}, fmt.Errorf("failed to start TUI in Herdr tab: %w", err)
+		return herdrLaunch{}, fmt.Errorf("failed to start TUI in Herdr TUI tab: %w", err)
 	}
 	if err := runCommand(herdr.command(herdrBin, "tab", "focus", launch.tab)); err != nil {
 		launch.close()
 		launch.restoreFocus()
-		return herdrLaunch{}, fmt.Errorf("failed to focus Herdr tab: %w", err)
+		return herdrLaunch{}, fmt.Errorf("failed to focus Herdr TUI tab: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, "Opened review in Herdr tab")
+	fmt.Fprintln(os.Stderr, "Opened review in Herdr TUI tab")
 	return launch, nil
 }
 

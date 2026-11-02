@@ -208,7 +208,7 @@ Add --terminal-notify-only to require a filter notification and skip registered
 pane screens. This consumes that one-time request; no review is opened.
 Use --python to check the dedicated Python environment used for Codex reviews.
 
-No AI service is contacted and no persistent settings are changed. Herdr checks read local
+No AI service is contacted and no persistent settings are changed. Herdr TUI checks read local
 configuration, not the running server or a remote client's configuration. Image
 support is probed on the current foreground TTY; without one, the check is skipped.
 Errors return exit status 1; optional features and unverified settings produce
@@ -473,10 +473,10 @@ func (r *doctorReport) checkHerdrImages() {
 	if path == "" {
 		base, err := os.UserConfigDir()
 		if err != nil {
-			r.add("images/herdr", "warn", "cannot locate local Herdr configuration", "")
+			r.add("images/herdr", "warn", "cannot locate local Herdr TUI configuration", "")
 			return
 		}
-		// Herdr uses ~/.config on Unix, including macOS.
+		// Herdr TUI uses ~/.config on Unix, including macOS.
 		if home, err := os.UserHomeDir(); err == nil && os.PathSeparator == '/' {
 			base = filepath.Join(home, ".config")
 		}
@@ -505,7 +505,7 @@ func (r *doctorReport) checkHerdrImages() {
 	if enabled == nil {
 		enabled = cfg.Experimental.KittyGraphics
 	}
-	status, message := "info", "kitty_graphics unset (current Herdr default: true)"
+	status, message := "info", "kitty_graphics unset (current Herdr TUI default: true)"
 	advice := "This checks local config only; running server and remote client settings may differ."
 	if enabled != nil {
 		message = fmt.Sprintf("kitty_graphics=%t in %s", *enabled, path)

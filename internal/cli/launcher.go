@@ -170,7 +170,7 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 		ctx, ok := launcherTerminal(name, terminal).(herdrContext)
 		return []reviewLauncher{{name: name, check: func() error {
 			if !ok {
-				return fmt.Errorf("no Herdr terminal")
+				return fmt.Errorf("no Herdr TUI terminal")
 			}
 			_, err := lookPath("herdr")
 			return err

@@ -325,12 +325,12 @@ func TestDoctorTmuxInheritedSetting(t *testing.T) {
 
 func TestDoctorHerdrConfig(t *testing.T) {
 	for _, tt := range []struct{ config, status, message string }{
-		{"", "info", "current Herdr default: true"},
+		{"", "info", "current Herdr TUI default: true"},
 		{"[experimental]\nkitty_graphics = false\n", "warn", "false"},
 		{"[terminal]\nkitty_graphics = true\n[experimental]\nkitty_graphics = false\n", "info", "true"},
 		{"terminal.kitty_graphics = false\n", "warn", "false"},
 		{"[terminal]\nkitty_graphics = 'false'\n", "warn", "invalid"},
-		{"[other]\ntext = '''\n[terminal]\nkitty_graphics = false\n'''\n", "info", "current Herdr default: true"},
+		{"[other]\ntext = '''\n[terminal]\nkitty_graphics = false\n'''\n", "info", "current Herdr TUI default: true"},
 	} {
 		path := filepath.Join(t.TempDir(), "config.toml")
 		t.Setenv("HERDR_CONFIG_PATH", path)

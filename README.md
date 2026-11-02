@@ -15,7 +15,7 @@ You can review a diff, file, or document on its own.  Your agent can also attach
 
 When your agent needs your input, it prepares the request and opens a review in Critty.  Comment on individual lines, answer questions, confirm details, or authorize actions.  Your comments and answers go back to the agent.
 
-If you chat with your agent in a terminal multiplexer, such as tmux, Herdr, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/references/terminals.md#review-launchers) for the full list.
+If you chat with your agent in a terminal multiplexer, such as tmux, Herdr TUI, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/references/terminals.md#review-launchers) for the full list.
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
@@ -110,9 +110,9 @@ After setting up or switching your terminal or multiplexer, run `critty doctor` 
 
 #### Image previews
 
-Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, or iTerm2.  Through tmux or Herdr, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
+Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, or iTerm2.  Through tmux or Herdr TUI, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
 
-After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr checks read local configuration; running server and remote client settings may differ.
+After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr TUI checks read local configuration; running server and remote client settings may differ.
 
 PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
 

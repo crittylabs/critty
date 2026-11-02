@@ -205,7 +205,7 @@ func TestSpawnTUIHerdrTab(t *testing.T) {
 		t.Errorf("pane run target = %q", got)
 	}
 	command := runCalls[0][4]
-	for _, want := range []string{"exec env CRITTY_HOST='Herdr'", "XDG_STATE_HOME='/tmp/state with spaces'", "'/usr/local/bin/critty' _tui --session '0123456789ab'"} {
+	for _, want := range []string{"exec env CRITTY_HOST='Herdr TUI'", "XDG_STATE_HOME='/tmp/state with spaces'", "'/usr/local/bin/critty' _tui --session '0123456789ab'"} {
 		if !strings.Contains(command, want) {
 			t.Errorf("pane command missing %q: %s", want, command)
 		}
@@ -222,7 +222,7 @@ func TestSpawnTUIHerdrTabCleansUpAfterFailure(t *testing.T) {
 		created = `{"result":{"tab":{"tab_id":"w1:t9"},"root_pane":{"pane_id":"w1:p9"}}}`
 		herdr   = "/usr/local/bin/herdr"
 	)
-	run := []string{herdr, "pane", "run", "w1:p9", "exec env CRITTY_HOST='Herdr' '/usr/local/bin/critty' _tui --session '0123456789ab'"}
+	run := []string{herdr, "pane", "run", "w1:p9", "exec env CRITTY_HOST='Herdr TUI' '/usr/local/bin/critty' _tui --session '0123456789ab'"}
 	focus := []string{herdr, "tab", "focus", "w1:t9"}
 	closeTab := []string{herdr, "tab", "close", "w1:t9"}
 	restore := []string{herdr, "tab", "focus", "w1:t1"}

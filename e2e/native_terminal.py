@@ -1,6 +1,6 @@
 """Record a command in a native terminal with isolated Critty state.
 
-Run inside the terminal being tested, outside tmux or Herdr.  For example:
+Run inside the terminal being tested, outside tmux or Herdr TUI.  For example:
   python3 e2e/native_terminal.py --output .tmp/native-probe -- \
 python3 e2e/probe_images.py --expect supported
 

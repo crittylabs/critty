@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Herdr TUI naming**: Documentation, `critty doctor`, launcher messages, and Keyboard Help now say Herdr TUI, the terminal app, since Herdr also ships a desktop app built on herdr-core that does not share terminals with it.  The `herdr` launcher name and `HERDR_*` variables are unchanged.
+
 ## 1.9.0
 
 ### Added
