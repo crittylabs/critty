@@ -24,17 +24,17 @@ jobs:
       contents: read
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2  # v2.22.2
+        uses: step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       # Cache poisoning is not a concern here; this job only runs tests and
       # publishes nothing.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0 # zizmor: ignore[cache-poisoning]
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
 
