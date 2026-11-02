@@ -27,10 +27,9 @@ type ImageCapability struct {
 }
 
 type terminalImageProbe struct {
-	display    imageDisplay
-	parser     *ansi.Parser
-	data       []byte
-	cursorSeen bool
+	display imageDisplay
+	parser  *ansi.Parser
+	data    []byte
 }
 
 func newTerminalImageProbe(tmux bool) terminalImageProbe {
@@ -83,12 +82,9 @@ func (p *terminalImageProbe) feed(data []byte) error {
 }
 
 func (p *terminalImageProbe) accept(msg tea.Msg) {
-	if _, ok := msg.(tea.CursorPositionMsg); ok && p.display.probeReply != "" {
-		p.cursorSeen = true
-	}
 	p.display.acceptProbeResponse(msg)
 }
 
 func (p *terminalImageProbe) complete() bool {
-	return p.display.probeReply != "" && p.cursorSeen
+	return p.display.probeReply != "" && p.display.probeCursor != nil
 }

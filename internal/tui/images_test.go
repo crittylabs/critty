@@ -277,26 +277,30 @@ func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
 		{"ignored extension", tea.CursorPositionMsg{X: 1, Y: 1}, "OK", false},
 		{"unsupported graphics", tea.CursorPositionMsg{X: 0, Y: 1}, "EINVAL", false},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			app := AppModel{images: newImageDisplay()}
-			app.images.checking = true
-			app.images.attempts = 1
-			messages := []tea.Msg{
-				uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte(tc.payload)},
-				tc.cursor,
-			}
-			for i, msg := range messages {
-				model, _ := app.Update(msg)
-				app = model.(AppModel)
-				if app.images.enabled != (i == 1 && tc.enabled) {
-					t.Fatalf("message %d: enabled=%t", i, app.images.enabled)
+		for _, order := range []string{"reply first", "cursor first"} {
+			t.Run(tc.name+", "+order, func(t *testing.T) {
+				app := AppModel{images: newImageDisplay()}
+				app.images.checking = true
+				app.images.attempts = 1
+				reply := uv.KittyGraphicsEvent{Options: kitty.Options{ID: app.images.probeID}, Payload: []byte(tc.payload)}
+				messages := []tea.Msg{reply, tc.cursor}
+				if order == "cursor first" {
+					// The Herdr desktop app's order: the report counts at the timeout.
+					messages = []tea.Msg{tc.cursor, reply, imageProbeTimeoutMsg{app.images.probeID}}
 				}
-			}
-			model, _ := app.Update(tea.CursorPositionMsg{X: 0, Y: 1})
-			if model.(AppModel).images.enabled != tc.enabled {
-				t.Fatal("later cursor reply changed capability")
-			}
-		})
+				for i, msg := range messages {
+					model, _ := app.Update(msg)
+					app = model.(AppModel)
+					if app.images.enabled != (i == len(messages)-1 && tc.enabled) {
+						t.Fatalf("message %d: enabled=%t", i, app.images.enabled)
+					}
+				}
+				model, _ := app.Update(tea.CursorPositionMsg{X: 0, Y: 1})
+				if model.(AppModel).images.enabled != tc.enabled {
+					t.Fatal("later cursor reply changed capability")
+				}
+			})
+		}
 	}
 }
 

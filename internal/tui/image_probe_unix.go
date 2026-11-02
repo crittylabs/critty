@@ -66,6 +66,7 @@ func CheckTerminalImages() (result ImageCapability, err error) {
 		if e := readImageProbe(ctx, tty, &p); e != nil {
 			return result, e
 		}
+		p.display.settleProbe()
 		if p.display.enabled {
 			result.Supported = true
 			result.Reason = "Kitty virtual placement accepted without moving the cursor"

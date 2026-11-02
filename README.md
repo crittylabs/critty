@@ -112,7 +112,7 @@ After setting up or switching your terminal or multiplexer, run `critty doctor` 
 
 #### Image previews
 
-Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, or iTerm2.  Through tmux or Herdr TUI, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
+Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, iTerm2, or the Herdr desktop app.  Through tmux or Herdr TUI, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
 
 After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr TUI checks read local configuration; running server and remote client settings may differ.
 

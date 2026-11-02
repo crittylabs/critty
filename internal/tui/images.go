@@ -44,6 +44,10 @@ type imageDisplay struct {
 	probeID     int
 	probeReply  string
 	probeCursor *tea.CursorPositionMsg
+	// earlyCursor arrived before the placement reply.  The Herdr desktop app
+	// answers in that order, but such a report may also be stale, so it
+	// counts only when no report follows the reply before the timeout.
+	earlyCursor *tea.CursorPositionMsg
 	checking    bool
 	attempts    int
 	// skipped records that the last check ended with queries withheld
@@ -192,6 +196,7 @@ func (d *imageDisplay) nextProbe() tea.Cmd {
 	}
 	d.probeReply = ""
 	d.probeCursor = nil
+	d.earlyCursor = nil
 	d.checking = true
 	return d.scheduleProbe()
 }
@@ -235,9 +240,12 @@ func (d imageDisplay) probeSequence() string {
 }
 
 func (d *imageDisplay) acceptProbeResponse(msg tea.Msg) {
+	if d.attempts == 0 {
+		return
+	}
 	switch msg := msg.(type) {
 	case uv.KittyGraphicsEvent:
-		if d.attempts == 0 || msg.Options.ID != d.probeID || d.probeReply != "" {
+		if msg.Options.ID != d.probeID || d.probeReply != "" {
 			return
 		}
 		d.probeReply = string(msg.Payload)
@@ -245,15 +253,29 @@ func (d *imageDisplay) acceptProbeResponse(msg tea.Msg) {
 			d.checking = false
 		}
 	case tea.CursorPositionMsg:
-		// Only a cursor report after this placement's reply belongs to the probe.
-		if d.probeReply != "OK" || d.probeCursor != nil {
+		if d.probeCursor != nil {
 			return
 		}
+		if d.probeReply == "" {
+			d.earlyCursor = &msg
+			return
+		}
+		// A report after the reply belongs to the probe.
 		d.probeCursor = &msg
 		d.checking = false
 	}
 	d.enabled = d.probeReply == "OK" && d.probeCursor != nil &&
 		d.probeCursor.X == 0 && d.probeCursor.Y == imageProbeRow-1
+}
+
+// settleProbe accepts the report that preceded the reply when none followed it.
+func (d *imageDisplay) settleProbe() {
+	if d.probeReply != "OK" || d.probeCursor != nil || d.earlyCursor == nil {
+		return
+	}
+	d.probeCursor = d.earlyCursor
+	d.checking = false
+	d.enabled = d.probeCursor.X == 0 && d.probeCursor.Y == imageProbeRow-1
 }
 
 func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -273,12 +295,15 @@ func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.id != m.images.probeID {
 			return m, nil
 		}
-		m.images.checking = false
-		if m.images.attempts < maxImageProbeAttempts {
-			cmd := m.images.nextProbe()
-			return m, cmd
+		m.images.settleProbe()
+		if !m.images.enabled {
+			m.images.checking = false
+			if m.images.attempts < maxImageProbeAttempts {
+				cmd := m.images.nextProbe()
+				return m, cmd
+			}
+			return m, nil
 		}
-		return m, nil
 	case uv.KittyGraphicsEvent, tea.CursorPositionMsg:
 		m.images.acceptProbeResponse(msg)
 	}

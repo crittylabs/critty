@@ -14,6 +14,8 @@ func TestTerminalImageProbeResponses(t *testing.T) {
 	}{
 		{"supported", false, true, true, func(id int) string { return fmt.Sprintf("\x1b_Gi=%d;OK\x1b\\\x1b[2;1R", id) }},
 		{"stale cursor", false, true, true, func(id int) string { return fmt.Sprintf("\x1b[4;8R\x1b_Gi=%d;OK\x1b\\\x1b[2;1R", id) }},
+		// The Herdr desktop app's order: the report counts once the read times out.
+		{"cursor first", false, false, true, func(id int) string { return fmt.Sprintf("\x1b[2;1R\x1b_Gi=%d;OK\x1b\\", id) }},
 		{"moved cursor", false, true, false, func(id int) string { return fmt.Sprintf("\x1b_Gi=%d;OK\x1b\\\x1b[2;2R", id) }},
 		{"rejected", false, true, false, func(id int) string { return fmt.Sprintf("\x1b_Gi=%d;ENOTSUP\x1b\\\x1b[2;1R", id) }},
 		{"stale ID", false, false, false, func(id int) string { return fmt.Sprintf("\x1b_Gi=%d;OK\x1b\\\x1b[2;1R", id+1) }},
@@ -33,8 +35,12 @@ func TestTerminalImageProbeResponses(t *testing.T) {
 					}
 					data = data[n:]
 				}
-				if p.complete() != tt.complete || p.display.enabled != tt.supported {
-					t.Fatalf("wrong response state: %+v", p)
+				if p.complete() != tt.complete {
+					t.Fatalf("wrong completion state: %+v", p)
+				}
+				p.display.settleProbe()
+				if p.display.enabled != tt.supported {
+					t.Fatalf("wrong support state: %+v", p)
 				}
 			}
 		})
