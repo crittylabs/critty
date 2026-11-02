@@ -204,3 +204,124 @@ func TestHerdrAppLauncherRequiresWindow(t *testing.T) {
 		})
 	}
 }
+
+func TestSpawnTUIHerdrCoreTab(t *testing.T) {
+	origOutput, origLook, origResolve := commandOutput, lookPath, resolveExec
+	t.Cleanup(func() { commandOutput, lookPath, resolveExec = origOutput, origLook, origResolve })
+	lookPath = func(name string) (string, error) {
+		if name == "herdr-app" {
+			return "", fmt.Errorf("%s not installed", name)
+		}
+		return "/bin/" + name, nil
+	}
+	resolveExec = func() (string, error) { return "/usr/local/bin/critty", nil }
+	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
+	t.Setenv("HC_TERMINAL_ID", "t3")
+	for _, tc := range []struct {
+		name, reply, wantError string
+	}{
+		{"success", `{"address":"t9","state":"live"}`, ""},
+		{"no address", `{"error":"no such space"}`, "missing terminal address"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []string
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				if cmd.Path != "/bin/hc" {
+					t.Fatalf("unexpected command: %v", cmd.Args)
+				}
+				calls = append(calls, cmd.Args[1])
+				switch cmd.Args[1] {
+				case "get":
+					return []byte(herdrAppAgentRecord), nil
+				case "run":
+					args := cmd.Args[2:]
+					sep := slices.Index(args, "--")
+					if sep < 0 {
+						t.Fatalf("missing argv separator: %v", args)
+					}
+					flags, argv := args[:sep], args[sep+1:]
+					for _, want := range []string{"--json", "--bg", "--no-notify", "--no-parent", "--rm"} {
+						if !slices.Contains(flags, want) {
+							t.Fatalf("hc run flags: %v", flags)
+						}
+					}
+					if i := slices.Index(flags, "--label"); i < 0 || flags[i+1] != "herdr.space=sp1" {
+						t.Fatalf("hc run labels: %v", flags)
+					}
+					if i := slices.Index(flags, "--cwd"); i < 0 || flags[i+1] == "" {
+						t.Fatalf("hc run cwd: %v", flags)
+					}
+					if len(argv) != 3 || argv[0] != "/bin/sh" || argv[1] != "-c" || !strings.Contains(argv[2], "exec env CRITTY_HOST='Herdr'") {
+						t.Fatalf("hc run argv: %v", argv)
+					}
+					for _, entry := range cmd.Env {
+						if strings.HasPrefix(entry, "TMUX=") || strings.HasPrefix(entry, "HC_TERMINAL_") {
+							t.Fatalf("stale terminal variable passed: %s", entry)
+						}
+					}
+					if !slices.Contains(cmd.Env, "HC_SOCKET=/core.sock") {
+						t.Fatalf("socket not pinned: %v", cmd.Env)
+					}
+					return []byte(tc.reply), nil
+				}
+				return nil, fmt.Errorf("unexpected hc command: %v", cmd.Args)
+			}
+			launch, err := spawnTUIHerdrAppTab(&reviewMode{sessionKey: "0123456789ab"}, herdrAppContext{socket: "/core.sock", terminal: "t3"})
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("error = %v, want %q", err, tc.wantError)
+				}
+				return
+			}
+			if err != nil || launch.bin != "" || launch.terminal != "t9" || launch.space != "sp1" {
+				t.Fatalf("launch = %+v, %v", launch, err)
+			}
+			if !slices.Equal(calls, []string{"get", "run"}) {
+				t.Fatalf("calls = %v", calls)
+			}
+		})
+	}
+}
+
+func TestHerdrCoreCloseHandlesEndedTerminal(t *testing.T) {
+	origOutput := commandOutput
+	t.Cleanup(func() { commandOutput = origOutput })
+	for _, tc := range []struct {
+		name              string
+		killFails, exists bool
+		wantError         bool
+	}{
+		{"killed", false, true, false},
+		{"already ended", true, false, false},
+		{"still running", true, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []string
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				calls = append(calls, cmd.Args[1])
+				if cmd.Path != "/bin/hc" || cmd.Args[len(cmd.Args)-1] != "t9" {
+					t.Fatalf("unexpected command: %v", cmd.Args)
+				}
+				switch cmd.Args[1] {
+				case "kill":
+					if tc.killFails {
+						return nil, fmt.Errorf("exit status 1")
+					}
+				case "get":
+					if !tc.exists {
+						return nil, fmt.Errorf("exit status 1")
+					}
+				}
+				return []byte(`{}`), nil
+			}
+			launch := herdrAppLaunch{context: herdrAppContext{socket: "/core.sock", terminal: "t3"}, core: "/bin/hc", terminal: "t9"}
+			if err := launch.close(); (err != nil) != tc.wantError {
+				t.Fatalf("close = %v (calls %v)", err, calls)
+			}
+			launch.restoreFocus()
+			if slices.Contains(calls, "do") {
+				t.Fatal("window command used without herdr-app")
+			}
+		})
+	}
+}

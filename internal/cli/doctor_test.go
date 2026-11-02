@@ -525,7 +525,8 @@ func TestDoctorHerdrApp(t *testing.T) {
 	}{
 		{"absent host", "", "", map[string]bool{"hc": true, "herdr-app": true}, false, "", ""},
 		{"missing hc", "", "", map[string]bool{"hc": true}, false, "warn", "hc not found"},
-		{"missing app", "t3", "", map[string]bool{"herdr-app": true}, false, "warn", "herdr-app not found"},
+		{"missing app", "", "", map[string]bool{"herdr-app": true}, false, "warn", "herdr-app not found"},
+		{"core only", "t3", `{"address":"t3","labels":{"herdr.space":"sp1"}}`, map[string]bool{"herdr-app": true}, false, "ok", "without herdr-app"},
 		{"no window", "t3", "", nil, false, "info", "no Herdr window"},
 		{"outside core", "", "", nil, true, "info", "not run by herdr-core"},
 		{"hidden terminal", "t3", `{"address":"t3","labels":{}}`, nil, true, "warn", "not shown in a Herdr window"},

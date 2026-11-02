@@ -99,9 +99,12 @@ func herdrAppPlace(c herdrAppContext) (space, tab string, err error) {
 	return space, tab, nil
 }
 
+// herdrAppLaunch is a review tab in the window.  Without the window CLI, as
+// on a machine reached through `hc machine`, the tab is a terminal that the
+// window adopts from its space label; bin is empty and terminal names it.
 type herdrAppLaunch struct {
-	context                    herdrAppContext
-	bin, tab, space, sourceTab string
+	context                                    herdrAppContext
+	bin, core, tab, terminal, space, sourceTab string
 }
 
 // herdrAppDo runs a window command and returns its JSON reply.
@@ -126,6 +129,9 @@ func herdrAppDo(bin, action string, args any) (map[string]any, error) {
 }
 
 func (l herdrAppLaunch) close() error {
+	if l.bin == "" {
+		return l.closeTerminal()
+	}
 	_, err := herdrAppDo(l.bin, "tab.close", map[string]any{"id": l.tab, "confirmed": true})
 	if err == nil || herdrAppHasTab(l.bin, l.tab) {
 		return err
@@ -161,7 +167,24 @@ func herdrAppHasTab(bin, tab string) bool {
 	return false
 }
 
+func (l herdrAppLaunch) closeTerminal() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := commandOutput(l.context.command(ctx, l.core, "kill", l.terminal))
+	if err == nil {
+		return nil
+	}
+	// The terminal is removed once the TUI process exits.
+	if _, exists := commandOutput(l.context.command(ctx, l.core, "get", "--json", l.terminal)); exists != nil {
+		return nil
+	}
+	return fmt.Errorf("closing herdr-core terminal %s: %w", l.terminal, err)
+}
+
 func (l herdrAppLaunch) restoreFocus() {
+	if l.bin == "" {
+		return
+	}
 	if l.sourceTab != "" {
 		_, _ = herdrAppDo(l.bin, "tab.select", map[string]any{"id": l.sourceTab})
 	}
@@ -169,7 +192,7 @@ func (l herdrAppLaunch) restoreFocus() {
 }
 
 func spawnTUIHerdrAppTab(mode *reviewMode, c herdrAppContext) (herdrAppLaunch, error) {
-	bin, err := lookPath("herdr-app")
+	core, err := lookPath("hc")
 	if err != nil {
 		return herdrAppLaunch{}, err
 	}
@@ -185,6 +208,10 @@ func spawnTUIHerdrAppTab(mode *reviewMode, c herdrAppContext) (herdrAppLaunch, e
 	if err != nil {
 		return herdrAppLaunch{}, err
 	}
+	bin, err := lookPath("herdr-app")
+	if err != nil {
+		return spawnTUIHerdrCoreTab(c, core, space, cwd, command)
+	}
 	reply, err := herdrAppDo(bin, "tab.new", map[string]any{
 		"space":  space,
 		"name":   "Critty",
@@ -199,7 +226,7 @@ func spawnTUIHerdrAppTab(mode *reviewMode, c herdrAppContext) (herdrAppLaunch, e
 	if tab == "" || terminal == "" {
 		return herdrAppLaunch{}, fmt.Errorf("missing tab or terminal in Herdr tab reply")
 	}
-	l := herdrAppLaunch{context: c, bin: bin, tab: tab, space: space, sourceTab: sourceTab}
+	l := herdrAppLaunch{context: c, bin: bin, core: core, tab: tab, terminal: terminal, space: space, sourceTab: sourceTab}
 	if _, err := herdrAppDo(bin, "pane.focus", map[string]any{"terminal": terminal}); err != nil {
 		cleanupErr := l.close()
 		l.restoreFocus()
@@ -207,4 +234,26 @@ func spawnTUIHerdrAppTab(mode *reviewMode, c herdrAppContext) (herdrAppLaunch, e
 	}
 	fmt.Fprintln(os.Stderr, "Opened review in Herdr tab")
 	return l, nil
+}
+
+// spawnTUIHerdrCoreTab starts the review through herdr-core alone.  The window
+// shows a terminal labeled with the space as a new tab but does not focus it.
+func spawnTUIHerdrCoreTab(c herdrAppContext, core, space, cwd, command string) (herdrAppLaunch, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := c.command(ctx, core, "run", "--json", "--bg", "--no-notify", "--no-parent", "--rm",
+		"--label", "herdr.space="+space, "--cwd", cwd, "--", "/bin/sh", "-c", "exec "+command)
+	cmd.Env = launcherEnvironment([]envVar{{"HC_SOCKET", c.socket}})
+	out, err := commandOutput(cmd)
+	if err != nil {
+		return herdrAppLaunch{}, fmt.Errorf("starting herdr-core terminal: %w", err)
+	}
+	var reply struct {
+		Address string `json:"address"`
+	}
+	if json.Unmarshal(out, &reply) != nil || reply.Address == "" {
+		return herdrAppLaunch{}, fmt.Errorf("missing terminal address in hc run reply")
+	}
+	fmt.Fprintln(os.Stderr, "Opened review in Herdr tab; without herdr-app, the tab is not focused")
+	return herdrAppLaunch{context: c, core: core, terminal: reply.Address, space: space}, nil
 }

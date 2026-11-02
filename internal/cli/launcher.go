@@ -172,10 +172,8 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 			if !ok {
 				return fmt.Errorf("no herdr-core terminal")
 			}
-			for _, bin := range []string{"hc", "herdr-app"} {
-				if _, err := lookPath(bin); err != nil {
-					return err
-				}
+			if _, err := lookPath("hc"); err != nil {
+				return err
 			}
 			_, _, err := herdrAppPlace(ctx)
 			return err

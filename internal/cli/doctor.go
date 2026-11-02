@@ -567,15 +567,17 @@ func (r *doctorReport) checkHerdrApp() {
 		r.add(check, "warn", "hc not found on PATH", "Install herdr-core, which the Herdr desktop app installs, and make `hc` available on PATH.")
 		return
 	}
-	if appErr != nil {
+	if appErr != nil && terminal == "" {
 		r.add(check, "warn", "herdr-app not found on PATH", "Install the Herdr desktop app; opening it links `herdr-app` into ~/.local/bin.")
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if _, err := commandOutput(exec.CommandContext(ctx, appBin, "status")); err != nil {
-		r.add(check, "info", "no Herdr window is open", "Open the Herdr desktop app; reviews started from its terminals open as tabs there.")
-		return
+	if appErr == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if _, err := commandOutput(exec.CommandContext(ctx, appBin, "status")); err != nil {
+			r.add(check, "info", "no Herdr window is open", "Open the Herdr desktop app; reviews started from its terminals open as tabs there.")
+			return
+		}
 	}
 	if terminal == "" {
 		r.add(check, "info", "Herdr window is open; this terminal is not run by herdr-core", "Run `critty doctor` from a terminal inside the Herdr desktop app to check its placement.")
@@ -584,6 +586,10 @@ func (r *doctorReport) checkHerdrApp() {
 	space, _, err := herdrAppPlace(herdrAppContext{socket: terminalbinding.HCSocketPath(), terminal: terminal})
 	if err != nil {
 		r.add(check, "warn", err.Error(), "Reviews from a terminal that herdr-core runs outside a window fall back to a desktop terminal; start the agent from a tab in the app.")
+		return
+	}
+	if appErr != nil {
+		r.add(check, "ok", "terminal "+terminal+" is shown in space "+space+"; without herdr-app, review tabs open unfocused", "Expected on a machine reached through `hc machine`; on the computer that runs the window, opening the Herdr desktop app links `herdr-app` into ~/.local/bin.")
 		return
 	}
 	r.add(check, "ok", "terminal "+terminal+" is shown in space "+space+" (tab creation is not tested)", "")
