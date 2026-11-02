@@ -72,5 +72,8 @@ func reviewTerminalContext() (reviewMultiplexerContext, error) {
 	if target.Kind == "cmux" {
 		return cmuxContext{socket: target.Socket, workspace: target.Workspace, surface: target.Pane}, nil
 	}
+	if target.Kind == "herdr-app" {
+		return herdrAppContext{socket: target.Socket, terminal: target.Pane}, nil
+	}
 	return herdrContext{socket: target.Socket, workspace: target.Workspace, tab: target.Tab, pane: target.Pane}, nil
 }

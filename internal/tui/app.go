@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"os"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -4567,6 +4568,26 @@ func renderHostHelp(host string, width int) string {
 			{keys: "prefix h/j/k/l", desc: "focus pane left/down/up/right"},
 			{keys: "prefix tab/shift+tab", desc: "⇵ pane"},
 			{keys: "prefix ?", desc: "show Herdr TUI keybindings"},
+		}
+	case "Herdr":
+		if runtime.GOOS == "darwin" {
+			title = "Herdr controls (default macOS keys)"
+			items = []helpItem{
+				{keys: "cmd+shift+enter", desc: "toggle pane zoom"},
+				{keys: "cmd+alt+←/↓/↑/→", desc: "focus pane left/down/up/right"},
+				{keys: "cmd+shift+[ / ]", desc: "⇅ tab"},
+				{keys: "cmd+[ / ]", desc: "⇅ agent"},
+				{keys: "cmd+/", desc: "show Herdr keys"},
+			}
+			break
+		}
+		title = "Herdr controls (default keys)"
+		items = []helpItem{
+			{keys: "ctrl+shift+z", desc: "toggle pane zoom"},
+			{keys: "alt+h/j/k/l", desc: "focus pane left/down/up/right"},
+			{keys: "alt+[ / ]", desc: "⇅ tab"},
+			{keys: "alt+↑/↓", desc: "⇅ agent"},
+			{keys: "ctrl+shift+/", desc: "show Herdr keys"},
 		}
 	case "Zellij":
 		title = "Zellij controls (default bindings)"

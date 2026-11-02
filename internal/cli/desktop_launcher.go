@@ -68,6 +68,8 @@ func terminalTarget(terminal reviewMultiplexerContext) terminalbinding.Target {
 		return t.target()
 	case cmuxContext:
 		return t.target()
+	case herdrAppContext:
+		return t.target()
 	case tmuxContext:
 		socket := t.socket
 		if socket == "" {
@@ -207,7 +209,7 @@ func (l *desktopLaunch) open(mode *reviewMode) (reviewLaunch, error) {
 		return nil, err
 	}
 	// GUI applications do not inherit the invoking shell's cwd or environment.
-	command = "/bin/sh -c " + shellEscape("cd "+shellEscape(cwd)+" && exec "+strings.Replace(command, "env ", "env -u NO_COLOR -u TMUX -u TMUX_PANE -u HERDR_ENV -u HERDR_SOCKET_PATH -u HERDR_WORKSPACE_ID -u HERDR_TAB_ID -u HERDR_PANE_ID ", 1))
+	command = "/bin/sh -c " + shellEscape("cd "+shellEscape(cwd)+" && exec "+strings.Replace(command, "env ", "env -u NO_COLOR -u TMUX -u TMUX_PANE -u HERDR_ENV -u HERDR_SOCKET_PATH -u HERDR_WORKSPACE_ID -u HERDR_TAB_ID -u HERDR_PANE_ID -u HC_TERMINAL_ID -u HC_TERMINAL_SOCKET ", 1))
 	if l.name == "xdg-terminal" || l.name == "windows-terminal-wsl" || l.usesCLI() {
 		if err := l.start(command, cwd); err != nil {
 			return nil, err

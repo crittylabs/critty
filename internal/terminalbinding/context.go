@@ -29,6 +29,9 @@ func (t Target) Validate() error {
 	if t.Kind == "zellij" {
 		return validateZellij(t)
 	}
+	if t.Kind == "herdr-app" {
+		return validateHerdrApp(t)
+	}
 	if t.Kind == "terminal" {
 		if t.Socket != "" || t.Pane != "" || t.Workspace != "" || t.Tab != "" || t.Origin.PID < 2 || t.Origin.Started == "" {
 			return fmt.Errorf("invalid terminal origin")
@@ -67,6 +70,9 @@ func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
 	}
 	if t.Kind == "tmux" {
 		return exec.CommandContext(ctx, "tmux", append([]string{"-S", t.Socket}, args...)...)
+	}
+	if t.Kind == "herdr-app" {
+		return t.hcCommand(ctx, args...)
 	}
 	if t.Kind == "cmux" {
 		cmd := exec.CommandContext(ctx, "cmux", append([]string{"--socket", t.Socket}, args...)...)
@@ -121,6 +127,9 @@ func FromEnvironment() (Target, error) {
 	if workspace, surface := os.Getenv("CMUX_WORKSPACE_ID"), os.Getenv("CMUX_SURFACE_ID"); workspace != "" && surface != "" {
 		targets = append(targets, Target{Kind: "cmux", Socket: CMUXSocketPath(), Workspace: workspace, Pane: surface})
 	}
+	if os.Getenv("HC_TERMINAL_ID") != "" {
+		targets = append(targets, HCEnvironment())
+	}
 	for _, t := range targets {
 		if err := t.Validate(); err != nil {
 			return Target{}, err
@@ -146,6 +155,17 @@ func FromEnvironment() (Target, error) {
 			if err == nil {
 				if pid, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil {
 					owners[pid] = t
+				}
+			}
+		} else if t.Kind == "herdr-app" {
+			terminals, err := HCTerminals(ctx, t)
+			if err == nil {
+				for pid, owner := range HCProcessTargets(terminals, t.Socket) {
+					if owner.Pane == t.Pane {
+						if _, exists := owners[pid]; !exists {
+							owners[pid] = t
+						}
+					}
 				}
 			}
 		} else if t.Kind == "cmux" {
@@ -221,6 +241,9 @@ func Snapshot(ctx context.Context, t Target) (string, error) {
 	if t.Kind == "cmux" {
 		out, err := t.Command(ctx, "read-screen", "--workspace", t.Workspace, "--surface", t.Pane).Output()
 		return string(out), err
+	}
+	if t.Kind == "herdr-app" {
+		return hcSnapshot(ctx, t)
 	}
 	out, err := t.Command(ctx, "pane", "read", t.Pane, "--source", "visible", "--format", "text").Output()
 	return string(out), err

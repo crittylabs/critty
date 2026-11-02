@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- **Herdr desktop app**: If you chat with your agent in the [Herdr](https://herdr.dev/) desktop app, the review opens as a Critty tab in the same space and the chat tab regains focus when you finish, as it already does for Herdr TUI, tmux, cmux, and Zellij.  The `herdr-app` launcher needs the `hc` and `herdr-app` commands that the app installs; a terminal that herdr-core runs outside a window falls back to a desktop terminal.  Keyboard Help lists the app's default tab and pane keys.  See the [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#review-launchers).
+
 ### Changed
 
-- **Herdr TUI naming**: Documentation, `critty doctor`, launcher messages, and Keyboard Help now say Herdr TUI, the terminal app, since Herdr also ships a desktop app built on herdr-core that does not share terminals with it.  The `herdr` launcher name and `HERDR_*` variables are unchanged.
+- **Herdr TUI naming**: Documentation, `critty doctor`, launcher messages, and Keyboard Help now say Herdr TUI, the terminal app, since the Herdr desktop app does not share terminals with it.  The `herdr` launcher name and `HERDR_*` variables are unchanged.
 
 ## 1.9.0
 

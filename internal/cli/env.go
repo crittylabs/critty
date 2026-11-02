@@ -141,6 +141,8 @@ func environmentForTerminal(ctx reviewMultiplexerContext) ([]envVar, error) {
 		}
 	case cmuxContext:
 		vars = []envVar{{"CMUX_SOCKET_PATH", ctx.socket}, {"CMUX_WORKSPACE_ID", ctx.workspace}, {"CMUX_SURFACE_ID", ctx.surface}}
+	case herdrAppContext:
+		vars = []envVar{{"HC_TERMINAL_ID", ctx.terminal}, {"HC_TERMINAL_SOCKET", ctx.socket}}
 	case tmuxContext:
 		vars, err = tmuxEnvironment(ctx)
 	case herdrContext:

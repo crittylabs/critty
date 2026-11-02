@@ -27,6 +27,7 @@ type multiplexerDetector interface {
 
 var supportedMultiplexerDetectors = []multiplexerDetector{
 	herdrDetector{},
+	herdrAppDetector{},
 	tmuxDetector{},
 	zellijDetector{},
 	cmuxDetector{},

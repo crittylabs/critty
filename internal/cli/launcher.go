@@ -21,7 +21,7 @@ var reviewLauncherNames []string
 var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, cmux, zellij, desktop-terminal, "+strings.Join(desktopNames, ", ")+", or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, herdr-app, cmux, zellij, desktop-terminal, "+strings.Join(desktopNames, ", ")+", or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
@@ -166,6 +166,22 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 		}, open: func(mode *reviewMode) (reviewLaunch, error) {
 			return spawnTUICMUXTab(mode, ctx)
 		}}}, nil
+	case "herdr-app":
+		ctx, ok := launcherTerminal(name, terminal).(herdrAppContext)
+		return []reviewLauncher{{name: name, check: func() error {
+			if !ok {
+				return fmt.Errorf("no herdr-core terminal")
+			}
+			for _, bin := range []string{"hc", "herdr-app"} {
+				if _, err := lookPath(bin); err != nil {
+					return err
+				}
+			}
+			_, _, err := herdrAppPlace(ctx)
+			return err
+		}, open: func(mode *reviewMode) (reviewLaunch, error) {
+			return spawnTUIHerdrAppTab(mode, ctx)
+		}}}, nil
 	case "herdr":
 		ctx, ok := launcherTerminal(name, terminal).(herdrContext)
 		return []reviewLauncher{{name: name, check: func() error {
@@ -202,6 +218,9 @@ func launcherTerminal(kind string, terminal reviewMultiplexerContext) reviewMult
 	var detector multiplexerDetector = tmuxDetector{}
 	if kind == "herdr" {
 		detector = herdrDetector{}
+	}
+	if kind == "herdr-app" {
+		detector = herdrAppDetector{}
 	}
 	if kind == "zellij" {
 		detector = zellijDetector{}
@@ -276,7 +295,7 @@ func launcherEnvironment(vars []envVar) []string {
 	var environment []string
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
-		if strings.HasPrefix(key, "ZELLIJ") || key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || key == "CRITTY_SSH" || key == "CRITTY_TERMINAL_APP" || strings.HasPrefix(key, "HERDR_") || strings.HasPrefix(key, "CMUX_") && key != "CMUX_SOCKET_PASSWORD" {
+		if strings.HasPrefix(key, "ZELLIJ") || key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || key == "CRITTY_SSH" || key == "CRITTY_TERMINAL_APP" || strings.HasPrefix(key, "HERDR_") || strings.HasPrefix(key, "HC_TERMINAL_") || strings.HasPrefix(key, "CMUX_") && key != "CMUX_SOCKET_PASSWORD" {
 			continue
 		}
 		environment = append(environment, value)

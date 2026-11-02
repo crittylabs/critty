@@ -1,0 +1,206 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"os/exec"
+	"slices"
+	"strings"
+	"testing"
+)
+
+const herdrAppAgentRecord = `{"address":"t3","state":"live","pid":300,"foreground":{"pid":310},"labels":{"herdr.space":"sp1","herdr.tab":"tb1"}}`
+
+func TestSpawnTUIHerdrAppTab(t *testing.T) {
+	origOutput, origLook, origResolve := commandOutput, lookPath, resolveExec
+	t.Cleanup(func() { commandOutput, lookPath, resolveExec = origOutput, origLook, origResolve })
+	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
+	resolveExec = func() (string, error) { return "/path with spaces/critty", nil }
+	t.Setenv("HC_SOCKET", "/wrong/core.sock")
+	t.Setenv("XDG_STATE_HOME", "/tmp/state with spaces")
+	for _, tc := range []struct {
+		name, record, created string
+		failFocus             bool
+		wantCalls             []string
+		wantError             string
+	}{
+		{"success", herdrAppAgentRecord, `{"space":"sp1","tab":"tb9","terminal":"t9"}`, false, []string{"get", "tab.new", "pane.focus"}, ""},
+		{"focus failure", herdrAppAgentRecord, `{"space":"sp1","tab":"tb9","terminal":"t9"}`, true, []string{"get", "tab.new", "pane.focus", "tab.close", "tab.select", "pane.focus"}, "focusing Herdr tab"},
+		{"hidden terminal", `{"address":"t3","state":"live","labels":{}}`, "", false, []string{"get"}, "not shown in a Herdr window"},
+		{"window error", herdrAppAgentRecord, `{"error":"no space \"sp1\""}`, false, []string{"get", "tab.new"}, `no space "sp1"`},
+		{"bad create reply", herdrAppAgentRecord, `{"space":"sp1"}`, false, []string{"get", "tab.new"}, "missing tab or terminal"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []string
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				switch cmd.Path {
+				case "/bin/hc":
+					if !slices.Contains(cmd.Env, "HC_SOCKET=/right/core.sock") || slices.Contains(cmd.Env, "HC_SOCKET=/wrong/core.sock") {
+						t.Fatalf("socket not pinned: %v", cmd.Env)
+					}
+					calls = append(calls, cmd.Args[1])
+					if !slices.Equal(cmd.Args[1:], []string{"get", "--json", "t3"}) {
+						t.Fatalf("unexpected hc command: %v", cmd.Args)
+					}
+					return []byte(tc.record), nil
+				case "/bin/herdr-app":
+					if cmd.Args[1] != "do" || len(cmd.Args) != 4 {
+						t.Fatalf("unexpected herdr-app command: %v", cmd.Args)
+					}
+					calls = append(calls, cmd.Args[2])
+					var args map[string]any
+					if err := json.Unmarshal([]byte(cmd.Args[3]), &args); err != nil {
+						t.Fatalf("arguments are not JSON: %v", cmd.Args)
+					}
+					switch cmd.Args[2] {
+					case "tab.new":
+						if args["space"] != "sp1" || args["name"] != "Critty" || args["folder"] == "" {
+							t.Fatalf("tab.new arguments: %v", args)
+						}
+						argv, _ := args["argv"].([]any)
+						if len(argv) != 3 || argv[0] != "/bin/sh" || argv[1] != "-c" {
+							t.Fatalf("tab.new argv: %v", args["argv"])
+						}
+						command, _ := argv[2].(string)
+						for _, want := range []string{"exec env CRITTY_HOST='Herdr'", "XDG_STATE_HOME='/tmp/state with spaces'", "'/path with spaces/critty' _tui --session '0123456789ab'"} {
+							if !strings.Contains(command, want) {
+								t.Fatalf("incorrect TUI command: %s", command)
+							}
+						}
+						return []byte(tc.created), nil
+					case "pane.focus":
+						if tc.failFocus && args["terminal"] == "t9" {
+							return []byte(`{"error":"no such pane"}`), fmt.Errorf("exit status 1")
+						}
+						if args["terminal"] != "t9" && args["terminal"] != "t3" {
+							t.Fatalf("pane.focus arguments: %v", args)
+						}
+						return []byte(`{}`), nil
+					case "tab.close":
+						if args["id"] != "tb9" || args["confirmed"] != true {
+							t.Fatalf("tab.close arguments: %v", args)
+						}
+						return []byte(`{}`), nil
+					case "tab.select":
+						if args["id"] != "tb1" {
+							t.Fatalf("tab.select arguments: %v", args)
+						}
+						return []byte(`{}`), nil
+					}
+				}
+				return nil, fmt.Errorf("unexpected command: %v", cmd.Args)
+			}
+			launch, err := spawnTUIHerdrAppTab(&reviewMode{sessionKey: "0123456789ab"}, herdrAppContext{socket: "/right/core.sock", terminal: "t3"})
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("error = %v, want %q", err, tc.wantError)
+				}
+			} else if err != nil || launch.tab != "tb9" || launch.sourceTab != "tb1" {
+				t.Fatalf("launch = %+v, %v", launch, err)
+			}
+			if !slices.Equal(calls, tc.wantCalls) {
+				t.Fatalf("calls = %v, want %v", calls, tc.wantCalls)
+			}
+		})
+	}
+}
+
+func TestHerdrAppCloseHandlesVanishedTab(t *testing.T) {
+	origOutput := commandOutput
+	t.Cleanup(func() { commandOutput = origOutput })
+	for _, tc := range []struct {
+		name, world string
+		wantError   bool
+	}{
+		{"already closed", `{"spaces":[{"id":"sp1","tabs":[{"id":"tb1"}]}]}`, false},
+		{"still exists", `{"spaces":[{"id":"sp1","tabs":[{"id":"tb1"},{"id":"tb9"}]}]}`, true},
+		{"unreadable", "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+				if cmd.Args[1] == "ls" {
+					if tc.world == "" {
+						return nil, fmt.Errorf("no window")
+					}
+					return []byte(tc.world), nil
+				}
+				return []byte(`{"error":"no tab \"tb9\""}`), fmt.Errorf("exit status 1")
+			}
+			err := (herdrAppLaunch{context: herdrAppContext{socket: "/core.sock", terminal: "t3"}, bin: "/bin/herdr-app", tab: "tb9", sourceTab: "tb1"}).close()
+			if (err != nil) != tc.wantError {
+				t.Fatalf("close = %v", err)
+			}
+		})
+	}
+}
+
+func TestHerdrAppDetectorAndEnvironment(t *testing.T) {
+	t.Setenv("HC_TERMINAL_ID", "t3")
+	t.Setenv("HC_TERMINAL_SOCKET", "/right/core.sock")
+	c := (herdrAppDetector{}).environmentContext()
+	want := herdrAppContext{socket: "/right/core.sock", terminal: "t3"}
+	if c != want {
+		t.Fatalf("context = %+v", c)
+	}
+	vars, err := environmentForTerminal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []envVar{{"HC_TERMINAL_ID", "t3"}, {"HC_TERMINAL_SOCKET", "/right/core.sock"}} {
+		if !slices.Contains(vars, v) {
+			t.Errorf("missing %v in %v", v, vars)
+		}
+	}
+	t.Setenv("HC_TERMINAL_ID", "")
+	if (herdrAppDetector{}).environmentContext() != nil {
+		t.Fatal("accepted missing terminal")
+	}
+
+	origOutput, origLook := commandOutput, lookPath
+	t.Cleanup(func() { commandOutput, lookPath = origOutput, origLook })
+	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
+	commandOutput = func(cmd *exec.Cmd) ([]byte, error) {
+		if cmd.Path != "/bin/hc" || cmd.Args[1] != "connect" || !slices.Contains(cmd.Env, "HC_SOCKET=/right/core.sock") {
+			return nil, fmt.Errorf("unexpected command: %v", cmd.Args)
+		}
+		return []byte(`{"jsonrpc":"2.0","id":1,"result":{"terminals":[` + herdrAppAgentRecord + `]}}` + "\n"), nil
+	}
+	contexts := (herdrAppDetector{}).processContexts()
+	if len(contexts) != 2 || contexts[300] != want || contexts[310] != want {
+		t.Fatalf("process contexts = %+v", contexts)
+	}
+}
+
+func TestHerdrAppLauncherRequiresWindow(t *testing.T) {
+	origOutput, origLook := commandOutput, lookPath
+	t.Cleanup(func() { commandOutput, lookPath = origOutput, origLook })
+	lookPath = func(name string) (string, error) { return "/bin/" + name, nil }
+	for _, tc := range []struct {
+		name, record string
+		want         string
+	}{
+		{"shown", herdrAppAgentRecord, "herdr-app"},
+		{"hidden", `{"address":"t3","state":"live","labels":{}}`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			commandOutput = func(cmd *exec.Cmd) ([]byte, error) { return []byte(tc.record), nil }
+			mode := &reviewMode{sessionKey: "0123456789ab"}
+			got, err := selectReviewLauncher([]string{"mux"}, herdrAppContext{socket: "/core.sock", terminal: "t3"}, mode)
+			if tc.want == "" {
+				// A hidden terminal falls through to the desktop defaults with its reason recorded.
+				if err != nil || got == nil || got.name == "herdr-app" {
+					t.Fatalf("launcher = %+v, %v", got, err)
+				}
+				if !slices.ContainsFunc(mode.launch.Failures, func(f launcherFailure) bool {
+					return f.Launcher == "herdr-app" && strings.Contains(f.Reason, "not shown in a Herdr window")
+				}) {
+					t.Fatalf("failures = %+v", mode.launch.Failures)
+				}
+				return
+			}
+			if err != nil || got == nil || got.name != tc.want {
+				t.Fatalf("launcher = %+v, %v", got, err)
+			}
+		})
+	}
+}
