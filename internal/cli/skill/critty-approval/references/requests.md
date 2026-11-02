@@ -66,6 +66,17 @@ For individual execution permissions, `consent` gates an operation and a choice 
 
 Use the same ID and distinct `value` attributes on all options of a single choice; mark every option `required` when selection is a prerequisite to approval.  Spell out how each choice maps to the operation (here, `draft` sets the PR's draft flag to true, `ready` sets it to false).  Attach all alternative payloads when their text differs.  Limit execution to the reviewed alternatives; a selection requiring newly drafted text needs a new review of that text.
 
+For a decision that must be settled either way, such as whether to include an optional step, use a required choice with one option per outcome rather than a single checkbox.  An unchecked checkbox cannot distinguish a deliberate no from an unanswered question, and `required` on a checkbox demands a check rather than an answer:
+
+```markdown
+Should the release also raise the minimum supported Go version?
+
+- [ ] Yes, raise it to 1.26. <!-- form: id=minimum-go value=yes required -->
+- [ ] No, keep 1.25. <!-- form: id=minimum-go value=no required -->
+```
+
+Name the concrete outcome in each option.  Approval requires a selection, but an answer round submits without one, so treat an empty value as unanswered and ask again.  A `yes` selection records the decision, not permission: an option cannot be a consent, so add a separate `consent` field when the chosen outcome is an individually gated action.
+
 Give independently authorized operations separate consent IDs.  Add `required` only when permission is a prerequisite to approving the request; otherwise approval may decline that operation.  Leave confirmations and consents unchecked in the source.  Initial checkmarks, ordinary checkboxes, and choices do not authorize actions.
 
 Read [attachment forms](../../critty-cli/references/forms.md) for widget and answer-retention contracts before revising a form.  Keep field wording, definitions, and explicit IDs stable; add explanations in surrounding prose or comments.  Changed fields need new answers, and new candidates remain unanswered even after an earlier select-all.

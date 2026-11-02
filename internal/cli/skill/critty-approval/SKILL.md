@@ -17,7 +17,7 @@ For preferences, scope, or requirements, collect ordinary form answers with `--a
 
 For one operation, a short request and ordinary review approval are enough.  For example: "Create an issue in example/project using the exact title, labels, and body in the attached PUBLICATION.md."  Attach the exact payload or diff and, for a commit, its exact message.  Keep reviewed inputs unchanged until submission.
 
-Use [request formats](references/requests.md) for push, publication, release/deployment, AI review, or commit/tag inputs, and for independently optional actions or choices.  Add form controls only for separate decisions; reserve `required` for genuine prerequisites to approval and `consent` for an individually gated action.  Leave them unchecked.  Avoid confirmation boxes that merely repeat the request.
+Use [request formats](references/requests.md) for push, publication, release/deployment, AI review, or commit/tag inputs, and for independently optional actions or choices.  Add form controls only for separate decisions; reserve `required` for genuine prerequisites to approval and `consent` for an individually gated action.  Leave them unchecked.  Avoid confirmation boxes that merely repeat the request.  Ask a decision that must be settled either way as a [required yes-or-no choice](references/requests.md#forms-and-choices), not as a single checkbox.
 
 Keep publication text separate from review instructions and controls.  The publishable body belongs in its own attached payload; a path alone is not a reviewed snapshot.  Attach all alternatives when a choice changes the payload.
 

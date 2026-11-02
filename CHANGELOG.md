@@ -9,6 +9,7 @@
 
 ### Changed
 
+- **Yes-or-no decisions**: When an agent needs you to settle a question either way, the [critty-approval](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-approval/SKILL.md) skill now asks it as a required choice with a Yes and a No option instead of a single checkbox, so leaving the box unchecked no longer reads as a silent no.
 - **Herdr TUI naming**: Documentation, `critty doctor`, launcher messages, and Keyboard Help now say Herdr TUI, the terminal app, since the Herdr desktop app does not share terminals with it.  The `herdr` launcher name and `HERDR_*` variables are unchanged.
 
 ## 1.9.0
