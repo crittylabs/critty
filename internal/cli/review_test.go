@@ -27,6 +27,34 @@ func TestShellEscape(t *testing.T) {
 	}
 }
 
+func TestTUICommandClearsNoColor(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	bin := filepath.Join(t.TempDir(), "review executable")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nprintf '%s\\n' \"${NO_COLOR-unset}\" \"$CRITTY_HOST\" \"$XDG_STATE_HOME\" \"$@\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldResolve := resolveExec
+	t.Cleanup(func() { resolveExec = oldResolve })
+	resolveExec = func() (string, error) { return bin, nil }
+	t.Setenv("NO_COLOR", "1")
+	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "state's directory"))
+	command, err := buildTUICommand(&reviewMode{sessionKey: "0123456789ab"}, "review host")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := exec.Command(sh, "-c", command).CombinedOutput()
+	if err != nil {
+		t.Fatalf("review command: %v: %s", err, out)
+	}
+	want := strings.Join([]string{"unset", "review host", os.Getenv("XDG_STATE_HOME"), "_tui", "--session", "0123456789ab", ""}, "\n")
+	if string(out) != want {
+		t.Fatalf("review environment and arguments = %q, want %q", out, want)
+	}
+}
+
 func TestReviewModePersistedCLIArgs(t *testing.T) {
 	tests := []struct {
 		name string

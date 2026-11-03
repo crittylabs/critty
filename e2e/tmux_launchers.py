@@ -30,13 +30,14 @@ def verify(binary: Path, tmux_binary: Path) -> None:
         env = {
             key: value
             for key, value in os.environ.items()
-            if not key.startswith(("TMUX", "HERDR_", "HC_TERMINAL_", "CRITTY_")) and key != "NO_COLOR"
+            if not key.startswith(("TMUX", "HERDR_", "HC_TERMINAL_", "CRITTY_"))
         }
         env.update(
             PATH=f"{root / 'bin'}:{env['PATH']}",
             XDG_STATE_HOME=str(root / "state"),
             XDG_CONFIG_HOME=str(root / "config"),
             TERM="xterm-256color",
+            NO_COLOR="1",
         )
         pid, master, process = None, None, None
 
@@ -204,6 +205,10 @@ def verify(binary: Path, tmux_binary: Path) -> None:
                         ),
                         "rendered TUI",
                     )
+                    assert re.search(
+                        r"\x1b\[(?:[0-9;]*;)?(?:3[0-7]|38|9[0-7])(?:;|m)",
+                        tmux("capture-pane", "-e", "-p", "-t", pane),
+                    ), "review inherited NO_COLOR from the multiplexer"
                     if state == "unfocused":
                         assert "focused" not in tmux(
                             "list-clients", "-F", "#{client_flags}"

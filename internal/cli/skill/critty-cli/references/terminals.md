@@ -24,6 +24,8 @@ Desktop launchers open new windows without marker binding.  Omit `--terminal-req
 
 `--launcher` applies to code, document, plan, and resumed reviews.  It is not saved in the review session; repeat an explicit user override when resuming.  Agent workflows otherwise omit it and use configured or automatic selection.
 
+Launched reviews remove `NO_COLOR` from the TUI environment, including values inherited from a multiplexer server.  This keeps an agent's plain-text tool output setting from disabling review colors.  The same rule applies to the TUI command supplied to custom launchers.  Foreground reviews and other commands continue to honor `NO_COLOR`.
+
 | Kind | Launcher names |
 | --- | --- |
 | Automatic selection | `mux`, `desktop-terminal` |

@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Review colors in multiplexers**: Reviews opened in a pane or tab no longer become monochrome when the multiplexer server inherits `NO_COLOR` from an agent.  All launcher-generated TUI commands clear it, including commands supplied to custom launchers; foreground reviews and other commands still honor it.
 - **Image previews after returning to a review**: A review opened in a background tmux pane could stay at `Images: N/A` until you pressed a key or clicked.  Returning focus or moving the mouse over the review now retries the detection that tmux had withheld.  Focus events require tmux's `focus-events on`; Critty leaves that server setting unchanged.
 
 ## 1.10.0

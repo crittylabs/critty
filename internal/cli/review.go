@@ -541,7 +541,9 @@ func buildTUICommand(mode *reviewMode, host string) (string, error) {
 
 	// Multiplexer panes inherit their host's environment, not necessarily the
 	// caller's, so pass through the variables that locate review state.
-	envPrefix := "env CRITTY_HOST=" + shellEscape(host)
+	// Codex tool calls may set NO_COLOR for plain-text output. Clear it in
+	// launched reviews even when inherited from the multiplexer server.
+	envPrefix := "env -u NO_COLOR CRITTY_HOST=" + shellEscape(host)
 	for _, name := range []string{"XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
 		if val := os.Getenv(name); val != "" {
 			envPrefix += " " + name + "=" + shellEscape(val)

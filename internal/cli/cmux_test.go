@@ -54,7 +54,7 @@ func TestSpawnTUICMUXTab(t *testing.T) {
 					}
 				}
 				command := args[len(args)-1]
-				if !strings.Contains(command, "exec env CRITTY_HOST='cmux'") || !strings.Contains(command, "XDG_STATE_HOME='/tmp/state with spaces'") || !strings.Contains(command, "'/path with spaces/critty' _tui --session '0123456789ab'") {
+				if !strings.Contains(command, "exec env -u NO_COLOR CRITTY_HOST='cmux'") || !strings.Contains(command, "XDG_STATE_HOME='/tmp/state with spaces'") || !strings.Contains(command, "'/path with spaces/critty' _tui --session '0123456789ab'") {
 					t.Fatalf("incorrect TUI command: %s", command)
 				}
 				return []byte(tc.created), nil

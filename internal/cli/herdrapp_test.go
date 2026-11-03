@@ -62,7 +62,7 @@ func TestSpawnTUIHerdrAppTab(t *testing.T) {
 							t.Fatalf("tab.new argv: %v", args["argv"])
 						}
 						command, _ := argv[2].(string)
-						for _, want := range []string{"exec env CRITTY_HOST='Herdr'", "XDG_STATE_HOME='/tmp/state with spaces'", "'/path with spaces/critty' _tui --session '0123456789ab'"} {
+						for _, want := range []string{"exec env -u NO_COLOR CRITTY_HOST='Herdr'", "XDG_STATE_HOME='/tmp/state with spaces'", "'/path with spaces/critty' _tui --session '0123456789ab'"} {
 							if !strings.Contains(command, want) {
 								t.Fatalf("incorrect TUI command: %s", command)
 							}
@@ -251,7 +251,7 @@ func TestSpawnTUIHerdrCoreTab(t *testing.T) {
 					if i := slices.Index(flags, "--cwd"); i < 0 || flags[i+1] == "" {
 						t.Fatalf("hc run cwd: %v", flags)
 					}
-					if len(argv) != 3 || argv[0] != "/bin/sh" || argv[1] != "-c" || !strings.Contains(argv[2], "exec env CRITTY_HOST='Herdr'") {
+					if len(argv) != 3 || argv[0] != "/bin/sh" || argv[1] != "-c" || !strings.Contains(argv[2], "exec env -u NO_COLOR CRITTY_HOST='Herdr'") {
 						t.Fatalf("hc run argv: %v", argv)
 					}
 					for _, entry := range cmd.Env {
