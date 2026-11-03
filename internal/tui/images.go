@@ -148,15 +148,14 @@ func (d imageDisplay) scheduleProbe() tea.Cmd {
 	return tea.Tick(imageProbeDelay, func(time.Time) tea.Msg { return imageProbeMsg{d.probeID} })
 }
 
-// recheckImagesOnSelection restarts an unconfirmed check when a key or click
-// selects a tab holding a local image, or arrives after a check whose queries
-// were withheld: input proves the pane is now the one in view.
-func (m *AppModel) recheckImagesOnSelection(previousTab int, msg tea.Msg) tea.Cmd {
+// recheckImagesOnActivity restarts an unconfirmed check when input selects an
+// image tab, or focus or input arrives after queries were withheld by tmux.
+func (m *AppModel) recheckImagesOnActivity(previousTab int, msg tea.Msg) tea.Cmd {
 	if m.images.enabled || m.images.checking || m.images.hidden || len(m.tabs) == 0 {
 		return nil
 	}
 	switch msg.(type) {
-	case tea.KeyPressMsg, tea.MouseClickMsg:
+	case tea.FocusMsg, tea.KeyPressMsg, tea.MouseMsg:
 	default:
 		return nil
 	}

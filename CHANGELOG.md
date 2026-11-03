@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Image previews after returning to a review**: A review opened in a background tmux pane could stay at `Images: N/A` until you pressed a key or clicked.  Returning focus or moving the mouse over the review now retries the detection that tmux had withheld.  Focus events require tmux's `focus-events on`; Critty leaves that server setting unchanged.
+
 ## 1.10.0
 
 ### Added

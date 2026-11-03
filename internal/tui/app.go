@@ -592,7 +592,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
 		reloadCmd := app.resumeReload()
-		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
+		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnActivity(m.activeTab, msg), app.prepareImage(),
 			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
@@ -600,7 +600,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
 		reloadCmd := app.resumeReload()
-		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnSelection(m.activeTab, msg), app.prepareImage(),
+		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnActivity(m.activeTab, msg), app.prepareImage(),
 			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	}
 	return model, cmd
@@ -3020,6 +3020,7 @@ func (m AppModel) View() tea.View {
 		}
 		v := tea.NewView(fmt.Sprintf("Error: %v\n\n%s", m.err, hint))
 		v.AltScreen = true
+		v.ReportFocus = true
 		return v
 	}
 
@@ -3027,6 +3028,7 @@ func (m AppModel) View() tea.View {
 		body, regions := m.renderEmptyReview()
 		v := tea.NewView(body)
 		v.AltScreen = true
+		v.ReportFocus = true
 		v.MouseMode = tea.MouseModeAllMotion
 		m.placeModalCursor(&v, regions)
 		return v
@@ -3034,12 +3036,14 @@ func (m AppModel) View() tea.View {
 	if m.width == 0 || len(m.tabs) == 0 || m.tab().state == nil {
 		v := tea.NewView("Loading...")
 		v.AltScreen = true
+		v.ReportFocus = true
 		return v
 	}
 	full, layout := m.renderReviewScreen()
 
 	v := tea.NewView(full)
 	v.AltScreen = true
+	v.ReportFocus = true
 	v.MouseMode = tea.MouseModeAllMotion
 	if c := layout.isearchCursor; c != nil && c.X >= 0 && c.X < m.width && c.Y >= 0 && c.Y < m.height {
 		v.Cursor = c

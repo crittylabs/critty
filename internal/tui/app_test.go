@@ -131,13 +131,20 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 	}
 }
 
-func TestViewEnablesMouseHoverReporting(t *testing.T) {
+func TestViewEnablesInputReporting(t *testing.T) {
 	app := setupAppWithDoc(t, "line\n")
 	app.width = 80
 	app.height = 20
 
 	if got := app.View().MouseMode; got != tea.MouseModeAllMotion {
 		t.Fatalf("mouse mode = %v, want all-motion reporting", got)
+	}
+	if !app.View().ReportFocus {
+		t.Fatal("review does not request focus events")
+	}
+	app.width = 0
+	if !app.View().ReportFocus {
+		t.Fatal("loading screen disables focus events")
 	}
 }
 

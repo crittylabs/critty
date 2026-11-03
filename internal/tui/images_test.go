@@ -368,19 +368,45 @@ func TestImageProbeRetriesAfterSkippedQuery(t *testing.T) {
 	if app.images.checking {
 		t.Fatal("a late skip restarted the check")
 	}
-	// Input shows the pane is in view now, so the check starts over.
-	for _, msg := range []tea.Msg{tea.KeyPressMsg{Code: 'j'}, tea.MouseClickMsg{X: 1, Y: 1, Button: tea.MouseLeft}} {
-		app.images.skipped, app.images.checking = true, false
-		var cmd tea.Cmd
-		app, cmd = updateApp(app, msg)
-		if cmd == nil || !app.images.checking || app.images.attempts != 0 || app.images.skipped {
-			t.Fatalf("%T after skipped queries did not restart the check: %+v", msg, app.images)
-		}
-	}
-	app.images.checking = false
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'j'})
-	if app.images.checking {
-		t.Fatal("input restarted a check that was answered or unanswered rather than skipped")
+	for _, tc := range []struct {
+		name string
+		msg  tea.Msg
+	}{
+		{"key", tea.KeyPressMsg{Code: 'j'}},
+		{"focus", tea.FocusMsg{}},
+		{"click", tea.MouseClickMsg{X: 1, Y: 1, Button: tea.MouseLeft}},
+		{"hover", tea.MouseMotionMsg{X: 1, Y: 1}},
+		{"release", tea.MouseReleaseMsg{X: 1, Y: 1, Button: tea.MouseLeft}},
+		{"wheel", tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := app
+			var cmd tea.Cmd
+			app, cmd = updateApp(app, tc.msg)
+			if cmd == nil || !app.images.checking || app.images.attempts != 0 || app.images.skipped {
+				t.Fatalf("activity after skipped queries did not restart the check: %+v", app.images)
+			}
+			id := app.images.probeID
+			app, _ = updateApp(app, tc.msg)
+			if app.images.probeID != id {
+				t.Fatal("activity restarted a pending check")
+			}
+			app.images.checking = false
+			app, _ = updateApp(app, tc.msg)
+			if app.images.checking {
+				t.Fatal("activity retried an unanswered check")
+			}
+			app.images.skipped, app.images.enabled = true, true
+			app, _ = updateApp(app, tc.msg)
+			if app.images.checking {
+				t.Fatal("activity retried a confirmed terminal")
+			}
+			app.images.enabled, app.images.hidden = false, true
+			app, _ = updateApp(app, tc.msg)
+			if app.images.checking {
+				t.Fatal("activity retried hidden previews")
+			}
+		})
 	}
 }
 
