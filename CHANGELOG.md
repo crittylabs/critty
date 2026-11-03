@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.10.0
 
 ### Added
 
 - **Waiting status in your terminal**: While a review waits for you, Critty reports that it is blocked through the [Program Status Protocol](https://www.superlogical.com/rex/docs/build/program-status) (OSC 7501), naming the project, branch, and topic; approval requests with consent items report a permission request, other reviews a question.  Terminals and agent inboxes that read it, such as the Herdr desktop app, cmux, iTerm2, and kitty, mark the review as needing attention and clear it when the review ends.  Inside tmux, the report reaches the outer terminal when `allow-passthrough` is on.  Other terminals ignore it.
-- **Herdr desktop app**: If you chat with your agent in the [Herdr](https://herdr.dev/) desktop app, the review opens as a Critty tab in the same space and the chat tab regains focus when you finish, as it already does for Herdr TUI, tmux, cmux, and Zellij.  The `herdr-app` launcher needs the `hc` command that the app installs; on another machine added with `hc machine`, where the `herdr-app` command is absent, the review tab appears in the space without taking focus.  A terminal that herdr-core runs outside a window falls back to a desktop terminal.  Image previews work in the app's terminals, which answer the capability check in a different order than other terminals.  Keyboard Help lists the app's default tab and pane keys, `critty doctor` reports whether the window answers and whether the current terminal is shown in it, and `critty env` names the app in `CRITTY_TERMINAL_APP` instead of the Ghostty engine it runs on.  See the [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#review-launchers).
+- **Herdr desktop app**: If you chat with your agent in the [Herdr](https://herdr.dev/) desktop app, reviews open in the same space and return focus to your chat when you finish.  The `herdr-app` launcher requires the `hc` command installed by the app.  On a remote machine connected with `hc machine`, where `herdr-app` is absent, reviews open in the space without taking focus; terminals outside an app window fall back to a desktop terminal.  Image previews work in the app.  Keyboard Help covers tab and pane navigation, `critty doctor` checks the app connection and current terminal, and `critty env` identifies the app in `CRITTY_TERMINAL_APP`.  See the [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#review-launchers).
 
 ### Changed
 

@@ -17,11 +17,11 @@ When your agent needs your input, it prepares the request and opens a review in 
 
 If you chat with your agent in a terminal multiplexer, such as tmux, the Herdr desktop app or Herdr TUI, or cmux, the review opens in a pane or tab alongside the chat.  Review the request, send your feedback, and return to the conversation while your agent handles the next step.  This works with both TUI and GUI multiplexers; without one, Critty opens a new terminal emulator window when available.  Local desktop reviews prefer terminals with image previews and try other available terminals if needed.  A failed attempt to identify the invoking pane can still fall back to a desktop or custom launcher; your configured launcher order takes precedence.  See the [supported launchers and requirements](internal/cli/skill/critty-cli/references/terminals.md#review-launchers) for the full list.
 
-While a review waits for you, Critty tells the terminal it is blocked on a question through the Program Status Protocol (OSC 7501).  Terminals and agent inboxes that read it, such as the Herdr desktop app, cmux, iTerm2, and kitty, mark the review as needing attention; inside tmux, enable `allow-passthrough` so the report reaches the outer terminal.
+While a review waits for you, Critty tells the terminal it needs your input through the Program Status Protocol (OSC 7501).  Approval requests with consent items report a permission request; other reviews report a question.  Terminals and agent inboxes that read it, such as the Herdr desktop app, cmux, iTerm2, and kitty, mark the review as needing attention; inside tmux, enable `allow-passthrough` so the report reaches the outer terminal.
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/8bce362f-f53f-4711-b6d3-47cf93df0c84
+https://github.com/user-attachments/assets/a8d07800-d0c7-4b68-8f7b-9e1f14168b49
 
 For example:
 
@@ -144,7 +144,7 @@ Critty opens a review pane or tab in the detected multiplexer, or a new window o
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-https://github.com/user-attachments/assets/8afbb65f-e001-4a67-ab34-7c3afac65a4e
+https://github.com/user-attachments/assets/99017ffc-f835-4c8c-9676-90908ad77476
 
 For a manual review:
 
@@ -302,83 +302,85 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos and screenshots captured with v1.7.0 candidates.
+Videos and screenshots captured with the v1.10.0 candidate.
 
-### Navigating outlines and image attachments
+### Navigating source and Markdown outlines
 
-Jump through source declarations and Markdown headings, then inspect an attached image.  `M-G` focuses the outline; Enter returns to the source.
+Follow the source outline as you move through code, or jump to a Markdown heading.  `M-G` focuses the outline; Enter returns to the source.
 
-https://github.com/user-attachments/assets/b647a70b-8206-4402-857b-330ee6a214c6
+https://github.com/user-attachments/assets/24e09750-687e-434a-819c-7019985eb790
 
-![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/22e5987a-53d3-4f32-91a1-792d610bc3d5)
+![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/feb5301d-43d9-4f80-b530-1cc436799ca7)
 
-![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/91781b73-e5d8-47a1-be89-3b822c70badb)
+### Previewing an image attachment
+
+![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/e14f8d94-b268-4e8e-b68c-1cf5f866f4d5)
 
 ### Code review with inline comments
 
-https://github.com/user-attachments/assets/8afbb65f-e001-4a67-ab34-7c3afac65a4e
+https://github.com/user-attachments/assets/99017ffc-f835-4c8c-9676-90908ad77476
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/1d93a68b-a4d2-4a0f-91da-f51928cbf018)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/eab311dc-0db9-4120-be5c-00f6c8e8dce3)
 
 ### Review round trips with Claude Code
 
-https://github.com/user-attachments/assets/56724c09-7ffa-4521-bfe6-9452be423e4e
+https://github.com/user-attachments/assets/24f5f6ae-a41c-4513-ba3b-f6259400bb84
 
 ### Review round trips with Codex
 
-https://github.com/user-attachments/assets/ecc84f8b-3ab9-4d22-80e7-f1e2e854e992
+https://github.com/user-attachments/assets/4a21894c-61e1-4824-8b54-b8714537b93c
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-https://github.com/user-attachments/assets/418bb5b9-e31e-42ab-9abd-075127fe643c
+https://github.com/user-attachments/assets/f58d891a-5727-40e5-a04f-7be5050ac1a8
 
 ### Following live review updates
 
 Watch follows file edits and marks changed background tabs.  Follow a file reference from an attachment to inspect the updated source.
 
-https://github.com/user-attachments/assets/a01e9427-1963-4771-ac00-b42e6de94900
+https://github.com/user-attachments/assets/5252cd1b-35b1-402c-a9bf-00ffc7440f65
 
 ### Reviewing a document
 
-https://github.com/user-attachments/assets/1b66b800-df61-4ee0-8424-0b39fb68bba7
+https://github.com/user-attachments/assets/211ea142-595d-4e3b-8ae4-0d8c564459c3
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/3268a1ce-0a8a-4a32-ac7d-39d803673cef)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/60ff80bf-0260-4450-9aa2-b33c9b4e29e0)
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/07954969-1d1b-452b-853f-9dd834c57208)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/c5837711-4916-49bf-93b4-aafc87f4c770)
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/c93ac410-3def-4f3c-a7b5-c72581e7c98c)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/c0d9a10c-874a-47c9-adb0-2a99c1c7beee)
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/4ae61333-45d5-42b1-9e8b-d698cb0cc9de)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/ec1c0884-3309-47c9-89cf-aa5be893e0cb)
 
 ### Answering a questionnaire with form widgets
 
 See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/28bd80aa-e323-4198-9c8b-47be3c760708)
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/a43ffbb8-8950-43f9-a17e-ab2bc1148ab3)
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/db36474c-6ebe-4554-af8c-c2e497bd0f21)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/0af43307-23be-4291-866b-7b80b644176e)
 
 ### Approval checks for unfinished items
 
-![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/7fab4e15-c81e-4062-9720-e19f3bf718aa)
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/5cc64faa-4e2b-4250-afe0-e4352f82be4d)
 
 ### Incremental search
 
-![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/19fbf244-9aef-47fa-b26f-cd2bdfe46045)
+![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/5d1bc9c7-89f7-4281-a093-0760ed004584)
 
 ## Contributing
 
