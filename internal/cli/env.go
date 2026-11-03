@@ -134,6 +134,8 @@ func environmentForTerminal(ctx reviewMultiplexerContext) ([]envVar, error) {
 	var err error
 	var vars []envVar
 	switch ctx := ctx.(type) {
+	case workspaceContext:
+		vars = workspaceEnvironment(ctx.place)
 	case zellijContext:
 		vars = []envVar{{"ZELLIJ", "0"}, {"ZELLIJ_SESSION_NAME", ctx.session}, {"ZELLIJ_PANE_ID", ctx.pane}}
 		if ctx.socket != "" {

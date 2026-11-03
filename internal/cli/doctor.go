@@ -230,6 +230,7 @@ warnings or informational results. The former check command remains an alias.`,
 				return (&desktopLaunch{name: name, origin: origin}).check()
 			})
 			r.checkHerdrApp()
+			r.checkWorkspaceHosts()
 			if err := r.write(cmd.OutOrStdout(), asJSON); err != nil {
 				return err
 			}
@@ -250,6 +251,32 @@ warnings or informational results. The former check command remains an alias.`,
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print a structured diagnostic report")
 	cmd.Flags().StringVar(&python, "python", "python3", "Python executable used for restricted AI reviews")
 	return cmd
+}
+
+func (r *doctorReport) checkWorkspaceHosts() {
+	d := workspaceDetector{}
+	const check = "launchers/orca"
+	_, err := lookPath(terminalbinding.WorkspaceExecutable("orca"))
+	if err != nil {
+		if d.environmentPresent() {
+			r.add(check, "warn", "orca CLI not found on PATH", "Install the desktop app and its matching CLI.")
+		}
+		return
+	}
+	if !d.environmentPresent() {
+		r.add(check, "info", "orca CLI is available; no invoking workspace identity", "Run this check from a workspace terminal or agent.")
+		return
+	}
+	c, ok := d.environmentContext().(workspaceContext)
+	if !ok {
+		r.add(check, "warn", "incomplete orca workspace identity", "Open a new Orca workspace terminal or agent.")
+		return
+	}
+	if err := checkWorkspaceLauncher(c); err != nil {
+		r.add(check, "warn", err.Error(), "Check that the local workspace is still open and the app and CLI versions match.")
+		return
+	}
+	r.add(check, "ok", "local orca workspace is available", "")
 }
 
 func (r *doctorReport) checkIntegrations(reg map[string][]integrationFile) {

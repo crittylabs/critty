@@ -29,7 +29,7 @@ Launched reviews remove `NO_COLOR` from the TUI environment, including values in
 | Kind | Launcher names |
 | --- | --- |
 | Automatic selection | `mux`, `desktop-terminal` |
-| Multiplexer | `tmux`, `tmux-floating`, `tmux-split`, `herdr`, `herdr-app`, `cmux`, `zellij` |
+| Multiplexer | `tmux`, `tmux-floating`, `tmux-split`, `herdr`, `herdr-app`, `cmux`, `zellij`, `orca` |
 | Desktop terminal | `xdg-terminal`, `ghostty-window`, `kitty-window`, `iterm-window`, `rio-window`, `wezterm-window`, `alacritty-window`, `terminal-app-window`, `windows-terminal-wsl`, `xterm-window` |
 | Custom executable | `custom:EXECUTABLE` |
 
@@ -69,7 +69,7 @@ Critty invokes the executable with one operation argument:
 
 `command` is a shell-quoted TUI command; run it in `cwd`.  Each operation has a 10-second deadline.  Write diagnostics to stderr; check diagnostics are reported only if all launchers fail.  Keep `open` stdout exclusively for the token.  If `open` fails after creating resources, the launcher must clean them up itself.  After a successful `open`, Critty calls `close` even if the TUI fails to become ready.
 
-Each operation inherits the caller's environment with stale `TMUX`, `TMUX_PANE`, `HERDR_*`, `HC_TERMINAL_*`, `CMUX_*` (except the socket password), `ZELLIJ*`, and `TTY` replaced by the detected terminal context.  Other variables, including the state/config locations, are preserved.  `CRITTY_TERMINAL_APP` carries a detected application name and `CRITTY_SSH=1` reports positive SSH evidence.  Use `critty env` to inspect or reuse the same detection.
+Each operation inherits the caller's environment with stale `TMUX`, `TMUX_PANE`, `HERDR_*`, `HC_TERMINAL_*`, `CMUX_*` (except the socket password), `ZELLIJ*`, `ORCA_*`, and `TTY` replaced by the detected terminal context.  Other variables, including the state/config locations, are preserved.  `CRITTY_TERMINAL_APP` carries a detected application name and `CRITTY_SSH=1` reports positive SSH evidence.  Use `critty env` to inspect or reuse the same detection.
 
 The `herdr` launcher targets Herdr TUI, the terminal app with its own server; the Herdr desktop app is a separate program served by the `herdr-app` launcher below.  It requires the `herdr` CLI and socket access from the agent process, opens the review in a full-width tab of the invoking workspace, closes it when the review ends, and restores focus to the invoking tab.  Detection uses inherited `HERDR_*` variables or `herdr pane list` and `herdr pane process-info` to match process ancestry.
 
@@ -92,3 +92,11 @@ critty env -- <command> [args]   # the same
 ```
 
 Flags go before the mode word.  Without a pane, `TTY` is the controlling terminal of the nearest ancestor process, then `SSH_TTY`; the command fails when no terminal or client hints are found.  Hooks that run detached from the agent's terminal can use `critty env tty` to find it.  `--terminal-request <id>` resolves a prepared marker as a review launch would, so it only applies inside a flow that displays one.
+
+### Orca
+
+The `orca` launcher opens a dedicated terminal in the invoking local workspace and closes only that terminal when the review ends.  It requires a Unix execution host with a POSIX-compatible terminal shell and the desktop app's matching CLI on PATH.  Linux uses `orca-ide` to avoid GNOME's unrelated `orca` command.  Orca brings the new review tab into view.  Closing a review does not force focus back to the source or change workspace status.  The tested app/CLI version is Orca 1.4.247.
+
+Orca detection uses `ORCA_WORKTREE_ID` (or `ORCA_WORKSPACE_ID`), `ORCA_TERMINAL_HANDLE` when present, and the `ORCA_RUNTIME_SOURCE_*` identity.  `ORCA_RUNTIME_SOURCE_PROFILE_PATH` or `ORCA_USER_DATA_PATH` pins the profile.  The CLI retains the originating installation and runtime identity so another profile cannot silently receive its commands.  Reviews target the recorded workspace ID, never the workspace currently visible in the app.  A chat agent can omit the terminal handle when it supplies the workspace and runtime identity.
+
+`critty env` returns the public identity variables for Orca; `critty doctor` checks CLI availability and the invoking local workspace without opening a review.  Orca does not expose local process ownership through its CLI inventory, so detection without inherited identity is unavailable.  Terminal filters and the Codex wrapper can preserve terminal identity for marker binding.  Screen lookups use Orca's rendered `terminal read --screen`; chat-only origins require a filter notification or direct environment-based launch.  Remote-control clients and native mobile approval cards are outside these launchers' scope.

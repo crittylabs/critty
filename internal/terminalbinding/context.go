@@ -23,9 +23,14 @@ type Target struct {
 	Pane      string `json:"pane"` // Surface ID for cmux.
 	Workspace string `json:"workspace,omitempty"`
 	Tab       string `json:"tab,omitempty"`
+	SourceID  string `json:"source_id,omitempty"`
+	RuntimeID string `json:"runtime_id,omitempty"`
 }
 
 func (t Target) Validate() error {
+	if t.Kind == "orca" {
+		return validateWorkspace(t)
+	}
 	if t.Kind == "zellij" {
 		return validateZellij(t)
 	}
@@ -65,6 +70,9 @@ func (t Target) Validate() error {
 
 // Command pins requests to the recorded server, regardless of daemon environment.
 func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
+	if t.Kind == "orca" {
+		return t.workspaceCommand(ctx, args...)
+	}
 	if t.Kind == "zellij" {
 		return t.zellijCommand(ctx, args...)
 	}
@@ -130,6 +138,9 @@ func FromEnvironment() (Target, error) {
 	if os.Getenv("HC_TERMINAL_ID") != "" {
 		targets = append(targets, HCEnvironment())
 	}
+	if os.Getenv("ORCA_TERMINAL_HANDLE") != "" || os.Getenv("ORCA_WORKTREE_ID") != "" || os.Getenv("ORCA_WORKSPACE_ID") != "" {
+		targets = append(targets, WorkspaceEnvironment("orca"))
+	}
 	for _, t := range targets {
 		if err := t.Validate(); err != nil {
 			return Target{}, err
@@ -146,7 +157,9 @@ func FromEnvironment() (Target, error) {
 	defer cancel()
 	owners := make(map[int]Target)
 	for _, t := range targets {
-		if t.Kind == "zellij" {
+		if t.Kind == "orca" {
+			continue
+		} else if t.Kind == "zellij" {
 			for pid, owner := range ZellijOwners(t) {
 				owners[pid] = owner
 			}
@@ -229,6 +242,9 @@ func Snapshot(ctx context.Context, t Target) (string, error) {
 	}
 	if t.Kind == "terminal" {
 		return "", fmt.Errorf("terminal origin requires a filter notification")
+	}
+	if t.Kind == "orca" {
+		return workspaceSnapshot(ctx, t)
 	}
 	if t.Kind == "zellij" {
 		out, err := t.Command(ctx, "action", "dump-screen", "--pane-id", t.Pane).Output()

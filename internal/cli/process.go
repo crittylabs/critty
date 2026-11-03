@@ -31,6 +31,7 @@ var supportedMultiplexerDetectors = []multiplexerDetector{
 	tmuxDetector{},
 	zellijDetector{},
 	cmuxDetector{},
+	workspaceDetector{},
 }
 
 func findMultiplexerContext() reviewMultiplexerContext {

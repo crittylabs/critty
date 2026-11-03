@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Orca workspaces**: Agents can open a Critty review in a dedicated terminal in the same local workspace through the new `orca` launcher.  It requires a Unix host with a POSIX-compatible terminal shell and the app's matching CLI; Linux uses `orca-ide`.  Terminal and chat-agent identity pin the workspace, and only the review's terminal is closed when it ends.  `critty env` and `critty doctor` cover the host.  See the [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#orca).
+
 ### Fixed
 
 - **Review colors in multiplexers**: Reviews opened in a pane or tab no longer become monochrome when the multiplexer server inherits `NO_COLOR` from an agent.  All launcher-generated TUI commands clear it, including commands supplied to custom launchers; foreground reviews and other commands still honor it.

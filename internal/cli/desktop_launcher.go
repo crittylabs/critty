@@ -64,6 +64,8 @@ func desktopOrder(platform string, origin terminalbinding.Origin) []string {
 
 func terminalTarget(terminal reviewMultiplexerContext) terminalbinding.Target {
 	switch t := terminal.(type) {
+	case workspaceContext:
+		return t.target()
 	case zellijContext:
 		return t.target()
 	case cmuxContext:

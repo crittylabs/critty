@@ -60,6 +60,9 @@ func reviewTerminalContext() (reviewMultiplexerContext, error) {
 		return nil, err
 	}
 	reviewOrigin = target.Origin
+	if target.Kind == "orca" {
+		return workspaceContext{target}, nil
+	}
 	if target.Kind == "terminal" {
 		return nil, nil
 	}

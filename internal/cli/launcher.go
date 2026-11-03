@@ -21,7 +21,7 @@ var reviewLauncherNames []string
 var errNoReviewLauncher = errors.New("no usable review launcher")
 
 func init() {
-	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, herdr-app, cmux, zellij, desktop-terminal, "+strings.Join(desktopNames, ", ")+", or custom:EXECUTABLE")
+	rootCmd.PersistentFlags().StringArrayVar(&reviewLauncherNames, "launcher", nil, "review launcher (repeat to set priority, default mux, desktop-terminal): mux, tmux, tmux-floating, tmux-split, herdr, herdr-app, cmux, zellij, orca, desktop-terminal, "+strings.Join(desktopNames, ", ")+", or custom:EXECUTABLE")
 }
 
 type reviewLauncher struct {
@@ -104,6 +104,16 @@ func launcherCandidates(name string, terminal reviewMultiplexerContext, mode *re
 		name = terminal.kind()
 	}
 	switch name {
+	case "orca":
+		ctx, ok := launcherTerminal(name, terminal).(workspaceContext)
+		return []reviewLauncher{{name: name, check: func() error {
+			if !ok {
+				return fmt.Errorf("no %s workspace terminal", name)
+			}
+			return checkWorkspaceLauncher(ctx)
+		}, open: func(mode *reviewMode) (reviewLaunch, error) {
+			return spawnWorkspaceReview(mode, ctx)
+		}}}, nil
 	case "tmux":
 		floating, err := launcherCandidates("tmux-floating", terminal, mode)
 		if err != nil {
@@ -226,6 +236,9 @@ func launcherTerminal(kind string, terminal reviewMultiplexerContext) reviewMult
 	if kind == "cmux" {
 		detector = cmuxDetector{}
 	}
+	if kind == "orca" {
+		detector = workspaceDetector{}
+	}
 	if ctx := walkAncestorContexts([]multiplexerDetector{detector}); ctx != nil {
 		return ctx
 	}
@@ -293,6 +306,9 @@ func launcherEnvironment(vars []envVar) []string {
 	var environment []string
 	for _, value := range os.Environ() {
 		key, _, _ := strings.Cut(value, "=")
+		if workspaceTerminalVariable(key) {
+			continue
+		}
 		if strings.HasPrefix(key, "ZELLIJ") || key == "TMUX" || key == "TMUX_PANE" || key == "TTY" || key == "CRITTY_SSH" || key == "CRITTY_TERMINAL_APP" || strings.HasPrefix(key, "HERDR_") || strings.HasPrefix(key, "HC_TERMINAL_") || strings.HasPrefix(key, "CMUX_") && key != "CMUX_SOCKET_PASSWORD" {
 			continue
 		}
