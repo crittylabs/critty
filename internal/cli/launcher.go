@@ -33,6 +33,7 @@ type reviewLauncher struct {
 func resolveReviewLauncher(names []string, mode *reviewMode) (*reviewLauncher, bool, error) {
 	mode.launch = &launchSummary{Failures: []launcherFailure{}}
 	terminal, terminalErr := reviewTerminalContext()
+	mode.launch.Discovery = terminalDiscovery
 	if terminalErr != nil {
 		mode.launch.TerminalError = terminalErr.Error()
 		// Keep terminalRequest set so named multiplexers cannot use an unrelated

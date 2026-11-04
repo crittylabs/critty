@@ -41,12 +41,13 @@ type registration struct {
 }
 
 type Store struct {
-	dir   string
-	stamp func(int) (string, error)
+	dir      string
+	stamp    func(int) (string, error)
+	discover func(context.Context, []Target) discovery
 }
 
 func DefaultStore() *Store {
-	return &Store{dir: filepath.Join(xdg.StateHome(), "terminals"), stamp: processStamp}
+	return &Store{dir: filepath.Join(xdg.StateHome(), "terminals"), stamp: processStamp, discover: discoverTargets}
 }
 
 func processStamp(pid int) (string, error) {
@@ -217,16 +218,24 @@ func (s *Store) Notify(id string, target Target) error {
 	})
 }
 
-// Resolve prefers notifications and otherwise scans only live registrations' visible screens.
+// Resolve prefers notifications and otherwise searches visible mux screens.
 // It consumes the request once a destination is selected, before the caller launches its UI.
 func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error)) (Target, error) {
-	return s.resolve(ctx, id, snapshot, false, nil)
+	target, _, err := s.ResolveWithDiagnostics(ctx, id, snapshot)
+	return target, err
+}
+
+// ResolveWithDiagnostics also reports unavailable mux connections, even on success.
+func (s *Store) ResolveWithDiagnostics(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error)) (Target, []DiscoveryIssue, error) {
+	var issues []DiscoveryIssue
+	target, err := s.resolve(ctx, id, snapshot, false, nil, &issues)
+	return target, issues, err
 }
 
 // ResolveNotification tests the terminal filter callback without falling back to
 // registered pane screens. It consumes the request only after a notification.
 func (s *Store) ResolveNotification(ctx context.Context, id string) (Target, error) {
-	return s.resolve(ctx, id, nil, true, nil)
+	return s.resolve(ctx, id, nil, true, nil, nil)
 }
 
 // Probe checks a marker displayed in the caller's own terminal, without a
@@ -253,19 +262,20 @@ func (s *Store) Probe(ctx context.Context, target Target, display func(string) e
 	if err := display(request.Marker); err != nil {
 		return Target{}, err
 	}
-	resolved, err = s.resolve(ctx, request.ID, snapshot, target.Kind == "", []Target{target})
+	resolved, err = s.resolve(ctx, request.ID, snapshot, target.Kind == "", []Target{target}, nil)
 	if err == nil && target.Kind != "" && (resolved.Kind != target.Kind || resolved.Socket != target.Socket || resolved.Pane != target.Pane || resolved.Workspace != target.Workspace || resolved.Tab != target.Tab) {
 		return Target{}, fmt.Errorf("marker resolved to a different terminal")
 	}
 	return resolved, err
 }
 
-func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error), notifyOnly bool, candidates []Target) (Target, error) {
+func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error), notifyOnly bool, candidates []Target, issues *[]DiscoveryIssue) (Target, error) {
 	// Let a notification arriving with the just-rendered marker reach the intake first.
 	if err := pause(ctx, 150*time.Millisecond); err != nil {
 		return Target{}, err
 	}
 	var lastErr error
+	var discovered *discovery
 	for {
 		var p pending
 		var targets []Target
@@ -286,18 +296,39 @@ func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Co
 		if err != nil {
 			return Target{}, err
 		}
+		if len(p.Notifications) == 0 && !notifyOnly && candidates == nil && s.discover != nil {
+			if discovered == nil {
+				found := s.discover(ctx, targets)
+				discovered = &found
+				if issues != nil {
+					*issues = found.issues
+				}
+			}
+			for _, target := range discovered.targets {
+				targets = addTarget(targets, target)
+			}
+		}
 		matches := p.Notifications
 		var scanErr error
 		if len(matches) == 0 {
-			for _, t := range targets {
-				text, err := snapshot(ctx, t)
-				if err != nil {
-					lastErr = err
-					scanErr = err
+			readCtx, cancel := context.WithTimeout(ctx, time.Second)
+			type screen struct {
+				text string
+				err  error
+			}
+			screens := parallelSearch(readCtx, targets, func(ctx context.Context, target Target) screen {
+				text, err := snapshot(ctx, target)
+				return screen{text, err}
+			})
+			cancel()
+			for i, screen := range screens {
+				if screen.err != nil {
+					lastErr = fmt.Errorf("%s pane %s: %w", targets[i].Kind, targets[i].Pane, screen.err)
+					scanErr = lastErr
 					continue
 				}
-				if strings.Contains(text, p.Marker) {
-					matches = append(matches, t)
+				if strings.Contains(screen.text, p.Marker) {
+					matches = append(matches, targets[i])
 				}
 			}
 		}
@@ -330,6 +361,10 @@ func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Co
 			return Target{}, err
 		}
 		if selected.Kind != "" {
+			if selected.Origin.PID > 1 && selected.Origin.Started == "" {
+				selected.Origin.Started, _ = s.stamp(selected.Origin.PID)
+				selected.Origin.SSH = sshAncestor(selected.Origin.PID, parentProcess)
+			}
 			return selected, nil
 		}
 		if err := pause(ctx, 100*time.Millisecond); err != nil {
@@ -343,9 +378,15 @@ func (s *Store) resolve(ctx context.Context, id string, snapshot func(context.Co
 				return Target{}, fmt.Errorf("local terminal marker was not observed before timeout")
 			}
 			if lastErr != nil {
-				return Target{}, fmt.Errorf("cannot read registered terminal screens (check socket access): %w", lastErr)
+				return Target{}, fmt.Errorf("cannot read all candidate terminal screens (check socket access): %w", lastErr)
 			}
-			return Target{}, fmt.Errorf("terminal marker not found in registered visible panes; launch through critty codex or a notifying filter, display a new marker, and retry")
+			message := "terminal marker not found in visible mux panes; use a notifying filter or run Codex with --no-daemon, or request a desktop/custom launcher"
+			if discovered != nil {
+				for _, issue := range discovered.issues {
+					message += fmt.Sprintf("; %s: %s", issue.Kind, issue.Reason)
+				}
+			}
+			return Target{}, errors.New(message)
 		}
 	}
 }

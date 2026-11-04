@@ -12,6 +12,7 @@ import (
 
 var terminalRequest string
 var reviewOrigin terminalbinding.Origin
+var terminalDiscovery []terminalbinding.DiscoveryIssue
 var terminalRequestTimeout = 3 * time.Second
 
 func init() {
@@ -49,13 +50,15 @@ func init() {
 
 func reviewTerminalContext() (reviewMultiplexerContext, error) {
 	reviewOrigin = terminalbinding.Origin{}
+	terminalDiscovery = nil
 	if terminalRequest == "" {
 		reviewOrigin = terminalbinding.CaptureOrigin(os.Getpid())
 		return findMultiplexerContext(), nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), terminalRequestTimeout)
 	defer cancel()
-	target, err := terminalbinding.DefaultStore().Resolve(ctx, terminalRequest, terminalbinding.Snapshot)
+	target, issues, err := terminalbinding.DefaultStore().ResolveWithDiagnostics(ctx, terminalRequest, terminalbinding.Snapshot)
+	terminalDiscovery = issues
 	if err != nil {
 		return nil, err
 	}

@@ -126,13 +126,15 @@ Attach images alongside review documents with `--attachment image.png`, includin
 
 ### Using Codex in a multiplexer
 
-When using Codex in a supported multiplexer, start it through Critty so reviews can find the correct terminal:
+When Codex uses a shared background server, Critty finds the conversation by searching visible mux panes for a marker printed by the agent.  Supported muxes can be discovered without a wrapper.  Start Codex through Critty to also register custom connections and client hints:
 
 ```bash
 critty codex
 ```
 
 Alternatively, put the bundled `codex` wrapper ahead of Codex on your `PATH`.  Run `critty doctor` to inspect wrapper and terminal-filter detection.  For an end-to-end binding test, use the [marker-based doctor check](internal/cli/skill/critty-cli/references/terminals.md#environment-diagnostics).  See [terminal-filter integration](docs/terminal-filter.md) for setup.
+
+If your mux cannot list panes or read their screens, use a notifying terminal filter, start Codex with `--no-daemon`, or ask your agent to use a desktop/custom launcher that opens its own review window.  A mux launcher name alone cannot identify the correct pane.
 
 ## Basic workflow
 

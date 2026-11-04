@@ -23,8 +23,12 @@ const hcListRequest = `{"jsonrpc":"2.0","id":1,"method":"terminal.list","params"
 // HCSocketPath follows hc's own resolution: the terminal's core, an explicit
 // override, the config file, then the runtime directory of the session.
 func HCSocketPath() string {
+	return hcSocketPath(os.Getenv)
+}
+
+func hcSocketPath(getenv func(string) string) string {
 	for _, key := range []string{"HC_TERMINAL_SOCKET", "HC_SOCKET"} {
-		if socket := os.Getenv(key); socket != "" {
+		if socket := getenv(key); socket != "" {
 			return socket
 		}
 	}
@@ -32,7 +36,7 @@ func HCSocketPath() string {
 	if err != nil {
 		return ""
 	}
-	configHome := os.Getenv("XDG_CONFIG_HOME")
+	configHome := getenv("XDG_CONFIG_HOME")
 	if configHome == "" {
 		configHome = filepath.Join(home, ".config")
 	}
@@ -42,11 +46,11 @@ func HCSocketPath() string {
 	if data, err := os.ReadFile(filepath.Join(configHome, "herdr-core", "config.toml")); err == nil && toml.Unmarshal(data, &config) == nil && config.Socket != "" {
 		return config.Socket
 	}
-	session := strings.TrimSpace(os.Getenv("HC_SESSION"))
+	session := strings.TrimSpace(getenv("HC_SESSION"))
 	if session == "" {
 		session = "default"
 	}
-	run := os.Getenv("XDG_RUNTIME_DIR")
+	run := getenv("XDG_RUNTIME_DIR")
 	if run == "" {
 		if info, err := os.Stat("/run/user/" + strconv.Itoa(os.Getuid())); err == nil && info.IsDir() {
 			run = "/run/user/" + strconv.Itoa(os.Getuid())
@@ -55,7 +59,7 @@ func HCSocketPath() string {
 	if run != "" {
 		return filepath.Join(run, "herdr-core", session+".sock")
 	}
-	stateHome := os.Getenv("XDG_STATE_HOME")
+	stateHome := getenv("XDG_STATE_HOME")
 	if stateHome == "" {
 		stateHome = filepath.Join(home, ".local", "state")
 	}
@@ -124,6 +128,9 @@ func DecodeHCTerminals(data []byte) ([]HCTerminal, error) {
 	}
 	if reply.Error != nil {
 		return nil, fmt.Errorf("herdr-core: %s", reply.Error.Message)
+	}
+	if reply.Result.Terminals == nil {
+		return nil, fmt.Errorf("missing herdr-core terminal inventory")
 	}
 	return reply.Result.Terminals, nil
 }

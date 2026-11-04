@@ -41,13 +41,17 @@ func (r *doctorReport) checkTerminalBinding(request string, notifyOnly bool) {
 		defer cancel()
 		var target terminalbinding.Target
 		var err error
+		var issues []terminalbinding.DiscoveryIssue
 		if notifyOnly {
 			target, err = terminalbinding.DefaultStore().ResolveNotification(ctx, request)
 		} else {
-			target, err = terminalbinding.DefaultStore().Resolve(ctx, request, terminalbinding.Snapshot)
+			target, issues, err = terminalbinding.DefaultStore().ResolveWithDiagnostics(ctx, request, terminalbinding.Snapshot)
+		}
+		for _, issue := range issues {
+			r.add("terminal/discovery/"+issue.Kind, "info", issue.Reason, "Use a notifying filter, run Codex with --no-daemon, or request a desktop/custom launcher if this mux cannot be searched.")
 		}
 		if err != nil {
-			advice := "Start Codex through `critty codex` or tfil with --critty-notify, then prepare and display a new marker. Use the same XDG_STATE_HOME in the agent and terminal filter."
+			advice := "Check mux socket access or use tfil --critty-notify, then display a fresh marker. If screen discovery is unavailable, run Codex with --no-daemon or request a desktop/custom launcher. Use the same XDG_STATE_HOME in the agent and terminal filter."
 			if notifyOnly {
 				advice = "Enable tfil --critty-notify with Critty on its PATH and the same XDG_STATE_HOME as the agent, then prepare and display a new marker."
 			}

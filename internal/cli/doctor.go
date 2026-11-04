@@ -204,7 +204,7 @@ three-second wait, without launching an agent. It writes the marker to the TTY,
 keeping redirected JSON clean. Terminals without a readable multiplexer pane
 or active tfil are skipped.
 Use --terminal-request with a prepared, displayed marker to test terminal binding.
-Add --terminal-notify-only to require a filter notification and skip registered
+Add --terminal-notify-only to require a filter notification and skip discovered
 pane screens. This consumes that one-time request; no review is opened.
 Use --python to check the dedicated Python environment used for Codex reviews.
 

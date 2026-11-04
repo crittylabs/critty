@@ -118,18 +118,7 @@ func FromEnvironment() (Target, error) {
 		}
 	}
 	if w, tab, pane := os.Getenv("HERDR_WORKSPACE_ID"), os.Getenv("HERDR_TAB_ID"), os.Getenv("HERDR_PANE_ID"); w != "" && tab != "" && pane != "" {
-		socket := os.Getenv("HERDR_SOCKET_PATH")
-		if socket == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return Target{}, err
-			}
-			dir := filepath.Join(home, ".config", "herdr")
-			if config := os.Getenv("HERDR_CONFIG_PATH"); config != "" {
-				dir = filepath.Dir(config)
-			}
-			socket = filepath.Join(dir, "herdr.sock")
-		}
+		socket := herdrSocketPath()
 		targets = append(targets, Target{Kind: "herdr", Socket: socket, Workspace: w, Tab: tab, Pane: pane})
 	}
 	if workspace, surface := os.Getenv("CMUX_WORKSPACE_ID"), os.Getenv("CMUX_SURFACE_ID"); workspace != "" && surface != "" {

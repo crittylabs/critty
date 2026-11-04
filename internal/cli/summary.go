@@ -5,6 +5,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/ipc"
 	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/terminalbinding"
 )
 
 type summaryAttachment struct {
@@ -21,9 +22,10 @@ type launcherFailure struct {
 }
 
 type launchSummary struct {
-	Launcher      string            `json:"launcher"`
-	Failures      []launcherFailure `json:"failures"`
-	TerminalError string            `json:"terminal_error,omitempty"`
+	Launcher      string                           `json:"launcher"`
+	Failures      []launcherFailure                `json:"failures"`
+	TerminalError string                           `json:"terminal_error,omitempty"`
+	Discovery     []terminalbinding.DiscoveryIssue `json:"discovery,omitempty"`
 }
 
 // finishSummary indexes complete finish output without copying attachment bodies.
