@@ -49,9 +49,11 @@ Before every changelog update:
 - Support multilingual input and Unicode text, including wide and combining characters.  Keep rendering, selection, mouse hit areas, and the terminal cursor aligned through wrapping and scrolling so IME input appears at the correct position.
 - Keep dialogs usable in small terminals and after resizing.  Keep confirm and cancel controls reachable, let users scroll content that does not fit, and restore focus appropriately when dialogs close.
 - Keep editing behavior consistent across input fields.  Preserve existing Emacs-style editing and paste operations when adding shortcuts, and document new key bindings in the help.
-- For visual experiments, show alternatives together in a preview and get feedback before staging the final implementation.
+- For visual experiments, show alternatives together through the actual rendering path and get feedback before staging the final implementation.  Attach form samples so their interactive styling is rendered.
 - Use the hidden `critty review --demo` option for interactive demos in the current terminal.  Review controls work normally, but comments, answers, and submission stay in memory and are discarded on exit.  It creates no saved review, history, IPC server, or agent result.  Temporary files for external editors and pasted images are allowed; demo image files are removed on exit.  Do not combine it with session, task, export, terminal-request, or launcher options.  Use `critty view` for read-only inspection.
 - Critty detects the terminal background, so check light and dark schemes in separate native windows titled with the scheme and build, and keep the previous build open for comparison.
+- Verify each preview's actual background with an OSC 11 query response before labeling it light or dark.  State the theme, palette, and font settings used; window titles and launch options alone do not verify the display.
+- For Ghostty light previews, use the default fonts and ANSI palette with a white background and black foreground.  Disable user configuration with `--config-default-files=false`, omit the theme option, and set `--background=ffffff --foreground=000000`.  Explicit user colors override theme colors, so a light theme alone does not isolate a dark user configuration.
 - Diagnose color and background glitches by inspecting the emitted ANSI sequences before changing the palette.  In tmux, `tmux capture-pane -e` can reveal the actual terminal output.
 
 ## Review
