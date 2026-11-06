@@ -262,10 +262,10 @@ var (
 	progressColors = newProgressPalette()
 
 	mdCheckboxOpen = lipgloss.NewStyle().
-			Foreground(subtle)
+			Foreground(textColors.cyan)
 
 	mdCheckboxDone = lipgloss.NewStyle().
-			Foreground(success).
+			Foreground(textColors.cyan).
 			Bold(true)
 
 	mdCheckboxDoneText = lipgloss.NewStyle().
@@ -413,7 +413,8 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	footerNoticeStyle = footerNoticeStyle.Foreground(ld(lipgloss.Color("#456766"), lipgloss.Color("#608786")))
 	success = textColors.green
 	warning = textColors.yellow
-	mdCheckboxDone = mdCheckboxDone.Foreground(success)
+	mdCheckboxOpen = mdCheckboxOpen.Foreground(textColors.cyan)
+	mdCheckboxDone = mdCheckboxDone.Foreground(textColors.cyan)
 	fileMatchStyle = fileMatchStyle.Foreground(warning)
 	activeAttachmentColor = ld(textColors.brightYellow, lipgloss.Yellow)
 	mdH3Style = mdH3Style.Foreground(textColors.cyan)

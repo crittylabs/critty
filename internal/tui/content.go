@@ -739,7 +739,7 @@ func highlightMarkdownWith(line string, inline func(string) string) string {
 		checked := line[loc[4]:loc[5]]
 		rest := line[loc[6]:loc[7]]
 		if checked == "x" || checked == "X" {
-			return indent + mdCheckboxDone.Render("✓") + " " + mdCheckboxDoneText.Render(inline(rest))
+			return indent + mdCheckboxDone.Render("☑︎") + " " + mdCheckboxDoneText.Render(inline(rest))
 		}
 		return indent + mdCheckboxOpen.Render("☐") + " " + inline(rest)
 	}
