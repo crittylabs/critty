@@ -30,6 +30,9 @@ func CaptureOrigin(pid int) Origin {
 }
 
 func terminalApplication(getenv func(string) string) string {
+	if getenv("REX_SESSION") != "" || getenv("REX_BLOCK") != "" {
+		return "rex"
+	}
 	if getenv("ORCA_TERMINAL_HANDLE") != "" || getenv("ORCA_WORKTREE_ID") != "" || getenv("ORCA_WORKSPACE_ID") != "" {
 		return "orca"
 	}
@@ -40,6 +43,8 @@ func terminalApplication(getenv func(string) string) string {
 	}
 	for _, key := range []string{"TERMINAL_APP", "TERM_PROGRAM"} {
 		switch strings.ToLower(getenv(key)) {
+		case "rex":
+			return "rex"
 		case "rio", "rioterm":
 			return "rio"
 		case "ghostty":

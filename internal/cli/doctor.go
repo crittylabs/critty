@@ -231,6 +231,7 @@ warnings or informational results. The former check command remains an alias.`,
 			})
 			r.checkHerdrApp()
 			r.checkWorkspaceHosts()
+			r.checkRex()
 			if err := r.write(cmd.OutOrStdout(), asJSON); err != nil {
 				return err
 			}

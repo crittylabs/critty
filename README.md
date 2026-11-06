@@ -19,6 +19,8 @@ If you chat with your agent in a terminal multiplexer, such as tmux, the Herdr d
 
 In Orca, reviews can open in a dedicated terminal in the same local workspace as your agent.  Install the app's matching CLI and use a Unix host with a POSIX-compatible terminal shell.  See the [workspace launcher requirements](internal/cli/skill/critty-cli/references/terminals.md#orca) for terminal and chat-agent detection.
 
+In Rex, reviews open in a new tab in the same session as your agent, using a local Unix server.  Automatic tab switching and return to your conversation require Rex's Remote Control setting, even on the same computer.  With it off, select the review tab manually.  See the [Rex launcher requirements](internal/cli/skill/critty-cli/references/terminals.md#rex) for preview setup and terminal detection.
+
 While a review waits for you, Critty tells the terminal it needs your input through the Program Status Protocol (OSC 7501).  Approval requests with consent items report a permission request; other reviews report a question.  Terminals and agent inboxes that read it, such as the Herdr desktop app, cmux, iTerm2, and kitty, mark the review as needing attention; inside tmux, enable `allow-passthrough` so the report reaches the outer terminal.
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.

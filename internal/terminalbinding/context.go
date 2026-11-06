@@ -28,6 +28,9 @@ type Target struct {
 }
 
 func (t Target) Validate() error {
+	if t.Kind == "rex" {
+		return validateRex(t)
+	}
 	if t.Kind == "orca" {
 		return validateWorkspace(t)
 	}
@@ -70,6 +73,9 @@ func (t Target) Validate() error {
 
 // Command pins requests to the recorded server, regardless of daemon environment.
 func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
+	if t.Kind == "rex" {
+		return t.rexCommand(ctx, args...)
+	}
 	if t.Kind == "orca" {
 		return t.workspaceCommand(ctx, args...)
 	}
@@ -104,6 +110,9 @@ func (t Target) Command(ctx context.Context, args ...string) *exec.Cmd {
 // FromEnvironment is used in the real terminal, never to infer a daemon client's identity.
 func FromEnvironment() (Target, error) {
 	var targets []Target
+	if os.Getenv("REX_SESSION") != "" || os.Getenv("REX_BLOCK") != "" {
+		targets = append(targets, RexEnvironment())
+	}
 	if os.Getenv("ZELLIJ_SESSION_NAME") != "" || os.Getenv("ZELLIJ_PANE_ID") != "" {
 		targets = append(targets, ZellijEnvironment())
 	}
@@ -146,7 +155,11 @@ func FromEnvironment() (Target, error) {
 	defer cancel()
 	owners := make(map[int]Target)
 	for _, t := range targets {
-		if t.Kind == "orca" {
+		if t.Kind == "rex" {
+			for pid, owner := range RexOwners(ctx, t) {
+				owners[pid] = owner
+			}
+		} else if t.Kind == "orca" {
 			continue
 		} else if t.Kind == "zellij" {
 			for pid, owner := range ZellijOwners(t) {
@@ -231,6 +244,9 @@ func Snapshot(ctx context.Context, t Target) (string, error) {
 	}
 	if t.Kind == "terminal" {
 		return "", fmt.Errorf("terminal origin requires a filter notification")
+	}
+	if t.Kind == "rex" {
+		return "", fmt.Errorf("Rex preview requires a terminal filter notification; its capture API includes scrollback")
 	}
 	if t.Kind == "orca" {
 		return workspaceSnapshot(ctx, t)

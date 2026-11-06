@@ -33,7 +33,7 @@ Launched reviews remove `NO_COLOR` from the TUI environment, including values in
 | Kind | Launcher names |
 | --- | --- |
 | Automatic selection | `mux`, `desktop-terminal` |
-| Multiplexer | `tmux`, `tmux-floating`, `tmux-split`, `herdr`, `herdr-app`, `cmux`, `zellij`, `orca` |
+| Multiplexer | `tmux`, `tmux-floating`, `tmux-split`, `herdr`, `herdr-app`, `cmux`, `zellij`, `orca`, `rex` |
 | Desktop terminal | `xdg-terminal`, `ghostty-window`, `kitty-window`, `iterm-window`, `rio-window`, `wezterm-window`, `alacritty-window`, `terminal-app-window`, `windows-terminal-wsl`, `xterm-window` |
 | Custom executable | `custom:EXECUTABLE` |
 
@@ -82,6 +82,16 @@ The `herdr-app` launcher targets the Herdr desktop app, whose terminals run in h
 The `cmux` launcher requires the cmux CLI and socket access from the agent process.  It creates a terminal surface in the invoking surface's pane, closes it when the review ends, and restores the invoking surface's focus.  Requests pin the socket, workspace, and surface instead of following the currently focused tab.  Set `CMUX_SOCKET_PATH` for a nondefault socket.  Detection uses `cmux top --all --processes` to match process ancestry, including nested multiplexers; a single inherited cmux context remains usable when process metadata is unavailable.  `critty env` returns `CMUX_SOCKET_PATH`, `CMUX_WORKSPACE_ID`, and `CMUX_SURFACE_ID`.  Terminal markers support visible-screen discovery without a wrapper and notifying terminal filters.
 
 The `zellij` launcher requires Zellij 0.45+ on PATH.  It opens a floating review pane at 90% width and height in the invoking pane's tab, closes it on exit, and restores focus to the invoking pane.  Session and pane IDs are pinned, including when another tab is selected.  Without a marker, detection requires inherited `ZELLIJ_SESSION_NAME` and `ZELLIJ_PANE_ID`; ancestry selects the nearest supported multiplexer when nested.  Zellij does not expose pane process IDs.  Marker discovery instead lists active sessions and non-plugin panes and reads their screens without requiring inherited pane identity.  The wrapper and notifying terminal filters can also preserve that identity.  `critty env` returns `ZELLIJ=0`, the session name, pane ID, and `ZELLIJ_SOCKET_DIR` when set.  A custom socket directory is preserved in discovery, marker registrations, and launcher requests.
+
+### Rex
+
+The `rex` launcher opens a review tab in the invoking session and closes only the created block when the review ends.  It requires a Unix host with a POSIX shell and access to the local Rex server.  The CLI is found on PATH or inside `Rex.app` / `Rex Beta.app` on macOS.  The tested preview is Rex Beta 0.1.0, build 1829.
+
+Automatic tab selection and return to the source tab require Remote Control in the Rex app's Settings under Rex Server.  Critty sends `session.select` to the app client that owns the invoking block, using full client and window IDs.  The preview's `run --focus` and `focus` can change server state without changing the app's displayed tab.  If the app refuses selection or the invoking block has no recorded owner, Critty prints a warning and keeps the review available for manual tab selection; Remote Control is not required to create or use a review.
+
+Detection uses inherited `REX_SESSION` and `REX_BLOCK`; process metadata selects the nearest supported multiplexer when nested.  `REX_SERVER` pins the connection.  If it is absent, Critty asks `rex whoami` for the default server endpoint without starting a server.  Only explicit local Unix endpoints and full session/block IDs are accepted.  Network endpoints are unsupported.  Requests use `--server` and disable autostart, so a missing server cannot silently redirect a review to the default server.  `critty env` returns `REX_SERVER`, `REX_SESSION`, and `REX_BLOCK`; `critty doctor` verifies that the invoking block belongs to the recorded session.
+
+For agents whose tools lack the terminal environment, use a notifying terminal filter such as `tfil --critty-notify` in the Rex terminal.  Preview capture includes scrollback and has no visible-screen-only option, so Critty does not use it for marker searches.  Wrapper registration alone cannot supply this missing screen check.  The existing OSC 7501 waiting-status reports also reach Rex.
 
 ## Terminal environment
 
