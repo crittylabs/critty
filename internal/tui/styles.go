@@ -594,7 +594,7 @@ type progressPalette struct {
 func newProgressPalette() progressPalette {
 	return progressPalette{
 		required: textColors.red,
-		pending:  warning,
+		pending:  textColors.cyan,
 		complete: success,
 	}
 }

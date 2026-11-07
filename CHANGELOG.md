@@ -8,6 +8,10 @@
 - **Orca workspaces**: Agents can open a Critty review in a dedicated terminal in the same local workspace through the new `orca` launcher.  It requires a Unix host with a POSIX-compatible terminal shell and the app's matching CLI; Linux uses `orca-ide`.  Terminal and chat-agent identity pin the workspace, and only the review's terminal is closed when it ends.  `critty env` and `critty doctor` cover the host.  See the [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#orca).
 - **Finding Codex's review terminal**: Agents can locate the conversation in tmux, Herdr TUI, Herdr App, cmux, Zellij, and Orca without starting Codex through a wrapper.  Critty enumerates reachable local muxes and searches visible panes for a fresh marker, with bounded parallel searches.  Filter notifications take precedence; multiple matches or unread candidate screens prevent an uncertain selection.  The wrapper remains useful for custom connections and client hints.  See the [marker requirements and fallbacks](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#terminal-marker-requests).
 
+### Changed
+
+- **Checklists and optional answers**: Ordinary Markdown checklists use cyan boxes, with completed text dimmed.  Optional form items use cyan status markers and counts in tabs, Files, the header, and the Answers list, plus cyan notices and attention borders in Submit dialogs.  Required items remain red, and cyan adapts to light and dark backgrounds.
+
 ### Fixed
 
 - **Review colors in multiplexers**: Reviews opened in a pane or tab no longer become monochrome when the multiplexer server inherits `NO_COLOR` from an agent.  All launcher-generated TUI commands clear it, including commands supplied to custom launchers; foreground reviews and other commands still honor it.

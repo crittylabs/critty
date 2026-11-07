@@ -36,7 +36,7 @@ func TestSubmitAttentionColorsAndNotices(t *testing.T) {
 			case "threads":
 				want = lipgloss.Cyan
 			case "optional", "optional-and-threads":
-				want = warning
+				want = progressColors.pending
 			}
 			if color.RGBAModel.Convert(app.finishAttentionColor()) != color.RGBAModel.Convert(want) {
 				t.Fatalf("%s: wrong border color", state)

@@ -344,7 +344,7 @@ func (m AppModel) optionalFormsNotice(width int) string {
 	if len(m.missingForms()) == 0 {
 		text += " You can still approve."
 	}
-	return lipgloss.Wrap(lipgloss.NewStyle().Foreground(warning).Render(text), width, "")
+	return lipgloss.Wrap(lipgloss.NewStyle().Foreground(progressColors.pending).Render(text), width, "")
 }
 
 func (m AppModel) finishAttentionColor() color.Color {
@@ -355,7 +355,7 @@ func (m AppModel) finishAttentionColor() color.Color {
 		return lipgloss.Red
 	}
 	if len(m.pendingForms()) > 0 {
-		return warning
+		return progressColors.pending
 	}
 	if m.unresolvedTotal() > 0 {
 		return lipgloss.Cyan
@@ -650,7 +650,11 @@ func (m AppModel) canSubmitWithForms() bool {
 }
 
 func (m AppModel) finishFormsContent(width int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(warning).Render("Unanswered form items"), width)
+	titleColor := progressColors.pending
+	if len(m.missingForms()) > 0 {
+		titleColor = progressColors.required
+	}
+	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(titleColor).Render("Unanswered form items"), width)
 	prefix := title + "\n"
 	if m.canSubmitWithForms() {
 		count := len(m.unviewedForms())

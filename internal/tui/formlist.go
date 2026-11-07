@@ -192,7 +192,7 @@ func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMous
 			section = row.section
 			lines = append(lines, line{helpHeadingStyle.Render(ansi.Truncate(section, width, "…")), -1})
 		}
-		status, statusColor := "○", formChip.cyan
+		status, statusColor := "○", progressColors.pending
 		switch {
 		case row.missing:
 			status, statusColor = "!", formChip.red
