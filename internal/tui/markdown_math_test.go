@@ -51,12 +51,12 @@ func TestInlineMathCenteredOnTextRow(t *testing.T) {
 				t.Fatalf("height %d: unequal padding above and below ink: %d, %d", height, top, bounds.Dy()-bottom-1)
 			}
 			img := inlineImage{id: 1, width: bounds.Dx(), height: bounds.Dy(), columns: bounds.Dx() / cell.width, rows: rows}
-			line := markdownLine{mathTokens: []markdownToken{
+			line := markdownLine{previewTokens: []markdownToken{
 				{text: "before "},
-				{text: mathPlaceholder(&img), style: markdownMath},
+				{text: previewPlaceholder(&img), style: markdownRendered},
 				{text: " after"},
 			}}
-			got := strings.Split(ansi.Strip(line.renderMath(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)), "\n")
+			got := strings.Split(ansi.Strip(line.renderPreview(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)), "\n")
 			if len(got) != rows || !strings.Contains(got[rows/2], "before ") || !strings.Contains(got[rows/2], " after") {
 				t.Fatalf("height %d: text is not on the image's center row: %q", height, got)
 			}
@@ -142,7 +142,7 @@ func TestMarkdownMathRefs(t *testing.T) {
 			refs := markdownMathRefs(tc.source)
 			var got []string
 			for _, ref := range refs {
-				got = append(got, ref.math)
+				got = append(got, ref.renderBody)
 			}
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("got %#v, want %#v", got, tc.want)
@@ -154,7 +154,7 @@ func TestMarkdownMathRefs(t *testing.T) {
 func TestMathCodeBlockOffsetsAndCopy(t *testing.T) {
 	quoted := "> ```markdown\n> Before $x$ after.\n> $$\n> a\\\\\n> b\n> $$\n> ```"
 	refs := markdownMathRefs(quoted)
-	if len(refs) != 2 || refs[0].mathFirst != 2 || refs[0].mathColumn != 9 || refs[0].mathSource != "$x$" || refs[1].mathFirst != 3 || refs[1].line != 6 || refs[1].math != "a\\\\\nb" || refs[1].mathSource != "$$\n> a\\\\\n> b\n> $$" {
+	if len(refs) != 2 || refs[0].renderFirst != 2 || refs[0].renderColumn != 9 || refs[0].renderSource != "$x$" || refs[1].renderFirst != 3 || refs[1].line != 6 || refs[1].renderBody != "a\\\\\nb" || refs[1].renderSource != "$$\n> a\\\\\n> b\n> $$" {
 		t.Fatalf("code block source projection: %+v", refs)
 	}
 	source := "```suggestion\nBefore $x_1$ after.\n```"
@@ -230,7 +230,7 @@ func TestMathReplacementsCopyOriginalAndRetainAnchors(t *testing.T) {
 	if got := selectLine(refs[1].line); got != "$$\na\\\\\nb\n$$" {
 		t.Fatalf("block copy=%q", got)
 	}
-	for line := refs[1].mathFirst; line <= refs[1].line; line++ {
+	for line := refs[1].renderFirst; line <= refs[1].line; line++ {
 		if app.contentLayout.lineRanges[line] != app.contentLayout.lineRanges[refs[1].line] {
 			t.Fatalf("line %d lost image anchor", line)
 		}
@@ -292,7 +292,7 @@ func TestCommentMathThemeSwitchReleasesPendingLoads(t *testing.T) {
 	app.prepareCommentImages()
 	loading := 0
 	for key, side := range app.commentImages {
-		if key.math != "" && !key.dark && side.attempted {
+		if key.renderBody != "" && !key.dark && side.attempted {
 			loading++
 		}
 	}
@@ -308,7 +308,7 @@ func TestCommentMathReadingAndEditing(t *testing.T) {
 	app.images.enabled = true
 	body := "Before $x_1$ after."
 	app.renderCommentContent("Reviewer", body, "", 40)
-	key := commentImageKey{width: 40, math: "x_1", inline: true, dark: terminalIsDark}
+	key := commentImageKey{width: 40, renderBody: "x_1", inline: true, dark: terminalIsDark}
 	side := app.commentImages[key]
 	if side == nil {
 		t.Fatal("comment math was not registered")
@@ -345,10 +345,10 @@ func TestMathSourcePreserved(t *testing.T) {
 		t.Fatalf("math link label=%q", got)
 	}
 	if refs := markdownImageRefs(`$\text{![code](not.png)}$`); len(refs) != 0 {
-		t.Fatalf("parsed images inside math: %+v", refs)
+		t.Fatalf("parsed images inside renderBody: %+v", refs)
 	}
 	refs := markdownMathRefs("$$\na\\\\\nb\n$$\nend")
-	if len(refs) != 1 || refs[0].line != 4 || !strings.Contains(refs[0].math, "\n") {
+	if len(refs) != 1 || refs[0].line != 4 || !strings.Contains(refs[0].renderBody, "\n") {
 		t.Fatalf("bad multiline anchor: %+v", refs)
 	}
 }
@@ -358,7 +358,7 @@ func TestMathPreviewKeepsSourceAndImageNavigation(t *testing.T) {
 	app := setupAppWithDoc(t, source)
 	app.math = mathrender.New("/missing/ratex-render")
 	refs := app.findMarkdownImages()().(markdownImagesMsg)
-	if len(refs.images) != 3 || refs.images[0].math != "x_1" || refs.images[1].math != "" || refs.images[2].math != "y" {
+	if len(refs.images) != 3 || refs.images[0].renderBody != "x_1" || refs.images[1].renderBody != "" || refs.images[2].renderBody != "y" {
 		t.Fatalf("unexpected references: %+v", refs.images)
 	}
 	app.tab().markdownImages, app.tab().markdownImagesPending = refs.images, true

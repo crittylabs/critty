@@ -614,7 +614,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		if before && ref.side != "old" {
 			sourceLine = line.oldLine
 		}
-		if t.mathLineHidden(sourceLine, oldSide) {
+		if t.previewLineHidden(sourceLine, oldSide) {
 			return nil, target
 		}
 		content, contentPlain, contentWidth, measured := t.markdownDisplayLineInfo(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))

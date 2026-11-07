@@ -12,21 +12,24 @@ import (
 )
 
 func (line *markdownLine) displayTokens() []markdownToken {
-	if line.mathTokens != nil {
-		return line.mathTokens
+	if line.previewTokens != nil {
+		return line.previewTokens
 	}
 	return line.tokens
 }
 
 func (m AppModel) markdownPreviewSize(ref markdownImage, img *inlineImage) (int, int) {
-	if ref.math == "" {
+	if ref.renderBody == "" {
 		return m.markdownImageSize(img)
 	}
 	width := max(1, m.contentViewport.Width()-gutterWidth-1)
 	if m.alternateDiff(m.tab()) {
 		width = max(1, (m.contentViewport.Width()-3)/2-gutterWidth-1)
 	}
-	if ref.mathInline {
+	if ref.renderKind == renderedMermaid {
+		return img.fit(width, max(5, m.contentViewport.Height()-2), m.images.cell)
+	}
+	if ref.renderInline {
 		return img.fit(min(44, width), 5, m.images.cell)
 	}
 	return img.fit(min(44, width), min(19, max(5, m.contentViewport.Height())), m.images.cell)
@@ -48,13 +51,13 @@ func centerInlineMath(img image.Image, cell cellSize) image.Image {
 	return canvas
 }
 
-type mathDisplaySpan struct {
+type previewDisplaySpan struct {
 	start, end int
 	token      markdownToken
 	offset     int
 }
 
-type mathDisplayBand struct{ start, height int }
+type previewDisplayBand struct{ start, height int }
 
 func (t *FileTab) sourceRowGutter(line int, before bool, row int, marker, number string) string {
 	if t.markdown != nil {
@@ -64,8 +67,8 @@ func (t *FileTab) sourceRowGutter(line int, before bool, row int, marker, number
 		}
 		if source != nil && line > 0 && line <= len(source.lines) {
 			parsed := &source.lines[line-1]
-			if parsed.mathTokens != nil {
-				for _, band := range parsed.mathBands {
+			if parsed.previewTokens != nil {
+				for _, band := range parsed.previewBands {
 					if row < band.start || row >= band.start+band.height {
 						continue
 					}
@@ -94,7 +97,7 @@ func (t *FileTab) sourceRowGutter(line int, before bool, row int, marker, number
 // Compose text and image boxes around the same center row.  Each image keeps
 // its rows and columns contiguous instead of shrinking tall formulas to one
 // terminal cell or letting surrounding prose shift the image's later rows.
-func (line *markdownLine) renderMath(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
+func (line *markdownLine) renderPreview(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
 	type box struct {
 		rows          []string
 		width, offset int
@@ -102,12 +105,12 @@ func (line *markdownLine) renderMath(inline []gitpkg.InlineSegment, base, change
 	}
 	var band []box
 	used := 0
-	width := line.mathWidth
+	width := line.previewWidth
 	if width < 1 {
 		width = 1 << 20
 	}
-	line.mathMap = nil
-	line.mathBands = nil
+	line.previewMap = nil
+	line.previewBands = nil
 	displayRow := 0
 	var output strings.Builder
 	offset := 0
@@ -124,7 +127,7 @@ func (line *markdownLine) renderMath(inline []gitpkg.InlineSegment, base, change
 			height = max(height, len(box.rows))
 		}
 		height |= 1
-		line.mathBands = append(line.mathBands, mathDisplayBand{displayRow, height})
+		line.previewBands = append(line.previewBands, previewDisplayBand{displayRow, height})
 		displayRow += height
 		for row := range height {
 			for _, box := range band {
@@ -133,7 +136,7 @@ func (line *markdownLine) renderMath(inline []gitpkg.InlineSegment, base, change
 				if i >= 0 && i < len(box.rows) {
 					value = box.rows[i]
 					plain := ansi.Strip(value)
-					line.mathMap = append(line.mathMap, mathDisplaySpan{offset, offset + len(plain), box.token, box.offset})
+					line.previewMap = append(line.previewMap, previewDisplaySpan{offset, offset + len(plain), box.token, box.offset})
 					value += strings.Repeat(" ", max(0, box.width-ansi.StringWidth(value)))
 				}
 				output.WriteString(value)
@@ -147,11 +150,11 @@ func (line *markdownLine) renderMath(inline []gitpkg.InlineSegment, base, change
 		band = nil
 		used = 0
 	}
-	for _, token := range line.mathTokens {
+	for _, token := range line.previewTokens {
 		if token.text == "" {
 			continue
 		}
-		if token.style&markdownMath != 0 {
+		if token.style&markdownRendered != 0 {
 			size := lipgloss.Width(token.text)
 			if used+size > width && used > 0 {
 				flush()
@@ -193,19 +196,19 @@ func (line *markdownLine) renderMath(inline []gitpkg.InlineSegment, base, change
 	return output.String()
 }
 
-func (line *markdownLine) mathSourceOffset(offset int, end bool) int {
+func (line *markdownLine) previewSourceOffset(offset int, end bool) int {
 	if offset == 0 && !end {
 		start := 0
-		for _, span := range line.mathMap {
+		for _, span := range line.previewMap {
 			start = min(start, span.token.start)
 		}
 		return start
 	}
 	last := 0
-	for _, span := range line.mathMap {
+	for _, span := range line.previewMap {
 		last = max(last, span.token.end)
 		if offset < span.end || end && offset == span.end && span.end > span.start {
-			if span.token.style&markdownMath != 0 {
+			if span.token.style&markdownRendered != 0 {
 				if end {
 					return span.token.end
 				}
@@ -221,14 +224,14 @@ func (line *markdownLine) mathSourceOffset(offset int, end bool) int {
 	return last
 }
 
-func (line *markdownLine) mathSourceRange(start, end int) (int, int, bool) {
+func (line *markdownLine) previewSourceRange(start, end int) (int, int, bool) {
 	from, to, found := len(line.source), 0, false
-	for _, span := range line.mathMap {
+	for _, span := range line.previewMap {
 		if span.end <= start || span.start >= end {
 			continue
 		}
 		a, b := span.token.start, span.token.end
-		if span.token.style&markdownMath == 0 {
+		if span.token.style&markdownRendered == 0 {
 			stop := span.token.sourceEnd
 			if stop == 0 {
 				stop = b
@@ -242,7 +245,7 @@ func (line *markdownLine) mathSourceRange(start, end int) (int, int, bool) {
 	return from, to, found
 }
 
-func mathPlaceholder(img *inlineImage) string {
+func previewPlaceholder(img *inlineImage) string {
 	rows := strings.Split(img.placeholder(), "\n")
 	for i := range rows {
 		rows[i] = strings.TrimPrefix(rows[i], "  ")
@@ -250,12 +253,12 @@ func mathPlaceholder(img *inlineImage) string {
 	return strings.Join(rows, "\n")
 }
 
-type mathDisplayEdit struct {
+type previewDisplayEdit struct {
 	start, end int
 	token      *markdownToken
 }
 
-func (t *FileTab) mathLineHidden(line int, before bool) bool {
+func (t *FileTab) previewLineHidden(line int, before bool) bool {
 	if t.markdown == nil {
 		return false
 	}
@@ -263,12 +266,12 @@ func (t *FileTab) mathLineHidden(line int, before bool) bool {
 	if before {
 		source = t.markdown.before
 	}
-	return source != nil && line > 0 && line <= len(source.lines) && source.lines[line-1].mathHidden
+	return source != nil && line > 0 && line <= len(source.lines) && source.lines[line-1].previewHidden
 }
 
 // Build a display-only token projection.  Parsed tokens and source offsets
-// remain unchanged; an image is an atomic selection of its original TeX.
-func (m *AppModel) prepareMathDisplay() {
+// remain unchanged; an image is an atomic selection of its original source.
+func (m *AppModel) prepareRenderedDisplay() {
 	t := m.tab()
 	t.ensureMarkdownCache()
 	if t.markdown == nil {
@@ -279,12 +282,12 @@ func (m *AppModel) prepareMathDisplay() {
 			continue
 		}
 		for i := range source.lines {
-			source.lines[i].mathTokens = nil
-			source.lines[i].mathHidden = false
-			source.lines[i].mathBands = nil
-			source.lines[i].mathWidth = max(1, m.contentViewport.Width()-gutterWidth-1)
+			source.lines[i].previewTokens = nil
+			source.lines[i].previewHidden = false
+			source.lines[i].previewBands = nil
+			source.lines[i].previewWidth = max(1, m.contentViewport.Width()-gutterWidth-1)
 			if m.alternateDiff(t) {
-				source.lines[i].mathWidth = max(1, (m.contentViewport.Width()-3)/2-gutterWidth-1)
+				source.lines[i].previewWidth = max(1, (m.contentViewport.Width()-3)/2-gutterWidth-1)
 			}
 		}
 		if !m.images.enabled || m.images.hidden || m.isearch.active || t.selecting {
@@ -296,41 +299,41 @@ func (m *AppModel) prepareMathDisplay() {
 				refs = append(refs, ref)
 			}
 		}
-		projectMathDisplay(source, refs)
+		projectRenderedDisplay(source, refs)
 	}
 }
 
-func projectMathDisplay(source *markdownSource, refs []markdownImage) {
-	edits := make(map[int][]mathDisplayEdit)
+func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
+	edits := make(map[int][]previewDisplayEdit)
 	for _, ref := range refs {
-		if ref.math == "" || ref.image == nil || !ref.image.ready || ref.mathFirst < 1 || ref.line > len(source.lines) {
+		if ref.renderBody == "" || ref.image == nil || !ref.image.ready || ref.renderFirst < 1 || ref.line > len(source.lines) {
 			continue
 		}
-		if width := source.lines[ref.line-1].mathWidth; width > 0 && ref.image.columns > width {
+		if width := source.lines[ref.line-1].previewWidth; width > 0 && ref.image.columns > width {
 			continue
 		}
-		start := source.offsets[ref.mathFirst-1] + ref.mathColumn
-		end := source.offsets[ref.line-1] + ref.mathStop
-		if start < 0 || end > len(source.source) || start >= end || source.source[start:end] != ref.mathSource {
+		start := source.offsets[ref.renderFirst-1] + ref.renderColumn
+		end := source.offsets[ref.line-1] + ref.renderStop
+		if start < 0 || end > len(source.source) || start >= end || source.source[start:end] != ref.renderSource {
 			continue
 		}
-		for line := ref.mathFirst; line <= ref.line; line++ {
+		for line := ref.renderFirst; line <= ref.line; line++ {
 			from, to := 0, len(source.lines[line-1].source)
-			if line == ref.mathFirst {
-				from = ref.mathColumn
+			if line == ref.renderFirst {
+				from = ref.renderColumn
 			}
 			var token *markdownToken
 			if line == ref.line {
-				to = ref.mathStop
-				token = &markdownToken{start: start - source.offsets[line-1], end: to, text: mathPlaceholder(ref.image), style: markdownMath}
+				to = ref.renderStop
+				token = &markdownToken{start: start - source.offsets[line-1], end: to, text: previewPlaceholder(ref.image), style: markdownRendered}
 			}
-			edits[line-1] = append(edits[line-1], mathDisplayEdit{from, to, token})
+			edits[line-1] = append(edits[line-1], previewDisplayEdit{from, to, token})
 		}
 	}
 	for index, replacements := range edits {
 		line := &source.lines[index]
 		sort.Slice(replacements, func(i, j int) bool { return replacements[i].start < replacements[j].start })
-		line.mathTokens = make([]markdownToken, 0, len(line.tokens))
+		line.previewTokens = make([]markdownToken, 0, len(line.tokens))
 		appendSource := func(from, to int) {
 			for _, token := range line.tokens {
 				a, b := max(from, token.start), min(to, token.end)
@@ -342,7 +345,7 @@ func projectMathDisplay(source *markdownSource, refs []markdownImage) {
 					part.text = token.text[a-token.start : b-token.start]
 				}
 				part.start, part.end = a, b
-				line.mathTokens = append(line.mathTokens, part)
+				line.previewTokens = append(line.previewTokens, part)
 			}
 		}
 		pos := 0
@@ -352,12 +355,12 @@ func projectMathDisplay(source *markdownSource, refs []markdownImage) {
 			}
 			appendSource(pos, edit.start)
 			if edit.token != nil {
-				line.mathTokens = append(line.mathTokens, *edit.token)
+				line.previewTokens = append(line.previewTokens, *edit.token)
 			}
 			pos = edit.end
 		}
 		appendSource(pos, len(line.source))
-		line.mathHidden = strings.TrimSpace(ansi.Strip(line.render(nil, diffCommonTextBg, diffAddedTextBg, nil))) == ""
+		line.previewHidden = strings.TrimSpace(ansi.Strip(line.render(nil, diffCommonTextBg, diffAddedTextBg, nil))) == ""
 	}
 }
 
@@ -369,22 +372,22 @@ func (m AppModel) mapMathRanges(layout *renderedContentLayout) {
 		return
 	}
 	for _, ref := range t.markdownImages {
-		if ref.math == "" {
+		if ref.renderBody == "" {
 			continue
 		}
 		source, ranges := t.markdown.after, layout.lineRanges
 		if ref.before {
 			source, ranges = t.markdown.before, layout.oldRanges
 		}
-		if source == nil || ref.line > len(source.lines) || source.lines[ref.line-1].mathTokens == nil {
+		if source == nil || ref.line > len(source.lines) || source.lines[ref.line-1].previewTokens == nil {
 			continue
 		}
 		anchor, ok := ranges[ref.line]
 		if !ok {
 			continue
 		}
-		for line := ref.mathFirst; line < ref.line; line++ {
-			if !source.lines[line-1].mathHidden {
+		for line := ref.renderFirst; line < ref.line; line++ {
+			if !source.lines[line-1].previewHidden {
 				continue
 			}
 			r := anchor

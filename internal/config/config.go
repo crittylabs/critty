@@ -20,6 +20,9 @@ import (
 
 // Config is the resolved (merged) configuration.
 type Config struct {
+	MermaidMerman    string            `json:"mermaid_merman,omitempty"`
+	MermaidMmdr      string            `json:"mermaid_mmdr,omitempty"`
+	MermaidFonts     []string          `json:"mermaid_fonts,omitempty"`
 	MathRaTeX        string            `json:"math_ratex,omitempty"`
 	History          history.Policy    `json:"history"`
 	Output           string            `json:"output,omitempty"`
@@ -41,6 +44,9 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
+	MermaidMerman    string            `toml:"mermaid_merman"`
+	MermaidMmdr      string            `toml:"mermaid_mmdr"`
+	MermaidFonts     []string          `toml:"mermaid_fonts"`
 	MathRaTeX        string            `toml:"math_ratex"`
 	History          *history.Policy   `toml:"history"`
 	Output           string            `toml:"output"`
@@ -78,6 +84,7 @@ func Load(projectRoot string) (*Config, error) {
 	// Executable selection is a user setting, never repository-controlled.
 	if global != nil {
 		cfg.MathRaTeX = global.MathRaTeX
+		cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts = global.MermaidMerman, global.MermaidMmdr, global.MermaidFonts
 	}
 	// Retention can delete saved data, so repositories cannot enable it.
 	if global != nil && global.History != nil {
@@ -103,6 +110,19 @@ func Load(projectRoot string) (*Config, error) {
 	}
 	if !filepath.IsAbs(cfg.MathRaTeX) && strings.ContainsAny(cfg.MathRaTeX, `/\`) {
 		return nil, fmt.Errorf("math_ratex must be auto, off, a command name, or an absolute path")
+	}
+	for name, command := range map[string]string{"mermaid_merman": cfg.MermaidMerman, "mermaid_mmdr": cfg.MermaidMmdr} {
+		if !filepath.IsAbs(command) && strings.ContainsAny(command, `/\`) {
+			return nil, fmt.Errorf("%s must be auto, off, a command name, or an absolute path", name)
+		}
+	}
+	if len(cfg.MermaidFonts) > 8 {
+		return nil, fmt.Errorf("mermaid_fonts accepts at most 8 files")
+	}
+	for _, font := range cfg.MermaidFonts {
+		if !filepath.IsAbs(font) {
+			return nil, fmt.Errorf("mermaid_fonts requires absolute paths")
+		}
 	}
 	if cfg.Author == "" {
 		cfg.Author = gitUserName()

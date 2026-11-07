@@ -362,6 +362,9 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 	t.Setenv("HERDR_PANE_ID", "")
 	oldLook := lookPath
 	oldFind := findMathRaTeX
+	oldMermaid := findMermaid
+	t.Cleanup(func() { findMermaid = oldMermaid })
+	findMermaid = func(string, string) (string, error) { return "", nil }
 	t.Cleanup(func() { lookPath, findMathRaTeX = oldLook, oldFind })
 	findMathRaTeX = func(string) (string, error) { return "", nil }
 	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }

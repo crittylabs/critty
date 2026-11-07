@@ -67,7 +67,7 @@ func (m *AppModel) rebuildContent() {
 	}
 	t := m.tab()
 	t.ensureHighlightCache()
-	m.prepareMathDisplay()
+	m.prepareRenderedDisplay()
 	m.syncOutline()
 	t.unread = false
 	if m.alternateDiff(t) {
@@ -268,7 +268,7 @@ func (m *AppModel) rebuildContent() {
 			}
 			decorate := m.isearchDecorator(lineRef{side: "old", line: del.OldLineNum})
 			var rows []string
-			if isMarkdown && t.mathLineHidden(del.OldLineNum, true) {
+			if isMarkdown && t.previewLineHidden(del.OldLineNum, true) {
 				// The closing line carries this expression's image.
 			} else if isMarkdown {
 				content, _, width, measured := t.markdownDisplayLineInfo(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
@@ -367,7 +367,7 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		// Check if this line is part of a table block
-		if t.mathLineHidden(lineNum, false) {
+		if t.previewLineHidden(lineNum, false) {
 			// Preserve annotations while replacing this source with its image.
 		} else if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
 			var rows []string

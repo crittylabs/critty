@@ -84,7 +84,7 @@ var keys = keyMap{
 	Watch:            key.NewBinding(key.WithKeys("W", "shift+w", "shift+W", "shift+f5", "alt+R", "alt+shift+r", "alt+shift+R"), key.WithHelp("W/S-F5/M-R", "watch")),
 	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),
 	Split:            key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "toggle split diff")),
-	Images:           key.NewBinding(key.WithKeys("I"), key.WithHelp("I", "show/hide images or recheck support")),
+	Images:           key.NewBinding(key.WithKeys("I", "alt+i"), key.WithHelp("I/M-i", "show/hide image, math, and Mermaid previews")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),
 	FormList:         key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "answer list")),

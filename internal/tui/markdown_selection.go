@@ -159,10 +159,10 @@ func rawTextOffset(raw, rendered string, offset int, end bool) int {
 }
 
 func (line *markdownLine) sourceOffset(offset int, end bool) int {
-	if line.mathTokens != nil && len(line.mathMap) > 0 {
-		return line.mathSourceOffset(offset, end)
+	if line.previewTokens != nil && len(line.previewMap) > 0 {
+		return line.previewSourceOffset(offset, end)
 	}
-	if offset == 0 && !end && line.mathTokens == nil {
+	if offset == 0 && !end && line.previewTokens == nil {
 		return 0
 	}
 	pos := 0
@@ -170,7 +170,7 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 		value := line.displayTokenText(i)
 		stop := pos + len(value)
 		if offset < stop || end && offset == stop && stop > pos {
-			if token.style&markdownMath != 0 {
+			if token.style&markdownRendered != 0 {
 				if end {
 					return token.end
 				}
@@ -189,7 +189,7 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 
 func (line *markdownLine) displayTokenText(i int) string {
 	token := line.displayTokens()[i]
-	if token.style&markdownMath != 0 {
+	if token.style&markdownRendered != 0 {
 		return ansi.Strip(token.text)
 	}
 	value := displaySourceText(token.text)

@@ -204,9 +204,9 @@ func (m *AppModel) selectedText() string {
 			}
 			if source != nil && span.ref.line > 0 && span.ref.line <= len(source.lines) {
 				line := &source.lines[span.ref.line-1]
-				if line.mathTokens != nil {
+				if line.previewTokens != nil {
 					var found bool
-					start, end, found = line.mathSourceRange(start, end)
+					start, end, found = line.previewSourceRange(start, end)
 					if !found {
 						continue
 					}

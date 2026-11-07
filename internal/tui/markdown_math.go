@@ -85,7 +85,7 @@ func markdownMathRefs(source string) []markdownImage {
 		first := strings.Count(source[:node.start], "\n") + 1
 		column := node.start - strings.LastIndexByte(source[:node.start], '\n') - 1
 		stop := node.end - strings.LastIndexByte(source[:node.end], '\n') - 1
-		refs = append(refs, markdownImage{line: strings.Count(source[:node.end], "\n") + 1, math: node.formula, mathInline: node.inline, mathFirst: first, mathColumn: column, mathStop: stop, mathSource: source[node.start:node.end]})
+		refs = append(refs, markdownImage{line: strings.Count(source[:node.end], "\n") + 1, renderBody: node.formula, renderInline: node.inline, renderFirst: first, renderColumn: column, renderStop: stop, renderSource: source[node.start:node.end]})
 	}
 	return refs
 }
@@ -115,6 +115,9 @@ func markdownMathSpans(data []byte, depth int) []mathSpan {
 		case *mathNode:
 			spans = append(spans, mathSpan{node.start, node.end, node.formula, node.inline})
 		case *ast.CodeBlock:
+			if language, _ := node.Language(data); language == "mermaid" {
+				return ast.WalkSkipChildren, nil
+			}
 			type projection struct{ local, start int }
 			var body strings.Builder
 			var positions []projection

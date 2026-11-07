@@ -42,6 +42,8 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `prompts` | Table mapping prompt keys to overrides. |
 | `history` | Global-only table controlling task retention. |
 | `math_ratex` | Global-only RaTeX selection: `auto` (default), `off`, a command name, or an absolute executable path. |
+| `mermaid_merman`, `mermaid_mmdr` | Global-only Mermaid CLI selections with the same `auto`, `off`, command, or absolute path values. |
+| `mermaid_fonts` | Global-only array of up to eight absolute font-file paths for Merman; omission enables automatic font selection. |
 
 Global settings are applied first, followed by project settings.  Settings merge as follows:
 
@@ -94,6 +96,30 @@ math_ratex = "off"
 ```
 
 Use `auto` (or omit the setting) for automatic discovery.  To select a wrapper or another installation, set `math_ratex` to its command name or absolute path.  Project files cannot override this selection.  Each renderer command has a three-second deadline.  Expressions are limited to 16 KiB and PNGs to 5 MiB and 16 megapixels.  Results are cached in memory for the open viewer.  LaTeX runs in a temporary directory with shell escape disabled and restrictive TeX file access; dvipng disables Ghostscript.  The subprocesses retain the user's OS permissions, so these controls do not provide an OS sandbox.
+
+## Mermaid previews
+
+In terminals supporting image previews, fenced `mermaid` blocks in documents and comments can appear as diagrams.  Copying keeps the original fence and Mermaid source, and review coordinates stay attached to the source lines.  The comment editor retains editable source and shows the diagram below its closing fence after a typing pause.  Press `I` or `M-i` (`Alt+i`) outside input, use `M-i` in the comment editor, or click **Images** to show or hide images, math, and Mermaid previews together.  Turning previews off does not change the document or editor text.  Searching or selecting document source also reveals its text.
+
+Critty tries [Merman](https://github.com/Latias94/merman), then [mmdr](https://github.com/1jehuang/mermaid-rs-renderer) if it is installed and Merman is missing, fails, or produces an invalid PNG.  If neither renderer succeeds, the source remains visible.  These native CLIs run without a browser.  Their syntax coverage and layout can differ from official Mermaid; mmdr can accept malformed input and treats math labels as literal text.  It is a best-effort preview fallback.  Set `mermaid_mmdr = "off"` to keep the source on Merman failure instead.
+
+### Install with mise
+
+Install Merman, and optionally mmdr for fallback:
+
+```sh
+mise use -g 'github:Latias94/merman[matching=merman-cli]@latest'
+mise use -g github:1jehuang/mermaid-rs-renderer@latest
+critty doctor
+```
+
+No Critty configuration is needed when the executables are on PATH.  Global `mermaid_merman` and `mermaid_mmdr` accept `auto` (or omission), `off`, a command name, or an absolute executable path.  Project files cannot override these selections.  Tools are never installed automatically.  `doctor` checks availability, not rendering correctness or complete font coverage.
+
+### Fonts and limits
+
+If Fontconfig's `fc-match` is available, Critty selects a generic sans face and a face matching the diagram's character set.  Merman receives their font files directly, avoiding a full system-font scan that can exceed Merman 0.9.3's limits on font-rich hosts.  mmdr receives the matching installed family through its configuration.  Without Fontconfig, each renderer uses its own system-font defaults.  The result depends on installed fonts; matching does not guarantee every glyph or weight.  Missing glyphs may be blank even when a renderer succeeds.  Install Fontconfig through your OS package manager if automatic discovery fails, or set `mermaid_fonts` globally to explicit font-file paths for Merman.  Those files do not supply fonts to mmdr.
+
+Inputs are limited to 64 KiB.  Each command has a three-second deadline; generated PNGs are limited to 5 MiB, 4096 pixels per side, and 16 megapixels.  Merman applies raster limits before generation; mmdr's reported dimensions are checked before PNG generation.  Results are cached in memory for the open viewer.  Source code and font paths are passed as data, without shell evaluation.  Merman network access remains disabled, and subprocesses retain the user's OS permissions.
 
 ## History settings
 

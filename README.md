@@ -124,6 +124,8 @@ PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed
 
 Markdown math expressions in `$...$` and `$$...$$` can appear as images in documents and comments, including code blocks such as suggestions and Markdown examples.  Copying keeps the original TeX; searching, selecting lines, or turning Images off reveals the source.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH first, with LaTeX plus dvipng as fallback; multiline expressions use LaTeX directly.  These optional tools stay outside Critty, and missing tools or rendering failures leave the source visible.  See [math preview setup and limits](docs/configuration.md#math-previews).
 
+Fenced `mermaid` blocks can appear as diagrams through the optional native Merman CLI, with mmdr as fallback.  The comment editor keeps the source with a preview below it.  Press `I` or `M-i` (`Alt+i`) outside input, use `M-i` while editing comments, or click **Images** to toggle image, math, and Mermaid previews together.  See [Mermaid setup and limits](docs/configuration.md#mermaid-previews).
+
 Attach images alongside review documents with `--attachment image.png`, including in attachment-only reviews.  Images are saved with the review, so resuming keeps the reviewed version even if the original changes or disappears.  Supported terminals show the image inline and in the lightbox; other terminals show its format and dimensions.  Image attachments are limited to 5 MiB and 16 megapixels.  Animated GIFs display their first frame.
 
 <a id="codex-with-a-background-server"></a>

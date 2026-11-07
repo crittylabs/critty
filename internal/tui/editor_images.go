@@ -116,15 +116,13 @@ func (m *AppModel) applyEditorImages(value string) {
 		s.refs = append(s.refs, editorImageRef{line: ref.line, path: path, key: key})
 		m.commentImageSide(key)
 	}
-	if m.math.Available() {
-		for _, ref := range markdownMathRefs(value) {
-			if len(s.refs) >= maxEditorImages {
-				break
-			}
-			key := commentImageKey{width: s.width, math: ref.math, inline: ref.mathInline, dark: terminalIsDark, editor: true}
-			s.refs = append(s.refs, editorImageRef{line: ref.line, key: key})
-			m.commentImageSide(key)
+	for _, ref := range m.renderedRefs(value) {
+		if len(s.refs) >= maxEditorImages {
+			break
 		}
+		key := commentImageKey{width: s.width, renderKind: ref.renderKind, renderBody: ref.renderBody, inline: ref.renderInline, dark: terminalIsDark, editor: true}
+		s.refs = append(s.refs, editorImageRef{line: ref.line, key: key})
+		m.commentImageSide(key)
 	}
 }
 
@@ -143,13 +141,13 @@ func (m AppModel) editorImageBlocks() map[int][]string {
 			continue
 		}
 		if side.failed {
-			if ref.key.math != "" {
+			if ref.key.renderBody != "" {
 				continue
 			}
 			byLine[ref.line] = append(byLine[ref.line], ansi.Truncate("  Image preview unavailable", s.width, ""))
 		} else if side.image != nil && side.image.ready {
 			uri := imageTarget{path: ref.path}.uri()
-			if ref.key.math != "" {
+			if ref.key.renderBody != "" {
 				uri = ""
 			}
 			byLine[ref.line] = append(byLine[ref.line], side.image.linkedPlaceholder(uri))
@@ -287,4 +285,17 @@ func textareaWrap(runes []rune, width int) [][]rune {
 		lines[row] = append(lines[row], spaceRunes(spaces)...)
 	}
 	return lines
+}
+
+func (m AppModel) editorPreviewButtons() []modalButtonSpec {
+	if m.editorModal() == noModal {
+		return nil
+	}
+	state := "on"
+	if m.images.hidden {
+		state = "off"
+	} else if !m.images.enabled {
+		state = "N/A"
+	}
+	return []modalButtonSpec{{rendered: m.renderModalButton("Images: "+state, "M-i", false), action: modalMouseAction{toggleImages: true}}}
 }

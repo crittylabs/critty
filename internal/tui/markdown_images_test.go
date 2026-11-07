@@ -275,6 +275,18 @@ func TestImagesTogglePreservesTextInput(t *testing.T) {
 	if !app.images.hidden {
 		t.Fatal("I did not hide images")
 	}
+	for _, readOnly := range []bool{false, true} {
+		app.readOnly = readOnly
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'i', Mod: tea.ModAlt})
+		if app.images.hidden {
+			t.Fatalf("M-i did not show previews (read-only=%t)", readOnly)
+		}
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'i', Mod: tea.ModAlt})
+		if !app.images.hidden {
+			t.Fatalf("M-i did not hide previews (read-only=%t)", readOnly)
+		}
+	}
+	app.readOnly = false
 	app.width, app.height = 100, 40
 	app.recalculateLayout()
 	_, layout := app.renderReviewScreen()

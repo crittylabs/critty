@@ -64,6 +64,7 @@ var doctorSections = map[string]string{
 	"ai":           "AI reviews",
 	"images":       "Images",
 	"math":         "Math previews",
+	"mermaid":      "Mermaid previews",
 	"terminal":     "Terminal binding",
 	"launchers":    "Review launchers",
 	"history":      "Review history",
@@ -227,6 +228,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkAI(python)
 			r.checkImages()
 			r.checkMath()
+			r.checkMermaid()
 			r.checkHistory()
 			r.checkTerminalBinding(request, notifyOnly)
 			origin := terminalbinding.CaptureOrigin(os.Getpid())

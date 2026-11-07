@@ -42,6 +42,9 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
 		MathRaTeX:        cfg.MathRaTeX,
+		MermaidMerman:    cfg.MermaidMerman,
+		MermaidMmdr:      cfg.MermaidMmdr,
+		MermaidFonts:     cfg.MermaidFonts,
 		Branch:           branch,
 		Context:          ctx,
 		Watch:            reviewWatch,

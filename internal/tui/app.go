@@ -26,6 +26,7 @@ import (
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/mathrender"
+	"github.com/crittylabs/critty/internal/mermaidrender"
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/searchhistory"
 )
@@ -92,8 +93,10 @@ type AppConfig struct {
 	FocusPath string
 	FocusLine int
 	// Answers labels Comment as Confirm answers and selects it by default.
-	Answers   bool
-	MathRaTeX string
+	Answers                    bool
+	MathRaTeX                  string
+	MermaidMerman, MermaidMmdr string
+	MermaidFonts               []string
 }
 
 // gutterWidth is the total width of the left gutter: line number (5) + marker (1) + space (1).
@@ -102,19 +105,20 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
-	textSelection contentTextSelection
-	readOnly      bool
-	reload        reloadState
-	images        imageDisplay
-	math          *mathrender.Renderer
-	commentImages map[commentImageKey]*previewSide
-	imageBodies   map[string][]markdownImageRef
-	mathBodies    map[string]*commentMathBody
-	editorImages  editorImageState
-	lightbox      lightboxState
-	forms         *review.FormState
-	formRows      map[string]map[int]formRow
-	formViewed    map[string]map[int]bool
+	textSelection  contentTextSelection
+	readOnly       bool
+	reload         reloadState
+	images         imageDisplay
+	math           *mathrender.Renderer
+	mermaid        *mermaidrender.Renderer
+	commentImages  map[commentImageKey]*previewSide
+	imageBodies    map[string][]markdownImageRef
+	renderedBodies map[string]*commentRenderedBody
+	editorImages   editorImageState
+	lightbox       lightboxState
+	forms          *review.FormState
+	formRows       map[string]map[int]formRow
+	formViewed     map[string]map[int]bool
 	// formTargets maps select-all IDs to item indices by document path.
 	formTargets   map[string]map[string][]int
 	formList      formListState
@@ -359,6 +363,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
 		math:             mathrender.New(cfg.MathRaTeX),
+		mermaid:          mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		project:          cfg.Project,
 		branch:           cfg.Branch,
 		topic:            cfg.Topic,
@@ -454,6 +459,8 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		searchRing:      loadSearchRing(cfg.SearchHistory),
 		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
+		math:            mathrender.New(cfg.MathRaTeX),
+		mermaid:         mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		project:         cfg.Project,
 		branch:          cfg.Branch,
 		topic:           cfg.Topic,
@@ -678,7 +685,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case imageTransmittedMsg:
-		if msg.math && msg.mathDark != terminalIsDark {
+		if msg.rendered && msg.renderDark != terminalIsDark {
 			return m, nil
 		}
 		if msg.comment != nil {
@@ -777,7 +784,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		initAdaptiveStyles(msg.IsDark())
 		if recolor {
 			for key, side := range m.commentImages {
-				if key.math == "" {
+				if key.renderBody == "" {
 					continue
 				}
 				if side.image != nil {
@@ -790,7 +797,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if recolor {
 				for j := range m.tabs[i].markdownImages {
 					ref := &m.tabs[i].markdownImages[j]
-					if ref.math == "" {
+					if ref.renderBody == "" {
 						continue
 					}
 					if ref.image != nil {
@@ -2316,6 +2323,9 @@ func (m *AppModel) submitReview(verdict review.Verdict) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "alt+i" && m.editorModal() != noModal {
+		return m, m.toggleImages()
+	}
 	m.clipboardStatus = ""
 	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
 		return m, cmd
@@ -3646,6 +3656,7 @@ func (m *AppModel) selectTab(index int) {
 type modalMouseAction struct {
 	resolve         bool
 	openImage       bool
+	toggleImages    bool
 	dialog          bool // the whole dialog frame
 	close           bool
 	lineInput       bool
@@ -3687,6 +3698,9 @@ func (m *AppModel) handleTextModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 			continue
 		}
 		action := region.action
+		if action.toggleImages {
+			return m, m.toggleImages()
+		}
 		if action.resolve {
 			m.toggleResolve(m.editingID)
 			return m, nil
@@ -4531,7 +4545,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "M-G", desc: "focus outline"},
 			{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline"},
 			{keys: "enter/esc", desc: "outline: return to source"},
-			{keys: "w · S · I", desc: "whitespace / split / images"},
+			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "M-? · esc", desc: "help / close help"},
@@ -4547,7 +4561,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},
 		{keys: "V · O", desc: "reading view / open all"},
-		{keys: "w · I", desc: "WS changes · images"},
+		{keys: "w · I/M-i", desc: "WS changes · image/math/Mermaid previews"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
 		{keys: "o/M-o", desc: "open image/link/reference on line"},
@@ -4593,6 +4607,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,k/j · enter/v/esc · C-PgUp/PgDn", desc: "⇅ extend · comment/toggle/cancel selection · ⇅ scroll thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
+		{keys: "M-i (editors)", desc: "show/hide image, math, and Mermaid previews without changing source"},
 		{keys: "drag,S-arrows · M-w · C-v · C-z (editors)", desc: "select text · copy it · paste clipboard text · undo the last deletion, overwrite, or paste; esc cancels the selection"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
@@ -5015,7 +5030,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 			content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), innerWidth)
 			contentRegions = append(contentRegions, textareaRegion)
-			buttons, buttonRegions := layoutModalActions(buttonSpecs, innerWidth, strings.Count(content, "\n"))
+			buttons, buttonRegions := layoutModalActions(append(buttonSpecs, m.editorPreviewButtons()...), innerWidth, strings.Count(content, "\n"))
 			content += buttons
 			contentRegions = append(contentRegions, buttonRegions...)
 			return content, contentRegions
@@ -5060,10 +5075,10 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		}
 		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
 		regions = append(regions, textareaRegion)
-		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
+		buttons, buttonRegions := layoutModalActions(append([]modalButtonSpec{
 			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
-		}, innerWidth, strings.Count(prefix, "\n"))
+		}, m.editorPreviewButtons()...), innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
 		regions = append(regions, closeRegion)
 		modalContent = frameStyle.Width(modalWidth).Render(prefix + buttons)
@@ -5151,7 +5166,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			content, textareaRegion := layoutModalTextarea(content, m.clipboardTextareaView(), innerWidth)
 			contentRegions = append(contentRegions, textareaRegion)
 			buttonY := strings.Count(content, "\n")
-			buttonRow, buttonRegions := layoutModalActions(buttonSpecs, innerWidth, buttonY)
+			buttonRow, buttonRegions := layoutModalActions(append(buttonSpecs, m.editorPreviewButtons()...), innerWidth, buttonY)
 			content += buttonRow
 			contentRegions = append(contentRegions, buttonRegions...)
 			buttonY += lipgloss.Height(buttonRow)

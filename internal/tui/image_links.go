@@ -223,7 +223,7 @@ func (m *AppModel) lineImages(target imageTarget) []imageTarget {
 	}
 	var targets []imageTarget
 	for _, ref := range m.tab().markdownImages {
-		if ref.math == "" && ref.line == target.line && ref.before == target.before {
+		if ref.renderBody == "" && ref.line == target.line && ref.before == target.before {
 			targets = append(targets, ref.target())
 		}
 	}
@@ -281,7 +281,7 @@ func (m *AppModel) openImageAtCursor() tea.Cmd {
 	}
 	before := t.cursorSide == "old"
 	for _, ref := range t.markdownImages {
-		if ref.math == "" && ref.line == t.cursorLine && ref.before == before {
+		if ref.renderBody == "" && ref.line == t.cursorLine && ref.before == before {
 			return m.openImage(ref.target())
 		}
 	}

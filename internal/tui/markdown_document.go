@@ -31,7 +31,7 @@ const (
 	markdownCode
 	markdownLink
 	markdownCodePadding
-	markdownMath
+	markdownRendered
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -45,16 +45,16 @@ type markdownToken struct {
 }
 
 type markdownLine struct {
-	source     string
-	tokens     []markdownToken
-	cells      [][2]int
-	tableSep   bool
-	literal    bool
-	mathTokens []markdownToken
-	mathHidden bool
-	mathMap    []mathDisplaySpan
-	mathBands  []mathDisplayBand
-	mathWidth  int
+	source        string
+	tokens        []markdownToken
+	cells         [][2]int
+	tableSep      bool
+	literal       bool
+	previewTokens []markdownToken
+	previewHidden bool
+	previewMap    []previewDisplaySpan
+	previewBands  []previewDisplayBand
+	previewWidth  int
 	// plainRender caches the rendering without word-diff segments, and
 	// inlineRender the one for the segments it was last rendered with.
 	plainRender, inlineRender markdownRender
@@ -351,11 +351,11 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 }
 
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
-	if line.mathTokens != nil {
-		return line.renderMath(inline, base, changed, links)
+	if line.previewTokens != nil {
+		return line.renderPreview(inline, base, changed, links)
 	}
 	key := inlineKey(inline)
-	cacheable := len(links) == 0 && line.mathTokens == nil
+	cacheable := len(links) == 0 && line.previewTokens == nil
 	slot := line.cacheSlot(key)
 	if cacheable && slot.set && slot.dark == terminalIsDark && slot.with == key {
 		return slot.text
@@ -366,7 +366,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		if token.text == "" {
 			continue
 		}
-		if token.style&markdownMath != 0 {
+		if token.style&markdownRendered != 0 {
 			b.WriteString(token.text)
 			continue
 		}
@@ -455,8 +455,8 @@ func (t *FileTab) markdownTableCellsWithInline(line int, links []linkSpan, inlin
 			cell.tokens = append(cell.tokens, part)
 		}
 		for _, token := range cell.tokens {
-			if token.style&markdownMath != 0 {
-				cell.mathTokens = cell.tokens
+			if token.style&markdownRendered != 0 {
+				cell.previewTokens = cell.tokens
 				break
 			}
 		}

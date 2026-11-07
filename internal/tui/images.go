@@ -106,16 +106,16 @@ func (t *FileTab) previewSides() []bool {
 }
 
 type imageLoadedMsg struct {
-	math, mathDark, mathInline bool
-	path                       string
-	comment                    *commentImageKey
-	markdown                   int
-	before                     bool
-	sequence                   string
-	id                         int
-	width, height              int
-	info                       imageinfo.Info
-	err                        error
+	rendered, renderDark, renderInline bool
+	path                               string
+	comment                            *commentImageKey
+	markdown                           int
+	before                             bool
+	sequence                           string
+	id                                 int
+	width, height                      int
+	info                               imageinfo.Info
+	err                                error
 }
 
 type imageTransmittedMsg struct{ imageLoadedMsg }
@@ -494,7 +494,7 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 	if err != nil {
 		return msg
 	}
-	if msg.mathInline {
+	if msg.renderInline {
 		img = centerInlineMath(img, d.cell)
 	}
 	msg.id = newImageID()
@@ -506,7 +506,7 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 }
 
 func (m AppModel) finishImageLoad(msg imageLoadedMsg) (tea.Model, tea.Cmd) {
-	if msg.math && msg.mathDark != terminalIsDark {
+	if msg.rendered && msg.renderDark != terminalIsDark {
 		return m, nil
 	}
 	if msg.comment == nil && msg.markdown == 0 {

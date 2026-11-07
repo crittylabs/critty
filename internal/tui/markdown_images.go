@@ -20,15 +20,16 @@ import (
 )
 
 type markdownImage struct {
-	line                            int
-	before                          bool
-	path                            string
-	url                             string // web URL that is linked but not previewed
-	local                           bool
-	math                            string
-	mathInline                      bool
-	mathFirst, mathColumn, mathStop int
-	mathSource                      string
+	line                                  int
+	before                                bool
+	path                                  string
+	url                                   string // web URL that is linked but not previewed
+	local                                 bool
+	renderKind                            renderedKind
+	renderBody                            string
+	renderInline                          bool
+	renderFirst, renderColumn, renderStop int
+	renderSource                          string
 	// start and end bound the reference text on its line.
 	start, end    int
 	columns, rows int // retain layout while pixels are released or reloading
@@ -232,14 +233,12 @@ func (m AppModel) findMarkdownImages() tea.Cmd {
 				img.path = imagePath
 				msg.images = append(msg.images, img)
 			}
-			if m.math.Available() {
-				for _, ref := range markdownMathRefs(content) {
-					if len(msg.images) >= 64 {
-						break
-					}
-					ref.before, ref.local = before, true
-					msg.images = append(msg.images, ref)
+			for _, ref := range m.renderedRefs(content) {
+				if len(msg.images) >= 64 {
+					break
 				}
+				ref.before, ref.local = before, true
+				msg.images = append(msg.images, ref)
 			}
 		}
 		if t.doc != nil {
@@ -281,13 +280,13 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 	source := m.imageSource()
 	dark := terminalIsDark
 	return func() tea.Msg {
-		if ref.math != "" {
+		if ref.renderBody != "" {
 			ctx := m.reload.context
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			data, err := m.math.Render(ctx, ref.math, ref.mathInline, dark)
-			return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, math: true, mathDark: dark, mathInline: ref.mathInline, err: err})
+			data, err := m.renderSource(ctx, ref.renderKind, ref.renderBody, ref.renderInline, dark)
+			return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, rendered: true, renderDark: dark, renderInline: ref.renderInline, err: err})
 		}
 		if ref.local {
 			source = gitpkg.ReviewSource{}
@@ -386,19 +385,13 @@ func (m *AppModel) renderMarkdownImages(line int, before bool) string {
 		if ref.line != line || ref.before != before {
 			continue
 		}
-		if ref.math != "" {
+		if ref.renderBody != "" {
 			continue
 		}
 		if ref.failed {
-			if ref.math != "" {
-				continue
-			}
 			blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 		} else if ref.image != nil && ref.image.ready {
 			uri := ref.target().uri()
-			if ref.math != "" {
-				uri = ""
-			}
 			blocks = append(blocks, ref.image.linkedPlaceholder(uri))
 		} else if ref.columns > 0 && ref.rows > 0 {
 			row := strings.Repeat(" ", min(width, ref.columns+2))

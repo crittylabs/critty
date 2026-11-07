@@ -230,3 +230,23 @@ end = "typo"
 		t.Fatal("invalid history policy accepted")
 	}
 }
+
+func TestMermaidConfigurationIsGlobalOnly(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	project := t.TempDir()
+	writeConfig(t, GlobalPath(), "mermaid_merman='wrapper'\nmermaid_mmdr='off'\nmermaid_fonts=['/fonts/sans.ttf']")
+	writeConfig(t, ProjectPath(project), "mermaid_merman='/untrusted/renderer'\nmermaid_mmdr='/untrusted/fallback'\nmermaid_fonts=['/untrusted/font.ttf']")
+	cfg, err := Load(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MermaidMerman != "wrapper" || cfg.MermaidMmdr != "off" || len(cfg.MermaidFonts) != 1 || cfg.MermaidFonts[0] != "/fonts/sans.ttf" {
+		t.Fatalf("project overrode renderer: %+v", cfg)
+	}
+	for _, text := range []string{"mermaid_merman='./wrapper'", "mermaid_mmdr='bin/mmdr'", "mermaid_fonts=['relative.ttf']"} {
+		writeConfig(t, GlobalPath(), text)
+		if _, err := Load(project); err == nil {
+			t.Fatalf("invalid configuration accepted: %s", text)
+		}
+	}
+}

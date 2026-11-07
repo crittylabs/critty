@@ -16,7 +16,8 @@ import (
 type commentImageKey struct {
 	path                 string
 	width                int
-	math                 string
+	renderKind           renderedKind
+	renderBody           string
 	inline, dark, editor bool
 }
 
@@ -95,15 +96,15 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 	width = max(1, width)
 	refs := m.commentImageRefs(body)
 	showImages := !m.images.hidden && m.modal == noModal
-	mathSource := m.commentMathDisplay(body, width, showImages)
+	renderSource := m.commentRenderedDisplay(body, width, showImages)
 	var lines []string
 	prefixed := false
 	for i, line := range strings.Split(body, "\n") {
-		if mathSource != nil && mathSource.lines[i].mathHidden {
+		if renderSource != nil && renderSource.lines[i].previewHidden {
 			continue
 		}
 		content := style.Render(m.linkCommentLine(line, refs, i+1))
-		if mathSource != nil && mathSource.lines[i].mathTokens != nil {
+		if renderSource != nil && renderSource.lines[i].previewTokens != nil {
 			links := m.referenceSpans(line)
 			for _, ref := range refs {
 				if ref.line == i+1 {
@@ -112,7 +113,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 					}
 				}
 			}
-			content = style.Render(mathSource.lines[i].render(nil, style, style, links))
+			content = style.Render(renderSource.lines[i].render(nil, style, style, links))
 		}
 		if !prefixed && prefix != "" {
 			content = style.Bold(true).Render(prefix) + content
@@ -150,13 +151,13 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 
 func (m AppModel) loadCommentImage(key commentImageKey) tea.Cmd {
 	return func() tea.Msg {
-		if key.math != "" {
+		if key.renderBody != "" {
 			ctx := m.reload.context
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			data, err := m.math.Render(ctx, key.math, key.inline, key.dark)
-			return m.images.encode(data, imageLoadedMsg{comment: &key, math: true, mathDark: key.dark, mathInline: key.inline && !key.editor, err: err})
+			data, err := m.renderSource(ctx, key.renderKind, key.renderBody, key.inline, key.dark)
+			return m.images.encode(data, imageLoadedMsg{comment: &key, rendered: true, renderDark: key.dark, renderInline: key.inline && !key.editor, err: err})
 		}
 		data, err := (gitpkg.ReviewSource{}).PreviewContent(key.path, false, maxPreviewBytes)
 		return m.images.encode(data, imageLoadedMsg{comment: &key, err: err})
@@ -178,7 +179,7 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 	}
 	loading := 0
 	for key, side := range m.commentImages {
-		if key.math != "" && key.dark != terminalIsDark {
+		if key.renderBody != "" && key.dark != terminalIsDark {
 			continue
 		}
 		if side.image == nil && side.attempted && !side.failed {
@@ -187,12 +188,19 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 	}
 	var cmds []tea.Cmd
 	for key, side := range m.commentImages {
-		if key.math != "" && key.dark != terminalIsDark {
+		if key.renderBody != "" && key.dark != terminalIsDark {
 			continue
 		}
 		if img := side.image; img != nil {
 			cols, rows := img.size(min(44, key.width), 11, m.images.cell)
-			if key.math != "" && key.inline && !key.editor {
+			if key.renderBody != "" && key.renderKind == renderedMermaid {
+				maxRows := 19
+				if key.editor {
+					maxRows = min(11, max(1, m.height-20))
+				}
+				cols, rows = img.fit(key.width, maxRows, m.images.cell)
+			}
+			if key.renderBody != "" && key.inline && !key.editor {
 				cols, rows = img.fit(min(44, key.width), 5, m.images.cell)
 			}
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
