@@ -12,11 +12,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/crittylabs/critty/internal/renderfont"
 )
 
 type command func(context.Context, string, string, string, ...string) ([]byte, error)
@@ -28,11 +28,12 @@ type result struct {
 
 // Renderer keeps subprocesses and a small result cache within one viewer.
 type Renderer struct {
-	mu                       sync.Mutex
-	merman, mmdr, fontconfig string
-	fonts                    []string
-	run                      command
-	cache                    map[string]result
+	mu           sync.Mutex
+	merman, mmdr string
+	fontSelector *renderfont.Selector
+	fonts        []string
+	run          command
+	cache        map[string]result
 }
 
 // Find resolves a global command override, auto discovery, or explicit off.
@@ -50,8 +51,7 @@ func Find(setting, name string) (string, error) {
 func New(merman, mmdr string, fonts []string) *Renderer {
 	merman, _ = Find(merman, "merman-cli")
 	mmdr, _ = Find(mmdr, "mmdr")
-	fc, _ := exec.LookPath("fc-match")
-	return &Renderer{merman: merman, mmdr: mmdr, fontconfig: fc, fonts: append([]string(nil), fonts...), run: runCommand, cache: make(map[string]result)}
+	return &Renderer{merman: merman, mmdr: mmdr, fontSelector: renderfont.New(), fonts: append([]string(nil), fonts...), run: runCommand, cache: make(map[string]result)}
 }
 
 func (r *Renderer) Available() bool {
@@ -114,10 +114,10 @@ func (r *Renderer) render(ctx context.Context, source string, dark bool) ([]byte
 	// mmdr has no raster budget flags. Check its natural dimensions before
 	// allowing the PNG allocation, using the same source, theme, and fonts.
 	args := []string{"--input", "-", "--theme", theme}
-	if len(fonts) > 0 && r.fontconfig != "" {
+	if len(fonts) > 0 && r.fontSelector.Available() {
 		// Resolve an installed family matching the source character set.
 		// mmdr accepts families through configuration, not explicit font files.
-		if family := r.fontFamily(ctx, source); family != "" {
+		if family := r.fontSelector.Family(ctx, source); family != "" {
 			data, err := json.Marshal(map[string]any{"themeVariables": map[string]string{"fontFamily": family}})
 			if err != nil {
 				return nil, err
@@ -147,48 +147,11 @@ func validSize(width, height float64) bool {
 	return !math.IsNaN(width) && !math.IsNaN(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && math.Ceil(width)*math.Ceil(height) <= 16<<20
 }
 
-func fontPattern(source string) string {
-	chars := make(map[rune]bool)
-	for _, ch := range source {
-		if ch > ' ' {
-			chars[ch] = true
-		}
-	}
-	var values []string
-	for ch := range chars {
-		values = append(values, strconv.FormatInt(int64(ch), 16))
-	}
-	sort.Strings(values)
-	return ":charset=" + strings.Join(values, " ")
-}
-
 func (r *Renderer) selectFonts(ctx context.Context, source string) []string {
 	if len(r.fonts) > 0 {
 		return r.fonts
 	}
-	if r.fontconfig == "" {
-		return nil
-	}
-	var fonts []string
-	for _, pattern := range []string{"sans-serif", fontPattern(source)} {
-		data, err := r.run(ctx, r.fontconfig, "", "", "--format", "%{file}\n", pattern)
-		font := strings.TrimSpace(string(data))
-		if err != nil || font == "" || !filepath.IsAbs(font) || strings.ContainsAny(font, "\r\n") {
-			continue
-		}
-		if len(fonts) == 0 || fonts[0] != font {
-			fonts = append(fonts, font)
-		}
-	}
-	return fonts
-}
-
-func (r *Renderer) fontFamily(ctx context.Context, source string) string {
-	data, err := r.run(ctx, r.fontconfig, "", "", "--format", "%{family[0]}", fontPattern(source))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	return r.fontSelector.Files(ctx, source)
 }
 
 func readPNG(path string) ([]byte, error) {

@@ -387,6 +387,7 @@ func (m *AppModel) rebuildDiffContent() {
 	t := m.tab()
 	layout := newRenderedContentLayout()
 	var b strings.Builder
+	m.appendSVGPreview(&b, &layout)
 	width := m.contentViewport.Width()
 	groups := m.commentMarkerGroups()
 	for _, ids := range groups {

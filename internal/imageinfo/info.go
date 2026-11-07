@@ -16,6 +16,11 @@ import (
 
 const MaxPixels = 16 << 20
 
+// SVGPath identifies text images that need an external rasterizer.
+func SVGPath(path string) bool {
+	return strings.EqualFold(filepath.Ext(path), ".svg")
+}
+
 func SupportedPath(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".png", ".jpg", ".jpeg", ".gif", ".webp":

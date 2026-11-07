@@ -170,7 +170,7 @@ func (m *AppModel) recheckImagesOnActivity(previousTab int, msg tea.Msg) tea.Cmd
 	if t.outsideChanges {
 		return nil
 	}
-	if t.isBinary && imagePath(t.path) && (m.patch == nil || t.attachment != nil) {
+	if (t.isBinary || m.svgFilePreview()) && imagePath(t.path) && (m.patch == nil || t.attachment != nil) {
 		return m.images.restartProbe()
 	}
 	if t.isMarkdown && t.doc != nil && (m.patch == nil || t.attachment != nil) {
@@ -319,7 +319,7 @@ func (m AppModel) updateImageCapability(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func imagePath(path string) bool {
-	return imageinfo.SupportedPath(path)
+	return imageinfo.SupportedPath(path) || imageinfo.SVGPath(path)
 }
 
 func decodePreview(data []byte) (image.Image, error) {
@@ -370,7 +370,7 @@ func (m *AppModel) prepareVisibleImage() tea.Cmd {
 		}
 		return m.prepareMarkdownImages()
 	}
-	if !t.isBinary || !imagePath(t.path) || t.outsideChanges || m.patch != nil && t.attachment == nil {
+	if (!t.isBinary && !m.svgFilePreview()) || !imagePath(t.path) || t.outsideChanges || m.patch != nil && t.attachment == nil {
 		return nil
 	}
 	if !m.images.enabled || m.images.hidden {
@@ -465,11 +465,17 @@ func (m AppModel) loadImage(before bool) tea.Cmd {
 	}
 	return func() tea.Msg {
 		data, err := m.imageContent(sourcePath, before)
-		return m.images.encode(data, imageLoadedMsg{path: path, before: before, err: err})
+		return m.encodeImage(data, sourcePath, imageLoadedMsg{path: path, before: before, err: err})
 	}
 }
 
 func (m AppModel) imageContent(path string, before bool) ([]byte, error) {
+	if doc, ok := m.attachments[path]; ok && imageinfo.SVGPath(doc.Source) && doc.Image == "" {
+		if len(doc.Content) > maxPreviewBytes {
+			return nil, fmt.Errorf("SVG exceeds 5 MiB")
+		}
+		return []byte(doc.Content), nil
+	}
 	if doc, ok := m.attachments[path]; ok && doc.Image != "" {
 		base := ""
 		if m.session != nil {

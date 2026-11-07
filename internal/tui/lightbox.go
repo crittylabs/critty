@@ -41,7 +41,7 @@ type lightboxLoadedMsg struct {
 func (m AppModel) loadLightboxImage(target imageTarget) tea.Cmd {
 	return func() tea.Msg {
 		data, err := m.imageContent(target.path, target.before)
-		return lightboxLoadedMsg{target, m.images.encode(data, imageLoadedMsg{err: err})}
+		return lightboxLoadedMsg{target, m.encodeImage(data, target.path, imageLoadedMsg{err: err})}
 	}
 }
 

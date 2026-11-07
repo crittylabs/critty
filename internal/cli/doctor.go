@@ -63,6 +63,7 @@ var doctorSections = map[string]string{
 	"git":          "Git",
 	"ai":           "AI reviews",
 	"images":       "Images",
+	"svg":          "SVG previews",
 	"math":         "Math previews",
 	"mermaid":      "Mermaid previews",
 	"terminal":     "Terminal binding",
@@ -227,6 +228,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkGit()
 			r.checkAI(python)
 			r.checkImages()
+			r.checkSVG()
 			r.checkMath()
 			r.checkMermaid()
 			r.checkHistory()

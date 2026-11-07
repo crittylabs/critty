@@ -58,6 +58,16 @@ Unknown keys are ignored by the current loader.  Omit a key when no override is 
 
 The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
 
+## SVG previews
+
+SVG images are previewed automatically when `rsvg-convert`, `merman-cli`, or `resvg` is available on PATH, in that order.  A command failure or invalid PNG output tries the next converter.  Merman uses Fontconfig's optional `fc-match` to select host fonts, sharing the Mermaid font-selection mechanism.  No converter is installed automatically, and SVG has no separate configuration switch.  `critty doctor` reports the available converters.
+
+Local SVG references work in Markdown, comments, the comment editor, and the image lightbox.  Opening an SVG file or attaching it for review also shows a preview above its XML source, retaining source text, line comments, and diff coordinates.  Attached SVGs remain text snapshots, so their source and preview survive source-file removal and review resumption.  `I` / `M-i` outside input and `M-i` in the editor toggle SVG with other images.  When conversion is unavailable or fails, the source or image reference remains visible.
+
+Previews are static and retain the SVG's own colors and transparency.  Converter font handling and supported SVG features may differ.  Inputs and output PNGs are limited to 5 MiB, the output fits within 2048 pixels per side, and each converter has a three-second deadline.  Results are cached in memory for the viewer.  Common absolute SVG dimensions and `viewBox` aspect ratios determine the preview size; documents without usable dimensions use a 300 by 150 pixel viewport.
+
+Converters receive validated SVG on stdin in a temporary directory.  External resource references, DTDs, XML stylesheet instructions, and XML base URLs are unsupported; use self-contained SVGs with internal references or embedded raster images.  Embedded raster metadata must fit the existing 16-megapixel limit.  Source viewing remains available for unsupported documents.
+
 ## Math previews
 
 In terminals supporting image previews, Markdown `$...$` and `$$...$$` expressions in documents and comments can be replaced by PNG images.  Inline images share a row with surrounding text and move as a whole when wrapping.  Multiline display expressions hide their source lines while retaining their navigation and review coordinates.  Copying an image keeps its original TeX.  Searching, selecting source lines, or turning Images off reveals the source; comments retain image previews until Images is turned off.  Code blocks also support math, including `suggestion`, `md`, and `markdown` fences; inline code stays literal.  Multiline display expressions must remain in one Markdown paragraph, without blank lines.  Missing tools or rendering failures leave the source visible.  The comment editor keeps editable source and shows previews below it after a typing pause.  Math previews do not implement MathJax extensions.

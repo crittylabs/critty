@@ -230,6 +230,7 @@ func (m *AppModel) rebuildContent() {
 		m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
 		return
 	}
+	m.appendSVGPreview(&b, &layout)
 	renderDeleted := func(afterLine int) {
 		dels := t.deletedAfter[afterLine]
 		cachedHL := t.deletedLineCache[afterLine]

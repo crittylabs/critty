@@ -120,7 +120,7 @@ Image previews need a terminal with Kitty graphics protocol support and Unicode 
 
 After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr TUI checks read local configuration; running server and remote client settings may differ.
 
-PNG, JPEG, GIF, and WebP are supported.  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
+PNG, JPEG, GIF, and WebP are supported directly.  SVG previews use `rsvg-convert`, `merman-cli`, or `resvg` found on PATH, with no extra setting.  SVG files retain their XML source alongside the preview; Markdown images and comment editors support SVG too.  See [SVG preview details](docs/configuration.md#svg-previews).  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
 
 Markdown math expressions in `$...$` and `$$...$$` can appear as images in documents and comments, including code blocks such as suggestions and Markdown examples.  Copying keeps the original TeX; searching, selecting lines, or turning Images off reveals the source.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH first, with LaTeX plus dvipng as fallback; multiline expressions use LaTeX directly.  These optional tools stay outside Critty, and missing tools or rendering failures leave the source visible.  See [math preview setup and limits](docs/configuration.md#math-previews).
 

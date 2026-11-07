@@ -292,7 +292,7 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 			source = gitpkg.ReviewSource{}
 		}
 		data, err := source.PreviewContent(ref.path, ref.before && !ref.local, maxPreviewBytes)
-		return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, err: err})
+		return m.encodeImage(data, ref.path, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, err: err})
 	}
 }
 

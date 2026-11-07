@@ -85,7 +85,7 @@ func ReadAttachedDocuments(paths []string) ([]AttachedDocument, error) {
 		if !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("attachment is not a regular file: %s", path)
 		}
-		if imageinfo.SupportedPath(abs) && info.Size() > MaxAttachmentBytes {
+		if (imageinfo.SupportedPath(abs) || imageinfo.SVGPath(abs)) && info.Size() > MaxAttachmentBytes {
 			return nil, fmt.Errorf("image attachment exceeds 5 MiB: %s", path)
 		}
 		data, err := os.ReadFile(abs)

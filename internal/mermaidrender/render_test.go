@@ -94,21 +94,10 @@ func TestFontsAndDiscovery(t *testing.T) {
 	if _, err := Find("missing-wrapper", "merman-cli"); err == nil {
 		t.Fatal("missing override accepted")
 	}
-	r := &Renderer{fontconfig: "fc-match"}
-	var patterns []string
-	r.run = func(_ context.Context, exe, dir, input string, args ...string) ([]byte, error) {
-		patterns = append(patterns, args[len(args)-1])
-		return []byte("/fonts/sans.ttf\n"), nil
-	}
-	if fonts := r.selectFonts(context.Background(), "A\u03bbA"); len(fonts) != 1 {
-		t.Fatalf("fonts=%v", fonts)
-	}
-	if !slices.Equal(patterns, []string{"sans-serif", ":charset=3bb 41"}) {
-		t.Fatalf("patterns=%v", patterns)
-	}
+	r := &Renderer{}
 	r.fonts = []string{"/fonts/custom.ttf"}
-	if fonts := r.selectFonts(context.Background(), "text"); !slices.Equal(fonts, r.fonts) || len(patterns) != 2 {
-		t.Fatal(fonts, patterns)
+	if fonts := r.selectFonts(context.Background(), "text"); !slices.Equal(fonts, r.fonts) {
+		t.Fatal(fonts)
 	}
 }
 

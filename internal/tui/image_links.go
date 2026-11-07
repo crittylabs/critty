@@ -173,7 +173,7 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 // openImage enlarges a previewed image in the lightbox, or hands a web URL
 // or an image without a preview to the system opener.
 func (m *AppModel) openImage(target imageTarget) tea.Cmd {
-	if len(m.tabs) > 0 && m.tab().isBinary && target.line == 0 {
+	if len(m.tabs) > 0 && (m.tab().isBinary || m.svgFilePreview()) && target.line == 0 {
 		for _, candidate := range m.tab().imageTargets() {
 			if candidate == target {
 				return m.openImageWithSiblings(target, m.tab().imageTargets())
@@ -194,7 +194,7 @@ func (t *FileTab) imageTarget(before bool) imageTarget {
 // imageTargets follows the same Before/After order as the inline preview.
 // A standalone image and an added or deleted file have only one target.
 func (t *FileTab) imageTargets() []imageTarget {
-	if !t.isBinary || !imagePath(t.path) || t.outsideChanges {
+	if !imagePath(t.path) || t.outsideChanges {
 		return nil
 	}
 	var targets []imageTarget
@@ -269,7 +269,7 @@ func (m *AppModel) openImageAtCursor() tea.Cmd {
 		return m.openImageWithSiblings(target, siblings)
 	}
 	t := m.tab()
-	if t.isBinary && imagePath(t.path) {
+	if (t.isBinary || m.svgFilePreview()) && imagePath(t.path) {
 		targets := t.imageTargets()
 		if len(targets) > 0 {
 			return m.openImageWithSiblings(targets[0], targets)

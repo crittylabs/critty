@@ -160,7 +160,7 @@ func (m AppModel) loadCommentImage(key commentImageKey) tea.Cmd {
 			return m.images.encode(data, imageLoadedMsg{comment: &key, rendered: true, renderDark: key.dark, renderInline: key.inline && !key.editor, err: err})
 		}
 		data, err := (gitpkg.ReviewSource{}).PreviewContent(key.path, false, maxPreviewBytes)
-		return m.images.encode(data, imageLoadedMsg{comment: &key, err: err})
+		return m.encodeImage(data, key.path, imageLoadedMsg{comment: &key, err: err})
 	}
 }
 

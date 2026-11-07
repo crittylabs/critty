@@ -25,10 +25,12 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/imageinfo"
 	"github.com/crittylabs/critty/internal/mathrender"
 	"github.com/crittylabs/critty/internal/mermaidrender"
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/searchhistory"
+	"github.com/crittylabs/critty/internal/svgrender"
 )
 
 type pane int
@@ -111,6 +113,7 @@ type AppModel struct {
 	images         imageDisplay
 	math           *mathrender.Renderer
 	mermaid        *mermaidrender.Renderer
+	svg            svgRenderer
 	commentImages  map[commentImageKey]*previewSide
 	imageBodies    map[string][]markdownImageRef
 	renderedBodies map[string]*commentRenderedBody
@@ -352,7 +355,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	tab := FileTab{
 		path:       filePath,
 		cursorLine: 1,
-		isBinary:   imagePath(filePath),
+		isBinary:   imagePath(filePath) && !imageinfo.SVGPath(filePath),
 	}
 
 	m := AppModel{
@@ -364,6 +367,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		images:           newImageDisplay(),
 		math:             mathrender.New(cfg.MathRaTeX),
 		mermaid:          mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
+		svg:              svgrender.New(),
 		project:          cfg.Project,
 		branch:           cfg.Branch,
 		topic:            cfg.Topic,
@@ -420,7 +424,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		ft.textconv = f.Textconv
 		ft.loadErr = diffErr
 		ft.status = f.Status.String()
-		ft.isBinary = f.IsBinary() || cfg.Patch == nil && imagePath(f.Path) && f.Textconv.Command == ""
+		ft.isBinary = f.IsBinary() || cfg.Patch == nil && imagePath(f.Path) && !imageinfo.SVGPath(f.Path) && f.Textconv.Command == ""
 		if f.Status == gitpkg.StatusBinary {
 			ft.status = "modified"
 		}
@@ -461,6 +465,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		images:          newImageDisplay(),
 		math:            mathrender.New(cfg.MathRaTeX),
 		mermaid:         mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
+		svg:             svgrender.New(),
 		project:         cfg.Project,
 		branch:          cfg.Branch,
 		topic:           cfg.Topic,
