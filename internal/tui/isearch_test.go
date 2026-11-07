@@ -483,10 +483,22 @@ func clickISearchAction(t *testing.T, app AppModel, action isearchMouseAction) A
 }
 
 func TestISearchMouseControls(t *testing.T) {
-	for _, width := range []int{18, 40, 100} {
+	startSearch := func(app AppModel) AppModel {
+		_, layout := app.renderReviewScreen()
+		for _, region := range layout.isearchRegions {
+			if region.action == isearchStart {
+				return clickMouse(app, region.rect.left, region.rect.top)
+			}
+		}
+		if !strings.Contains(ansi.Strip(app.renderFooter()), "…") {
+			t.Fatal("Search was hidden without an omission indicator")
+		}
+		return ctrlKey(app, 's')
+	}
+	for _, width := range []int{18, 40, 100, 240} {
 		app := newISearchApp(t, 1)
 		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 40})
-		app = clickISearchAction(t, app, isearchStart)
+		app = startSearch(app)
 		if !app.isearch.active {
 			t.Fatal("Search did not start incremental search")
 		}
@@ -515,7 +527,7 @@ func TestISearchMouseControls(t *testing.T) {
 		if app.isearch.active {
 			t.Fatal("Keep did not end search")
 		}
-		app = clickISearchAction(t, app, isearchStart)
+		app = startSearch(app)
 		app = typeSearch(app, "beta")
 		app = clickISearchAction(t, app, isearchCancel)
 		assertCursor(t, app, 3)

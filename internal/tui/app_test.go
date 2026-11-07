@@ -1072,6 +1072,47 @@ func TestFooterHiddenOnShortTerminals(t *testing.T) {
 	}
 }
 
+func TestFooterHintsFitHeightBudget(t *testing.T) {
+	for _, height := range []int{22, 25, 26, 39, 40, 80} {
+		t.Run(fmt.Sprint(height), func(t *testing.T) {
+			app := setupAppWithDoc(t, "first\nsecond\n")
+			app.width, app.height = 40, height
+			app.recalculateLayout()
+			footer := ansi.Strip(app.renderFooter())
+			rows := strings.Split(footer, "\n")
+			if len(rows) > 2 || len(rows)*20 > height {
+				t.Fatalf("height %d: footer exceeds height budget: %q", height, footer)
+			}
+			if !strings.HasSuffix(strings.TrimSpace(rows[len(rows)-1]), "…") {
+				t.Fatalf("omitted hints have no ellipsis: %q", footer)
+			}
+			for _, row := range rows {
+				if ansi.StringWidth(row) > app.width {
+					t.Fatalf("footer exceeds width: %q", row)
+				}
+			}
+			rect, ok := app.footerHelpRect()
+			if !ok {
+				t.Fatal("Help button was omitted")
+			}
+			app = clickMouse(app, rect.left, rect.top)
+			if app.modal != helpModal {
+				t.Fatal("visible Help button is not clickable")
+			}
+		})
+	}
+	for _, width := range []int{0, 1, 4, 12, 30} {
+		app := AppModel{width: width, height: 40}
+		footer := app.renderFooterItems([]string{footerKeyStyle.Render("long hint"), "界界", "last"})
+		if lipgloss.Height(footer) > 2 || lipgloss.Width(footer) > width {
+			t.Fatalf("width %d: oversized footer %q", width, footer)
+		}
+		if width == 30 && strings.Contains(ansi.Strip(footer), "…") {
+			t.Fatalf("complete hints marked as omitted: %q", footer)
+		}
+	}
+}
+
 func TestDimRenderedDimsBackgrounds(t *testing.T) {
 	initAdaptiveStyles(true)
 	bar := reviewBarStyle.Render("bar") + diffAddedTextBg.Foreground(lipgloss.BrightWhite).Render("staged") + "plain"

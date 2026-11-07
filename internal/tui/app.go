@@ -4410,24 +4410,49 @@ func (m AppModel) renderFooterHints() string {
 }
 
 // Keep each key hint together so its clickable region survives wrapping.
+// Hints use at most 5% of terminal height, capped at two rows.
 func (m AppModel) renderFooterItems(items []string) string {
-	var rows []string
-	row := ""
+	limit := min(2, m.height/20)
+	if m.width <= 0 || limit <= 0 {
+		return ""
+	}
+	rows := [][]string{{}}
+	omitted := false
 	for _, item := range items {
 		if item == "" {
 			continue
 		}
+		item = ansi.Truncate(item, m.width, "…")
+		last := len(rows) - 1
+		row := strings.Join(rows[last], " · ")
 		if row != "" && lipgloss.Width(row)+3+lipgloss.Width(item) > m.width {
-			rows = append(rows, row)
-			row = ""
+			if len(rows) == limit {
+				omitted = true
+				break
+			}
+			rows = append(rows, nil)
+			last++
 		}
-		if row != "" {
-			row += " · "
-		}
-		row += item
+		rows[last] = append(rows[last], item)
 	}
-	rows = append(rows, row)
-	return footerStyle.Width(m.width).Render(strings.Join(rows, "\n"))
+	if omitted {
+		last := len(rows) - 1
+		for len(rows[last]) > 0 && lipgloss.Width(strings.Join(rows[last], " · "))+2 > m.width {
+			rows[last] = rows[last][:len(rows[last])-1]
+		}
+	}
+	var rendered []string
+	for i, row := range rows {
+		text := strings.Join(row, " · ")
+		if omitted && i == len(rows)-1 {
+			if text != "" {
+				text += " "
+			}
+			text += "…"
+		}
+		rendered = append(rendered, text)
+	}
+	return footerStyle.Width(m.width).Render(strings.Join(rendered, "\n"))
 }
 
 // formListButton opens the answer list when any attachment has a form.
