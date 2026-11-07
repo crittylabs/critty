@@ -258,7 +258,7 @@ Required confirmations must be complete before approval.  Approving the review d
 
 You can send Comment or Reject with unfinished form items or unresolved threads without extra confirmation.  Completion checks apply when approving.
 
-Ordinary Markdown checklists keep their written checkmarks and are display-only.  Agents add a `<!-- form: ... -->` annotation to each item that should collect an answer.  Optional answer status uses cyan across tabs, Files, the header, Answers, and Submit dialogs; required items use red.  Preference answers use separate fields from execution permissions.  Changed execution requests require renewed consent.
+Ordinary Markdown checklists use cyan checked and unchecked boxes, keep their written state, and are display-only.  Agents add a `<!-- form: ... -->` annotation to each item that should collect an answer.  Optional answer status uses cyan across tabs, Files, the header, Answers, and Submit dialogs; required items use red.  Preference answers use separate fields from execution permissions.  Changed execution requests require renewed consent.
 
 ### Approvals and choices without a code diff
 

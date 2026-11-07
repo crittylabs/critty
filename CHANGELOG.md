@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.10.1
+
 ### Added
 
 - **Rex review tabs**: Agents running in Rex can open reviews in the same session with the new `rex` launcher.  Automatic tab selection and return to the invoking pane require the Rex app's Remote Control setting; otherwise select the review tab manually.  The launcher supports local Unix servers, including the macOS preview app's bundled CLI; `critty env` and `critty doctor` cover its terminal identity.  Agents without inherited terminal variables need a notifying terminal filter because preview capture includes scrollback.  See the [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/references/terminals.md#rex).
