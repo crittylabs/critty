@@ -31,6 +31,7 @@ const (
 	markdownCode
 	markdownLink
 	markdownCodePadding
+	markdownMath
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -44,11 +45,16 @@ type markdownToken struct {
 }
 
 type markdownLine struct {
-	source   string
-	tokens   []markdownToken
-	cells    [][2]int
-	tableSep bool
-	literal  bool
+	source     string
+	tokens     []markdownToken
+	cells      [][2]int
+	tableSep   bool
+	literal    bool
+	mathTokens []markdownToken
+	mathHidden bool
+	mathMap    []mathDisplaySpan
+	mathBands  []mathDisplayBand
+	mathWidth  int
 	// plainRender caches the rendering without word-diff segments, and
 	// inlineRender the one for the segments it was last rendered with.
 	plainRender, inlineRender markdownRender
@@ -209,6 +215,7 @@ func paragraphParser() parser.Parser {
 	return parser.New(parser.WithDefaultParsers(false),
 		parser.WithBlockParsers(util.Prioritized(parser.NewParagraphParser(), 1000)),
 		parser.WithInlineParsers(
+			util.Prioritized[parser.InlineParser](mathParser{}, 50),
 			util.Prioritized[parser.InlineParser](sourceInlineParser{parser.NewCodeSpanParser()}, 100),
 			util.Prioritized[parser.InlineParser](sourceInlineParser{parser.NewLinkParser()}, 200),
 			util.Prioritized(parser.NewAutoLinkParser(), 300),
@@ -255,6 +262,9 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	var render func(ast.Node, markdownStyle, string)
 	render = func(n ast.Node, style markdownStyle, uri string) {
 		switch node := n.(type) {
+		case *mathNode:
+			emit(node.start, node.end, "", style, uri)
+			return
 		case *ast.Text:
 			i := node.Value.Index()
 			emit(i.Start, i.Stop, node.Value.Str(input), style, uri)
@@ -341,16 +351,23 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 }
 
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
+	if line.mathTokens != nil {
+		return line.renderMath(inline, base, changed, links)
+	}
 	key := inlineKey(inline)
-	cacheable := len(links) == 0
+	cacheable := len(links) == 0 && line.mathTokens == nil
 	slot := line.cacheSlot(key)
 	if cacheable && slot.set && slot.dark == terminalIsDark && slot.with == key {
 		return slot.text
 	}
 	var b strings.Builder
 	segmentIndex, segmentStart := 0, 0
-	for _, token := range linkedMarkdownTokens(line.tokens, links) {
+	for _, token := range linkedMarkdownTokens(line.displayTokens(), links) {
 		if token.text == "" {
+			continue
+		}
+		if token.style&markdownMath != 0 {
+			b.WriteString(token.text)
 			continue
 		}
 		style := lipgloss.NewStyle()
@@ -424,8 +441,8 @@ func (t *FileTab) markdownTableCellsWithInline(line int, links []linkSpan, inlin
 	parsed := &t.markdown.after.lines[line-1]
 	var cells []string
 	for _, span := range parsed.cells {
-		cell := markdownLine{literal: true}
-		for _, token := range parsed.tokens {
+		cell := markdownLine{literal: true, source: parsed.source}
+		for _, token := range parsed.displayTokens() {
 			from, to := max(span[0], token.start), min(span[1], token.end)
 			if from >= to {
 				continue
@@ -436,6 +453,12 @@ func (t *FileTab) markdownTableCellsWithInline(line int, links []linkSpan, inlin
 			}
 			part.start, part.end = from, to
 			cell.tokens = append(cell.tokens, part)
+		}
+		for _, token := range cell.tokens {
+			if token.style&markdownMath != 0 {
+				cell.mathTokens = cell.tokens
+				break
+			}
 		}
 		cells = append(cells, cell.render(inline, diffCommonTextBg, diffAddedTextBg, links))
 	}

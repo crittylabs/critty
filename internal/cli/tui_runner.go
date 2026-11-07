@@ -41,6 +41,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	finishCh := make(chan tui.FinishEvent, 4)
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
+		MathRaTeX:        cfg.MathRaTeX,
 		Branch:           branch,
 		Context:          ctx,
 		Watch:            reviewWatch,

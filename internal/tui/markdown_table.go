@@ -47,7 +47,7 @@ func (line *markdownLine) tableCellWrapText(column int, plain string) string {
 	end := line.cells[column][1]
 	var b strings.Builder
 	start := 0
-	for _, token := range line.tokens {
+	for _, token := range line.displayTokens() {
 		if token.start < line.cells[column][0] || token.end > end || token.style&markdownCodePadding == 0 {
 			continue
 		}
@@ -103,12 +103,12 @@ func (m *AppModel) highlightTableCells(ref lineRef, cells []string) {
 
 func (line *markdownLine) displayOffset(sourceOffset int) int {
 	offset := 0
-	for _, token := range line.tokens {
+	for i, token := range line.displayTokens() {
 		if token.start >= sourceOffset {
 			break
 		}
 		if token.end <= sourceOffset {
-			offset += len(displaySourceText(token.text))
+			offset += len(line.displayTokenText(i))
 		} else if len(token.text) == token.end-token.start {
 			offset += len(displaySourceText(token.text[:sourceOffset-token.start]))
 		}

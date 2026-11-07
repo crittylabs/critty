@@ -78,7 +78,7 @@ func (s *isearchState) markdownSearchHighlights(source *markdownSource) map[int]
 func (line *markdownLine) searchDisplayTokens() []markdownSearchToken {
 	var tokens []markdownSearchToken
 	offset := 0
-	for i, token := range line.tokens {
+	for i, token := range line.displayTokens() {
 		value := line.displayTokenText(i)
 		rawEnd := token.sourceEnd
 		if rawEnd == 0 {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -14,15 +15,20 @@ import (
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/util"
 	nethtml "golang.org/x/net/html"
 )
 
 type markdownImage struct {
-	line   int
-	before bool
-	path   string
-	url    string // web URL that is linked but not previewed
-	local  bool
+	line                            int
+	before                          bool
+	path                            string
+	url                             string // web URL that is linked but not previewed
+	local                           bool
+	math                            string
+	mathInline                      bool
+	mathFirst, mathColumn, mathStop int
+	mathSource                      string
 	// start and end bound the reference text on its line.
 	start, end    int
 	columns, rows int // retain layout while pixels are released or reloading
@@ -50,7 +56,7 @@ type markdownImageRef struct {
 
 func markdownImageRefs(source string) []markdownImageRef {
 	data := []byte(source)
-	root := parser.New().Parse(data)
+	root := parser.New(parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50))).Parse(data)
 	var refs []markdownImageRef
 	add := func(offset, end int, destination string) {
 		if offset < 0 || offset > len(source) {
@@ -226,6 +232,15 @@ func (m AppModel) findMarkdownImages() tea.Cmd {
 				img.path = imagePath
 				msg.images = append(msg.images, img)
 			}
+			if m.math.Available() {
+				for _, ref := range markdownMathRefs(content) {
+					if len(msg.images) >= 64 {
+						break
+					}
+					ref.before, ref.local = before, true
+					msg.images = append(msg.images, ref)
+				}
+			}
 		}
 		if t.doc != nil {
 			appendRefs(t.doc.Content, docPath, false)
@@ -238,6 +253,7 @@ func (m AppModel) findMarkdownImages() tea.Cmd {
 				appendRefs(string(data), docPath, true)
 			}
 		}
+		sort.SliceStable(msg.images, func(i, j int) bool { return msg.images[i].line < msg.images[j].line })
 		return msg
 	}
 }
@@ -263,7 +279,16 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 	ref := m.tab().markdownImages[index]
 	path := m.tab().path
 	source := m.imageSource()
+	dark := terminalIsDark
 	return func() tea.Msg {
+		if ref.math != "" {
+			ctx := m.reload.context
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			data, err := m.math.Render(ctx, ref.math, ref.mathInline, dark)
+			return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, math: true, mathDark: dark, mathInline: ref.mathInline, err: err})
+		}
 		if ref.local {
 			source = gitpkg.ReviewSource{}
 		}
@@ -331,7 +356,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 			continue
 		}
 		if img := ref.image; img != nil {
-			cols, rows := m.markdownImageSize(img)
+			cols, rows := m.markdownPreviewSize(*ref, img)
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
 			}
@@ -361,10 +386,20 @@ func (m *AppModel) renderMarkdownImages(line int, before bool) string {
 		if ref.line != line || ref.before != before {
 			continue
 		}
+		if ref.math != "" {
+			continue
+		}
 		if ref.failed {
+			if ref.math != "" {
+				continue
+			}
 			blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 		} else if ref.image != nil && ref.image.ready {
-			blocks = append(blocks, ref.image.linkedPlaceholder(ref.target().uri()))
+			uri := ref.target().uri()
+			if ref.math != "" {
+				uri = ""
+			}
+			blocks = append(blocks, ref.image.linkedPlaceholder(uri))
 		} else if ref.columns > 0 && ref.rows > 0 {
 			row := strings.Repeat(" ", min(width, ref.columns+2))
 			blocks = append(blocks, strings.TrimSuffix(strings.Repeat(row+"\n", ref.rows), "\n"))

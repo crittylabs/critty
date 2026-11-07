@@ -473,6 +473,7 @@ func (m *AppModel) rebuildDiffContent() {
 	if t.doc.Known != nil {
 		layout.appendBlock(&b, "       ⋯ remaining context not included in diff", contentMouseTarget{})
 	}
+	m.mapMathRanges(&layout)
 	m.contentLayout = layout
 	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
 }
@@ -608,11 +609,13 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 	decorate := m.isearchDecorator(ref)
 	var rows []string
 	plain, plainWidth := "", 0 // known for an unwrapped row only
+	sourceLine, oldSide := ref.line, before || ref.side == "old"
 	if t.isMarkdown {
-		oldSide := before || ref.side == "old"
-		sourceLine := ref.line
 		if before && ref.side != "old" {
 			sourceLine = line.oldLine
+		}
+		if t.mathLineHidden(sourceLine, oldSide) {
+			return nil, target
 		}
 		content, contentPlain, contentWidth, measured := t.markdownDisplayLineInfo(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
 		if ref.side == "old" && len(line.inline) == 0 {
@@ -652,10 +655,9 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		} else if highlighted {
 			text = inlineBackground(sidebarHighlightBg, ansi.Strip(text))
 		}
+		cells[i] = diffCellRow{text: t.sourceRowGutter(sourceLine, oldSide, i, marker, num) + text}
 		if i == 0 {
-			cells[i] = diffCellRow{text: marker + num + " " + text, plain: plain, width: gutterWidth + plainWidth}
-		} else {
-			cells[i] = diffCellRow{text: " " + continuationGutter + " " + text}
+			cells[i].plain, cells[i].width = plain, gutterWidth+plainWidth
 		}
 	}
 	return cells, target

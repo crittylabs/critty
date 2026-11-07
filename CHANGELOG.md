@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Math previews in Markdown**: Read `$...$` and `$$...$$` expressions as images in documents and comments, including suggestions and Markdown code blocks, in supported terminals.  Copying keeps their original TeX, and source-line navigation and review coordinates are retained.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH, then fall back to LaTeX plus dvipng; multiline expressions use LaTeX directly.  These optional tools are installed separately; `critty doctor` checks their executable availability.  Missing tools or failed rendering leave the source visible.  See [setup and limits](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#math-previews).
+
 ## 1.10.1
 
 ### Added

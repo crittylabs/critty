@@ -55,6 +55,7 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 	}
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
+		MathRaTeX:     cfg.MathRaTeX,
 		Branch:        branch,
 		Context:       ctx,
 		Watch:         reviewWatch,

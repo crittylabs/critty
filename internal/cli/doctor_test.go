@@ -361,7 +361,9 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 	t.Setenv("HERDR_TAB_ID", "")
 	t.Setenv("HERDR_PANE_ID", "")
 	oldLook := lookPath
-	t.Cleanup(func() { lookPath = oldLook })
+	oldFind := findMathRaTeX
+	t.Cleanup(func() { lookPath, findMathRaTeX = oldLook, oldFind })
+	findMathRaTeX = func(string) (string, error) { return "", nil }
 	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
 	for _, name := range []string{"doctor", "check"} {
 		root := &cobra.Command{Use: "critty"}
@@ -378,6 +380,11 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 		}
 		if d := diagnosticFor(t, r, "git/version"); d.Status != "warn" {
 			t.Fatalf("missing Git must warn without failing standalone reviews: %+v", d)
+		}
+		for _, tool := range []string{"ratex", "latex", "dvipng"} {
+			if d := diagnosticFor(t, r, "math/"+tool); d.Status != "info" {
+				t.Fatalf("missing optional math tool must not fail doctor: %+v", d)
+			}
 		}
 	}
 	first := integrations()["codex"][0]

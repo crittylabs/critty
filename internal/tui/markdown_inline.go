@@ -7,6 +7,7 @@ import (
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/extension"
 	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/util"
 )
 
 func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) string {
@@ -24,7 +25,7 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 	content := strings.TrimRight(line, " \t")
 	suffix := line[len(content):]
 	source := []byte(prefix + content)
-	root := parser.New(parser.WithExtensions(extension.LinkifyParser)).Parse(source)
+	root := parser.New(parser.WithExtensions(extension.LinkifyParser), parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50))).Parse(source)
 	var render func(ast.Node, lipgloss.Style) string
 	linkDepth := 0
 	decorate := func(text string) string {
@@ -42,6 +43,8 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 	}
 	render = func(n ast.Node, style lipgloss.Style) string {
 		switch n := n.(type) {
+		case *mathNode:
+			return style.Render(string(source[n.start:n.end]))
 		case *ast.Text:
 			text := n.Value.Str(source)
 			if n.SoftLineBreak() || n.HardLineBreak() {
@@ -80,6 +83,8 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 
 func markdownHasLabel(n ast.Node, source []byte) bool {
 	switch n := n.(type) {
+	case *mathNode:
+		return strings.TrimSpace(n.formula) != ""
 	case *ast.Text:
 		return strings.TrimSpace(n.Value.Str(source)) != ""
 	case *ast.CodeSpan:

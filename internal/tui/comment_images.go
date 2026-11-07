@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,8 +14,10 @@ import (
 )
 
 type commentImageKey struct {
-	path  string
-	width int
+	path                 string
+	width                int
+	math                 string
+	inline, dark, editor bool
 }
 
 func (m AppModel) commentImagePath(destination string) (string, bool) {
@@ -92,12 +95,29 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 	width = max(1, width)
 	refs := m.commentImageRefs(body)
 	showImages := !m.images.hidden && m.modal == noModal
+	mathSource := m.commentMathDisplay(body, width, showImages)
 	var lines []string
+	prefixed := false
 	for i, line := range strings.Split(body, "\n") {
+		if mathSource != nil && mathSource.lines[i].mathHidden {
+			continue
+		}
 		content := style.Render(m.linkCommentLine(line, refs, i+1))
-		if i == 0 && prefix != "" {
+		if mathSource != nil && mathSource.lines[i].mathTokens != nil {
+			links := m.referenceSpans(line)
+			for _, ref := range refs {
+				if ref.line == i+1 {
+					if target, ok := m.commentImageTarget(ref.destination); ok {
+						links = append(links, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
+					}
+				}
+			}
+			content = style.Render(mathSource.lines[i].render(nil, style, style, links))
+		}
+		if !prefixed && prefix != "" {
 			content = style.Bold(true).Render(prefix) + content
 		}
+		prefixed = true
 		lines = append(lines, strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")...)
 		if !showImages {
 			continue
@@ -111,7 +131,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 			if !ok {
 				continue
 			}
-			side := m.commentImageSide(commentImageKey{path, width})
+			side := m.commentImageSide(commentImageKey{path: path, width: width})
 			if side == nil {
 				continue
 			}
@@ -130,6 +150,14 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 
 func (m AppModel) loadCommentImage(key commentImageKey) tea.Cmd {
 	return func() tea.Msg {
+		if key.math != "" {
+			ctx := m.reload.context
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			data, err := m.math.Render(ctx, key.math, key.inline, key.dark)
+			return m.images.encode(data, imageLoadedMsg{comment: &key, math: true, mathDark: key.dark, mathInline: key.inline && !key.editor, err: err})
+		}
 		data, err := (gitpkg.ReviewSource{}).PreviewContent(key.path, false, maxPreviewBytes)
 		return m.images.encode(data, imageLoadedMsg{comment: &key, err: err})
 	}
@@ -149,15 +177,24 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 		return nil
 	}
 	loading := 0
-	for _, side := range m.commentImages {
+	for key, side := range m.commentImages {
+		if key.math != "" && key.dark != terminalIsDark {
+			continue
+		}
 		if side.image == nil && side.attempted && !side.failed {
 			loading++
 		}
 	}
 	var cmds []tea.Cmd
 	for key, side := range m.commentImages {
+		if key.math != "" && key.dark != terminalIsDark {
+			continue
+		}
 		if img := side.image; img != nil {
 			cols, rows := img.size(min(44, key.width), 11, m.images.cell)
+			if key.math != "" && key.inline && !key.editor {
+				cols, rows = img.fit(min(44, key.width), 5, m.images.cell)
+			}
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
 			}

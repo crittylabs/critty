@@ -63,6 +63,7 @@ var doctorSections = map[string]string{
 	"git":          "Git",
 	"ai":           "AI reviews",
 	"images":       "Images",
+	"math":         "Math previews",
 	"terminal":     "Terminal binding",
 	"launchers":    "Review launchers",
 	"history":      "Review history",
@@ -192,10 +193,12 @@ func newDoctorCommand() *cobra.Command {
 	var notifyOnly bool
 	cmd := &cobra.Command{
 		Use: "doctor", Aliases: []string{"check"},
-		Short: "Diagnose integrations, review history, launchers and image settings",
+		Short: "Diagnose integrations, review history, launchers and previews",
 		Long: `Check project and global integrations against this build, Git 2.31+,
 Python and MCP requirements for restricted AI reviews, desktop terminal launchers, and multiplexer
-image settings. History checks report backup capacity, idle records, and interrupted
+image settings. Math checks locate RaTeX and LaTeX/dvipng on PATH.
+RaTeX autodetection reads PNG CLI help; no formulas are rendered and TeX
+packages are not checked. History checks report backup capacity, idle records, and interrupted
 cleanup with suggested commands. They inspect saved records without deleting data.
 Desktop checks inspect installed applications and commands without
 opening windows or testing automation permission.
@@ -223,6 +226,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkGit()
 			r.checkAI(python)
 			r.checkImages()
+			r.checkMath()
 			r.checkHistory()
 			r.checkTerminalBinding(request, notifyOnly)
 			origin := terminalbinding.CaptureOrigin(os.Getpid())

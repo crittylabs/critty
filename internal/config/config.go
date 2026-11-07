@@ -20,6 +20,7 @@ import (
 
 // Config is the resolved (merged) configuration.
 type Config struct {
+	MathRaTeX        string            `json:"math_ratex,omitempty"`
 	History          history.Policy    `json:"history"`
 	Output           string            `json:"output,omitempty"`
 	Author           string            `json:"author,omitempty"`
@@ -40,6 +41,7 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
+	MathRaTeX        string            `toml:"math_ratex"`
 	History          *history.Policy   `toml:"history"`
 	Output           string            `toml:"output"`
 	Author           string            `toml:"author"`
@@ -73,6 +75,10 @@ func Load(projectRoot string) (*Config, error) {
 		return nil, err
 	}
 	apply(cfg, global)
+	// Executable selection is a user setting, never repository-controlled.
+	if global != nil {
+		cfg.MathRaTeX = global.MathRaTeX
+	}
 	// Retention can delete saved data, so repositories cannot enable it.
 	if global != nil && global.History != nil {
 		cfg.History = *global.History
@@ -94,6 +100,9 @@ func Load(projectRoot string) (*Config, error) {
 	cfg.History, err = cfg.History.Normalize()
 	if err != nil {
 		return nil, err
+	}
+	if !filepath.IsAbs(cfg.MathRaTeX) && strings.ContainsAny(cfg.MathRaTeX, `/\`) {
+		return nil, fmt.Errorf("math_ratex must be auto, off, a command name, or an absolute path")
 	}
 	if cfg.Author == "" {
 		cfg.Author = gitUserName()

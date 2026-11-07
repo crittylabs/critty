@@ -67,6 +67,7 @@ func (m *AppModel) rebuildContent() {
 	}
 	t := m.tab()
 	t.ensureHighlightCache()
+	m.prepareMathDisplay()
 	m.syncOutline()
 	t.unread = false
 	if m.alternateDiff(t) {
@@ -267,7 +268,9 @@ func (m *AppModel) rebuildContent() {
 			}
 			decorate := m.isearchDecorator(lineRef{side: "old", line: del.OldLineNum})
 			var rows []string
-			if isMarkdown {
+			if isMarkdown && t.mathLineHidden(del.OldLineNum, true) {
+				// The closing line carries this expression's image.
+			} else if isMarkdown {
 				content, _, width, measured := t.markdownDisplayLineInfo(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
 				if len(del.Inline) == 0 {
 					content = inlineBackground(diffDeletedLineBg, content)
@@ -282,11 +285,7 @@ func (m *AppModel) rebuildContent() {
 				} else if isSidebarHighlight {
 					content = inlineBackground(sidebarHighlightBg, ansi.Strip(content))
 				}
-				if wi == 0 {
-					layout.appendSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, num, content), target)
-				} else {
-					layout.appendSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, content), target)
-				}
+				layout.appendSourceBlock(&b, t.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target)
 			}
 			if images := m.renderMarkdownImages(del.OldLineNum, true); images != "" {
 				layout.appendBlock(&b, images, target)
@@ -368,7 +367,9 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		// Check if this line is part of a table block
-		if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
+		if t.mathLineHidden(lineNum, false) {
+			// Preserve annotations while replacing this source with its image.
+		} else if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
 			var rows []string
 			if isMarkdown {
 				content, _, width, measured := t.markdownDisplayLineInfo(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false))
@@ -377,11 +378,7 @@ func (m *AppModel) rebuildContent() {
 				rows = inlineDiffDisplayLines(inlineChanges, false, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
 			}
 			for wi, styledLine := range rows {
-				if wi == 0 {
-					layout.appendSourceBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, styledLine), lineTarget)
-				} else {
-					layout.appendSourceBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, styledLine), lineTarget)
-				}
+				layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+styledLine, lineTarget)
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
 			var rows []string
@@ -488,18 +485,14 @@ func (m *AppModel) rebuildContent() {
 
 			// Styling only adds escape sequences, so a line that fits needs
 			// no wrapping pass and its plain text is already known.
-			if width <= textWidth {
+			if width <= textWidth && !strings.ContainsRune(displayLine, '\n') {
 				if decorate != nil {
 					plain = ""
 				}
 				layout.appendSourceRow(&b, marker+numStr+" "+displayLine, plain, lineTarget)
 			} else {
 				for wi, wl := range strings.Split(lipgloss.Wrap(displayLine, textWidth, ""), "\n") {
-					if wi == 0 {
-						layout.appendSourceBlock(&b, marker+numStr+" "+wl, lineTarget)
-					} else {
-						layout.appendSourceBlock(&b, " "+continuationGutter+" "+wl, lineTarget)
-					}
+					layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+wl, lineTarget)
 				}
 			}
 		}
@@ -525,6 +518,7 @@ func (m *AppModel) rebuildContent() {
 		layout.appendBlock(&b, "       ⋯ remaining context not included in diff", contentMouseTarget{})
 	}
 
+	m.mapMathRanges(&layout)
 	m.contentLayout = layout
 	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
 }

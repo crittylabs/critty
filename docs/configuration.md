@@ -41,6 +41,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `disable_stats` | Boolean disabling review statistics. |
 | `prompts` | Table mapping prompt keys to overrides. |
 | `history` | Global-only table controlling task retention. |
+| `math_ratex` | Global-only RaTeX selection: `auto` (default), `off`, a command name, or an absolute executable path. |
 
 Global settings are applied first, followed by project settings.  Settings merge as follows:
 
@@ -54,6 +55,45 @@ Global settings are applied first, followed by project settings.  Settings merge
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.
 
 The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
+
+## Math previews
+
+In terminals supporting image previews, Markdown `$...$` and `$$...$$` expressions in documents and comments can be replaced by PNG images.  Inline images share a row with surrounding text and move as a whole when wrapping.  Multiline display expressions hide their source lines while retaining their navigation and review coordinates.  Copying an image keeps its original TeX.  Searching, selecting source lines, or turning Images off reveals the source; comments retain image previews until Images is turned off.  Code blocks also support math, including `suggestion`, `md`, and `markdown` fences; inline code stays literal.  Multiline display expressions must remain in one Markdown paragraph, without blank lines.  Missing tools or rendering failures leave the source visible.  The comment editor keeps editable source and shows previews below it after a typing pause.  Math previews do not implement MathJax extensions.
+
+Critty tries RaTeX for expressions without physical newlines, then falls back to `latex` and `dvipng` on PATH.  Expressions containing newlines go directly to LaTeX.  Line breaks between display delimiters and the expression are excluded; internal line breaks and TeX comments are preserved.  LaTeX needs `amsmath` and `amssymb`.  No renderer is installed or downloaded automatically.  Run `critty doctor` to check executable availability; RaTeX autodetection reads CLI help, but no formulas are rendered and TeX packages are not verified.  Missing optional tools are informational; an unavailable configured RaTeX executable produces a warning.
+
+### Install with mise
+
+Install the [RaTeX](https://github.com/erweixin/RaTeX) PNG CLI for single-line expressions:
+
+```sh
+mise use -g 'github:erweixin/RaTeX[matching=ratex-cli]@latest'
+```
+
+For multiline expressions and fallback, install LaTeX and dvipng through [TinyTeX](https://yihui.org/tinytex/).  Its mise backend supports macOS and x86_64 Linux.  The postinstall updates the package manager before adding the AMS math packages and PNG converter:
+
+```sh
+mise use -g --tool-option 'os=["linux/x64","macos"]' \
+  --postinstall 'tlmgr update --self && tlmgr install amsmath amsfonts dvipng' \
+  tinytex@latest
+```
+
+No Critty configuration is needed.  Check detection, then reopen the document:
+
+```sh
+critty doctor
+critty view notes.md
+```
+
+### Renderer selection
+
+With no configuration, Critty looks for `render` on PATH and checks that its help advertises the RaTeX PNG CLI.  LaTeX and dvipng are also found on PATH.  To disable RaTeX while keeping the LaTeX fallback, set this global option:
+
+```toml
+math_ratex = "off"
+```
+
+Use `auto` (or omit the setting) for automatic discovery.  To select a wrapper or another installation, set `math_ratex` to its command name or absolute path.  Project files cannot override this selection.  Each renderer command has a three-second deadline.  Expressions are limited to 16 KiB and PNGs to 5 MiB and 16 megapixels.  Results are cached in memory for the open viewer.  LaTeX runs in a temporary directory with shell escape disabled and restrictive TeX file access; dvipng disables Ghostscript.  The subprocesses retain the user's OS permissions, so these controls do not provide an OS sandbox.
 
 ## History settings
 

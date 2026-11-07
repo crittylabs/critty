@@ -25,6 +25,7 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/mathrender"
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/searchhistory"
 )
@@ -91,7 +92,8 @@ type AppConfig struct {
 	FocusPath string
 	FocusLine int
 	// Answers labels Comment as Confirm answers and selects it by default.
-	Answers bool
+	Answers   bool
+	MathRaTeX string
 }
 
 // gutterWidth is the total width of the left gutter: line number (5) + marker (1) + space (1).
@@ -104,8 +106,10 @@ type AppModel struct {
 	readOnly      bool
 	reload        reloadState
 	images        imageDisplay
+	math          *mathrender.Renderer
 	commentImages map[commentImageKey]*previewSide
 	imageBodies   map[string][]markdownImageRef
+	mathBodies    map[string]*commentMathBody
 	editorImages  editorImageState
 	lightbox      lightboxState
 	forms         *review.FormState
@@ -354,6 +358,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		searchRing:       loadSearchRing(cfg.SearchHistory),
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
+		math:             mathrender.New(cfg.MathRaTeX),
 		project:          cfg.Project,
 		branch:           cfg.Branch,
 		topic:            cfg.Topic,
@@ -673,6 +678,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case imageTransmittedMsg:
+		if msg.math && msg.mathDark != terminalIsDark {
+			return m, nil
+		}
 		if msg.comment != nil {
 			if side := m.commentImages[*msg.comment]; side != nil {
 				side.image = &inlineImage{id: msg.id, width: msg.width, height: msg.height}
@@ -765,17 +773,47 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case tea.BackgroundColorMsg:
 		recolor := msg.IsDark() != terminalIsDark
+		var clearMath strings.Builder
 		initAdaptiveStyles(msg.IsDark())
+		if recolor {
+			for key, side := range m.commentImages {
+				if key.math == "" {
+					continue
+				}
+				if side.image != nil {
+					fmt.Fprintf(&clearMath, "\x1b_Ga=d,d=I,q=2,i=%d\x1b\\", side.image.id)
+				}
+				*side = previewSide{}
+			}
+		}
 		for i := range m.tabs {
+			if recolor {
+				for j := range m.tabs[i].markdownImages {
+					ref := &m.tabs[i].markdownImages[j]
+					if ref.math == "" {
+						continue
+					}
+					if ref.image != nil {
+						fmt.Fprintf(&clearMath, "\x1b_Ga=d,d=I,q=2,i=%d\x1b\\", ref.image.id)
+					}
+					ref.previewSide = previewSide{}
+				}
+			}
 			if recolor && m.tabs[i].chromaLines != nil {
 				m.tabs[i].resetHighlightCache()
 				m.tabs[i].ensureHighlightCache()
 			}
 		}
 		m.modalTextarea.SetStyles(modalTextareaStyles(msg.IsDark()))
+		if recolor && m.editorImages.active {
+			m.applyEditorImages(m.editorImages.value)
+		}
 		if len(m.tabs) > 0 && m.tab().state != nil {
 			m.rebuildContent()
 			m.updateCommentSidebar()
+		}
+		if clearMath.Len() > 0 {
+			return m, tea.Raw(m.images.wrap(clearMath.String()))
 		}
 		return m, nil
 

@@ -44,7 +44,7 @@ func TestCommentEditorPreviewsImagesAfterTypingPause(t *testing.T) {
 	if len(app.editorImages.refs) != 1 || app.editorImages.refs[0].line != 1 || app.editorImages.refs[0].path != want {
 		t.Fatalf("refs=%+v", app.editorImages.refs)
 	}
-	key := commentImageKey{want, app.modalTextarea.Width()}
+	key := commentImageKey{path: want, width: app.modalTextarea.Width()}
 	side := app.commentImages[key]
 	if side == nil {
 		t.Fatal("editor image not registered for loading")

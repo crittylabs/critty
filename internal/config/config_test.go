@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -65,6 +66,31 @@ func TestInvalidTextconvPattern(t *testing.T) {
 	writeConfig(t, GlobalPath(), `textconv_drivers = ["["]`)
 	if _, err := Load(""); err == nil || !strings.Contains(err.Error(), "textconv_drivers") {
 		t.Fatalf("invalid pattern error = %v", err)
+	}
+}
+
+func TestMathExecutableIsGlobalOnly(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	project := t.TempDir()
+	writeConfig(t, GlobalPath(), `math_ratex = '/opt/ratex/render'`)
+	writeConfig(t, ProjectPath(project), `math_ratex = '/untrusted/render'`)
+	cfg, err := Load(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MathRaTeX != "/opt/ratex/render" {
+		t.Fatalf("repository selected executable: %q", cfg.MathRaTeX)
+	}
+	for _, value := range []string{"", "auto", "off", "render"} {
+		writeConfig(t, GlobalPath(), fmt.Sprintf("math_ratex = %q", value))
+		cfg, err := Load(project)
+		if err != nil || cfg.MathRaTeX != value {
+			t.Fatalf("setting %q: config=%+v, err=%v", value, cfg, err)
+		}
+	}
+	writeConfig(t, GlobalPath(), `math_ratex = './render'`)
+	if _, err := Load(project); err == nil {
+		t.Fatal("relative executable accepted")
 	}
 }
 

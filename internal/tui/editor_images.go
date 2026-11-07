@@ -23,6 +23,7 @@ const maxEditorImages = 16
 type editorImageRef struct {
 	line int
 	path string
+	key  commentImageKey
 }
 
 // editorImageState tracks previews under image references in the comment
@@ -111,8 +112,19 @@ func (m *AppModel) applyEditorImages(value string) {
 		if !ok {
 			continue
 		}
-		s.refs = append(s.refs, editorImageRef{line: ref.line, path: path})
-		m.commentImageSide(commentImageKey{path, s.width})
+		key := commentImageKey{path: path, width: s.width}
+		s.refs = append(s.refs, editorImageRef{line: ref.line, path: path, key: key})
+		m.commentImageSide(key)
+	}
+	if m.math.Available() {
+		for _, ref := range markdownMathRefs(value) {
+			if len(s.refs) >= maxEditorImages {
+				break
+			}
+			key := commentImageKey{width: s.width, math: ref.math, inline: ref.mathInline, dark: terminalIsDark, editor: true}
+			s.refs = append(s.refs, editorImageRef{line: ref.line, key: key})
+			m.commentImageSide(key)
+		}
 	}
 }
 
@@ -126,14 +138,21 @@ func (m AppModel) editorImageBlocks() map[int][]string {
 	lineEnds := textareaLineEnds(m.modalTextarea)
 	byLine := make(map[int][]string)
 	for _, ref := range s.refs {
-		side := m.commentImages[commentImageKey{ref.path, s.width}]
+		side := m.commentImages[ref.key]
 		if side == nil {
 			continue
 		}
 		if side.failed {
+			if ref.key.math != "" {
+				continue
+			}
 			byLine[ref.line] = append(byLine[ref.line], ansi.Truncate("  Image preview unavailable", s.width, ""))
 		} else if side.image != nil && side.image.ready {
-			byLine[ref.line] = append(byLine[ref.line], side.image.linkedPlaceholder(imageTarget{path: ref.path}.uri()))
+			uri := imageTarget{path: ref.path}.uri()
+			if ref.key.math != "" {
+				uri = ""
+			}
+			byLine[ref.line] = append(byLine[ref.line], side.image.linkedPlaceholder(uri))
 		}
 	}
 	blocks := make(map[int][]string)

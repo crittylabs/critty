@@ -159,14 +159,23 @@ func rawTextOffset(raw, rendered string, offset int, end bool) int {
 }
 
 func (line *markdownLine) sourceOffset(offset int, end bool) int {
-	if offset == 0 && !end {
+	if line.mathTokens != nil && len(line.mathMap) > 0 {
+		return line.mathSourceOffset(offset, end)
+	}
+	if offset == 0 && !end && line.mathTokens == nil {
 		return 0
 	}
 	pos := 0
-	for i, token := range line.tokens {
+	for i, token := range line.displayTokens() {
 		value := line.displayTokenText(i)
 		stop := pos + len(value)
 		if offset < stop || end && offset == stop && stop > pos {
+			if token.style&markdownMath != 0 {
+				if end {
+					return token.end
+				}
+				return token.start
+			}
 			sourceEnd := token.sourceEnd
 			if sourceEnd == 0 {
 				sourceEnd = token.end
@@ -179,11 +188,14 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 }
 
 func (line *markdownLine) displayTokenText(i int) string {
-	token := line.tokens[i]
+	token := line.displayTokens()[i]
+	if token.style&markdownMath != 0 {
+		return ansi.Strip(token.text)
+	}
 	value := displaySourceText(token.text)
 	if !line.literal && i == 0 && token.style == 0 {
 		var rest strings.Builder
-		for _, remaining := range line.tokens[1:] {
+		for _, remaining := range line.displayTokens()[1:] {
 			rest.WriteString(displaySourceText(remaining.text))
 		}
 		actual := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil))

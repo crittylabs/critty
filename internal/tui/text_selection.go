@@ -2,6 +2,7 @@ package tui
 
 import (
 	"slices"
+	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -173,6 +174,7 @@ func (m *AppModel) selectedText() string {
 	type sourceRange struct {
 		first, last contentTextSpan
 		start, end  int
+		raw         bool
 	}
 	var ranges []sourceRange
 	rawLines := make(map[lineRef]string)
@@ -193,14 +195,51 @@ func (m *AppModel) selectedText() string {
 			start = span.offset + tableSourceOffset(span.tableSource[span.offset:], span.text, start-span.offset, false)
 			end = span.offset + tableSourceOffset(span.tableSource[span.offset:], span.text, end-span.offset, true)
 		}
+		raw := false
+		if m.tab().isMarkdown {
+			m.tab().ensureMarkdownCache()
+			source := m.tab().markdown.after
+			if span.ref.side == "old" {
+				source = m.tab().markdown.before
+			}
+			if source != nil && span.ref.line > 0 && span.ref.line <= len(source.lines) {
+				line := &source.lines[span.ref.line-1]
+				if line.mathTokens != nil {
+					var found bool
+					start, end, found = line.mathSourceRange(start, end)
+					if !found {
+						continue
+					}
+				} else {
+					start, end = line.sourceOffset(start, false), line.sourceOffset(end, true)
+				}
+				start += source.offsets[span.ref.line-1]
+				end += source.offsets[span.ref.line-1]
+				raw = true
+			}
+		}
+		first, last := span, span
+		if raw {
+			source := m.tab().markdown.after
+			if span.ref.side == "old" {
+				source = m.tab().markdown.before
+			}
+			first.ref.line = max(1, sort.Search(len(source.offsets), func(i int) bool { return source.offsets[i] > start }))
+			last.ref.line = max(1, sort.Search(len(source.offsets), func(i int) bool { return source.offsets[i] >= end }))
+		}
 		if len(ranges) > 0 {
-			last := &ranges[len(ranges)-1]
-			if last.last.ref == span.ref || last.last.ref.side == span.ref.side && last.last.ref.line+1 == span.ref.line {
-				last.last, last.end = span, end
+			previous := &ranges[len(ranges)-1]
+			if previous.raw && raw && previous.last.ref.side == span.ref.side && first.ref.line <= previous.last.ref.line+1 {
+				previous.start, previous.end = min(previous.start, start), max(previous.end, end)
+				previous.last = last
+				continue
+			}
+			if !previous.raw && !raw && (previous.last.ref == span.ref || previous.last.ref.side == span.ref.side && previous.last.ref.line+1 == span.ref.line) {
+				previous.last, previous.end = span, end
 				continue
 			}
 		}
-		ranges = append(ranges, sourceRange{span, span, start, end})
+		ranges = append(ranges, sourceRange{first, last, start, end, raw})
 	}
 	var result strings.Builder
 	for i, r := range ranges {
@@ -214,6 +253,10 @@ func (m *AppModel) selectedText() string {
 				source = m.tab().markdown.before
 			}
 			if source != nil && r.first.ref.line > 0 && r.last.ref.line <= len(source.lines) {
+				if r.raw {
+					result.WriteString(source.copySourceRange(r.start, r.end))
+					continue
+				}
 				start, end := r.start, r.end
 				start = source.lines[r.first.ref.line-1].sourceOffset(start, false)
 				end = source.lines[r.last.ref.line-1].sourceOffset(end, true)
