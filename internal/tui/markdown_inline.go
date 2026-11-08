@@ -49,7 +49,7 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 			}
 			return style.Render(decorate(text))
 		case *ast.CodeSpan:
-			return codeStyle.Inherit(style).Render(" " + decorate(n.Value.Str(source)) + " ")
+			return codeStyle.Inherit(style).Render(" " + decorate(n.Value.Value(source)) + " ")
 		case *ast.Strong:
 			return children(n, mdBoldStyle.Inherit(style))
 		case *ast.Emphasis:
