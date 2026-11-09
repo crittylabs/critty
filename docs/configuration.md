@@ -62,6 +62,9 @@ The header's `Split: off/on` control or `S` switches between unified and side-by
 
 SVG images are previewed automatically when `rsvg-convert`, `merman-cli`, or `resvg` is available on PATH, in that order.  A command failure or invalid PNG output tries the next converter.  Merman uses Fontconfig's optional `fc-match` to select host fonts, sharing the Mermaid font-selection mechanism.  No converter is installed automatically, and SVG has no separate configuration switch.  `critty doctor` reports the available converters.
 
+Run `critty install tools svg` to install a missing converter with mise or
+Homebrew.  See [preview tool installation](#install-preview-tools).
+
 Local SVG references work in Markdown, comments, the comment editor, and the image lightbox.  Opening an SVG file or attaching it for review also shows a preview above its XML source, retaining source text, line comments, and diff coordinates.  Attached SVGs remain text snapshots, so their source and preview survive source-file removal and review resumption.  `I` / `M-i` outside input and `M-i` in the editor toggle SVG with other images.  When conversion is unavailable or fails, the source or image reference remains visible.
 
 Previews are static and retain the SVG's own colors and transparency.  Converter font handling and supported SVG features may differ.  Inputs and output PNGs are limited to 5 MiB, the output fits within 2048 pixels per side, and each converter has a three-second deadline.  Results are cached in memory for the viewer.  Common absolute SVG dimensions and `viewBox` aspect ratios determine the preview size; documents without usable dimensions use a 300 by 150 pixel viewport.
@@ -74,7 +77,29 @@ In terminals supporting image previews, Markdown `$...$` and `$$...$$` expressio
 
 Critty tries RaTeX for expressions without physical newlines, then falls back to `latex` and `dvipng` on PATH.  Expressions containing newlines go directly to LaTeX.  Line breaks between display delimiters and the expression are excluded; internal line breaks and TeX comments are preserved.  LaTeX needs `amsmath` and `amssymb`.  No renderer is installed or downloaded automatically.  Run `critty doctor` to check executable availability; RaTeX autodetection reads CLI help, but no formulas are rendered and TeX packages are not verified.  Missing optional tools are informational; an unavailable configured RaTeX executable produces a warning.
 
-### Install with mise
+### Install preview tools
+
+Run `critty install tools math` to install missing math tools with mise, or
+`critty install tools` for SVG, math, and Mermaid together.  The command prefers
+mise when available; `--manager mise` or `--manager brew` selects one explicitly.
+The selected package manager must already be installed.  Use `--dry-run` to
+inspect the commands first.  Existing tools on PATH are kept.
+
+`critty doctor` suggests the relevant install command for missing preview
+tools.  RaTeX advice selects mise, and Fontconfig advice selects Homebrew;
+those tools are not installed by the other manager.  Existing alternatives
+and disabled or overridden renderer selections retain their own diagnostics.
+
+mise installs RaTeX and TinyTeX in its global configuration, then updates
+TinyTeX's package manager and installs `amsmath`, `amsfonts`, and `dvipng`.
+Homebrew installs the full `texlive` formula for math, a larger download that
+uses Critty's LaTeX fallback without RaTeX.  For SVG it installs `librsvg`; for
+Mermaid it installs `merman-cli` and Fontconfig.  mise uses Merman for both SVG
+and Mermaid.  Commands run from your home directory and can download packages
+and run package-manager hooks.  Renderer settings and fonts are left unchanged.
+Refresh your shell's PATH afterward and run `critty doctor`.
+
+### Manual installation with mise
 
 Install the [RaTeX](https://github.com/erweixin/RaTeX) PNG CLI for single-line expressions:
 
@@ -113,9 +138,11 @@ In terminals supporting image previews, fenced `mermaid` blocks in documents and
 
 Critty tries [Merman](https://github.com/Latias94/merman), then [mmdr](https://github.com/1jehuang/mermaid-rs-renderer) if it is installed and Merman is missing, fails, or produces an invalid PNG.  If neither renderer succeeds, the source remains visible.  These native CLIs run without a browser.  Their syntax coverage and layout can differ from official Mermaid; mmdr can accept malformed input and treats math labels as literal text.  It is a best-effort preview fallback.  Set `mermaid_mmdr = "off"` to keep the source on Merman failure instead.
 
-### Install with mise
+### Install Mermaid tools
 
-Install Merman, and optionally mmdr for fallback:
+`critty install tools mermaid` installs the missing primary tools with mise
+or Homebrew.  For manual installation with mise, including the optional mmdr
+fallback:
 
 ```sh
 mise use -g 'github:Latias94/merman[matching=merman-cli]@latest'

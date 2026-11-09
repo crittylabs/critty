@@ -319,9 +319,10 @@ func integrationTargets(target string, reg map[string][]integrationFile) ([]stri
 
 var installCmd = &cobra.Command{
 	Use:   "install [--user] [--force] <claude-code|codex|opencode|antigravity|agy|gemini|agents|prompts|all>",
-	Short: "Install agent integrations or stock prompt templates",
+	Short: "Install agent integrations, prompt templates, or preview tools",
 	Long: `Install agent integrations (skills) or the stock finish prompt
-templates.
+templates. Use the tools subcommand to install optional preview renderers
+with mise or Homebrew: critty install tools --help.
 
 Use --user or run from your home directory to install for your user.
 Otherwise, run from a repository root to install for that project only.

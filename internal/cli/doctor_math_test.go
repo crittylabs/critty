@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/crittylabs/critty/internal/config"
@@ -58,8 +59,18 @@ func TestDoctorMathTools(t *testing.T) {
 			r := doctorReport{}
 			r.checkMath()
 			for i, name := range []string{"ratex", "latex", "dvipng"} {
-				if d := diagnosticFor(t, r, "math/"+name); d.Status != tc.want[i] {
+				d := diagnosticFor(t, r, "math/"+name)
+				if d.Status != tc.want[i] {
 					t.Fatalf("%s: %+v", name, d)
+				}
+				wantInstall := tc.want[i] == "info"
+				if i == 0 {
+					wantInstall = wantInstall && (tc.settings == "" || tc.settings == "math_ratex = 'auto'\n")
+				} else if i == 2 && tc.want[1] == "info" {
+					wantInstall = false
+				}
+				if strings.Contains(d.Advice, "critty install tools math") != wantInstall {
+					t.Fatalf("%s: unexpected setup advice: %+v", name, d)
 				}
 			}
 		})

@@ -108,6 +108,15 @@ After installing or upgrading the skills, run `critty doctor` from your project 
 
 In v1.3.0, user settings move to `~/.config/critty/config.toml` and project `.critty.toml`.  Startup converts older JSON settings when the TOML destination is absent.  Local state and prompt paths also use Critty names; update custom launchers to use `CRITTY_HOST`.  See [configuration](docs/configuration.md) and the [release notes](CHANGELOG.md#130) for migration details.
 
+### Preview tools
+
+To enable SVG, math, and Mermaid previews, run `critty install tools` with
+[mise](https://mise.jdx.dev/) or Homebrew already installed.  It installs missing
+tools, preferring mise; choose `--manager brew` for Homebrew or use `--dry-run`
+to inspect the commands.  Homebrew's math setup installs the full TeX Live
+distribution.  See [preview tool setup](docs/configuration.md#install-preview-tools)
+for individual features and requirements.
+
 ### Terminals and multiplexers
 
 In tmux, floating panes require version 3.8 or later; older servers use split panes.  Desktop terminal windows are not opened over SSH, so use a supported multiplexer for agent reviews, or run Critty directly.

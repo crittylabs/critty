@@ -19,7 +19,8 @@ For editing settings or locating custom prompts, read [configuration](configurat
 | `tmp create` | Create a unique private scratch directory under the current directory's `.critty/tmp/`, returning its absolute path as the JSON `directory` field.  Requires no Git repository and creates no application manifest.  Keep documents and results there until no longer needed, then remove only the returned directory; retain `.critty/tmp/.gitignore`. |
 | `tmp prepare`, `tmp snapshot` | Preparation reads explicit regular-file targets beneath `--root` into `.critty/tmp/`; snapshot reads those copies.  Both initialize isolated Git baselines with hooks and content conversions disabled.  Snapshot writes the frozen diff and application-consent attachment.  Originals stay unchanged. |
 | `tmp apply` | Verify the saved review and consent, then write or delete registered destinations beneath the prepared root, also required as `--root`.  This can write outside the working directory.  Detect concurrent changes, preserve backups, and journal partial application for retry.  Runs no Git subprocess.  Requires the caller's permission to modify those targets; see the [temporary-tree workflow](../../critty/references/temporary-tree.md). |
-| `install` | Write integration files to the selected project or user configuration directories. |
+| `install <target>` | Write integration files to the selected project or user configuration directories. |
+| `install tools [svg\|math\|mermaid\|all]` | Install missing preview tools through an existing mise or Homebrew.  Defaults to all; `--manager auto` prefers mise, and `--manager mise\|brew` selects one.  Runs package-manager commands from the user's home directory.  mise writes global tool selections; Homebrew installs into its prefix.  Downloads packages and runs their installation hooks.  `--dry-run` prints planned argument lists without executing them.  Existing PATH tools, renderer settings, and agent integrations are kept. |
 | `env`, `env tty` | Inspect local terminal/process information and print the requested environment or device. |
 | `env run`, `env --` | Execute the supplied command with the detected terminal environment.  Assess that command's own effects; the wrapper does not make it read-only or local-only. |
 
@@ -35,3 +36,20 @@ External editors launched from the TUI likewise have their own behavior.  Descri
 | `agents` | `.agents/skills` | `~/.agents/skills` |
 
 `agents` provides shared, host-neutral skill references and comment attribution.  Antigravity skills use the ordinary `critty` names.  Prefer a shared installation or selected host variants, because hosts may discover duplicate names across directories.  Existing installations in old locations are left untouched.  `install all` includes Antigravity; legacy Gemini CLI skills remain available through `install gemini`.
+
+`install tools` is always a user/host installation and takes no `--user` or
+`--force` flag.  It does not install a package manager.  mise installs Merman
+for SVG/Mermaid and RaTeX plus TinyTeX for math; TinyTeX setup installs AMS
+packages and dvipng, including when retrying a partial install.  TinyTeX support
+is limited to macOS and x86_64 Linux.  Homebrew installs librsvg, Merman,
+Fontconfig, and the full TeX Live distribution as needed; it does not install
+RaTeX.  No fonts or optional mmdr fallback are installed.  Failure stops later
+steps and retains earlier installations.  Refresh the shell's PATH and run
+`critty doctor` afterward; existing TeX packages and configured renderer
+overrides are not validated by the installer.  See [preview tool setup](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#install-preview-tools).
+
+`doctor` suggests feature-specific `install tools` commands for missing
+preview tools.  RaTeX advice explicitly selects mise, and Fontconfig advice
+selects Homebrew.  It does not suggest installing the optional mmdr fallback
+through this command.  Follow configuration advice for disabled renderers or
+unavailable executable overrides.
