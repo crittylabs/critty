@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"bytes"
+	"fmt"
 	"image"
 	"image/color"
+	"image/png"
 	"reflect"
 	"strings"
 	"testing"
@@ -370,5 +373,39 @@ func TestMathPreviewKeepsSourceAndImageNavigation(t *testing.T) {
 	}
 	if got := app.lineImages(imageTarget{line: 3}); len(got) != 1 || !strings.HasSuffix(got[0].path, "example.png") {
 		t.Fatalf("math entered file navigation: %+v", got)
+	}
+}
+
+func TestMathPreviewFollowsTextSize(t *testing.T) {
+	for _, cell := range []cellSize{{}, {width: 8, height: 16}, {width: 20, height: 40}, {width: 9, height: 20}} {
+		t.Run(fmt.Sprintf("%dx%d", cell.width, cell.height), func(t *testing.T) {
+			app := setupPrivateAppWithDoc(t, "$x$\n")
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+			app.images.cell, app.images.enabled = cell, true
+			var data bytes.Buffer
+			if err := png.Encode(&data, image.NewNRGBA(image.Rect(0, 0, 24, 32))); err != nil {
+				t.Fatal(err)
+			}
+			for _, inline := range []bool{false, true} {
+				msg := app.images.encode(data.Bytes(), imageLoadedMsg{rendered: true, renderInline: inline})
+				if msg.err != nil {
+					t.Fatal(msg.err)
+				}
+				img := inlineImage{width: msg.width, height: msg.height}
+				cols, rows := app.markdownPreviewSize(markdownImage{renderBody: "x", renderInline: inline}, &img)
+				if cols > 3 || rows != 1 {
+					t.Fatalf("inline=%t: single math glyph occupies %dx%d cells, want at most three columns on one text row", inline, cols, rows)
+				}
+				for _, editor := range []bool{false, true} {
+					key := commentImageKey{width: 80, renderBody: "x", inline: inline, editor: editor, dark: terminalIsDark}
+					side := app.commentImageSide(key)
+					side.image = &inlineImage{width: msg.width, height: msg.height}
+					app.prepareCommentImages()
+					if side.image.columns != cols || side.image.rows != rows {
+						t.Fatalf("inline=%t editor=%t: comment glyph uses %dx%d cells, document uses %dx%d", inline, editor, side.image.columns, side.image.rows, cols, rows)
+					}
+				}
+			}
+		})
 	}
 }

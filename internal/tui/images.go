@@ -501,7 +501,7 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 		return msg
 	}
 	if msg.renderInline {
-		img = centerInlineMath(img, d.cell)
+		img = centerInlineMath(img, mathCell(d.cell))
 	}
 	msg.id = newImageID()
 	msg.width, msg.height = img.Bounds().Dx(), img.Bounds().Dy()

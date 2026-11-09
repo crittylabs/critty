@@ -30,17 +30,23 @@ func (m AppModel) markdownPreviewSize(ref markdownImage, img *inlineImage) (int,
 		return img.fit(width, max(5, m.contentViewport.Height()-2), m.images.cell)
 	}
 	if ref.renderInline {
-		return img.fit(min(44, width), 5, m.images.cell)
+		return img.fit(min(44, width), 5, mathCell(m.images.cell))
 	}
-	return img.fit(min(44, width), min(19, max(5, m.contentViewport.Height())), m.images.cell)
+	return img.fit(min(44, width), min(19, max(5, m.contentViewport.Height())), mathCell(m.images.cell))
+}
+
+// Math renderers use a 32-pixel em.  A 40-pixel line keeps that em aligned
+// with prose, independent of the terminal's physical resolution or font size.
+func mathCell(cell cellSize) cellSize {
+	if !cell.known() {
+		return cellSize{width: 20, height: 40}
+	}
+	return cellSize{width: max(1, 40*cell.width/cell.height), height: 40}
 }
 
 // An odd number of complete cell rows gives inline math a center text row.
 // Center the pixels too, so a fraction does not sit half a row below prose.
 func centerInlineMath(img image.Image, cell cellSize) image.Image {
-	if !cell.known() {
-		cell = cellSize{width: 8, height: 16}
-	}
 	bounds := img.Bounds()
 	cols := (bounds.Dx() + cell.width - 1) / cell.width
 	rows := (bounds.Dy() + cell.height - 1) / cell.height

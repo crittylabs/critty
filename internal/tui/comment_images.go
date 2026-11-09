@@ -192,16 +192,22 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 			continue
 		}
 		if img := side.image; img != nil {
-			cols, rows := img.size(min(44, key.width), 11, m.images.cell)
-			if key.renderBody != "" && key.renderKind == renderedMermaid {
+			var cols, rows int
+			switch {
+			case key.renderBody == "":
+				cols, rows = img.size(min(44, key.width), 11, m.images.cell)
+			case key.renderKind == renderedMermaid:
 				maxRows := 19
 				if key.editor {
 					maxRows = min(11, max(1, m.height-20))
 				}
 				cols, rows = img.fit(key.width, maxRows, m.images.cell)
-			}
-			if key.renderBody != "" && key.inline && !key.editor {
-				cols, rows = img.fit(min(44, key.width), 5, m.images.cell)
+			default:
+				maxRows := 8
+				if key.inline && !key.editor {
+					maxRows = 5
+				}
+				cols, rows = img.fit(min(44, key.width), maxRows, mathCell(m.images.cell))
 			}
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
