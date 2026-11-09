@@ -25,7 +25,7 @@ While a review waits for you, Critty tells the terminal it needs your input thro
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/a8d07800-d0c7-4b68-8f7b-9e1f14168b49
+https://github.com/user-attachments/assets/5435586b-f5db-483a-beef-819b6b3581c5
 
 For example:
 
@@ -164,7 +164,7 @@ Critty opens a review pane or tab in the detected multiplexer, or a new window o
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-https://github.com/user-attachments/assets/99017ffc-f835-4c8c-9676-90908ad77476
+https://github.com/user-attachments/assets/f333c3d7-029f-47b5-a48c-4e4e92591c04
 
 For a manual review:
 
@@ -322,7 +322,7 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Math, Mermaid, and SVG previews below were captured with the v1.11.0 candidate.  Other videos and screenshots were captured with the v1.10.0 candidate.
+All videos and the Math/Mermaid screenshots were captured with the v1.11.0 candidate.  Other screenshots were captured with the v1.10.0 candidate.
 
 ### Previewing math, Mermaid diagrams, and SVG images
 
@@ -342,7 +342,7 @@ https://github.com/user-attachments/assets/6da225e3-3855-4e07-a09a-e585ed1f299c
 
 Follow the source outline as you move through code, or jump to a Markdown heading.  `M-G` focuses the outline; Enter returns to the source.
 
-https://github.com/user-attachments/assets/24e09750-687e-434a-819c-7019985eb790
+https://github.com/user-attachments/assets/e95cf2eb-a6cd-4157-a336-920054425319
 
 ![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/feb5301d-43d9-4f80-b530-1cc436799ca7)
 
@@ -352,7 +352,7 @@ https://github.com/user-attachments/assets/24e09750-687e-434a-819c-7019985eb790
 
 ### Code review with inline comments
 
-https://github.com/user-attachments/assets/99017ffc-f835-4c8c-9676-90908ad77476
+https://github.com/user-attachments/assets/f333c3d7-029f-47b5-a48c-4e4e92591c04
 
 ### Side-by-side code review
 
@@ -360,27 +360,27 @@ https://github.com/user-attachments/assets/99017ffc-f835-4c8c-9676-90908ad77476
 
 ### Review round trips with Claude Code
 
-https://github.com/user-attachments/assets/24f5f6ae-a41c-4513-ba3b-f6259400bb84
+https://github.com/user-attachments/assets/1eb9458b-a6e5-451b-ace6-30ef56735cf5
 
 ### Review round trips with Codex
 
-https://github.com/user-attachments/assets/4a21894c-61e1-4824-8b54-b8714537b93c
+https://github.com/user-attachments/assets/155f8540-8923-4249-9cb3-52bd4e486b1b
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-https://github.com/user-attachments/assets/f58d891a-5727-40e5-a04f-7be5050ac1a8
+https://github.com/user-attachments/assets/825d4bb6-ebb8-43e4-aac4-1dec91bbe096
 
 ### Following live review updates
 
 Watch follows file edits and marks changed background tabs.  Follow a file reference from an attachment to inspect the updated source.
 
-https://github.com/user-attachments/assets/5252cd1b-35b1-402c-a9bf-00ffc7440f65
+https://github.com/user-attachments/assets/42688fc6-5010-4ad5-81b5-ef3f2b7553f2
 
 ### Reviewing a document
 
-https://github.com/user-attachments/assets/211ea142-595d-4e3b-8ae4-0d8c564459c3
+https://github.com/user-attachments/assets/8a6534ba-2afa-4bbc-bd7e-37b715bd809c
 
 ### Previewing an image while writing a comment
 

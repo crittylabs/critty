@@ -20,6 +20,8 @@ MP4s are local build outputs ignored by Git.  Published recordings are hosted as
 
 For inline playback in the GitHub README, upload the MP4s as GitHub video attachments and put each `https://github.com/user-attachments/assets/...` URL on its own line.  GitHub generates the player.  Handwritten `<video>` elements can fail playback for signed-in readers.  Verify playback and seeking in the README and hosting issue, both signed in and signed out.  Keep the versioned release assets for downloads.
 
+For native macOS window recordings, exclude the pointer in the capture configuration: use ScreenCaptureKit with `SCStreamConfiguration.showsCursor = false` and `showMouseClicks = false`.  Hiding the desktop pointer with `CGDisplayHideCursor` alone is unreliable because mouse input can make it reappear during recording.  Inspect frames throughout the finished video for pointer movement before publishing.
+
 With GitHub CLI 2.103.2 or newer, publish attachments and their hosting issue together:
 
 ```sh
