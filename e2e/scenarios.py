@@ -816,8 +816,16 @@ def scenarios() -> None:
             + "filler " * 30
             + "[target](https://hidden.example) |\n"
         )
-        table = Round("table-scroll", ["table.md"])
+        table = Round("table-scroll", ["table.md", "--launcher", "tmux-split"])
         tmux("resize-pane", "-t", table.pane, "-x", "60", "-y", "24")
+        # The scroll button also exists before the resized frame is drawn.
+        wait_until(
+            lambda: any(
+                len(row) == 60 and row.endswith("╮")
+                for row in table.screen().splitlines()
+            ),
+            "table frame reaches the resized pane's right edge",
+        )
         table.wait_screen("▶", "wide table has a horizontal scroll button")
         table.keys("C-s")
         table.text("hidden.example")
@@ -828,6 +836,7 @@ def scenarios() -> None:
         table.wait_screen("◀", "l scrolls the table right")
         table.keys("h", "h", "h", "h")
         table.wait_screen("StartColumn", "h scrolls the table left")
+        wait_until(lambda: "◀" not in table.screen(), "table reaches its left edge")
         table.click("▶")
         table.wait_screen("◀", "right edge button scrolls the table")
         table.keys("Enter")
