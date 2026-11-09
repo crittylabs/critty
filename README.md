@@ -126,13 +126,15 @@ After setting up or switching your terminal or multiplexer, run `critty doctor` 
 
 #### Image previews
 
+Recently viewed image, math, and Mermaid previews stay cached when switching files.  Known preview dimensions remain available with the loaded document even when image data is evicted, keeping the layout stable while it reloads.
+
 Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, iTerm2, or the Herdr desktop app.  Through tmux or Herdr TUI, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
 
 After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr TUI checks read local configuration; running server and remote client settings may differ.
 
 PNG, JPEG, GIF, and WebP are supported directly.  SVG previews use `rsvg-convert`, `merman-cli`, or `resvg` found on PATH, with no extra setting.  SVG files retain their XML source alongside the preview; Markdown images and comment editors support SVG too.  See [SVG preview details](docs/configuration.md#svg-previews).  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
 
-Markdown math expressions in `$...$` and `$$...$$` can appear as images in documents and comments, including code blocks such as suggestions and Markdown examples.  Copying keeps the original TeX; searching, selecting lines, or turning Images off reveals the source.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH first, with LaTeX plus dvipng as fallback; multiline expressions use LaTeX directly.  These optional tools stay outside Critty, and missing tools or rendering failures leave the source visible.  See [math preview setup and limits](docs/configuration.md#math-previews).
+Markdown math expressions in `$...$` and `$$...$$` can appear as images in documents and comments, including code blocks such as suggestions and Markdown examples.  Inline formulas follow the surrounding text size; wide block formulas in document views scroll horizontally.  Copying keeps the original TeX; searching, selecting lines, or turning Images off reveals the source.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH first, with LaTeX plus dvipng as fallback; multiline expressions use LaTeX directly.  These optional tools stay outside Critty, and missing tools or rendering failures leave the source visible.  See [math preview setup and limits](docs/configuration.md#math-previews).
 
 Fenced `mermaid` blocks can appear as diagrams through the optional native Merman CLI, with mmdr as fallback.  The comment editor keeps the source with a preview below it.  Press `I` or `M-i` (`Alt+i`) outside input, use `M-i` while editing comments, or click **Images** to toggle image, math, and Mermaid previews together.  See [Mermaid setup and limits](docs/configuration.md#mermaid-previews).
 
@@ -328,15 +330,15 @@ All videos and the Math/Mermaid screenshots were captured with the v1.11.0 candi
 
 Read formulas, diagrams, and vector images alongside their source.  Missing renderers can be installed with `critty install tools`.
 
-https://github.com/user-attachments/assets/6da225e3-3855-4e07-a09a-e585ed1f299c
+https://github.com/user-attachments/assets/d5eafe0a-76cb-40a1-8d61-f3827dd6f9da
 
 ### Block and inline math expressions
 
-![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/93f64968-9774-4a9a-8b82-64ed8fe2b411)
+![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/18cb5a58-72a1-469a-add7-ff471c5b8265)
 
 ### Mermaid diagrams
 
-![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/a4316e7a-6d13-4352-9aed-72f5f99ce1f3)
+![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/a34dac9b-77d8-436d-b275-9c400a2605e4)
 
 ### Navigating source and Markdown outlines
 

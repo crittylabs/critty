@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+## 1.11.1
+
 ### Changed
 
 - **Readable math**: Inline formulas sit closer to the surrounding text size without extra side padding, and thin strokes stay visible after rasterization.  Block formulas in document views retain their size and scroll horizontally with the same keyboard, mouse wheel, and edge controls as tables.
-- **Stable previews when switching files**: Recently viewed images, math, and Mermaid diagrams remain cached.  Known preview dimensions stay in memory even after image data is evicted, keeping the document's layout stable while it reloads.  Generated math, Mermaid, and SVG previews use bounded caches that evict older entries instead of clearing all results at once.
+- **Stable previews when switching files**: Recently viewed images, math, and Mermaid diagrams remain cached.  Known preview dimensions stay in memory with the loaded document even after image data is evicted, keeping its layout stable while it reloads.
 
 ### Fixed
 
