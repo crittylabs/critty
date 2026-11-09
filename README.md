@@ -328,7 +328,7 @@ Math, Mermaid, and SVG previews below were captured with the v1.11.0 candidate. 
 
 Read formulas, diagrams, and vector images alongside their source.  Missing renderers can be installed with `critty install tools`.
 
-https://github.com/user-attachments/assets/98ebbfc3-8f20-4f22-90a7-91ef3f64ce5e
+https://github.com/user-attachments/assets/6da225e3-3855-4e07-a09a-e585ed1f299c
 
 ### Block and inline math expressions
 
