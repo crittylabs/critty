@@ -5,18 +5,22 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-type tableViewport struct {
+type horizontalBlockViewport struct {
 	startLine, endLine int
 	left               int
 	window             horizontalViewport
 	match              *mouseRect // unscrolled horizontal position and rendered row
+	compactEdges       bool
 }
 
-func (t tableViewport) render(row string) string {
+func (t horizontalBlockViewport) render(row string) string {
 	if t.window.maxOffset() == 0 {
 		return row
 	}
 	left, right := " ", " "
+	if t.compactEdges {
+		left, right = "", ""
+	}
 	if t.window.offset > 0 {
 		left = "◀"
 	}
@@ -26,9 +30,9 @@ func (t tableViewport) render(row string) string {
 	return mdTablePipe.Render(left) + t.window.render(row) + mdTablePipe.Render(right)
 }
 
-func (m *AppModel) tableAtLine(line int) *tableViewport {
-	for i := range m.contentLayout.tables {
-		t := &m.contentLayout.tables[i]
+func (m *AppModel) horizontalBlockAtLine(line int) *horizontalBlockViewport {
+	for i := range m.contentLayout.horizontalBlocks {
+		t := &m.contentLayout.horizontalBlocks[i]
 		if line >= t.startLine && line <= t.endLine {
 			return t
 		}
@@ -36,7 +40,7 @@ func (m *AppModel) tableAtLine(line int) *tableViewport {
 	return nil
 }
 
-func (m *AppModel) tableAtMouse(mouse tea.Mouse) *tableViewport {
+func (m *AppModel) horizontalBlockAtMouse(mouse tea.Mouse) *horizontalBlockViewport {
 	left, top, right, bottom := m.contentBounds()
 	if mouse.X < left+gutterWidth || mouse.X >= right || mouse.Y < top || mouse.Y >= bottom {
 		return nil
@@ -45,49 +49,49 @@ func (m *AppModel) tableAtMouse(mouse tea.Mouse) *tableViewport {
 	if !ok || target.annotation || target.side != "" {
 		return nil
 	}
-	return m.tableAtLine(target.line)
+	return m.horizontalBlockAtLine(target.line)
 }
 
-func (m *AppModel) handleTableScrollClick(mouse tea.Mouse) bool {
-	table := m.tableAtMouse(mouse)
+func (m *AppModel) handleHorizontalScrollClick(mouse tea.Mouse) bool {
+	table := m.horizontalBlockAtMouse(mouse)
 	if table == nil || table.window.maxOffset() == 0 {
 		return false
 	}
 	left, _, _, _ := m.contentBounds()
 	x := mouse.X - left
 	direction := 0
-	if x == gutterWidth {
+	if x == gutterWidth && (!table.compactEdges || table.window.offset > 0) {
 		direction = -1
-	} else if x == table.left+table.window.width {
+	} else if x == table.left+table.window.width && (!table.compactEdges || table.window.offset < table.window.maxOffset()) {
 		direction = 1
 	}
 	if direction == 0 {
 		return false
 	}
 	m.focused = contentPane
-	m.scrollTable(*table, direction*max(1, table.window.width/2))
+	m.scrollHorizontalBlock(*table, direction*max(1, table.window.width/2))
 	return true
 }
 
-func (m *AppModel) scrollTable(table tableViewport, delta int) {
+func (m *AppModel) scrollHorizontalBlock(table horizontalBlockViewport, delta int) {
 	offset := table.window.clamp(table.window.offset + delta)
 	if offset == table.window.offset {
 		return
 	}
-	if m.tab().tableOffsets == nil {
-		m.tab().tableOffsets = make(map[int]int)
+	if m.tab().horizontalOffsets == nil {
+		m.tab().horizontalOffsets = make(map[int]int)
 	}
-	m.tab().tableOffsets[table.startLine] = offset
+	m.tab().horizontalOffsets[table.startLine] = offset
 	m.rebuildContent()
 }
 
 func (m *AppModel) revealTableMatch() {
-	table := m.tableAtLine(m.isearch.match.ref.line)
+	table := m.horizontalBlockAtLine(m.isearch.match.ref.line)
 	if table == nil || table.match == nil || m.isearch.match.ref.side != "" {
 		return
 	}
 	r := *table.match
-	m.scrollTable(*table, table.window.reveal(r.left, r.right)-table.window.offset)
+	m.scrollHorizontalBlock(*table, table.window.reveal(r.left, r.right)-table.window.offset)
 	top := m.contentViewport.YOffset()
 	if r.top < top {
 		m.contentViewport.SetYOffset(r.top)

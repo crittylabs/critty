@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -133,7 +134,7 @@ func (r *Renderer) render(ctx context.Context, formula string, inline, dark bool
 			entries, err := os.ReadDir(out)
 			if err == nil && len(entries) == 1 && !entries[0].IsDir() {
 				if data, err := readPNG(filepath.Join(out, entries[0].Name())); err == nil {
-					if normalized, err := normalizePNG(data); err == nil {
+					if normalized, err := normalizePNG(data, inline); err == nil {
 						return normalized, nil
 					}
 				}
@@ -147,7 +148,11 @@ func (r *Renderer) render(ctx context.Context, formula string, inline, dark bool
 	if inline {
 		style = "\\textstyle "
 	}
-	source := "\\documentclass{article}\n\\usepackage{amsmath,amssymb}\n\\pagestyle{empty}\n\\begin{document}\n$" + style + formula + "\n$\n\\end{document}\n"
+	body := "$" + style + formula + "\n$"
+	if !inline && displayEnvironment(formula) {
+		body = formula
+	}
+	source := "\\documentclass{article}\n\\usepackage{amsmath,amssymb}\n\\pagestyle{empty}\n\\begin{document}\n" + body + "\n\\end{document}\n"
 	if err := os.WriteFile(filepath.Join(dir, "formula.tex"), []byte(source), 0o600); err != nil {
 		return nil, err
 	}
@@ -161,12 +166,24 @@ func (r *Renderer) render(ctx context.Context, formula string, inline, dark bool
 	if err != nil {
 		return nil, err
 	}
-	return normalizePNG(data)
+	return normalizePNG(data, inline)
+}
+
+// These environments enter display math themselves.  Inner environments such
+// as aligned, gathered, and matrices still need the surrounding math mode.
+func displayEnvironment(formula string) bool {
+	body := strings.TrimSpace(formula)
+	for _, name := range []string{"equation", "eqnarray", "align", "alignat", "flalign", "gather", "multline"} {
+		if strings.HasPrefix(body, "\\begin{"+name+"}") || strings.HasPrefix(body, "\\begin{"+name+"*}") {
+			return true
+		}
+	}
+	return false
 }
 
 // Both engines rasterize at four times the target size.  Use one resampler
-// and transparent border instead of mixing their native antialiasing/padding.
-func normalizePNG(data []byte) ([]byte, error) {
+// and padding instead of mixing their native antialiasing/padding.
+func normalizePNG(data []byte, inline bool) ([]byte, error) {
 	source, err := png.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -184,9 +201,18 @@ func normalizePNG(data []byte) ([]byte, error) {
 	if ink.Empty() {
 		return nil, fmt.Errorf("empty math image")
 	}
-	const padding = 3
-	out := image.NewRGBA(image.Rect(0, 0, (ink.Dx()+3)/4+2*padding, (ink.Dy()+3)/4+2*padding))
-	draw.CatmullRom.Scale(out, out.Bounds().Inset(padding), source, ink, draw.Src, nil)
+	size := image.Pt((ink.Dx()+3)/4, (ink.Dy()+3)/4)
+	padding := image.Pt(3, 3)
+	if inline {
+		padding.X = 0
+	}
+	out := image.NewNRGBA(image.Rectangle{Max: size.Add(padding.Mul(2))})
+	draw.CatmullRom.Scale(out, image.Rectangle{Min: padding, Max: padding.Add(size)}, source, ink, draw.Src, nil)
+	// Thin rules can cover less than one pixel after resampling.  Raise their
+	// coverage without changing glyph bounds or the light/dark foreground.
+	for i := 3; i < len(out.Pix); i += 4 {
+		out.Pix[i] = uint8(math.Round(255 * math.Sqrt(float64(out.Pix[i])/255)))
+	}
 	var encoded bytes.Buffer
 	if err := png.Encode(&encoded, out); err != nil {
 		return nil, err

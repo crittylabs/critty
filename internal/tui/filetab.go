@@ -73,21 +73,21 @@ type FileTab struct {
 	outsideChanges bool
 
 	// Cached rendering data (computed once per tab switch, not per keystroke)
-	highlighted      bool // language detection and highlight caches are current
-	lexer            chroma.Lexer
-	outlineMask      *outlineMask // masked source from the highlight pass, nil when unavailable
-	chromaLines      []string     // display-ready syntax-highlighted lines (nil for markdown)
-	plainLines       []string     // display text without styling, parallel to chromaLines
-	displayWidths    []int        // display widths of chromaLines
-	lineNumbers      []string     // default gutter rendering of each line number
-	lineNumbersDark  bool
-	deletedLineCache map[int][]string // pre-highlighted deleted line content, keyed by afterLine
-	isMarkdown       bool
-	isCode           bool
-	markdown         *markdownCache
-	goOutline        *goOutlineCache
-	codeOutline      *codeOutlineCache
-	tableOffsets     map[int]int // horizontal offsets keyed by table start line
+	highlighted       bool // language detection and highlight caches are current
+	lexer             chroma.Lexer
+	outlineMask       *outlineMask // masked source from the highlight pass, nil when unavailable
+	chromaLines       []string     // display-ready syntax-highlighted lines (nil for markdown)
+	plainLines        []string     // display text without styling, parallel to chromaLines
+	displayWidths     []int        // display widths of chromaLines
+	lineNumbers       []string     // default gutter rendering of each line number
+	lineNumbersDark   bool
+	deletedLineCache  map[int][]string // pre-highlighted deleted line content, keyed by afterLine
+	isMarkdown        bool
+	isCode            bool
+	markdown          *markdownCache
+	goOutline         *goOutlineCache
+	codeOutline       *codeOutlineCache
+	horizontalOffsets map[int]int // horizontal offsets keyed by block start line
 }
 
 // changeChunk represents a contiguous block of changed lines.

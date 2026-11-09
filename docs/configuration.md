@@ -77,6 +77,8 @@ In terminals supporting image previews, Markdown `$...$` and `$$...$$` expressio
 
 Critty tries RaTeX for expressions without physical newlines, then falls back to `latex` and `dvipng` on PATH.  Expressions containing newlines go directly to LaTeX.  Line breaks between display delimiters and the expression are excluded; internal line breaks and TeX comments are preserved.  LaTeX needs `amsmath` and `amssymb`.  No renderer is installed or downloaded automatically.  Run `critty doctor` to check executable availability; RaTeX autodetection reads CLI help, but no formulas are rendered and TeX packages are not verified.  Missing optional tools are informational; an unavailable configured RaTeX executable produces a warning.
 
+Inline formulas follow the surrounding text size.  Block formulas in document views keep their size when the pane narrows; use the horizontal scrolling controls in Help to read the rest.  Diff and comment previews fit the available area.  LaTeX display environments such as `eqnarray*` and `align*` can appear inside `$$...$$`; inner environments such as `aligned` also work.
+
 ### Install preview tools
 
 Run `critty install tools math` to install missing math tools with mise, or

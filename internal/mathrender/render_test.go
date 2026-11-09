@@ -72,10 +72,12 @@ func TestRendererFallback(t *testing.T) {
 	for _, tc := range []struct {
 		name, formula                     string
 		ratexFailure, invalidPNG, noLatex bool
+		display                           bool
 		want                              []string
 	}{
 		{name: "single line", formula: `\frac{1}{2}`, want: []string{"ratex"}},
 		{name: "multiline", formula: "a% comment\n+b", want: []string{"latex", "dvipng"}},
+		{name: "display environment", formula: " \\begin{eqnarray*}\na &=& b \\\\\n&=& c\n\\end{eqnarray*} ", display: true, want: []string{"latex", "dvipng"}},
 		{name: "failed RaTeX", formula: "x", ratexFailure: true, want: []string{"ratex", "latex", "dvipng"}},
 		{name: "invalid RaTeX PNG", formula: "x", invalidPNG: true, want: []string{"ratex", "latex", "dvipng"}},
 		{name: "missing fallback", formula: "x", ratexFailure: true, noLatex: true, want: []string{"ratex"}},
@@ -120,7 +122,11 @@ func TestRendererFallback(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					if !strings.Contains(string(data), tc.formula+"\n$") {
+					want := tc.formula + "\n$"
+					if tc.display {
+						want = "\\begin{document}\n" + tc.formula + "\n\\end{document}"
+					}
+					if !strings.Contains(string(data), want) {
 						t.Fatalf("TeX changed or closing delimiter swallowed by comment: %s", data)
 					}
 					if !strings.Contains(strings.Join(args, " "), "-no-shell-escape") {
@@ -140,5 +146,71 @@ func TestRendererFallback(t *testing.T) {
 				t.Fatalf("calls %v, want %v (including cache hit)", calls, tc.want)
 			}
 		})
+	}
+}
+
+func TestNormalizePNGKeepsThinRulesVisible(t *testing.T) {
+	for _, rgb := range []uint8{0, 255} {
+		t.Run(fmt.Sprintf("foreground %d", rgb), func(t *testing.T) {
+			source := image.NewNRGBA(image.Rect(0, 0, 80, 40))
+			ink := color.NRGBA{R: rgb, G: rgb, B: rgb, A: 255}
+			// Keep the full glyph height while placing two thin equality rules
+			// at different subpixel positions in the four-times raster.
+			source.SetNRGBA(0, 0, ink)
+			source.SetNRGBA(0, 39, ink)
+			for x := 16; x < 80; x++ {
+				source.SetNRGBA(x, 11, ink)
+				source.SetNRGBA(x, 24, ink)
+			}
+			var data bytes.Buffer
+			if err := png.Encode(&data, source); err != nil {
+				t.Fatal(err)
+			}
+			dataOut, err := normalizePNG(data.Bytes(), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := png.Decode(bytes.NewReader(dataOut))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, band := range [][2]int{{3, 8}, {8, 13}} {
+				peak := uint32(0)
+				for y := band[0]; y < band[1]; y++ {
+					_, _, _, a := out.At(12, y).RGBA()
+					peak = max(peak, a>>8)
+				}
+				if peak < 100 {
+					t.Fatalf("thin rule in rows %v faded to alpha %d", band, peak)
+				}
+			}
+		})
+	}
+}
+
+func TestInlineMathHasNoSidePadding(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 16, 16))
+	for y := range 16 {
+		for x := range 16 {
+			source.SetNRGBA(x, y, color.NRGBA{A: 255})
+		}
+	}
+	var data bytes.Buffer
+	if err := png.Encode(&data, source); err != nil {
+		t.Fatal(err)
+	}
+	result, err := normalizePNG(data.Bytes(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := png.Decode(bytes.NewReader(result))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range []int{0, out.Bounds().Max.X - 1} {
+		_, _, _, alpha := out.At(x, out.Bounds().Dy()/2).RGBA()
+		if alpha == 0 {
+			t.Fatalf("inline math has transparent side padding at x=%d", x)
+		}
 	}
 }

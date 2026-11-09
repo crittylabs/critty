@@ -60,20 +60,20 @@ func TestCommentFoldKeysPrioritizeFoldingOverTableScroll(t *testing.T) {
 	app.selectComment(0, app.commentTargets(0)[0])
 	app = pressKey(app, 'h')
 	app = pressKey(app, 'l')
-	if app.tableAtLine(3).window.offset != 0 {
+	if app.horizontalBlockAtLine(3).window.offset != 0 {
 		t.Fatal("unfolding scrolled the table")
 	}
 	app = pressKey(app, 'l')
-	offset := app.tableAtLine(3).window.offset
+	offset := app.horizontalBlockAtLine(3).window.offset
 	if offset == 0 {
 		t.Fatal("right on an unfolded comment did not scroll the table")
 	}
 	app = pressKey(app, 'h')
-	if app.tableAtLine(3).window.offset != offset {
+	if app.horizontalBlockAtLine(3).window.offset != offset {
 		t.Fatal("folding scrolled the table")
 	}
 	app = pressKey(app, 'h')
-	if app.tableAtLine(3).window.offset >= offset {
+	if app.horizontalBlockAtLine(3).window.offset >= offset {
 		t.Fatal("left on a folded comment did not scroll the table")
 	}
 }

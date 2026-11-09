@@ -166,11 +166,11 @@ func (m *AppModel) rebuildContent() {
 			width -= 2
 			left++
 		}
-		tb.viewport = tableViewport{startLine: tb.startLine, endLine: tb.endLine, left: left,
+		tb.viewport = horizontalBlockViewport{startLine: tb.startLine, endLine: tb.endLine, left: left,
 			window: horizontalViewport{width: width, contentWidth: totalWidth}}
-		tb.viewport.window.offset = tb.viewport.window.clamp(t.tableOffsets[tb.startLine])
-		if t.tableOffsets != nil {
-			t.tableOffsets[tb.startLine] = tb.viewport.window.offset
+		tb.viewport.window.offset = tb.viewport.window.clamp(t.horizontalOffsets[tb.startLine])
+		if t.horizontalOffsets != nil {
+			t.horizontalOffsets[tb.startLine] = tb.viewport.window.offset
 		}
 		for l := tb.startLine; l <= tb.endLine; l++ {
 			tableBlockMap[l] = tb
@@ -513,7 +513,14 @@ func (m *AppModel) rebuildContent() {
 	}
 	renderDeleted(t.doc.LineCount())
 	for _, table := range tableBlocks {
-		layout.tables = append(layout.tables, table.viewport)
+		layout.horizontalBlocks = append(layout.horizontalBlocks, table.viewport)
+	}
+	if t.markdown != nil && t.markdown.after != nil {
+		for _, line := range t.markdown.after.lines {
+			if line.previewScroll != nil {
+				layout.horizontalBlocks = append(layout.horizontalBlocks, *line.previewScroll)
+			}
+		}
 	}
 	if t.doc.Known != nil {
 		layout.appendBlock(&b, "       ⋯ remaining context not included in diff", contentMouseTarget{})
@@ -875,7 +882,7 @@ type tableBlock struct {
 	startLine int
 	endLine   int
 	colWidths []int
-	viewport  tableViewport
+	viewport  horizontalBlockViewport
 }
 
 func detectTableBlocks(lines []markdownLine, renderedCells func(int) []string) []tableBlock {

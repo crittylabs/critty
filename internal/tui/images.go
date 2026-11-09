@@ -107,6 +107,7 @@ func (t *FileTab) previewSides() []bool {
 
 type imageLoadedMsg struct {
 	rendered, renderDark, renderInline bool
+	renderKind                         renderedKind
 	path                               string
 	comment                            *commentImageKey
 	markdown                           int
@@ -500,8 +501,8 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 	if err != nil {
 		return msg
 	}
-	if msg.renderInline {
-		img = centerInlineMath(img, mathCell(d.cell))
+	if msg.rendered && msg.renderKind != renderedMermaid {
+		img = centerMath(img, d.cell, msg.renderInline)
 	}
 	msg.id = newImageID()
 	msg.width, msg.height = img.Bounds().Dx(), img.Bounds().Dy()

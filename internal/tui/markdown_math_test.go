@@ -25,20 +25,20 @@ func TestInlineMathCenteredOnTextRow(t *testing.T) {
 		height int
 	}{
 		{"one row", 10},
-		{"fraction", 28},
-		{"three rows", 48},
-		{"nested fraction", 60},
+		{"fraction", 60},
+		{"three rows", 112},
+		{"nested fraction", 160},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			height := tc.height
-			cell := cellSize{width: 8, height: 16}
+			cell := cellSize{width: 24, height: 48}
 			original := image.NewNRGBA(image.Rect(0, 0, 22, height))
 			for y := range height {
 				for x := range 22 {
 					original.SetNRGBA(x, y, color.NRGBA{A: 255})
 				}
 			}
-			canvas := centerInlineMath(original, cell)
+			canvas := centerMath(original, cell, true)
 			bounds := canvas.Bounds()
 			rows := bounds.Dy() / cell.height
 			if rows%2 == 0 || bounds.Dy()%cell.height != 0 || bounds.Dx()%cell.width != 0 {
@@ -52,6 +52,15 @@ func TestInlineMathCenteredOnTextRow(t *testing.T) {
 			}
 			if top != bounds.Dy()-bottom-1 {
 				t.Fatalf("height %d: unequal padding above and below ink: %d, %d", height, top, bounds.Dy()-bottom-1)
+			}
+			left, right := bounds.Dx(), -1
+			for x := range bounds.Dx() {
+				if _, _, _, a := canvas.At(x, bounds.Dy()/2).RGBA(); a > 0 {
+					left, right = min(left, x), max(right, x)
+				}
+			}
+			if gap := left - (bounds.Dx() - right - 1); gap < -1 || gap > 1 {
+				t.Fatal("cell rounding left unbalanced horizontal space")
 			}
 			img := inlineImage{id: 1, width: bounds.Dx(), height: bounds.Dy(), columns: bounds.Dx() / cell.width, rows: rows}
 			line := markdownLine{previewTokens: []markdownToken{
@@ -128,6 +137,7 @@ func TestMarkdownMathRefs(t *testing.T) {
 		{"inline", `A $\frac{1}{2}$ and $x_1$.`, []string{`\frac{1}{2}`, "x_1"}},
 		{"block", "$$\n\\frac{1}{2}\n$$", []string{`\frac{1}{2}`}},
 		{"multiline", "$$\n\\begin{aligned}\na&=b\\\\\nc&=d\n\\end{aligned}\n$$", []string{"\\begin{aligned}\na&=b\\\\\nc&=d\n\\end{aligned}"}},
+		{"display environment", "$$ \\begin{eqnarray*}\na &=& b \\\\\n&=& c\n\\end{eqnarray*} $$", []string{" \\begin{eqnarray*}\na &=& b \\\\\n&=& c\n\\end{eqnarray*} "}},
 		{"inline code and escapes", "`$x$` \\$y$", nil},
 		{"code blocks", "```tex\n$$z$$\n```\n\n    $q$\n", []string{"z", "q"}},
 		{"suggestion", "```suggestion:-2+3\nResult: $x$.\n```", []string{"x"}},
@@ -407,5 +417,121 @@ func TestMathPreviewFollowsTextSize(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBlockMathKeepsScaleAcrossWidths(t *testing.T) {
+	app := setupPrivateAppWithDoc(t, "$$x$$\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
+	app.images.cell = cellSize{width: 8, height: 16}
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewNRGBA(image.Rect(0, 0, 2400, 43))); err != nil {
+		t.Fatal(err)
+	}
+	msg := app.images.encode(data.Bytes(), imageLoadedMsg{rendered: true})
+	if msg.err != nil {
+		t.Fatal(msg.err)
+	}
+	if msg.width != 2400 || msg.height != 48 {
+		t.Fatalf("math canvas = %dx%d, want 2400x48", msg.width, msg.height)
+	}
+	img := inlineImage{width: msg.width, height: msg.height}
+	for _, width := range []int{100, 40} {
+		app.contentViewport.SetWidth(width)
+		cols, rows := app.markdownPreviewSize(markdownImage{renderBody: "x"}, &img)
+		if cols != 100 || rows != 1 {
+			t.Fatalf("viewport %d shrank block math to %dx%d", width, cols, rows)
+		}
+	}
+}
+
+func TestMathPlacementDoesNotLetterboxLongFormulas(t *testing.T) {
+	cell := cellSize{width: 10, height: 22}
+	app := setupPrivateAppWithDoc(t, "$$x$$\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 160, Height: 40})
+	app.images.cell = cell
+	var data bytes.Buffer
+	if err := png.Encode(&data, image.NewNRGBA(image.Rect(0, 0, 1771, 43))); err != nil {
+		t.Fatal(err)
+	}
+	msg := app.images.encode(data.Bytes(), imageLoadedMsg{rendered: true})
+	if msg.err != nil {
+		t.Fatal(msg.err)
+	}
+	img := inlineImage{width: msg.width, height: msg.height}
+	cols, rows := app.markdownPreviewSize(markdownImage{renderBody: "x"}, &img)
+	placementWidth := float64(cols * cell.width)
+	imageWidth := float64(msg.width) * float64(rows*cell.height) / float64(msg.height)
+	if gap := placementWidth - imageWidth; gap < -1 || gap > 1 {
+		t.Fatalf("placement adds %.2f pixels of horizontal letterboxing", gap)
+	}
+}
+
+func TestBlockMathHorizontalControlsAndCopy(t *testing.T) {
+	source := "$$\na+b\n$$\n"
+	app := setupPrivateAppWithDoc(t, source)
+	app.viewMode = true
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 70, Height: 40})
+	app.images.enabled = true
+	refs := markdownMathRefs(source)
+	refs[0].previewSide = previewSide{attempted: true, image: &inlineImage{id: 1, width: 2400, height: 48, columns: 100, rows: 1, ready: true}}
+	app.tab().markdownImages, app.tab().markdownImagesPending = refs, true
+	app.tab().cursorLine = 2
+	app.rebuildContent()
+	block := app.horizontalBlockAtLine(2)
+	if block == nil || block.window.maxOffset() <= 0 {
+		t.Fatal("wide formula has no horizontal viewport")
+	}
+	rows := strings.Split(app.contentViewport.GetContent(), "\n")
+	rowBody := ansi.Cut(rows[app.contentLayout.lineRanges[3].start], gutterWidth, app.contentViewport.Width())
+	if !strings.HasPrefix(ansi.Strip(rowBody), string(kitty.Placeholder)) {
+		t.Fatal("unscrolled block reserves a blank cell before the formula")
+	}
+	width := block.window.contentWidth
+	app = pressKey(app, tea.KeyRight)
+	if app.horizontalBlockAtLine(2).window.offset == 0 {
+		t.Fatal("right key did not scroll the block formula")
+	}
+	left, top, _, _ := app.contentBounds()
+	row := app.contentLayout.lineRanges[3].start
+	app = clickMouse(app, left+gutterWidth, top+row)
+	if app.horizontalBlockAtLine(2).window.offset != 0 {
+		t.Fatal("left edge did not scroll back")
+	}
+	app, _ = updateApp(app, tea.MouseWheelMsg{X: left + gutterWidth + 2, Y: top + row, Button: tea.MouseWheelRight})
+	if app.horizontalBlockAtLine(2).window.offset == 0 {
+		t.Fatal("horizontal wheel did not scroll the block formula")
+	}
+	app.scrollHorizontalBlock(*app.horizontalBlockAtLine(2), width)
+	block = app.horizontalBlockAtLine(2)
+	if block.window.offset != block.window.maxOffset() {
+		t.Fatal("block formula did not reach its right edge")
+	}
+	rows = strings.Split(app.contentViewport.GetContent(), "\n")
+	rowBody = ansi.Strip(ansi.Cut(rows[app.contentLayout.lineRanges[3].start], gutterWidth, app.contentViewport.Width()))
+	if strings.HasSuffix(rowBody, " ") || strings.HasSuffix(rowBody, "▶") {
+		t.Fatal("right edge reserves space after the formula")
+	}
+	spans := app.contentLayout.textSpans
+	first, last := -1, -1
+	for i, span := range spans {
+		if span.ref.line == 3 {
+			if first < 0 {
+				first = i
+			}
+			last = i
+		}
+	}
+	if first < 0 {
+		t.Fatal("scrolled formula lost its selection spans")
+	}
+	app.textSelection = contentTextSelection{active: true, tab: app.activeTab, spans: spans, anchor: textPoint{first, 0}, cursor: textPoint{last, len(spans[last].text)}}
+	if got := app.selectedText(); got != strings.TrimSuffix(source, "\n") {
+		t.Fatalf("copy changed after scrolling: %q", got)
+	}
+	app.textSelection = contentTextSelection{}
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 180, Height: 40})
+	if app.horizontalBlockAtLine(2) != nil || refs[0].image.columns != width {
+		t.Fatal("resize retained overflow controls or changed the formula scale")
 	}
 }

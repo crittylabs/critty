@@ -217,10 +217,10 @@ func TestTextSelectionMarkdownTableSource(t *testing.T) {
 					if start < 0 {
 						continue
 					}
-					if table := app.tableAtLine(span.ref.line); table != nil {
+					if table := app.horizontalBlockAtLine(span.ref.line); table != nil {
 						x := span.left - table.left + table.window.offset + ansi.StringWidth(span.text[:start])
 						end := x + ansi.StringWidth(selected)
-						app.scrollTable(*table, table.window.reveal(x, end)-table.window.offset)
+						app.scrollHorizontalBlock(*table, table.window.reveal(x, end)-table.window.offset)
 						span = app.contentLayout.textSpans[index]
 					}
 					left, top, _, _ := app.contentBounds()

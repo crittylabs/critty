@@ -24,6 +24,7 @@ func (m *AppModel) commentRenderedDisplay(body string, width int, show bool) *ma
 	for i := range cached.source.lines {
 		cached.source.lines[i].previewTokens = nil
 		cached.source.lines[i].previewHidden = false
+		cached.source.lines[i].previewScroll = nil
 		cached.source.lines[i].previewWidth = width
 	}
 	refs := make([]markdownImage, 0, len(cached.refs))

@@ -55,6 +55,7 @@ type markdownLine struct {
 	previewMap    []previewDisplaySpan
 	previewBands  []previewDisplayBand
 	previewWidth  int
+	previewScroll *horizontalBlockViewport
 	// plainRender caches the rendering without word-diff segments, and
 	// inlineRender the one for the segments it was last rendered with.
 	plainRender, inlineRender markdownRender

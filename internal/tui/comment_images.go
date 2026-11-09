@@ -157,7 +157,7 @@ func (m AppModel) loadCommentImage(key commentImageKey) tea.Cmd {
 				ctx = context.Background()
 			}
 			data, err := m.renderSource(ctx, key.renderKind, key.renderBody, key.inline, key.dark)
-			return m.images.encode(data, imageLoadedMsg{comment: &key, rendered: true, renderDark: key.dark, renderInline: key.inline && !key.editor, err: err})
+			return m.images.encode(data, imageLoadedMsg{comment: &key, rendered: true, renderDark: key.dark, renderKind: key.renderKind, renderInline: key.inline && !key.editor, err: err})
 		}
 		data, err := (gitpkg.ReviewSource{}).PreviewContent(key.path, false, maxPreviewBytes)
 		return m.encodeImage(data, key.path, imageLoadedMsg{comment: &key, err: err})
@@ -207,7 +207,7 @@ func (m *AppModel) prepareCommentImages() tea.Cmd {
 				if key.inline && !key.editor {
 					maxRows = 5
 				}
-				cols, rows = img.fit(min(44, key.width), maxRows, mathCell(m.images.cell))
+				cols, rows = img.mathFit(min(44, key.width), maxRows, m.images.cell)
 			}
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue

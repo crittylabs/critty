@@ -27,6 +27,7 @@ type markdownImage struct {
 	local                                 bool
 	renderKind                            renderedKind
 	renderBody                            string
+	renderOffset                          int
 	renderInline                          bool
 	renderFirst, renderColumn, renderStop int
 	renderSource                          string
@@ -286,7 +287,7 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 				ctx = context.Background()
 			}
 			data, err := m.renderSource(ctx, ref.renderKind, ref.renderBody, ref.renderInline, dark)
-			return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, rendered: true, renderDark: dark, renderInline: ref.renderInline, err: err})
+			return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, rendered: true, renderDark: dark, renderKind: ref.renderKind, renderInline: ref.renderInline, err: err})
 		}
 		if ref.local {
 			source = gitpkg.ReviewSource{}

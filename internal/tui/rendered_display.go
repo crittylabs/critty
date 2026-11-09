@@ -30,28 +30,59 @@ func (m AppModel) markdownPreviewSize(ref markdownImage, img *inlineImage) (int,
 		return img.fit(width, max(5, m.contentViewport.Height()-2), m.images.cell)
 	}
 	if ref.renderInline {
-		return img.fit(min(44, width), 5, mathCell(m.images.cell))
+		return img.mathFit(width, 5, m.images.cell)
 	}
-	return img.fit(min(44, width), min(19, max(5, m.contentViewport.Height())), mathCell(m.images.cell))
+	if m.tab().doc != nil && !ref.before {
+		cols, rows := img.mathNativeCells(m.images.cell)
+		return min(cols, maxPlaceholderCells), min(rows, maxPlaceholderCells)
+	}
+	return img.mathFit(width, min(19, max(5, m.contentViewport.Height())), m.images.cell)
 }
 
-// Math renderers use a 32-pixel em.  A 40-pixel line keeps that em aligned
-// with prose, independent of the terminal's physical resolution or font size.
+// A 32-pixel math em occupies two thirds of a text line.
+const mathLineHeight = 48
+
 func mathCell(cell cellSize) cellSize {
 	if !cell.known() {
-		return cellSize{width: 20, height: 40}
+		return cellSize{width: 24, height: mathLineHeight}
 	}
-	return cellSize{width: max(1, 40*cell.width/cell.height), height: 40}
+	return cell
+}
+
+// Keep the terminal aspect ratio exact.  Rounding a reference cell's width
+// makes long formulas and their placement rectangles diverge, adding margins.
+func (img inlineImage) mathGeometry(cell cellSize) (inlineImage, cellSize) {
+	cell = mathCell(cell)
+	img.width *= cell.height
+	img.height *= cell.height
+	return img, cellSize{width: mathLineHeight * cell.width, height: mathLineHeight * cell.height}
+}
+
+func (img inlineImage) mathNativeCells(cell cellSize) (int, int) {
+	img, grid := img.mathGeometry(cell)
+	return img.nativeCells(grid)
+}
+
+func (img inlineImage) mathFit(width, height int, cell cellSize) (int, int) {
+	img, grid := img.mathGeometry(cell)
+	cols, rows := img.nativeCells(grid)
+	if cols <= width && rows <= height {
+		return cols, rows
+	}
+	return img.fit(width, height, grid)
 }
 
 // An odd number of complete cell rows gives inline math a center text row.
 // Center the pixels too, so a fraction does not sit half a row below prose.
-func centerInlineMath(img image.Image, cell cellSize) image.Image {
+func centerMath(img image.Image, cell cellSize, inline bool) image.Image {
 	bounds := img.Bounds()
-	cols := (bounds.Dx() + cell.width - 1) / cell.width
-	rows := (bounds.Dy() + cell.height - 1) / cell.height
-	rows |= 1
-	canvas := image.NewNRGBA(image.Rect(0, 0, cols*cell.width, rows*cell.height))
+	cell = mathCell(cell)
+	geometry := inlineImage{width: bounds.Dx(), height: bounds.Dy()}
+	cols, rows := geometry.mathNativeCells(cell)
+	if inline {
+		rows |= 1
+	}
+	canvas := image.NewNRGBA(image.Rect(0, 0, cols*mathLineHeight*cell.width/cell.height, rows*mathLineHeight))
 	offset := image.Pt((canvas.Bounds().Dx()-bounds.Dx())/2, (canvas.Bounds().Dy()-bounds.Dy())/2)
 	draw.Draw(canvas, bounds.Sub(bounds.Min).Add(offset), img, bounds.Min, draw.Src)
 	return canvas
@@ -293,6 +324,7 @@ func (m *AppModel) prepareRenderedDisplay() {
 			source.lines[i].previewTokens = nil
 			source.lines[i].previewHidden = false
 			source.lines[i].previewBands = nil
+			source.lines[i].previewScroll = nil
 			source.lines[i].previewWidth = max(1, m.contentViewport.Width()-gutterWidth-1)
 			if m.alternateDiff(t) {
 				source.lines[i].previewWidth = max(1, (m.contentViewport.Width()-3)/2-gutterWidth-1)
@@ -304,6 +336,7 @@ func (m *AppModel) prepareRenderedDisplay() {
 		var refs []markdownImage
 		for _, ref := range t.markdownImages {
 			if ref.before == (source == t.markdown.before) {
+				ref.renderOffset = t.horizontalOffsets[ref.renderFirst]
 				refs = append(refs, ref)
 			}
 		}
@@ -317,7 +350,8 @@ func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
 		if ref.renderBody == "" || ref.image == nil || !ref.image.ready || ref.renderFirst < 1 || ref.line > len(source.lines) {
 			continue
 		}
-		if width := source.lines[ref.line-1].previewWidth; width > 0 && ref.image.columns > width {
+		blockMath := !ref.renderInline && ref.renderKind != renderedMermaid
+		if width := source.lines[ref.line-1].previewWidth; width > 0 && ref.image.columns > width && !blockMath {
 			continue
 		}
 		start := source.offsets[ref.renderFirst-1] + ref.renderColumn
@@ -333,7 +367,27 @@ func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
 			var token *markdownToken
 			if line == ref.line {
 				to = ref.renderStop
-				token = &markdownToken{start: start - source.offsets[line-1], end: to, text: previewPlaceholder(ref.image), style: markdownRendered}
+				preview := previewPlaceholder(ref.image)
+				width := source.lines[line-1].previewWidth
+				if blockMath && width > 2 && ref.image.columns > width {
+					viewport := &horizontalBlockViewport{startLine: ref.renderFirst, endLine: ref.line, left: gutterWidth, compactEdges: true,
+						window: horizontalViewport{width: width, contentWidth: ref.image.columns}}
+					viewport.window.offset = max(0, min(ref.renderOffset, ref.image.columns-width+1))
+					if viewport.window.offset > 0 {
+						viewport.left++
+						viewport.window.width--
+					}
+					if viewport.window.offset+viewport.window.width < ref.image.columns {
+						viewport.window.width--
+					}
+					rows := strings.Split(preview, "\n")
+					for i := range rows {
+						rows[i] = viewport.render(rows[i])
+					}
+					preview = strings.Join(rows, "\n")
+					source.lines[line-1].previewScroll = viewport
+				}
+				token = &markdownToken{start: start - source.offsets[line-1], end: to, text: preview, style: markdownRendered}
 			}
 			edits[line-1] = append(edits[line-1], previewDisplayEdit{from, to, token})
 		}

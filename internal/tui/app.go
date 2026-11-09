@@ -241,15 +241,15 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
-	tables       []tableViewport
-	textSpans    []contentTextSpan
-	columns      []diffMouseRow
-	formControls []formControl
-	rows         []contentMouseTarget
-	lineRanges   map[int]renderedRange
-	oldRanges    map[int]renderedRange
-	actions      []commentHeaderRegion
-	markers      []commentMarker
+	horizontalBlocks []horizontalBlockViewport
+	textSpans        []contentTextSpan
+	columns          []diffMouseRow
+	formControls     []formControl
+	rows             []contentMouseTarget
+	lineRanges       map[int]renderedRange
+	oldRanges        map[int]renderedRange
+	actions          []commentHeaderRegion
+	markers          []commentMarker
 }
 
 type commentHeaderRegion struct {
@@ -1179,12 +1179,12 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.focused == contentPane && t.cursorSide == "" &&
 		(msg.String() == "left" || msg.String() == "right" || msg.String() == "h" || msg.String() == "l") {
-		if table := m.tableAtLine(t.cursorLine); table != nil {
+		if table := m.horizontalBlockAtLine(t.cursorLine); table != nil {
 			direction := 1
 			if msg.String() == "left" || msg.String() == "h" {
 				direction = -1
 			}
-			m.scrollTable(*table, direction*max(1, table.window.width/2))
+			m.scrollHorizontalBlock(*table, direction*max(1, table.window.width/2))
 			return m, nil
 		}
 	}
@@ -3448,7 +3448,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal != noModal {
 		return m, nil
 	}
-	if m.handleTableScrollClick(mouse) {
+	if m.handleHorizontalScrollClick(mouse) {
 		return m, nil
 	}
 	pendingTextLink := ""
@@ -4217,12 +4217,12 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	}
 	mouse := msg.Mouse()
 	if mouse.Button == tea.MouseWheelLeft || mouse.Button == tea.MouseWheelRight {
-		if table := m.tableAtMouse(mouse); table != nil {
+		if table := m.horizontalBlockAtMouse(mouse); table != nil {
 			direction := 1
 			if mouse.Button == tea.MouseWheelLeft {
 				direction = -1
 			}
-			m.scrollTable(*table, direction*max(1, table.window.width/2))
+			m.scrollHorizontalBlock(*table, direction*max(1, table.window.width/2))
 		}
 		return m, nil
 	}
@@ -4542,7 +4542,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		return renderHelpGroup("View (read-only)", []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
 			{keys: "↑/↓,k/j · PgUp/PgDn", desc: "⇅ move / scroll"},
-			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table horizontally; long cells wrap at 40 columns"},
+			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
 			{keys: "V · O", desc: "reading view / open all comments"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
@@ -4605,7 +4605,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "enter (comment)", desc: "unfold a folded thread; otherwise open its comment window"},
 		{keys: "←/→,h/l (comment)", desc: "fold/unfold first; otherwise scroll the table or switch diff sides with arrow keys"},
 		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
-		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table with keys, or the table under the pointer with the wheel or edge buttons; long cells wrap at 40 columns"},
+		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table or block formula with keys, or the block under the pointer with the wheel or edge buttons; long table cells wrap at 40 columns"},
 		{keys: "V", desc: "toggle reading view: hide sidebar and reduce all comments to bubble markers; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "reset individual folds and toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},

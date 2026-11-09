@@ -117,7 +117,7 @@ func (line *markdownLine) displayOffset(sourceOffset int) int {
 }
 
 // Keep spans in source order even though wrapped cells share display rows.
-func (l *renderedContentLayout) addTableSpans(firstRow int, columns [][]tableCellFragment, widths []int, line *markdownLine, target contentMouseTarget, viewport tableViewport) {
+func (l *renderedContentLayout) addTableSpans(firstRow int, columns [][]tableCellFragment, widths []int, line *markdownLine, target contentMouseTarget, viewport horizontalBlockViewport) {
 	source := ansi.Strip(line.render(nil, diffCommonTextBg, diffAddedTextBg, nil))
 	left := viewport.left - viewport.window.offset
 	for i, column := range columns {

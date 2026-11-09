@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- **Readable math**: Inline formulas sit closer to the surrounding text size without extra side padding, and thin strokes stay visible after rasterization.  Block formulas in document views retain their size and scroll horizontally with the same keyboard, mouse wheel, and edge controls as tables.
+
+### Fixed
+
+- **Display math environments**: Markdown formulas using display environments such as `eqnarray*` and `align*` render through LaTeX instead of falling back to source text because of nested math delimiters.
+
 ## 1.11.0
 
 ### Added
