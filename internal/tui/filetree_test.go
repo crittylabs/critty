@@ -73,6 +73,7 @@ func TestFileTreeAbsolutePathsUseProjectHierarchy(t *testing.T) {
 }
 
 func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
+	t.Parallel()
 	files := []gitpkg.FileChange{
 		{Path: "root.go"}, {Path: "a.go"}, {Path: "a/y.go"},
 		{Path: "b/x.go"}, {Path: "a/z/sub.go"}, {Path: "a/sub/z.go"},
@@ -149,6 +150,7 @@ func treeRowPaths(app AppModel) []string {
 }
 
 func TestFileTreeRowsListDirectoriesFirstAndFoldChildren(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	want := " a a/sub a/sub/z.go a/y.go b b/x.go root.go"
 	if got := strings.Join(treeRowPaths(app), " "); got != want {
@@ -167,6 +169,7 @@ func TestFileTreeRowsListDirectoriesFirstAndFoldChildren(t *testing.T) {
 }
 
 func TestFileTreeFollowsActiveTabAndUnfoldsItsDirectories(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	if app.sidebarView != filesView {
 		t.Fatalf("default view = %v, want the file tree", app.sidebarView)
@@ -204,6 +207,7 @@ func TestFileTreeFollowsActiveTabAndUnfoldsItsDirectories(t *testing.T) {
 }
 
 func TestMetaBracesSwitchFileTabs(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		prev, next tea.KeyPressMsg
 	}{
@@ -226,6 +230,7 @@ func TestMetaBracesSwitchFileTabs(t *testing.T) {
 }
 
 func TestFileTreeCursorSelectsFilesAndKeysFoldDirectories(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	app = pressKey(app, 's')
 	app = pressKey(app, 'G')
@@ -310,6 +315,7 @@ func TestFileTreeHighlightAcrossScrolling(t *testing.T) {
 }
 
 func TestFileTreeHighlightPaintsPadding(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	app.fileTree.viewport.SetWidth(60)
 	app.renderFileTree()
@@ -347,6 +353,7 @@ func TestFileTreeHighlightPaintsPadding(t *testing.T) {
 }
 
 func TestFileTreeMouse(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	left, top, _, _ := app.commentBounds()
 
@@ -370,6 +377,7 @@ func TestFileTreeMouse(t *testing.T) {
 }
 
 func TestFileTreeScrollsTruncatedCursorRow(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	long := "b/" + strings.Repeat("directory-name-", 4) + "file.go"
 	app.tabs = append(app.tabs, FileTab{path: long, cursorLine: 1,
@@ -416,6 +424,7 @@ func TestFileTreeScrollsTruncatedCursorRow(t *testing.T) {
 }
 
 func TestFileTreeRootAndCascade(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	app.tabs = app.tabs[:1]
 	app.tabs[0].path = "a/sub/deep/z.go"

@@ -69,7 +69,7 @@ func TestFinishMouseSubmitAfterOverallComment(t *testing.T) {
 }
 
 func TestFinishMouseSubmitMissingConfirmationKeepsButtonsAligned(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Parallel()
 	app, ch := formTestApp(t)
 	app.width, app.height = 74, 38
 	app.recalculateLayout()

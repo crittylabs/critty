@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -70,7 +70,7 @@ func TestPreviewToolPlan(t *testing.T) {
 			for _, step := range plan {
 				names = append(names, step.name)
 			}
-			if !reflect.DeepEqual(names, tc.want) {
+			if !slices.Equal(names, tc.want) {
 				t.Fatalf("steps = %v, want %v", names, tc.want)
 			}
 		})
@@ -80,7 +80,7 @@ func TestPreviewToolPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := plan[len(plan)-1].args; !reflect.DeepEqual(got, []string{"exec", "tinytex@latest", "--", "tlmgr", "install", "amsmath", "amsfonts", "dvipng"}) {
+	if got := plan[len(plan)-1].args; !slices.Equal(got, []string{"exec", "tinytex@latest", "--", "tlmgr", "install", "amsmath", "amsfonts", "dvipng"}) {
 		t.Fatalf("package setup argv = %q", got)
 	}
 }

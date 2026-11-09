@@ -11,9 +11,10 @@ import (
 )
 
 func TestNewRoundReplyFocusFromEmptyBaseline(t *testing.T) {
+	t.Parallel()
 	for _, author := range []string{"Agent", "Tester"} {
 		t.Run(author, func(t *testing.T) {
-			app := setupAppWithDoc(t, "first\nsecond\n")
+			app := setupPrivateAppWithDoc(t, "first\nsecond\n")
 			app.width, app.height = 120, 40
 			app.tab().state.Comments = []review.Comment{{ID: "thread", StartLine: 2, EndLine: 2, Body: "please fix"}}
 			app.newFeedback = true
@@ -42,6 +43,7 @@ func TestNewRoundReplyFocusFromEmptyBaseline(t *testing.T) {
 }
 
 func TestNewRoundFocusesFreshReplies(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name, scope, side             string
 		resolved, lateWindow, drifted bool

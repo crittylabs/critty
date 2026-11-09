@@ -94,11 +94,11 @@ esac
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	resolved, err := s.Resolve(ctx, request.ID, func(context.Context, Target) (string, error) {
+	resolved, issues, err := s.ResolveWithDiagnostics(ctx, request.ID, func(context.Context, Target) (string, error) {
 		t.Fatal("notification must not read scrollback")
 		return "", nil
 	})
-	if err != nil || resolved != target {
-		t.Fatalf("resolved = %+v, %v", resolved, err)
+	if err != nil || len(issues) != 0 || resolved != target {
+		t.Fatalf("resolved = %+v, issues = %+v, error = %v", resolved, issues, err)
 	}
 }

@@ -118,7 +118,6 @@ func TestZellijLauncherAvailability(t *testing.T) {
 			}
 		})
 	}
-	commandOutput = func(*exec.Cmd) ([]byte, error) { return nil, fmt.Errorf("unavailable") }
 }
 
 func TestZellijCloseVerifiesFailedCleanup(t *testing.T) {

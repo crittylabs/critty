@@ -46,6 +46,18 @@ func TestInvalidForms(t *testing.T) {
 		"- [ ] A <!-- form: id=a value=b required -->\n- [ ] B <!-- form: id=a value=c -->",
 		"- [x] A <!-- form: id=a value=b -->\n- [x] B <!-- form: id=a value=c -->",
 		"- [ ] A <!-- form: id=a value=b consent -->",
+		"- [ ] A <!-- form: select-all=a -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a required -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a value=x -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a consent -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a tags=a -->",
+		"- [ ] A <!-- form: id=all select-all=a,b -->\n- [ ] B <!-- form: tags=a -->",
+		"- [ ] A <!-- form: tags= -->",
+		"- [ ] A <!-- form: tags=a,,b -->",
+		"- [ ] A <!-- form: tags=a* -->",
+		"- [ ] A <!-- form: tags=a tags=b -->",
+		"- [ ] A <!-- form: id=a select-all=b tags=a -->\n- [ ] B <!-- form: id=b select-all=a tags=b -->",
+		"- [ ] All <!-- form: id=all select-all=q -->\n- [ ] A <!-- form: id=q value=a tags=q -->\n- [ ] B <!-- form: id=q value=b tags=q -->",
 	} {
 		t.Run(source, func(t *testing.T) {
 			if _, err := Parse(source); err == nil {
@@ -117,29 +129,6 @@ func TestSelectAllDefinitions(t *testing.T) {
 	}
 	if CountSelected(items, targets[0], defaults) != 0 {
 		t.Fatal("initial select-all mark selected targets")
-	}
-}
-
-func TestInvalidSelectAll(t *testing.T) {
-	for _, source := range []string{
-		"- [ ] A <!-- form: select-all=a -->\n- [ ] B <!-- form: tags=a -->",
-		"- [ ] A <!-- form: id=all select-all=a required -->\n- [ ] B <!-- form: tags=a -->",
-		"- [ ] A <!-- form: id=all select-all=a value=x -->\n- [ ] B <!-- form: tags=a -->",
-		"- [ ] A <!-- form: id=all select-all=a consent -->\n- [ ] B <!-- form: tags=a -->",
-		"- [ ] A <!-- form: id=all select-all=a tags=a -->",
-		"- [ ] A <!-- form: id=all select-all=a,b -->\n- [ ] B <!-- form: tags=a -->",
-		"- [ ] A <!-- form: tags= -->",
-		"- [ ] A <!-- form: tags=a,,b -->",
-		"- [ ] A <!-- form: tags=a* -->",
-		"- [ ] A <!-- form: tags=a tags=b -->",
-		"- [ ] A <!-- form: id=a select-all=b tags=a -->\n- [ ] B <!-- form: id=b select-all=a tags=b -->",
-		"- [ ] All <!-- form: id=all select-all=q -->\n- [ ] A <!-- form: id=q value=a tags=q -->\n- [ ] B <!-- form: id=q value=b tags=q -->",
-	} {
-		t.Run(source, func(t *testing.T) {
-			if _, err := Parse(source); err == nil {
-				t.Fatal("accepted invalid definition")
-			}
-		})
 	}
 }
 

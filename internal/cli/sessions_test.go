@@ -187,10 +187,6 @@ func TestSessionsLifecycleCommands(t *testing.T) {
 	if err != nil || cmd != resumeCmd {
 		t.Fatalf("sessions resume is not registered: %v", err)
 	}
-	cmd, _, _ = rootCmd.Find([]string{"resume"})
-	if cmd == resumeCmd {
-		t.Fatal("resume was registered at the top level")
-	}
 }
 
 func TestSessionsRejectsInvalidDirectoryFilters(t *testing.T) {

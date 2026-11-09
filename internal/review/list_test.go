@@ -1,6 +1,7 @@
 package review
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -31,7 +32,7 @@ func TestListCommentsOrdering(t *testing.T) {
 		ids = append(ids, e.ID)
 	}
 	want := []string{"r_1", "r_2", "c_a5", "c_bf", "c_b2", "c_b9"}
-	if strings.Join(ids, ",") != strings.Join(want, ",") {
+	if !slices.Equal(ids, want) {
 		t.Errorf("order = %v, want %v", ids, want)
 	}
 

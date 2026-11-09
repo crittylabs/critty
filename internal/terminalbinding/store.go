@@ -218,14 +218,9 @@ func (s *Store) Notify(id string, target Target) error {
 	})
 }
 
-// Resolve prefers notifications and otherwise searches visible mux screens.
-// It consumes the request once a destination is selected, before the caller launches its UI.
-func (s *Store) Resolve(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error)) (Target, error) {
-	target, _, err := s.ResolveWithDiagnostics(ctx, id, snapshot)
-	return target, err
-}
-
-// ResolveWithDiagnostics also reports unavailable mux connections, even on success.
+// ResolveWithDiagnostics prefers notifications and otherwise searches visible mux screens.
+// It consumes the request once a destination is selected, before the caller launches its UI,
+// and reports unavailable mux connections even on success.
 func (s *Store) ResolveWithDiagnostics(ctx context.Context, id string, snapshot func(context.Context, Target) (string, error)) (Target, []DiscoveryIssue, error) {
 	var issues []DiscoveryIssue
 	target, err := s.resolve(ctx, id, snapshot, false, nil, &issues)

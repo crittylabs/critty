@@ -17,6 +17,7 @@ func commentByID(t *testing.T, app AppModel, tab int, id string) *review.Comment
 }
 
 func TestResolveNextUndoReturnsToThreadAndRedoAdvances(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.rebuildContent()
 	app.tab().cursorLine, app.tab().cursorOnAnnotation, app.tab().cursorAnnoIdx = 2, true, 0
@@ -44,6 +45,7 @@ func TestResolveNextUndoReturnsToThreadAndRedoAdvances(t *testing.T) {
 }
 
 func TestDeleteUndoRestoresCommentAndReplyInPlace(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.rebuildContent()
 	app.tabs[0].state.Comments[2].Replies = []review.Reply{{ID: "reply-1", Body: "one"}, {ID: "reply-2", Body: "two"}}
@@ -77,6 +79,7 @@ func TestDeleteUndoRestoresCommentAndReplyInPlace(t *testing.T) {
 }
 
 func TestResolveNextUndoLeavesFinishDialog(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.rebuildContent()
 	for tab := range app.tabs {

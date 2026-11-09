@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,16 +13,15 @@ import (
 
 func patchApp(t *testing.T, raw string) AppModel {
 	t.Helper()
-	t.Chdir(t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	p, err := gitpkg.ParsePatch(strings.NewReader(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
-	sess, err := review.OpenSession("", "diff")
+	sess, err := review.OpenSession(t.TempDir(), "diff")
 	if err != nil {
 		t.Fatal(err)
 	}
+	sess.Meta.CWD = t.TempDir()
 	if err := sess.SaveDiff(p); err != nil {
 		t.Fatal(err)
 	}
@@ -35,6 +35,7 @@ func patchApp(t *testing.T, raw string) AppModel {
 }
 
 func TestBinaryChangeLabels(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		status, marker, header, before, after string
 	}{
@@ -59,6 +60,7 @@ func TestBinaryChangeLabels(t *testing.T) {
 }
 
 func TestTextChangeSummaryKeepsLineCounts(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n")
 	if got := ansi.Strip(m.tab().changeSummary(false)); got != "(+1 -1)" {
 		t.Fatalf("text summary = %q", got)
@@ -86,8 +88,9 @@ func TestTextChangeSummaryKeepsLineCounts(t *testing.T) {
 }
 
 func TestPatchPartialContext(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -10,2 +10,2 @@\n context\n-old\n+new\n@@ -20 +20 @@\n-last\n+final\n")
-	if err := os.WriteFile("a.txt", []byte("unrelated worktree"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(m.session.Meta.CWD, "a.txt"), []byte("unrelated worktree"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if m.tab().cursorLine != 10 {
@@ -112,6 +115,7 @@ func TestPatchPartialContext(t *testing.T) {
 }
 
 func TestChangeNavigationVisitsDeletedLineComments(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -10,2 +9,0 @@\n-old\n-more\n")
 	lines := m.visualLines(m.tab())
 	if len(lines) != 2 || lines[0].side != "old" || lines[0].line != 10 {
@@ -143,6 +147,7 @@ func TestChangeNavigationVisitsDeletedLineComments(t *testing.T) {
 }
 
 func TestPatchRoundRefreshesSnapshot(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\nnew file mode 100644\n--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+first\n")
 	m.tab().state.Comments = []review.Comment{{ID: "c1", Scope: "file", Body: "keep this thread"}}
 	m.persist()

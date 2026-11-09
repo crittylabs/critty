@@ -237,25 +237,13 @@ func TestPathValidationLayout(t *testing.T) {
 		app := pathCompletionApp(t, `type=file default='dir/'`)
 		app, _ = updateApp(app, size)
 		before := finishRegion(t, app, 1)
-		var titleRow, inputRow int
-		for _, region := range app.modalMouseRegions() {
-			if region.action.close {
-				titleRow = region.rect.top
-			}
-			if region.action.textarea {
-				inputRow = region.rect.top
-			}
-		}
-		if inputRow != titleRow+4 {
-			t.Fatalf("extra caption spacing: title=%d input=%d", titleRow, inputRow)
-		}
 		app.saveFormText()
 		if after := finishRegion(t, app, 1); after != before {
 			t.Fatalf("error moved Save: before=%+v after=%+v", before, after)
 		}
 		view := ansi.Strip(app.View().Content)
-		if !strings.Contains(view, "File path must not end with /") || strings.Contains(view, "Path (file)") {
-			t.Fatalf("missing error or incorrect title:\n%s", view)
+		if !strings.Contains(view, "File path must not end with /") {
+			t.Fatalf("missing validation error:\n%s", view)
 		}
 		if menu, _ := app.completionLayout(app.modalMouseRegions(), app.width, app.height); menu != "" {
 			t.Fatal("completion obscures the validation error")

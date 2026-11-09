@@ -179,9 +179,6 @@ func TestInstalledSkillLinksAndSize(t *testing.T) {
 					}
 				}
 				for _, f := range files {
-					if filepath.Ext(f.dest) != ".md" {
-						continue
-					}
 					dest, err := integrationDest(f, global)
 					if err != nil {
 						t.Fatal(err)
@@ -189,6 +186,19 @@ func TestInstalledSkillLinksAndSize(t *testing.T) {
 					data, err := os.ReadFile(dest)
 					if err != nil {
 						t.Fatal(err)
+					}
+					want, err := f.content()
+					if err != nil || !bytes.Equal(data, want) {
+						t.Fatalf("installed asset %s differs: %v", dest, err)
+					}
+					if _, resource, ok := strings.Cut(filepath.ToSlash(f.dest), "/skills/"); ok && filepath.Base(dest) != "SKILL.md" {
+						embedded, err := skillContent.ReadFile("skill/" + resource)
+						if err != nil || !bytes.Equal(data, embedded) {
+							t.Fatalf("skill resource %s changed during rendering: %v", dest, err)
+						}
+					}
+					if filepath.Ext(f.dest) != ".md" {
+						continue
 					}
 					if filepath.Base(dest) == "SKILL.md" && len(data) > 24_000 {
 						t.Errorf("%s exceeds the Antigravity entrypoint limit: %d bytes", dest, len(data))
@@ -273,44 +283,6 @@ func TestApprovalSkillReferencesUseAgentConventions(t *testing.T) {
 				}
 				if !bytes.Contains(caller, []byte("`"+variant.skillRef("critty-approval")+"`")) {
 					t.Errorf("%s cannot discover the approval workflow", name)
-				}
-			}
-		})
-	}
-}
-
-func TestBundledSkillResources(t *testing.T) {
-	for agent := range skillVariants {
-		t.Run(agent, func(t *testing.T) {
-			for _, f := range integrations()[agent] {
-				if !strings.Contains(filepath.ToSlash(f.dest), "/critty-ai-review/") && !strings.Contains(filepath.ToSlash(f.dest), "/references/") {
-					continue
-				}
-				data, err := f.content()
-				if err != nil {
-					t.Fatal(err)
-				}
-				dest := filepath.Join(t.TempDir(), f.dest)
-				f.dest = dest
-				if err := installIntegrationFile(f, false); err != nil {
-					t.Fatal(err)
-				}
-				got, err := os.ReadFile(dest)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !bytes.Equal(got, data) {
-					t.Errorf("installed asset %s differs", dest)
-				}
-				if filepath.Base(dest) != "SKILL.md" {
-					_, resource, _ := strings.Cut(filepath.ToSlash(dest), "/skills/")
-					embedded, err := skillContent.ReadFile("skill/" + resource)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if !bytes.Equal(got, embedded) {
-						t.Error("skill resource changed during rendering")
-					}
 				}
 			}
 		})
@@ -500,7 +472,6 @@ func TestInstallRetiresLegacyLinksWithoutDeletingTargets(t *testing.T) {
 }
 
 func TestAntigravityIntegration(t *testing.T) {
-	t.Chdir(t.TempDir())
 	reg := integrations()
 	names, err := integrationTargets("agy", reg)
 	if err != nil || !slices.Equal(names, []string{"antigravity"}) {
@@ -508,13 +479,6 @@ func TestAntigravityIntegration(t *testing.T) {
 	}
 	if len(reg["antigravity"]) != len(reg["codex"]) {
 		t.Fatal("Antigravity lacks bundled resources")
-	}
-	for _, agent := range []string{"codex", "antigravity"} {
-		for _, f := range reg[agent] {
-			if err := installIntegrationFile(f, false); err != nil {
-				t.Fatal(err)
-			}
-		}
 	}
 	for i, f := range reg["antigravity"] {
 		original := reg["codex"][i]
@@ -527,15 +491,11 @@ func TestAntigravityIntegration(t *testing.T) {
 		if f.dest != filepath.Join(".agents", "skills", wantRel) || f.globalDest != filepath.Join(".gemini", "antigravity-cli", "skills", wantRel) {
 			t.Errorf("wrong destinations: %s, %s", f.dest, f.globalDest)
 		}
-		got, err := os.ReadFile(original.dest)
+		want, err := original.content()
 		if err != nil {
 			t.Fatal(err)
 		}
-		want, err := original.content()
-		if err != nil || !bytes.Equal(got, want) {
-			t.Fatalf("Codex content changed: %s", original.dest)
-		}
-		data, err := os.ReadFile(f.dest)
+		data, err := f.content()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -585,24 +545,6 @@ func TestUserInstallScope(t *testing.T) {
 			}
 		})
 	}
-	t.Chdir(project)
-	installUser = true
-	if err := installCmd.RunE(installCmd, []string{"agents"}); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range skillNames {
-		global := filepath.Join(home, ".agents", "skills", name, "SKILL.md")
-		data, err := os.ReadFile(global)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(string(data), "`$critty") || strings.Contains(string(data), "`/critty") {
-			t.Errorf("shared skill uses host-specific references: %s", name)
-		}
-		if _, err := os.Stat(filepath.Join(project, ".agents")); !os.IsNotExist(err) {
-			t.Fatalf("user install wrote project files: %v", err)
-		}
-	}
 }
 
 func TestUserInstallTargetPaths(t *testing.T) {
@@ -629,6 +571,17 @@ func TestUserInstallTargetPaths(t *testing.T) {
 			}
 			if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(tc.path))); err != nil {
 				t.Fatal(err)
+			}
+			if tc.target == "agents" {
+				for _, name := range skillNames {
+					data, err := os.ReadFile(filepath.Join(home, ".agents", "skills", name, "SKILL.md"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if strings.Contains(string(data), "`$critty") || strings.Contains(string(data), "`/critty") {
+						t.Errorf("shared skill uses host-specific references: %s", name)
+					}
+				}
 			}
 		})
 	}

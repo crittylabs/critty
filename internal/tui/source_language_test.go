@@ -46,7 +46,7 @@ func TestSourceLanguageDetection(t *testing.T) {
 		{"oversized header", "tool", "#!/usr/bin/env " + strings.Repeat(" ", 4096) + "python3\n", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := codeOutlineLanguage(tc.path, tc.source); got != tc.want {
+			if got := outlineLanguage(codeLexer(tc.path, tc.source)); got != tc.want {
 				t.Fatalf("language = %q, want %q", got, tc.want)
 			}
 		})

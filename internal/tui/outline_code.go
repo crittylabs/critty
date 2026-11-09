@@ -19,10 +19,6 @@ type codeOutlineCache struct {
 var outlineRubyHeredoc = regexp.MustCompile("^<<-?[\"'`]?([a-zA-Z_][a-zA-Z0-9_]*)")
 var outlineCppRaw = regexp.MustCompile(`(?:u8|u|U|L)?R"([^\s()\\]{0,16})\(`)
 
-func codeOutlineLanguage(path, source string) string {
-	return outlineLanguage(codeLexer(path, source))
-}
-
 func outlineLanguage(lexer chroma.Lexer) string {
 	if lexer == nil {
 		return ""

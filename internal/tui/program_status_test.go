@@ -35,6 +35,7 @@ func TestProgramStatusReport(t *testing.T) {
 }
 
 func TestProgramStatusKindFollowsConsentItems(t *testing.T) {
+	t.Parallel()
 	m := AppModel{}
 	if got := m.programStatusKind(); got != "question" {
 		t.Fatalf("kind without forms = %q", got)
@@ -50,6 +51,7 @@ func TestProgramStatusKindFollowsConsentItems(t *testing.T) {
 }
 
 func TestProgramStatusTextIsSafeAndBounded(t *testing.T) {
+	t.Parallel()
 	decoded, err := base64.StdEncoding.DecodeString(programStatusText(" tab\there\x1bnew\nline ", 2048))
 	if err != nil || string(decoded) != "tab here new line" {
 		t.Fatalf("decoded %q %v", decoded, err)
@@ -62,6 +64,7 @@ func TestProgramStatusTextIsSafeAndBounded(t *testing.T) {
 }
 
 func TestProgramStatusRespectsReadOnlyAndTmux(t *testing.T) {
+	t.Parallel()
 	if (AppModel{readOnly: true}).reportProgramStatus() != nil {
 		t.Fatal("read-only view reported a status")
 	}

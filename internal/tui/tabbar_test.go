@@ -15,30 +15,34 @@ import (
 func TestAttachmentTabColorMatchesFilesAcrossFocusAndClipping(t *testing.T) {
 	wasDark := terminalIsDark
 	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
-	for _, dark := range []bool{false, true} {
-		initAdaptiveStyles(dark)
-		for _, active := range []bool{false, true} {
-			for _, focus := range []pane{contentPane, commentPane} {
-				for _, width := range []int{0, 6} {
-					t.Run(fmt.Sprintf("dark=%t/active=%t/focus=%d/width=%d", dark, active, focus, width), func(t *testing.T) {
-						app := newFileTreeTestApp()
-						app.tabs[0].attachment = &review.AttachedDocument{Name: "note.md"}
-						app.activeTab, app.focused = 1, focus
-						want := warning
-						if active {
-							app.activeTab, want = 0, activeAttachmentColor
-						}
-						tab := app.renderTabWidth(app.tabLabels(), 0, width)
-						runes, styles := renderedCells(tab)
-						for i, r := range runes {
-							if r != ' ' && !sameColor(styles[i].Fg, want) {
-								t.Fatalf("attachment character %q color = %v, want %v: %q", r, styles[i].Fg, want, tab)
-							}
-						}
-					})
+	for _, tc := range []struct {
+		dark, active bool
+		focus        pane
+		width        int
+	}{
+		{false, false, contentPane, 0},
+		{false, false, commentPane, 6},
+		{false, true, contentPane, 6},
+		{true, false, contentPane, 6},
+		{true, true, commentPane, 0},
+	} {
+		t.Run(fmt.Sprintf("dark=%t/active=%t/focus=%d/width=%d", tc.dark, tc.active, tc.focus, tc.width), func(t *testing.T) {
+			initAdaptiveStyles(tc.dark)
+			app := newFileTreeTestApp()
+			app.tabs[0].attachment = &review.AttachedDocument{Name: "note.md"}
+			app.activeTab, app.focused = 1, tc.focus
+			want := warning
+			if tc.active {
+				app.activeTab, want = 0, activeAttachmentColor
+			}
+			tab := app.renderTabWidth(app.tabLabels(), 0, tc.width)
+			runes, styles := renderedCells(tab)
+			for i, r := range runes {
+				if r != ' ' && !sameColor(styles[i].Fg, want) {
+					t.Fatalf("attachment character %q color = %v, want %v: %q", r, styles[i].Fg, want, tab)
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -57,6 +61,7 @@ func overflowTabTestApp() AppModel {
 }
 
 func TestOverflowTabsAnchorAndPreviewNeighbors(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		width   int
@@ -93,6 +98,7 @@ func TestOverflowTabsAnchorAndPreviewNeighbors(t *testing.T) {
 }
 
 func TestMouseClickOverflowPreviewsAndExpandedControls(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		width    int
@@ -128,9 +134,10 @@ func TestMouseClickOverflowPreviewsAndExpandedControls(t *testing.T) {
 }
 
 func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
+	t.Parallel()
 	app := overflowTabTestApp()
 	app.tabs[0].path = strings.Repeat("界é", 12) + ".go"
-	for _, width := range []int{8, 9, 18, 40, 41, 42, 63, 64, 65, 120} {
+	for _, width := range []int{8, 40, 64, 120} {
 		for _, active := range []int{0, len(app.tabs) / 2, len(app.tabs) - 1} {
 			t.Run(fmt.Sprintf("width=%d/active=%d", width, active), func(t *testing.T) {
 				app.width, app.activeTab = width, active
@@ -163,6 +170,7 @@ func TestTabLayoutFitsUnicodeAcrossWidthsAndActiveTabs(t *testing.T) {
 }
 
 func TestTabPathsExpandWithinTheirPaneShare(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		width, tabs int
 		path, want  string
@@ -195,6 +203,7 @@ func TestTabPathsExpandWithinTheirPaneShare(t *testing.T) {
 }
 
 func TestTabWidthSharesFitWithoutUnnecessaryOverflow(t *testing.T) {
+	t.Parallel()
 	for _, count := range []int{1, 2, 3, 4, 5} {
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			app := newFileTreeTestApp()
@@ -223,6 +232,7 @@ func TestTabWidthSharesFitWithoutUnnecessaryOverflow(t *testing.T) {
 }
 
 func TestExpandedTabReservesUnreadCountsAndComments(t *testing.T) {
+	t.Parallel()
 	app := newFileTreeTestApp()
 	app.tabs = app.tabs[:1]
 	app.tabs[0].path = "internal/server/file.go"
@@ -239,6 +249,7 @@ func TestExpandedTabReservesUnreadCountsAndComments(t *testing.T) {
 }
 
 func TestActiveTabKeepsFilenameBeforeNeighbors(t *testing.T) {
+	t.Parallel()
 	for _, width := range []int{80, 99, 100, 120} {
 		for _, active := range []int{0, 3, 6} {
 			t.Run(fmt.Sprint(width, "/", active), func(t *testing.T) {

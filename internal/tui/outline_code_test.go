@@ -40,7 +40,7 @@ func TestCodeOutlineDeclarations(t *testing.T) {
 		{"sample.sh", "#!/bin/sh\nrun()\n{\n    if ready; then\n        send\n    fi\n}\nfunction finish {\n    :\n}\n", []outlineHeading{{2, 1, "function run"}, {8, 1, "function finish"}}},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
-			language := codeOutlineLanguage(tc.path, tc.source)
+			language := outlineLanguage(codeLexer(tc.path, tc.source))
 			if got := parseCodeOutline(language, tc.source, 0); !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("outline:\ngot  %+v\nwant %+v\nmasked:\n%s", got, tc.want, outlineCode(language, tc.source))
 			}
@@ -84,9 +84,9 @@ func TestCodeOutlineIgnoresCommentsAndStrings(t *testing.T) {
 		{"sample.cpp", "const char *text = R\"tag(\nclass Hidden {};\n)tag\";\n/* void hidden() {} */\nvoid visible() {}\n"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
-			got := parseCodeOutline(codeOutlineLanguage(tc.path, tc.source), tc.source, 0)
+			got := parseCodeOutline(outlineLanguage(codeLexer(tc.path, tc.source)), tc.source, 0)
 			if len(got) != 1 || !strings.Contains(got[0].label, "visible") {
-				t.Fatalf("comments or strings leaked into outline: %+v\n%s", got, outlineCode(codeOutlineLanguage(tc.path, tc.source), tc.source))
+				t.Fatalf("comments or strings leaked into outline: %+v\n%s", got, outlineCode(outlineLanguage(codeLexer(tc.path, tc.source)), tc.source))
 			}
 		})
 	}
@@ -137,11 +137,11 @@ func TestCodeOutlineCacheAndFragments(t *testing.T) {
 		t.Fatal("source change retained a cached outline")
 	}
 	for _, path := range []string{"script.sh", "script.bash", "script.ksh", "script.zsh", ".profile", ".bashrc"} {
-		if codeOutlineLanguage(path, "") != "bash" {
+		if outlineLanguage(codeLexer(path, "")) != "bash" {
 			t.Fatalf("shell file not recognized: %s", path)
 		}
 	}
-	if codeOutlineLanguage("script", "#!/usr/bin/env -S bash -eu\n") != "bash" {
+	if outlineLanguage(codeLexer("script", "#!/usr/bin/env -S bash -eu\n")) != "bash" {
 		t.Fatal("shell shebang not recognized")
 	}
 }

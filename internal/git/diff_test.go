@@ -4,7 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -302,7 +302,7 @@ func TestInlineDiffWhitespace(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			old, new := inlineDiffTokens(splitInlineTokens(tc.before), splitInlineTokens(tc.after))
-			if !reflect.DeepEqual(old, tc.old) || !reflect.DeepEqual(new, tc.new) {
+			if !slices.Equal(old, tc.old) || !slices.Equal(new, tc.new) {
 				t.Fatalf("inlineDiff = %#v, %#v; want %#v, %#v", old, new, tc.old, tc.new)
 			}
 		})

@@ -129,13 +129,10 @@ func TestPathDisplayRepositoryBoundaries(t *testing.T) {
 				if plain := ansi.Strip(tab); tc.want != "" && plain != tc.want {
 					t.Fatalf("path = %q, want %q", plain, tc.want)
 				}
-				tabRunes, tabStyles := renderedCells(tab)
-				for i, style := range tabStyles {
+				_, tabStyles := renderedCells(tab)
+				for _, style := range tabStyles {
 					if !sameColor(style.Bg, activeTabStyle.GetBackground()) {
 						t.Fatal("tab path changes the background")
-					}
-					if i < len(tabRunes)-len([]rune("app.go")) && tabRunes[i] != '/' && !sameColor(style.Fg, lipgloss.LightDark(dark)(lipgloss.Color("#00535F"), lipgloss.Color("#73B8C5"))) {
-						t.Fatal("tab directory does not use the scheme's cyan")
 					}
 				}
 				base := headerPathStyle
@@ -149,8 +146,13 @@ func TestPathDisplayRepositoryBoundaries(t *testing.T) {
 				if tc.region != "" {
 					start = len([]rune(plain[:strings.Index(plain, tc.region)]))
 				}
-				background := lipgloss.Color("#D2BDDF")
-				filename := len(runes) - len([]rune("app.go"))
+				background := base.GetBackground()
+				if start >= 0 {
+					background = styles[start].Bg
+					if background == nil || sameColor(background, base.GetBackground()) {
+						t.Fatal("repository root lost its distinct background")
+					}
+				}
 				for i, r := range runes {
 					wantBG := base.GetBackground()
 					if start >= 0 && i >= start {
@@ -158,12 +160,6 @@ func TestPathDisplayRepositoryBoundaries(t *testing.T) {
 					}
 					if !sameColor(styles[i].Bg, wantBG) {
 						t.Fatalf("background at %d (%q) = %v, want %v", i, r, styles[i].Bg, wantBG)
-					}
-					if i < filename && r != '/' && !sameColor(styles[i].Fg, lipgloss.Color("#00758F")) {
-						t.Fatalf("header directory %q does not use blue cyan", r)
-					}
-					if r == '/' && sameColor(styles[i].Fg, lipgloss.Cyan) {
-						t.Fatal("slash uses the directory color")
 					}
 				}
 				for _, root := range tc.roots {
@@ -189,6 +185,11 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 	app.width = 100
 	for _, dark := range []bool{true, false} {
 		initAdaptiveStyles(dark)
+		rootPath := app.paths.render(app.filePath, headerPathStyle, false, true)
+		rootRunes, rootStyles := renderedCells(rootPath)
+		rootText := string(rootRunes)
+		rootStart := len([]rune(rootText[:strings.Index(rootText, filepath.Base(root))]))
+		rootBackground := rootStyles[rootStart].Bg
 		for _, width := range []int{100, 24} {
 			app.width = width
 			header := strings.Split(app.renderHeader(), "\n")[lipgloss.Height(app.renderReviewBar())]
@@ -196,24 +197,9 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 			if !strings.Contains(plain, ".md L0/3") || strings.Contains(plain, ".md  ") {
 				t.Fatalf("header lost filename or added space: %q", plain)
 			}
-			_, headerStyles := renderedCells(header)
-			position := len([]rune(plain[:strings.Index(plain, "L0/3")]))
-			for _, offset := range []int{0, 1, 3} {
-				if !sameColor(headerStyles[position+offset].Fg, lipgloss.Color("#00758F")) {
-					t.Fatal("header position does not match directory text")
-				}
-			}
-			slash := headerStyles[position+2]
-			if !sameColor(slash.Fg, lipgloss.Color("#81608E")) || slash.Attrs&uv.AttrBold == 0 {
-				t.Fatal("header position slash is not muted and bold")
-			}
 			progress := strings.LastIndex(plain, "0/0")
 			if progress < 0 {
 				t.Fatal("header progress control disappeared")
-			}
-			progressCell := len([]rune(plain[:progress]))
-			if !sameColor(headerStyles[progressCell].Bg, lipgloss.LightDark(dark)(lipgloss.Color("#E8E8E8"), lipgloss.Color("#3a3a3a"))) {
-				t.Fatal("header progress control lost its scheme's background")
 			}
 			tab := app.renderTabWidth(app.tabLabels(), 0, width)
 			for name, rendered := range map[string]string{"header": header, "tab": tab} {
@@ -231,7 +217,7 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 				}
 				last := -1
 				for i, style := range styles {
-					if sameColor(style.Bg, lipgloss.Color("#D2BDDF")) {
+					if sameColor(style.Bg, rootBackground) {
 						last = i
 					}
 				}

@@ -8,6 +8,7 @@ import (
 )
 
 func TestInlineMarkdownParser(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		source, text, uri string
 	}{
@@ -44,6 +45,7 @@ func TestInlineMarkdownParser(t *testing.T) {
 }
 
 func TestInlineMarkdownPreservesImageLinks(t *testing.T) {
+	t.Parallel()
 	uri := imageTarget{url: "https://example.org/a**b**.png"}.uri()
 	got := highlightInline(linkedText(uri, "![picture](https://example.org/a**b**.png)"))
 	if !strings.Contains(got, ansi.SetHyperlink(uri)) {

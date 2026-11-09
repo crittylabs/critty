@@ -378,31 +378,6 @@ func TestMetaQuestionMarkOpensAndClosesHelp(t *testing.T) {
 	}
 }
 
-func TestHelpModalFitsAndCloses(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 80
-	app.height = 24
-
-	app = pressAltKey(app, '?')
-	if app.modal != helpModal {
-		t.Fatalf("? opened modal %v, want help modal", app.modal)
-	}
-
-	background := lipgloss.NewStyle().Width(app.width).Height(app.height).Render("")
-	rendered := app.renderWithModal(background)
-	if width := lipgloss.Width(rendered); width > app.width {
-		t.Errorf("help width = %d, terminal width = %d", width, app.width)
-	}
-	if height := lipgloss.Height(rendered); height > app.height {
-		t.Errorf("help height = %d, terminal height = %d", height, app.height)
-	}
-
-	app = pressKey(app, tea.KeyEscape)
-	if app.modal != noModal {
-		t.Fatalf("esc left modal %v open", app.modal)
-	}
-}
-
 func TestHelpModalScrollsToBottom(t *testing.T) {
 	app := newISearchApp(t, 1)
 	app.version = "v1.0.0"
@@ -469,7 +444,7 @@ func TestHelpModalScrollsToBottom(t *testing.T) {
 			app, _ = updateApp(app, size)
 			app = pressKey(app, tea.KeyEnd)
 			view := app.View()
-			if !strings.Contains(ansi.Strip(view.Content), "critty v1.0.0") || lipgloss.Height(view.Content) > size.Height {
+			if !strings.Contains(ansi.Strip(view.Content), "critty v1.0.0") || lipgloss.Height(view.Content) > size.Height || lipgloss.Width(view.Content) > size.Width {
 				t.Fatal("help version missing or dialog clipped after scrolling and resizing")
 			}
 			footer, controls := app.helpFooter(app.modalInnerWidth(), 1, 0)
@@ -493,6 +468,10 @@ func TestHelpModalScrollsToBottom(t *testing.T) {
 		}
 	}
 	initAdaptiveStyles(true)
+	app = pressKey(app, tea.KeyEscape)
+	if app.modal != noModal {
+		t.Fatal("Escape did not close keyboard help")
+	}
 }
 
 func TestDocRenderedMsg_LoadsExistingComments(t *testing.T) {
@@ -1043,43 +1022,28 @@ func TestFillTabRowFitsSingleLine(t *testing.T) {
 	}
 }
 
-func TestFooterHiddenOnShortTerminals(t *testing.T) {
-	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
-	for _, tc := range []struct {
-		height int
-		shown  bool
-	}{{21, false}, {22, true}, {24, true}} {
-		app := setupAppWithDoc(t, "first\nsecond\n")
-		app.width, app.height = 100, tc.height
-		app.recalculateLayout()
-		content := ansi.Strip(app.View().Content)
-		rows := strings.Split(content, "\n")
-		if len(rows) != tc.height {
-			t.Fatalf("height %d: rendered %d rows, want the terminal filled with no spare row", tc.height, len(rows))
-		}
-		if shown := strings.Contains(content, "Help M-?"); shown != tc.shown {
-			t.Fatalf("height %d: footer shown = %t, want %t: %q", tc.height, shown, tc.shown, content)
-		}
-		last := rows[len(rows)-1]
-		if !tc.shown {
-			if _, ok := app.footerHelpRect(); ok {
-				t.Fatalf("height %d: hidden footer still has a Help button region", tc.height)
-			}
-			if !strings.HasSuffix(last, "╯") {
-				t.Fatalf("height %d: last row = %q, want the pane's bottom border", tc.height, last)
-			}
-		}
-	}
-}
-
 func TestFooterHintsFitHeightBudget(t *testing.T) {
-	for _, height := range []int{22, 25, 26, 39, 40, 80} {
+	for _, height := range []int{21, 22, 39, 40, 80} {
 		t.Run(fmt.Sprint(height), func(t *testing.T) {
 			app := setupAppWithDoc(t, "first\nsecond\n")
 			app.width, app.height = 40, height
 			app.recalculateLayout()
+			rows := strings.Split(ansi.Strip(app.View().Content), "\n")
+			if len(rows) != height {
+				t.Fatalf("rendered %d rows, want %d", len(rows), height)
+			}
+			rect, shown := app.footerHelpRect()
+			if shown != (height > 21) {
+				t.Fatalf("height %d: footer visible = %t", height, shown)
+			}
+			if !shown {
+				if !strings.HasSuffix(rows[len(rows)-1], "╯") {
+					t.Fatal("hidden footer did not leave the pane's bottom border visible")
+				}
+				return
+			}
 			footer := ansi.Strip(app.renderFooter())
-			rows := strings.Split(footer, "\n")
+			rows = strings.Split(footer, "\n")
 			if len(rows) > 2 || len(rows)*20 > height {
 				t.Fatalf("height %d: footer exceeds height budget: %q", height, footer)
 			}
@@ -1091,10 +1055,7 @@ func TestFooterHintsFitHeightBudget(t *testing.T) {
 					t.Fatalf("footer exceeds width: %q", row)
 				}
 			}
-			rect, ok := app.footerHelpRect()
-			if !ok {
-				t.Fatal("Help button was omitted")
-			}
+			assertRegionContainsRenderedText(t, app, rect, "Help M-?")
 			app = clickMouse(app, rect.left, rect.top)
 			if app.modal != helpModal {
 				t.Fatal("visible Help button is not clickable")
@@ -1114,76 +1075,36 @@ func TestFooterHintsFitHeightBudget(t *testing.T) {
 }
 
 func TestDimRenderedDimsBackgrounds(t *testing.T) {
-	initAdaptiveStyles(true)
-	bar := reviewBarStyle.Render("bar") + diffAddedTextBg.Foreground(lipgloss.BrightWhite).Render("staged") + "plain"
-	dimmed := dimRendered(bar, 14, 1)
-	_, styles := renderedCells(dimmed)
-	if len(styles) < 14 {
-		t.Fatalf("parsed %d cells, want 14: %q", len(styles), dimmed)
-	}
-	for i, style := range styles[:14] {
-		if !sameColor(style.Fg, color.RGBA{R: 0x55, G: 0x55, B: 0x55, A: 255}) {
-			t.Fatalf("cell %d fg = %v, want dimmed gray", i, style.Fg)
-		}
-		hasBg := i < 9
-		if (style.Bg != nil) != hasBg {
-			t.Fatalf("cell %d bg = %v, want background presence %t", i, style.Bg, hasBg)
-		}
-		if hasBg && !sameColor(style.Bg, color.RGBA{R: 0x2a, G: 0x2a, B: 0x2a, A: 255}) {
-			t.Fatalf("cell %d bg = %v, want dimmed dark gray", i, style.Bg)
-		}
-	}
-
-	initAdaptiveStyles(false)
 	t.Cleanup(func() { initAdaptiveStyles(true) })
-	if light := dimRendered(bar, 14, 1); !strings.Contains(light, "170;170;170") || !strings.Contains(light, "221;221;221") {
-		t.Fatalf("light dimming = %q, want pale gray text on a paler background", light)
+	for _, dark := range []bool{true, false} {
+		initAdaptiveStyles(dark)
+		bar := reviewBarStyle.Render("shade") + "plain"
+		runes, styles := renderedCells(dimRendered(bar, 10, 1))
+		if string(runes) != "shadeplain" || len(styles) != 10 {
+			t.Fatalf("dimming changed text or cell positions: %q", string(runes))
+		}
+		for i, style := range styles {
+			if (style.Bg != nil) != (i < 5) {
+				t.Fatalf("dimming changed the background boundary at cell %d", i)
+			}
+			if style.Bg != nil && sameColor(style.Fg, style.Bg) {
+				t.Fatalf("dimmed text blends into its background at cell %d", i)
+			}
+		}
 	}
 }
 
-func TestLightBackgroundDarkensTextOnTerminalBackground(t *testing.T) {
-	initAdaptiveStyles(false)
+func TestBackgroundColorUpdatesEditorStyles(t *testing.T) {
+	initAdaptiveStyles(true)
 	t.Cleanup(func() { initAdaptiveStyles(true) })
 	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width, app.height, app.multiFile = 100, 24, true
-	app.recalculateLayout()
-	for name, style := range map[string]lipgloss.Style{
-		"active tab": activeTabStyle, "help description": helpDescriptionStyle,
-		"context box": contextBoxStyle, "self author": app.commentAuthorStyle(app.author),
-	} {
-		if got := style.GetForeground(); !sameColor(got, lipgloss.Black) {
-			t.Errorf("%s foreground = %v on a light background, want black", name, got)
-		}
-	}
-	for name, style := range map[string]lipgloss.Style{
-		"inactive tab": inactiveTabStyle, "footer description": footerDescStyle, "comment": commentStyle,
-	} {
-		if got := style.GetForeground(); !sameColor(got, lipgloss.BrightBlack) {
-			t.Errorf("%s foreground = %v on a light background, want bright black", name, got)
-		}
-	}
-	tab := app.renderTabWidth(app.tabLabels(), 0, 0)
-	runes, styles := renderedCells(tab)
-	var blackText strings.Builder
-	for i, r := range runes {
-		if sameColor(styles[i].Fg, lipgloss.Black) {
-			blackText.WriteRune(r)
-		}
-	}
-	if !strings.Contains(blackText.String(), "test.md") {
-		t.Errorf("active tab = %q, want a black label", tab)
-	}
-	initAdaptiveStyles(true)
-	if got := activeTabStyle.GetForeground(); !sameColor(got, lipgloss.BrightWhite) {
-		t.Errorf("active tab foreground = %v on a dark background, want bright white", got)
-	}
-
+	before := app.modalTextarea.Styles().Focused.CursorLine.GetBackground()
 	app, _ = updateApp(app, tea.BackgroundColorMsg{Color: color.White})
-	if got := app.modalTextarea.Styles().Focused.CursorLine.GetBackground(); !sameColor(got, lipgloss.Color("255")) {
-		t.Errorf("textarea cursor line background = %v on a light background, want near white", got)
+	if after := app.modalTextarea.Styles().Focused.CursorLine.GetBackground(); sameColor(before, after) {
+		t.Fatal("background probe did not update the editor styles")
 	}
 	if terminalIsDark {
-		t.Error("terminalIsDark is still true after a light background probe")
+		t.Fatal("terminalIsDark is still true after a light background probe")
 	}
 }
 

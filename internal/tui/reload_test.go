@@ -31,7 +31,8 @@ func reloadApp(t *testing.T, app *AppModel) {
 }
 
 func TestReloadDocumentAndAttachments(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nanchor\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nanchor\n")
 	app.width, app.height = 100, 30
 	attachment := filepath.Join(t.TempDir(), "notes.md")
 	write := func(path, content string) {
@@ -83,7 +84,8 @@ func TestReloadDocumentAndAttachments(t *testing.T) {
 }
 
 func TestReloadPreservesPerFileViewport(t *testing.T) {
-	app := setupAppWithDoc(t, strings.Repeat("source line\n", 100))
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, strings.Repeat("source line\n", 100))
 	attachment := filepath.Join(t.TempDir(), "notes.md")
 	if err := os.WriteFile(attachment, []byte(strings.Repeat("note line\n", 100)), 0600); err != nil {
 		t.Fatal(err)
@@ -126,7 +128,8 @@ func TestReloadPreservesPerFileViewport(t *testing.T) {
 }
 
 func TestReloadDeferralAndFailure(t *testing.T) {
-	app := setupAppWithDoc(t, "original\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "original\n")
 	app.modal = commentModal
 	if cmd := app.requestReload(true); cmd != nil || !app.reload.pending {
 		t.Fatal("editing did not defer reload")
@@ -157,9 +160,10 @@ func TestReloadDeferralAndFailure(t *testing.T) {
 }
 
 func TestReloadDefersTextSelection(t *testing.T) {
+	t.Parallel()
 	for _, dragging := range []bool{true, false} {
 		t.Run(fmt.Sprintf("dragging=%t", dragging), func(t *testing.T) {
-			app := setupAppWithDoc(t, "original\n")
+			app := setupPrivateAppWithDoc(t, "original\n")
 			app.width, app.height = 100, 30
 			app.recalculateLayout()
 			app.rebuildContent()
@@ -188,7 +192,8 @@ func TestReloadDefersTextSelection(t *testing.T) {
 }
 
 func TestWatchResultAfterDisable(t *testing.T) {
-	app := setupAppWithDoc(t, "original\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "original\n")
 	app.reload.watch = true
 	cmd := app.requestReload(false)
 	if err := os.WriteFile(app.filePath, []byte("new\n"), 0600); err != nil {
@@ -247,6 +252,7 @@ func TestWatchIndicator(t *testing.T) {
 }
 
 func TestReloadWatchKeys(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		key    tea.KeyPressMsg
@@ -261,14 +267,14 @@ func TestReloadWatchKeys(t *testing.T) {
 		{"M-S-R", tea.KeyPressMsg{Code: 'R', Mod: tea.ModAlt | tea.ModShift}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "text\n")
+			app := setupPrivateAppWithDoc(t, "text\n")
 			app, cmd := updateApp(app, tc.key)
 			if cmd == nil || app.reload.busy != tc.reload || app.reload.watch == tc.reload || app.ignoreWhitespace {
 				t.Fatal("key did not invoke the intended action")
 			}
 		})
 	}
-	app := setupAppWithDoc(t, "text\n")
+	app := setupPrivateAppWithDoc(t, "text\n")
 	app.multiFile = true
 	app = pressKey(app, 'w')
 	if !app.ignoreWhitespace || app.reload.watch {
@@ -344,7 +350,8 @@ func TestReloadGitFilesAndConcurrentComments(t *testing.T) {
 }
 
 func TestReloadFormDraftsAndConsent(t *testing.T) {
-	app := setupAppWithDoc(t, "target\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "target\n")
 	path := filepath.Join(t.TempDir(), "form.md")
 	content := "- [ ] Publish <!-- form: id=publish consent -->\n- [ ] Notes <!-- form: id=notes text -->\n"
 	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
@@ -376,7 +383,8 @@ func TestReloadFormDraftsAndConsent(t *testing.T) {
 }
 
 func TestWatchQueuedStateSurvivesUpdate(t *testing.T) {
-	app := setupAppWithDoc(t, "content\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "content\n")
 	app.reload.watch, app.reload.dirty = true, true
 	updated, cmd := app.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	app = updated.(AppModel)

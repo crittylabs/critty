@@ -18,6 +18,7 @@ const formatsPatch = "diff --git a/missing.go b/missing.go\n--- a/missing.go\n++
 	"@@ -40 +50 @@\n-tail\n+final\n"
 
 func TestSplitDiffReplacementAlignment(t *testing.T) {
+	t.Parallel()
 	patch := "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -1,2 +1,3 @@\n-removed heading\n-alpha old beta\n+fresh introduction\n+alpha new beta\n+added footer\n"
 	m := patchApp(t, patch)
 	source := m.tab().doc.Content
@@ -53,6 +54,7 @@ func TestSplitDiffReplacementAlignment(t *testing.T) {
 }
 
 func TestDiffFormatsPartialPatch(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, formatsPatch)
 	source := m.tab().doc.Content
 	wantRefs := m.visualLines(m.tab())
@@ -89,6 +91,7 @@ func TestDiffFormatsPartialPatch(t *testing.T) {
 }
 
 func TestSplitDiffShowsAllAvailableSource(t *testing.T) {
+	t.Parallel()
 	var patch strings.Builder
 	patch.WriteString("diff --git a/large.txt b/large.txt\n--- a/large.txt\n+++ b/large.txt\n@@ -1,80 +1,80 @@\n")
 	for line := 1; line <= 80; line++ {
@@ -132,6 +135,7 @@ func TestSplitDiffShowsAllAvailableSource(t *testing.T) {
 }
 
 func TestDiffFormatMouseAndNavigation(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, formatsPatch)
 	m.split = true
 	m.rebuildContent()
@@ -179,6 +183,7 @@ func TestDiffFormatMouseAndNavigation(t *testing.T) {
 }
 
 func TestDiffFormatSwitchKeepsAttentionAndComments(t *testing.T) {
+	t.Parallel()
 	var patch strings.Builder
 	patch.WriteString("diff --git a/long.txt b/long.txt\n--- a/long.txt\n+++ b/long.txt\n@@ -1,80 +1,80 @@\n")
 	for i := 1; i <= 80; i++ {
@@ -245,6 +250,7 @@ func TestDiffFormatSwitchKeepsAttentionAndComments(t *testing.T) {
 }
 
 func TestDiffFormatKeyAndResize(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, formatsPatch)
 	m = pressKey(m, 'S')
 	if !m.split {
@@ -278,6 +284,7 @@ func TestDiffFormatKeyAndResize(t *testing.T) {
 }
 
 func TestDiffFormatWrappingAndNarrowFallback(t *testing.T) {
+	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-"+strings.Repeat("旧é", 30)+"\n+"+strings.Repeat("新\t", 30)+"\n")
 	m.split = true
 	m.rebuildContent()
@@ -303,6 +310,7 @@ func TestDiffFormatWrappingAndNarrowFallback(t *testing.T) {
 }
 
 func TestSplitWhitespaceAndEmptySides(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ name, patch, side string }{
 		{"added", "diff --git a/a b/a\nnew file mode 100644\n--- /dev/null\n+++ b/a\n@@ -0,0 +1,2 @@\n+one\n+two\n", ""},
 		{"deleted", "diff --git a/a b/a\ndeleted file mode 100644\n--- a/a\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-one\n-two\n", "old"},

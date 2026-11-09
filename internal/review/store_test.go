@@ -49,6 +49,24 @@ func TestSessionRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("opening session: %v", err)
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	abs, err := OpenDocSession("", filepath.Join(cwd, "plan.md"))
+	if err != nil {
+		t.Fatalf("opening with absolute path: %v", err)
+	}
+	if sess.Key != abs.Key {
+		t.Errorf("relative and absolute paths yield different keys: %s vs %s", sess.Key, abs.Key)
+	}
+	dotted, err := OpenDocSession("", "./plan.md")
+	if err != nil {
+		t.Fatalf("opening with dotted path: %v", err)
+	}
+	if sess.Key != dotted.Key {
+		t.Errorf("dotted path yields a different key: %s vs %s", sess.Key, dotted.Key)
+	}
 	if got := len(sess.FileComments("plan.md")); got != 0 {
 		t.Errorf("expected no comments, got %d", got)
 	}
@@ -151,33 +169,6 @@ func TestSessionUpdatePreservesConcurrentReplies(t *testing.T) {
 	}
 	if len(comments[1].Replies) != 1 || comments[1].Replies[0].Body != "second reply" {
 		t.Errorf("second reply lost: %+v", comments[1].Replies)
-	}
-}
-
-func TestSessionKeyPathNormalization(t *testing.T) {
-	setupStateDir(t)
-	if err := os.WriteFile("plan.md", []byte("# Test\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	rel, err := OpenDocSession("", "plan.md")
-	if err != nil {
-		t.Fatalf("opening with relative path: %v", err)
-	}
-	cwd, _ := os.Getwd()
-	abs, err := OpenDocSession("", filepath.Join(cwd, "plan.md"))
-	if err != nil {
-		t.Fatalf("opening with absolute path: %v", err)
-	}
-	if rel.Key != abs.Key {
-		t.Errorf("relative and absolute paths yield different keys: %s vs %s", rel.Key, abs.Key)
-	}
-	dotted, err := OpenDocSession("", "./plan.md")
-	if err != nil {
-		t.Fatalf("opening with dotted path: %v", err)
-	}
-	if rel.Key != dotted.Key {
-		t.Errorf("dotted path yields a different key: %s vs %s", rel.Key, dotted.Key)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 )
 
 func TestFormNavigationTargets(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name string
 		key  rune
@@ -95,6 +96,7 @@ func TestFormNavigationTargets(t *testing.T) {
 }
 
 func TestRequiredFormNavigationUsesValidHumanAnswers(t *testing.T) {
+	t.Parallel()
 	for _, human := range []bool{false, true} {
 		t.Run(fmt.Sprintf("human=%t", human), func(t *testing.T) {
 			app, _ := formTestApp(t)
@@ -144,6 +146,7 @@ func TestRequiredFormNavigationUsesValidHumanAnswers(t *testing.T) {
 }
 
 func TestOptionalChoiceNavigationAndFormFocus(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestApp(t)
 	app.tab().cursorLine = 2
 	app = pressKey(app, ' ')
@@ -178,6 +181,7 @@ func TestOptionalChoiceNavigationAndFormFocus(t *testing.T) {
 }
 
 func TestFormNavigationFinishAndWrap(t *testing.T) {
+	t.Parallel()
 	for _, key := range []rune{']', '}'} {
 		t.Run(string(key), func(t *testing.T) {
 			app, _ := formTestApp(t)
@@ -248,6 +252,7 @@ func formTestAppWithContent(t *testing.T, content string) (AppModel, chan Finish
 }
 
 func TestFormLinksTakePriorityOverSelection(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "- [ ] [Example](https://example.org) https://example.net <!-- form: id=link -->\n")
 	app.width = 70
 	app.recalculateLayout()
@@ -284,6 +289,7 @@ func TestFormLinksTakePriorityOverSelection(t *testing.T) {
 }
 
 func TestUnannotatedChecklistIsDisplayOnly(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "- [ ] Pending\n- [x] Complete\n- [ ] Answer <!-- form: id=answer -->\n")
 	if len(app.contentLayout.formControls) != 1 || len(app.formReviewItems()) != 1 {
 		t.Fatal("ordinary checklist entered the form controls or answers")
@@ -302,6 +308,7 @@ func TestUnannotatedChecklistIsDisplayOnly(t *testing.T) {
 }
 
 func TestFormKeyboardMouseAndSourcePositions(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestApp(t)
 	content := app.tab().doc.Content
 	if len(app.contentLayout.formControls) < 4 {
@@ -367,6 +374,7 @@ func TestFormKeyboardMouseAndSourcePositions(t *testing.T) {
 }
 
 func TestMissingFormFinishesAsFeedbackWithoutResolving(t *testing.T) {
+	t.Parallel()
 	app, ch := formTestApp(t)
 	app.tab().state.Comments = []review.Comment{testComment()}
 	app.newFeedback = false
@@ -385,6 +393,7 @@ func TestMissingFormFinishesAsFeedbackWithoutResolving(t *testing.T) {
 }
 
 func TestFormApprovalGrantsHumanConsent(t *testing.T) {
+	t.Parallel()
 	app, ch := formTestApp(t)
 	app.toggleForm(2)
 	app.toggleForm(3)
@@ -403,6 +412,7 @@ func TestFormApprovalGrantsHumanConsent(t *testing.T) {
 }
 
 func TestFormsDoNotToggleWhileSelecting(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestApp(t)
 	app.tab().cursorLine, app.tab().selecting = 2, true
 	app.handleKeyPress(tea.KeyPressMsg{Code: ' '})
@@ -412,6 +422,7 @@ func TestFormsDoNotToggleWhileSelecting(t *testing.T) {
 }
 
 func TestFormsWithDeletedBinaryTarget(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestApp(t)
 	app.tabs = append(app.tabs, FileTab{path: "missing-deleted.bin", status: "deleted", isBinary: true, isDeleted: true})
 	if err := app.beginForms(map[string]review.SnapshotFile{"target.md": {Content: "target\n"}}, ""); err != nil {
@@ -453,6 +464,7 @@ func TestFormAppearanceAndFinishDetailsFit(t *testing.T) {
 }
 
 func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
+	t.Parallel()
 	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictReject, review.VerdictComment} {
 		t.Run(string(verdict), func(t *testing.T) {
 			app, ch := formTestApp(t)
@@ -497,6 +509,7 @@ func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
 }
 
 func TestSelectAllForm(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "- [ ] Check all <!-- form: id=all select-all=api -->\n- [ ] Auth <!-- form: id=auth tags=api -->\n- [ ] Errors <!-- form: id=errors tags=api consent -->\n")
 	line := func() string {
 		return ansi.Strip(strings.Split(app.contentViewport.GetContent(), "\n")[0])
@@ -531,6 +544,7 @@ func TestSelectAllForm(t *testing.T) {
 }
 
 func TestFormTextAnswers(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Other <!-- form: id=q value=other text -->\n- [ ] Plain <!-- form: id=q value=plain -->\n")
 	d := app.forms.Document(app.tab().path)
 	content := func() string { return ansi.Strip(app.contentViewport.GetContent()) }
@@ -584,6 +598,7 @@ func TestFormTextAnswers(t *testing.T) {
 }
 
 func TestFormListModal(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "# Questions\n\n- [ ] All <!-- form: id=all select-all=r -->\n\n## Q1. Retry?\n\n- [ ] Bounded <!-- form: id=retry value=bounded tags=r -->\n- [ ] Manual <!-- form: id=retry value=manual -->\n\n## Q2. Why?\n\n- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Publish <!-- form: id=publish consent -->\n")
 	app.toggleForm(8)
 	view := func() string { return ansi.Strip(app.View().Content) }
@@ -624,6 +639,7 @@ func TestFormListModal(t *testing.T) {
 }
 
 func TestRankFieldReordersInPlace(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "# Lead\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
 	d := app.forms.Document(app.tab().path)
 	rows := func() []string {
@@ -685,6 +701,7 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 }
 
 func TestCommentOnRankedItemNamesTheItem(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "Intro\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
 	t1 := app.tab()
 	t1.cursorLine, t1.cursorOnForm = 2, true
@@ -712,6 +729,7 @@ func TestCommentOnRankedItemNamesTheItem(t *testing.T) {
 }
 
 func TestReorderedRegions(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		order []int
 		want  [][2]int

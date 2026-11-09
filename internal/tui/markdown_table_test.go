@@ -10,6 +10,7 @@ import (
 )
 
 func TestWrapTableCells(t *testing.T) {
+	t.Parallel()
 	const uri = "https://example.org/path"
 	cells := []string{linkedText(uri, "long linked label"), "日本語 é and text"}
 	widths := []int{6, 8}
@@ -34,7 +35,8 @@ func TestWrapTableCells(t *testing.T) {
 }
 
 func TestTableCodePaddingWrap(t *testing.T) {
-	app := setupAppWithDoc(t, "| Terminal |\n| --- |\n| `xdg-terminal`, `ghostty-window`, `iterm-window` |")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "| Terminal |\n| --- |\n| `xdg-terminal`, `ghostty-window`, `iterm-window` |")
 	cells := app.tab().markdownTableCells(3, nil)
 	columns := wrapTableCells(cells, []int{40}, &app.tab().markdown.after.lines[2])
 	if got := ansi.Strip(columns[0][1].text); got != " iterm-window " {
@@ -50,6 +52,7 @@ func TestTableCodePaddingWrap(t *testing.T) {
 }
 
 func TestWrappedMarkdownTableSelection(t *testing.T) {
+	t.Parallel()
 	const label = "first one two three four five six seven eight nine last"
 	const link = "[" + label + "](https://example.org/path)"
 	const note = "**alpha bravo charlie delta echo foxtrot golf hotel omega**"
@@ -57,7 +60,7 @@ func TestWrappedMarkdownTableSelection(t *testing.T) {
 	const content = "| Link | Notes | Code |\n| --- | --- | --- |\n| " + link + " | " + note + " | " + code + " |"
 	for _, selection := range []string{"link", "note", "code", "whole"} {
 		t.Run(selection, func(t *testing.T) {
-			app := setupAppWithDoc(t, content)
+			app := setupPrivateAppWithDoc(t, content)
 			app.width, app.height, app.viewMode = 200, 40, true
 			app.recalculateLayout()
 			app.rebuildContent()
@@ -95,10 +98,11 @@ func TestWrappedMarkdownTableSelection(t *testing.T) {
 }
 
 func TestMarkdownTableKeepsColumnsWhenResized(t *testing.T) {
+	t.Parallel()
 	content := "| PR | Notes |\n| --- | --- |\n| [日本語 é long label](https://example.org) | " + strings.Repeat("words ", 20) + " |"
 	for _, width := range []int{80, 110} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
-			app := setupAppWithDoc(t, content)
+			app := setupPrivateAppWithDoc(t, content)
 			app.width, app.height = width, 40
 			app.recalculateLayout()
 			app.rebuildContent()

@@ -103,20 +103,6 @@ func TestOpenReviewSessionPersistsStagedScope(t *testing.T) {
 	}
 }
 
-func TestTMUXDetectorUsesEnvironment(t *testing.T) {
-	t.Setenv("TMUX", "/tmp/tmux/default,100,2")
-	t.Setenv("TMUX_PANE", "%7")
-
-	context := (tmuxDetector{}).environmentContext()
-	got, ok := context.(tmuxContext)
-	if !ok {
-		t.Fatalf("environmentContext() = %T, want tmuxContext", context)
-	}
-	if got.session != "/tmp/tmux/default,100,2" || got.pane != "%7" {
-		t.Errorf("environmentContext() = %+v", got)
-	}
-}
-
 func TestResolveTMUXContextFromAncestor(t *testing.T) {
 	origOutput, origParent, origInspect, origLook := commandOutput, parentProcessID, inspectProcess, lookPath
 	t.Cleanup(func() {

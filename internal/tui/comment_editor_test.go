@@ -217,26 +217,6 @@ func TestSaveClearedCommentDeletesEditedEntry(t *testing.T) {
 	}
 }
 
-func TestMouseClickCommentModalSave(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-	app.openLineComment()
-	app.modalTextarea.SetValue("mouse comment")
-	for _, region := range app.modalMouseRegions() {
-		if region.action.focus == 1 {
-			assertRegionContainsRenderedText(t, app, region.rect, "Save C-s")
-			break
-		}
-	}
-
-	app = clickModalAction(t, app, "Save C-s")
-
-	if app.modal != noModal || len(app.tab().state.Comments) != 1 || app.tab().state.Comments[0].Body != "mouse comment" {
-		t.Fatalf("modal = %v, comments = %+v; want saved mouse comment", app.modal, app.tab().state.Comments)
-	}
-}
-
 func TestNewCommentIsSelectedForImmediateDeletion(t *testing.T) {
 	for _, tt := range []struct {
 		name string
@@ -407,25 +387,22 @@ func TestMouseClickCommentModalCloseConfirmsUnsavedText(t *testing.T) {
 				if !edit && len(app.tab().state.Comments) != 0 {
 					t.Fatalf("comments = %+v, want none", app.tab().state.Comments)
 				}
+				if edit {
+					app.openCommentThread("c_edit")
+				} else {
+					app.openLineComment()
+				}
+				app.modalTextarea.SetValue("unsaved text")
+				app = pressKey(app, tea.KeyEscape)
+				if app.modal != discardChangesModal {
+					t.Fatal("Escape did not confirm closing the dirty editor")
+				}
+				app = pressKey(app, tea.KeyEscape)
+				if app.modal != mode || !app.modalTextarea.Focused() || app.modalTextarea.Value() != "unsaved text" {
+					t.Fatal("Escape did not return to editing with the unsaved text")
+				}
 			})
 		}
-	}
-}
-
-func TestDirtyCommentModalEscapeReturnsToEditing(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
-	app.openLineComment()
-	app.modalTextarea.SetValue("unsaved comment")
-
-	app = pressKey(app, tea.KeyEscape)
-	if app.modal != discardChangesModal {
-		t.Fatalf("modal = %v, want discard confirmation", app.modal)
-	}
-
-	app = pressKey(app, tea.KeyEscape)
-	if app.modal != commentModal || !app.modalTextarea.Focused() {
-		t.Fatalf("modal = %v, focused = %t; want resumed comment editing",
-			app.modal, app.modalTextarea.Focused())
 	}
 }
 
@@ -493,7 +470,16 @@ func TestSuggestionButtonInsertsSelectedCodeAndPersistsComment(t *testing.T) {
 		t.Fatalf("suggestion selection = %q", got)
 	}
 
-	app.modalSubmit()
+	for _, region := range app.modalMouseRegions() {
+		if region.action.focus == 1 {
+			assertRegionContainsRenderedText(t, app, region.rect, "Save C-s")
+			break
+		}
+	}
+	app = clickModalAction(t, app, "Save C-s")
+	if app.modal != noModal {
+		t.Fatal("mouse save did not close the comment editor")
+	}
 	comments := app.session.FileComments(app.tab().path)
 	if len(comments) != 1 {
 		t.Fatalf("persisted comments = %+v, want one", comments)
@@ -598,6 +584,11 @@ func TestSuggestionCodeCanBeDeletedOrReplaced(t *testing.T) {
 			app.modalTextarea.SetHeight(3)
 			app.modalTextarea.SetValue("説明\n\n以前の本文")
 			app.insertSuggestion()
+			app.modalTextarea.SetVirtualCursor(false)
+			cursor := app.modalTextarea.Cursor()
+			if cursor == nil || cursor.Y < 0 || cursor.Y >= app.modalTextarea.Height() {
+				t.Fatal("inserted suggestion cursor is outside the visible textarea")
+			}
 			wantCode := strings.ReplaceAll(code, "\t", "    ")
 			if got := app.modalTextarea.SelectedText(); got != wantCode {
 				t.Fatalf("selected code = %q, want %q", got, wantCode)
@@ -615,28 +606,6 @@ func TestSuggestionCodeCanBeDeletedOrReplaced(t *testing.T) {
 				t.Fatalf("edited suggestion = %q, want %q", got, want)
 			}
 		}
-	}
-}
-
-func TestSuggestionScrollsCursorIntoView(t *testing.T) {
-	lastLine := strings.Repeat("x", 48)
-	app := setupAppWithDoc(t, "first\n"+lastLine+"\n")
-	app.tabs[0].selecting = true
-	app.tabs[0].selectAnchor = 1
-	app.tabs[0].cursorLine = 2
-	app.modal = commentModal
-	app.modalTextarea.SetWidth(12)
-	app.modalTextarea.SetHeight(3)
-
-	app.insertSuggestion()
-	app.modalTextarea.SetVirtualCursor(false)
-	cursor := app.modalTextarea.Cursor()
-	if cursor == nil {
-		t.Fatal("suggestion cursor is hidden")
-	}
-	if cursor.Y < 0 || cursor.Y >= app.modalTextarea.Height() {
-		t.Fatalf("suggestion cursor Y = %d outside textarea height %d",
-			cursor.Y, app.modalTextarea.Height())
 	}
 }
 

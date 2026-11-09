@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func typeSearch(app AppModel, text string) AppModel {
 
 func newISearchApp(t *testing.T, cursorLine int) AppModel {
 	t.Helper()
-	app := setupAppWithDoc(t, isearchDoc)
+	app := setupPrivateAppWithDoc(t, isearchDoc)
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app.tab().cursorLine = cursorLine
 	return app
@@ -44,6 +45,7 @@ func assertCursor(t *testing.T, app AppModel, want int) {
 }
 
 func TestISearchSmartCase(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		query, text string
 		want        bool
@@ -65,6 +67,7 @@ func TestISearchSmartCase(t *testing.T) {
 }
 
 func TestISearchEditsSearchAgainFromOrigin(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 2)
 	app = ctrlKey(app, 's')
 	if !app.isearch.active {
@@ -82,6 +85,7 @@ func TestISearchEditsSearchAgainFromOrigin(t *testing.T) {
 }
 
 func TestISearchStepsFailsAndWraps(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 2)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "alpha")
@@ -110,6 +114,7 @@ func TestISearchStepsFailsAndWraps(t *testing.T) {
 }
 
 func TestISearchBackwardIncludesOriginLine(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 4)
 	app = ctrlKey(app, 'r')
 	app = typeSearch(app, "a")
@@ -122,6 +127,7 @@ func TestISearchBackwardIncludesOriginLine(t *testing.T) {
 }
 
 func TestISearchExitKeepsOrRestoresPosition(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 2)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "gamma")
@@ -163,6 +169,7 @@ func TestISearchExitKeepsOrRestoresPosition(t *testing.T) {
 }
 
 func TestISearchOtherKeyLeavesAndActs(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "gamma")
@@ -174,6 +181,7 @@ func TestISearchOtherKeyLeavesAndActs(t *testing.T) {
 }
 
 func TestISearchInvalidRegexpKeepsPosition(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "beta(")
@@ -186,6 +194,7 @@ func TestISearchInvalidRegexpKeepsPosition(t *testing.T) {
 }
 
 func TestISearchHighlightsMatches(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "alpha")
@@ -203,6 +212,7 @@ func TestISearchHighlightsMatches(t *testing.T) {
 }
 
 func TestISearchHighlightsHiddenMarkdown(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name, source, query string
 		want                []string
@@ -214,7 +224,7 @@ func TestISearchHighlightsHiddenMarkdown(t *testing.T) {
 		{"multiline label", "[first\nsecond](https://hidden.example)", "hidden", []string{"first", "second"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, tt.source)
+			app := setupPrivateAppWithDoc(t, tt.source)
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 			app = ctrlKey(app, 's')
 			app = typeSearch(app, tt.query)
@@ -229,9 +239,10 @@ func TestISearchHighlightsHiddenMarkdown(t *testing.T) {
 }
 
 func TestISearchHiddenMatchInTable(t *testing.T) {
+	t.Parallel()
 	const content = "| Link | Notes |\n| --- | --- |\n| [label](https://example.org/needle) | needle and **bold** |"
 	for _, width := range []int{100, 45, 20} {
-		app := setupAppWithDoc(t, content)
+		app := setupPrivateAppWithDoc(t, content)
 		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 30})
 		app = ctrlKey(app, 's')
 		app = typeSearch(app, "needle")
@@ -245,6 +256,7 @@ func TestISearchHiddenMatchInTable(t *testing.T) {
 }
 
 func TestISearchHiddenLinkInFormLabel(t *testing.T) {
+	t.Parallel()
 	app, _ := formTestAppWithContent(t, "- [ ] See [label](https://example.org/hidden) <!-- form: id=check -->")
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "hidden")
@@ -252,7 +264,8 @@ func TestISearchHiddenLinkInFormLabel(t *testing.T) {
 }
 
 func TestISearchHiddenMatchKeepsSourceOrder(t *testing.T) {
-	app := setupAppWithDoc(t, "[label](https://example.org/needle) needle")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "[label](https://example.org/needle) needle")
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "needle")
@@ -267,8 +280,9 @@ func TestISearchHiddenMatchKeepsSourceOrder(t *testing.T) {
 }
 
 func TestISearchHiddenMatchPreservesLinkAndFormatting(t *testing.T) {
+	t.Parallel()
 	const uri = "https://example.org/hidden"
-	app := setupAppWithDoc(t, "[**日本語 é**]("+uri+")")
+	app := setupPrivateAppWithDoc(t, "[**日本語 é**]("+uri+")")
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "hidden")
@@ -291,6 +305,7 @@ func TestISearchHiddenMatchPreservesLinkAndFormatting(t *testing.T) {
 }
 
 func TestISearchHiddenMatchOnOldDiffSide(t *testing.T) {
+	t.Parallel()
 	const patch = "diff --git a/review.md b/review.md\n--- a/review.md\n+++ b/review.md\n@@ -1 +1 @@\n-[old label](https://example.org/hidden)\n+[new label](https://example.org/visible)\n"
 	for _, split := range []bool{false, true} {
 		app := patchApp(t, patch)
@@ -326,6 +341,7 @@ func assertISearchHighlight(t *testing.T, content, text string, current bool) {
 }
 
 func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
+	t.Parallel()
 	styled := "\x1b[31mfoo bar baz\x1b[0m"
 	re, err := compileSearch("bar|baz")
 	if err != nil {
@@ -346,6 +362,7 @@ func TestHighlightISearchKeepsSurroundingStyles(t *testing.T) {
 }
 
 func TestISearchSlashAndQuestionMarkStartSearches(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 3)
 	app = pressKey(app, '/')
 	if !app.isearch.active || !app.isearch.forward {
@@ -371,6 +388,7 @@ func TestISearchSlashAndQuestionMarkStartSearches(t *testing.T) {
 }
 
 func TestISearchToggles(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	prompt := func() string { return ansi.Strip(app.renderFooter()) }
@@ -417,6 +435,7 @@ func TestISearchToggles(t *testing.T) {
 }
 
 func TestISearchWordMode(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		query, text string
 		want        bool
@@ -453,7 +472,8 @@ func TestISearchWordMode(t *testing.T) {
 }
 
 func TestISearchUnicodeWordHighlights(t *testing.T) {
-	app := setupAppWithDoc(t, "全文検索\n検索、検索する\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "全文検索\n検索、検索する\n")
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app.tab().cursorLine = 1
 	app.isearch.mode = isearchWord
@@ -483,6 +503,7 @@ func clickISearchAction(t *testing.T, app AppModel, action isearchMouseAction) A
 }
 
 func TestISearchMouseControls(t *testing.T) {
+	t.Parallel()
 	startSearch := func(app AppModel) AppModel {
 		_, layout := app.renderReviewScreen()
 		for _, region := range layout.isearchRegions {
@@ -538,6 +559,7 @@ func TestISearchMouseControls(t *testing.T) {
 }
 
 func TestISearchMouseControlsAfterResize(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "alpha")
@@ -557,7 +579,8 @@ func TestISearchMouseControlsAfterResize(t *testing.T) {
 }
 
 func TestISearchCapturesFollowingText(t *testing.T) {
-	app := setupAppWithDoc(t, "intro\nsee foo.Bar_baz qux\nfoo.bar_baz\n検索する機能\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "intro\nsee foo.Bar_baz qux\nfoo.bar_baz\n検索する機能\n")
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app.tab().cursorLine = 1
 	app = ctrlKey(app, 's')
@@ -605,6 +628,7 @@ func TestISearchCapturesFollowingText(t *testing.T) {
 }
 
 func TestNextWord(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct{ in, want string }{
 		{"bar_baz qux", "bar_baz"},
 		{"Ünïcode9 x", "Ünïcode9"},
@@ -627,6 +651,7 @@ func assertTabCursor(t *testing.T, app AppModel, tab, line int) {
 }
 
 func TestISearchAcrossFiles(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.width = 120
 	prompt := func() string { return ansi.Strip(app.renderFooter()) }
@@ -680,6 +705,7 @@ func TestISearchAcrossFiles(t *testing.T) {
 }
 
 func TestISearchAcrossFilesStartsInLaterFile(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.tab().cursorLine = 4
 	app = ctrlKey(app, 's')
@@ -692,6 +718,7 @@ func TestISearchAcrossFilesStartsInLaterFile(t *testing.T) {
 }
 
 func TestISearchSelectionStaysInFile(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.width = 120
 	app = pressKey(app, 'v')
@@ -706,6 +733,7 @@ func TestISearchSelectionStaysInFile(t *testing.T) {
 }
 
 func TestISearchPasteAndYank(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{"terminal", "kill-ring"} {
 		for _, tt := range []struct {
 			name, input, want string
@@ -752,6 +780,7 @@ func TestISearchPasteAndYank(t *testing.T) {
 }
 
 func TestISearchTerminalCursor(t *testing.T) {
+	t.Parallel()
 	for _, query := range []string{"", "検索", "e\u0301🙂", strings.Repeat("日本語", 20)} {
 		for _, width := range []int{18, 40, 100} {
 			app := newISearchApp(t, 1)
@@ -779,6 +808,7 @@ func TestISearchTerminalCursor(t *testing.T) {
 }
 
 func TestISearchYanksCommentEditorKill(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = pressKey(app, tea.KeyEnter)
 	if app.modal != commentModal {
@@ -809,6 +839,7 @@ func altKey(app AppModel, code rune) AppModel {
 }
 
 func TestISearchRecallsProjectHistory(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app.searchRing = []searchhistory.Entry{
 		{Query: "gamma", Mode: "literal", CaseFold: true},
@@ -841,8 +872,9 @@ func TestISearchRecallsProjectHistory(t *testing.T) {
 }
 
 func TestISearchSavesAndRestoresProjectHistory(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
-	store := searchhistory.Open("git:/repo/.git")
+	store := &searchhistory.Store{Path: filepath.Join(t.TempDir(), "history.json"), Project: "git:/repo/.git"}
 	app.searchHistory = store
 	app = ctrlKey(app, 's')
 	app = altKey(app, 's')
@@ -860,7 +892,7 @@ func TestISearchSavesAndRestoresProjectHistory(t *testing.T) {
 		t.Fatalf("saved = %+v, %v", saved, err)
 	}
 
-	restarted := setupAppWithDoc(t, isearchDoc)
+	restarted := setupPrivateAppWithDoc(t, isearchDoc)
 	restarted.searchHistory, restarted.searchRing = store, loadSearchRing(store)
 	restarted, _ = updateApp(restarted, tea.WindowSizeMsg{Width: 100, Height: 30})
 	restarted = ctrlKey(restarted, 's')
@@ -876,9 +908,10 @@ func TestISearchSavesAndRestoresProjectHistory(t *testing.T) {
 }
 
 func TestISearchDemoKeepsHistoryInMemory(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app.session = review.NewMemorySession()
-	store := searchhistory.Open("git:/repo/.git")
+	store := &searchhistory.Store{Path: filepath.Join(t.TempDir(), "history.json"), Project: "git:/repo/.git"}
 	app.searchHistory = store
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "beta")
@@ -892,6 +925,7 @@ func TestISearchDemoKeepsHistoryInMemory(t *testing.T) {
 }
 
 func TestISearchEditorResumesWithEditedQuery(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "bet")
@@ -918,6 +952,7 @@ func TestISearchEditorResumesWithEditedQuery(t *testing.T) {
 }
 
 func TestISearchEditorCancelKillRingAndRepeat(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "alpha")
@@ -947,6 +982,7 @@ func TestISearchEditorCancelKillRingAndRepeat(t *testing.T) {
 }
 
 func TestISearchEditorRecallsHistoryAndTracksWideCursor(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app.searchRing = []searchhistory.Entry{{Query: "gamma", Mode: "literal"}}
 	app = ctrlKey(app, 's')
@@ -976,6 +1012,7 @@ func TestISearchEditorRecallsHistoryAndTracksWideCursor(t *testing.T) {
 }
 
 func TestISearchExitAppliesPendingEdit(t *testing.T) {
+	t.Parallel()
 	app := newISearchApp(t, 1)
 	app = ctrlKey(app, 's')
 	app = typeSearch(app, "bet")
@@ -1001,7 +1038,7 @@ func TestISearchBacktrackingSyntaxAndTimeout(t *testing.T) {
 
 	defer func(previous time.Duration) { isearchMatchTimeout = previous }(isearchMatchTimeout)
 	isearchMatchTimeout = time.Millisecond
-	app := setupAppWithDoc(t, strings.Repeat("a", 40)+"c\nbeta\n")
+	app := setupPrivateAppWithDoc(t, strings.Repeat("a", 40)+"c\nbeta\n")
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app = ctrlKey(app, 's')
 	app.isearchPaste(`(a+)+b`)

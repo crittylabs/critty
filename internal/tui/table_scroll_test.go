@@ -10,8 +10,9 @@ import (
 )
 
 func TestTableHorizontalControlsAndResize(t *testing.T) {
+	t.Parallel()
 	content := "| ID | Description | Notes |\n| --- | --- | --- |\n| 1 | " + strings.Repeat("word ", 20) + " | " + strings.Repeat("note ", 20) + " |"
-	app := setupAppWithDoc(t, content+"\n\n"+content)
+	app := setupPrivateAppWithDoc(t, content+"\n\n"+content)
 	app.viewMode = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 70, Height: 40})
 	app.tab().cursorLine = 3
@@ -53,8 +54,9 @@ func TestTableHorizontalControlsAndResize(t *testing.T) {
 }
 
 func TestTableSearchRevealsHiddenLinkAndWrappedRow(t *testing.T) {
+	t.Parallel()
 	content := "| First | Second |\n| --- | --- |\n| " + strings.Repeat("left ", 25) + " | " + strings.Repeat("filler ", 30) + " [日本語](https://hidden.example) |"
-	app := setupAppWithDoc(t, content)
+	app := setupPrivateAppWithDoc(t, content)
 	app.viewMode = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 60, Height: 14})
 	app = ctrlKey(app, 's')
@@ -67,26 +69,19 @@ func TestTableSearchRevealsHiddenLinkAndWrappedRow(t *testing.T) {
 	if !strings.Contains(app.contentViewport.GetContent(), ansi.SetHyperlink("https://hidden.example")) {
 		t.Fatal("clipped link lost its destination")
 	}
-}
-
-func TestTableSearchRevealsMatchAfterResize(t *testing.T) {
-	content := "| StartColumn | EndColumn |\n| --- | --- |\n| " + strings.Repeat("left ", 25) + " | " + strings.Repeat("filler ", 30) + "[target](https://hidden.example) |\n"
-	app := setupAppWithDoc(t, content)
-	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 60, Height: 38})
-	app = ctrlKey(app, 's')
-	app = typeSearch(app, "hidden.example")
 	for _, width := range []int{110, 60} {
-		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 38})
-		if !strings.Contains(ansi.Strip(app.contentViewport.View()), "target") {
-			t.Fatalf("target not visible after resize to %d: table=%+v\n%s", width, app.tableAtLine(3), ansi.Strip(app.contentViewport.View()))
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 14})
+		if !strings.Contains(ansi.Strip(app.contentViewport.View()), "日本語") {
+			t.Fatalf("match not visible after resize to %d: table=%+v\n%s", width, app.tableAtLine(3), ansi.Strip(app.contentViewport.View()))
 		}
 	}
 }
 
 func TestScrolledTableSelectionKeepsMarkdownAndGutter(t *testing.T) {
+	t.Parallel()
 	const label = "日本語 é label"
 	const link = "[**" + label + "**](https://example.org/path)"
-	app := setupAppWithDoc(t, "| First | Second |\n| --- | --- |\n| "+strings.Repeat("words ", 20)+" | "+link+" |")
+	app := setupPrivateAppWithDoc(t, "| First | Second |\n| --- | --- |\n| "+strings.Repeat("words ", 20)+" | "+link+" |")
 	app.viewMode = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 45, Height: 30})
 	table := *app.tableAtLine(3)

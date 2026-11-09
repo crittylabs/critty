@@ -10,6 +10,7 @@ import (
 )
 
 func TestRankFileMatches(t *testing.T) {
+	t.Parallel()
 	paths := []string{"docs/app.md", "internal/tui/app.go", "internal/tui/app_test.go", "cmd/critty/main.go", "internal/tui/thread.go"}
 	order := func(query string) string {
 		var names []string
@@ -60,6 +61,7 @@ func newFileSelectApp() AppModel {
 }
 
 func TestFileSelectFlow(t *testing.T) {
+	t.Parallel()
 	app := newFileSelectApp()
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
 	if app.modal != fileSelectModal || app.fileSelect.selected != 1 {
@@ -126,6 +128,7 @@ func TestFileSelectFlow(t *testing.T) {
 }
 
 func TestFileSelectMouse(t *testing.T) {
+	t.Parallel()
 	app := newFileSelectApp()
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
 	rows := strings.Split(ansi.Strip(app.View().Content), "\n")
@@ -144,6 +147,7 @@ func TestFileSelectMouse(t *testing.T) {
 }
 
 func TestFileSelectCloseButton(t *testing.T) {
+	t.Parallel()
 	app := newFileSelectApp()
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'p', Mod: tea.ModAlt})
 	titleRow := renderedLineY(t, app, "Open file")
@@ -164,6 +168,7 @@ func TestFileSelectCloseButton(t *testing.T) {
 }
 
 func TestRenderFileRowHighlightsMatches(t *testing.T) {
+	t.Parallel()
 	row := renderFileRow("src/app.go", []int{4, 5}, "(+1)", false)
 	if ansi.Strip(row) != "src/app.go (+1)" {
 		t.Fatalf("row text = %q", ansi.Strip(row))

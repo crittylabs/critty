@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -134,7 +134,7 @@ exit 127
 					t.Fatal(err)
 				}
 				got := strings.Split(strings.TrimSuffix(string(b), "\x00"), "\x00")
-				if !reflect.DeepEqual(got, args) {
+				if !slices.Equal(got, args) {
 					t.Fatalf("arguments changed: %q != %q", got, args)
 				}
 				b, err = os.ReadFile(os.Getenv("TEST_ENV"))

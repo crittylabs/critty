@@ -14,6 +14,7 @@ import (
 )
 
 func TestMouseClickSelectsFileTab(t *testing.T) {
+	t.Parallel()
 	app := newCommentNavigationTestApp()
 	app.width = 120
 	if app = clickMouse(app, 20, app.headerHeight()+app.tabBarHeight()); app.activeTab != 0 {
@@ -28,72 +29,9 @@ func TestMouseClickSelectsFileTab(t *testing.T) {
 	}
 }
 
-func TestMouseClickSelectsVisibleOverflowTab(t *testing.T) {
-	app := newCommentNavigationTestApp()
-	fourth := app.tabs[1]
-	fourth.path = "fourth.go"
-	fifth := app.tabs[1]
-	fifth.path = "fifth.go"
-	app.tabs = append(app.tabs, fourth, fifth)
-	app.width = 82 // a 56-column content pane beside the 26-column sidebar
-	app.activeTab = 2
-
-	for _, item := range app.tabBarItems() {
-		if item.overflow || item.target == app.activeTab {
-			continue
-		}
-		app = clickMouse(app, item.left+min(1, item.width-1), app.headerHeight())
-		if app.activeTab != item.target {
-			t.Fatalf("active tab = %d, want %d", app.activeTab, item.target)
-		}
-		return
-	}
-	t.Fatal("test setup did not expose another tab")
-}
-
-func TestMouseClickSelectsTabBehindOverflowIndicator(t *testing.T) {
-	newApp := func() AppModel {
-		app := newCommentNavigationTestApp()
-		template := app.tabs[1]
-		paths := []string{"a.go", "b.go", "c.go", "d.go", "e.go", "f.go", "g.go", "h.go"}
-		app.tabs = make([]FileTab, len(paths))
-		for i, path := range paths {
-			app.tabs[i] = template
-			app.tabs[i].path = path
-		}
-		app.width = 50 // a 24-column content pane beside the 26-column sidebar
-		app.activeTab = 4
-		return app
-	}
-
-	tests := []struct {
-		name  string
-		right bool
-	}{
-		{name: "left"},
-		{name: "right", right: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := newApp()
-			items := app.tabBarItems()
-			item := items[0]
-			if tt.right {
-				item = items[len(items)-1]
-			}
-			if !item.overflow {
-				t.Fatal("test setup did not overflow on both sides")
-			}
-			app = clickMouse(app, item.left+min(1, item.width-1), app.headerHeight())
-			if app.activeTab != item.target {
-				t.Fatalf("active tab = %d, want adjacent hidden tab %d", app.activeTab, item.target)
-			}
-		})
-	}
-}
-
 func TestMouseWheelScrollsCodePane(t *testing.T) {
-	app := setupAppWithDoc(t, strings.Repeat("line\n", 20))
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, strings.Repeat("line\n", 20))
 	app.width = 100
 	app.contentViewport.SetWidth(75)
 	_, top, right, _ := app.contentBounds()
@@ -108,23 +46,34 @@ func TestMouseWheelScrollsCodePane(t *testing.T) {
 }
 
 func TestMouseClickFocusesCodeLine(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-	app.tabs[0].cursorLine = 1
-
-	x, y := contentScreenPoint(app, 10, 1)
-	app = clickMouse(app, x, y)
-
-	if app.focused != contentPane || app.tab().cursorLine != 2 || app.tab().cursorOnAnnotation {
-		t.Fatalf("focus = %v, line = %d, annotation = %t; want content line 2",
-			app.focused, app.tab().cursorLine, app.tab().cursorOnAnnotation)
+	t.Parallel()
+	for _, tc := range []struct {
+		name           string
+		offset, height int
+	}{
+		{"unscrolled", 0, 10},
+		{"scrolled", 1, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\nfourth\n")
+			app.width = 100
+			app.contentViewport.SetWidth(75)
+			app.contentViewport.SetHeight(tc.height)
+			app.contentViewport.SetYOffset(tc.offset)
+			app.tabs[0].cursorLine = 1
+			x, y := contentScreenPoint(app, 10, 1)
+			app = clickMouse(app, x, y)
+			if app.focused != contentPane || app.tab().cursorLine != 2 || app.tab().cursorOnAnnotation {
+				t.Fatalf("focus = %v, line = %d, annotation = %t; want content line 2", app.focused, app.tab().cursorLine, app.tab().cursorOnAnnotation)
+			}
+		})
 	}
 }
 
 func TestMouseClickCodeGutterOpensLineComment(t *testing.T) {
+	t.Parallel()
 	for _, gutter := range []bool{true, false} {
-		app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+		app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\n")
 		app.width = 100
 		app.contentViewport.SetWidth(75)
 		x := gutterWidth
@@ -141,7 +90,8 @@ func TestMouseClickCodeGutterOpensLineComment(t *testing.T) {
 }
 
 func TestMouseHoverCodeGutterShowsCommentMarker(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\n")
 	app.width = 100
 	app.contentViewport.SetWidth(75)
 	app.tabs[0].changedLines = map[int]bool{2: true}
@@ -165,6 +115,7 @@ func TestMouseHoverCodeGutterShowsCommentMarker(t *testing.T) {
 }
 
 func TestMouseClickSelectionEndGutterPreservesRangeAndOpensComment(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		anchor int
@@ -175,7 +126,7 @@ func TestMouseClickSelectionEndGutterPreservesRangeAndOpensComment(t *testing.T)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "first\nsecond\nthird\nfourth\nfifth\n")
+			app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\nfourth\nfifth\n")
 			app.width = 100
 			app.contentViewport.SetWidth(75)
 			app.tabs[0].selecting = true
@@ -196,7 +147,8 @@ func TestMouseClickSelectionEndGutterPreservesRangeAndOpensComment(t *testing.T)
 }
 
 func TestMouseClickRenderedCodeLineUsesItsDisplayedPosition(t *testing.T) {
-	app := setupAppWithDoc(t, "first unique\nsecond unique\nthird unique\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first unique\nsecond unique\nthird unique\n")
 	app.multiFile = true
 	app.width = 60
 	app.height = 20
@@ -213,6 +165,7 @@ func TestMouseClickRenderedCodeLineUsesItsDisplayedPosition(t *testing.T) {
 }
 
 func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
+	t.Parallel()
 	words := func(n int) string { return strings.Repeat("word ", n) }
 	for _, tt := range []struct {
 		name, content, first, next string
@@ -226,7 +179,7 @@ func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
 		{name: "deleted before line", content: "current unique\nnext unique\n", first: "deleted-start", next: "current unique", deleted: true, minRows: 2},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, tt.content)
+			app := setupPrivateAppWithDoc(t, tt.content)
 			app.multiFile = true
 			app.width, app.height = 60, 24
 			if tt.deleted {
@@ -260,7 +213,8 @@ func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
 }
 
 func TestMouseDragRenderedCodeLinesUsesDisplayedPositions(t *testing.T) {
-	app := setupAppWithDoc(t, "first unique\nsecond unique\nthird unique\nfourth unique\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first unique\nsecond unique\nthird unique\nfourth unique\n")
 	app.multiFile = true
 	app.width = 60
 	app.height = 22
@@ -281,7 +235,8 @@ func TestMouseDragRenderedCodeLinesUsesDisplayedPositions(t *testing.T) {
 }
 
 func TestMouseDragCodeGutterSelectsLinesAndOpensComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\nfourth\nfifth\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\nfourth\nfifth\n")
 	app.width = 100
 	app.filePath = strings.Repeat("x", 76)
 	app.contentViewport.SetWidth(75)
@@ -303,7 +258,8 @@ func TestMouseDragCodeGutterSelectsLinesAndOpensComment(t *testing.T) {
 }
 
 func TestMouseDragCodeGutterScrollsAtBottomEdge(t *testing.T) {
-	app := setupAppWithDoc(t, strings.Repeat("line\n", 10))
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, strings.Repeat("line\n", 10))
 	app.width = 100
 	app.contentViewport.SetWidth(75)
 	app.contentViewport.SetHeight(3)
@@ -319,23 +275,9 @@ func TestMouseDragCodeGutterScrollsAtBottomEdge(t *testing.T) {
 	}
 }
 
-func TestMouseClickFocusesScrolledCodeLine(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\nfourth\n")
-	app.width = 100
-	app.contentViewport.SetWidth(75)
-	app.contentViewport.SetHeight(2)
-	app.contentViewport.SetYOffset(1)
-
-	x, y := contentScreenPoint(app, 10, app.contentViewport.YOffset())
-	app = clickMouse(app, x, y)
-
-	if app.tab().cursorLine != 2 {
-		t.Fatalf("line = %d, want first visible line 2", app.tab().cursorLine)
-	}
-}
-
 func TestMouseClickDeletedLineFocusesDeletedLine(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\n")
 	app.width = 100
 	app.contentViewport.SetWidth(75)
 	app.tabs[0].deletedAfter = map[int][]gitpkg.DeletedLine{
@@ -354,7 +296,8 @@ func TestMouseClickDeletedLineFocusesDeletedLine(t *testing.T) {
 }
 
 func TestMouseDragSelectsDeletedLineRange(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nfourth\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nfourth\n")
 	app.width = 100
 	app.height = 20
 	app.recalculateLayout()
@@ -382,7 +325,8 @@ func TestMouseDragSelectsDeletedLineRange(t *testing.T) {
 }
 
 func TestMouseClickOpensFocusedInlineComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
 	app.contentViewport.SetWidth(75)
 	app.tabs[0].state.Comments = []review.Comment{{
@@ -406,11 +350,12 @@ func TestMouseClickOpensFocusedInlineComment(t *testing.T) {
 }
 
 func TestMouseClickTogglesCommentResolution(t *testing.T) {
+	t.Parallel()
 	for _, location := range []string{"inline", "sidebar", "file"} {
 		for _, width := range []int{60, 120} {
 			for _, multiFile := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/width=%d/multiFile=%t", location, width, multiFile), func(t *testing.T) {
-					app := setupAppWithDoc(t, strings.Repeat("source line\n", 30))
+					app := setupPrivateAppWithDoc(t, strings.Repeat("source line\n", 30))
 					app.width, app.height, app.multiFile = width, 30, multiFile
 					comment := review.Comment{
 						ID: "thread", StartLine: 1, EndLine: 1, Body: "original",
@@ -477,10 +422,11 @@ func TestMouseClickTogglesCommentResolution(t *testing.T) {
 }
 
 func TestResolveButtonPositionSurvivesCollapse(t *testing.T) {
+	t.Parallel()
 	for _, width := range []int{20, 24, 32, 40} {
 		for _, replies := range []int{0, 2} {
 			t.Run(fmt.Sprintf("width=%d/replies=%d", width, replies), func(t *testing.T) {
-				app := setupAppWithDoc(t, "source\n")
+				app := setupPrivateAppWithDoc(t, "source\n")
 				comment := review.Comment{ID: "thread", StartLine: 1, EndLine: 1, Body: "body", Author: "Long reviewer name"}
 				for range replies {
 					comment.Replies = append(comment.Replies, review.Reply{Body: "reply"})
@@ -518,6 +464,7 @@ func TestResolveButtonPositionSurvivesCollapse(t *testing.T) {
 }
 
 func TestCommentHeaderActionsAlignRight(t *testing.T) {
+	t.Parallel()
 	const label = "comment L1 · 2 replies" // 22 columns
 	for _, tc := range []struct {
 		width     int
@@ -583,9 +530,10 @@ func TestCommentHeaderActionsAlignRight(t *testing.T) {
 }
 
 func TestMouseClickHeaderArrowsMoveBetweenComments(t *testing.T) {
+	t.Parallel()
 	for _, location := range []string{"inline", "sidebar"} {
 		t.Run(location, func(t *testing.T) {
-			app := setupAppWithDoc(t, strings.Repeat("source\n", 30))
+			app := setupPrivateAppWithDoc(t, strings.Repeat("source\n", 30))
 			app.width, app.height = 120, 40 // wide enough for the sidebar to show the arrows
 			app.tab().state.Comments = []review.Comment{
 				{ID: "first", StartLine: 1, EndLine: 1, Body: "one", Author: "AI"},
@@ -646,11 +594,12 @@ func TestMouseClickHeaderArrowsMoveBetweenComments(t *testing.T) {
 }
 
 func TestMouseClickHeaderDelete(t *testing.T) {
+	t.Parallel()
 	for _, location := range []string{"inline", "sidebar", "file"} {
 		for _, width := range []int{60, 120} {
 			for _, resolved := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/width=%d/resolved=%t", location, width, resolved), func(t *testing.T) {
-					app := setupAppWithDoc(t, strings.Repeat("source\n", 30))
+					app := setupPrivateAppWithDoc(t, strings.Repeat("source\n", 30))
 					app.width, app.height = width, 30
 					comment := review.Comment{ID: "delete", StartLine: 1, EndLine: 1, Body: "delete me",
 						Author: app.author, ReviewRound: app.reviewRound(), Resolved: resolved}
@@ -704,9 +653,10 @@ func TestMouseClickHeaderDelete(t *testing.T) {
 }
 
 func TestHeaderDeleteHonorsExistingRestrictions(t *testing.T) {
+	t.Parallel()
 	for _, reason := range []string{"other author", "previous round", "has replies"} {
 		t.Run(reason, func(t *testing.T) {
-			app := setupAppWithDoc(t, "source\n")
+			app := setupPrivateAppWithDoc(t, "source\n")
 			comment := review.Comment{ID: "keep", StartLine: 1, EndLine: 1, Body: "keep me", Author: app.author, ReviewRound: app.reviewRound()}
 			switch reason {
 			case "other author":
@@ -731,7 +681,8 @@ func TestHeaderDeleteHonorsExistingRestrictions(t *testing.T) {
 }
 
 func TestMouseClickOpensFocusedSidebarComment(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
 	app.contentViewport.SetWidth(75)
 	app.tabs[0].state.Comments = []review.Comment{{
@@ -753,7 +704,8 @@ func TestMouseClickOpensFocusedSidebarComment(t *testing.T) {
 }
 
 func TestMouseClickSelectsWrappedSidebarCommentFromRenderedRows(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\nthird\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\n")
 	app.width = 60
 	app.height = 24
 	app.tabs[0].state.Comments = []review.Comment{
@@ -784,7 +736,8 @@ func TestMouseClickSelectsWrappedSidebarCommentFromRenderedRows(t *testing.T) {
 }
 
 func TestMouseClickCommentPaneTabFocusesSidebar(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\n")
 	app.width, app.height = 80, 24
 	app.recalculateLayout()
 	app.rebuildContent()
@@ -811,7 +764,8 @@ func TestMouseClickCommentPaneTabFocusesSidebar(t *testing.T) {
 	if tabRow := ansi.Strip(rows[y]); !strings.Contains(tabRow, "╭  Files   Comments (0) ") {
 		t.Fatalf("tab row = %q, want the sidebar tabs", tabRow)
 	}
-	if got := ansi.Cut(rows[y], tabLeft, tabLeft+1); !strings.Contains(got, "\x1b[94m") {
-		t.Fatalf("focused comment pane border = %q, want bright blue", got)
+	_, cells := renderedCells(ansi.Cut(rows[y], tabLeft, tabLeft+1))
+	if len(cells) != 1 || !sameColor(cells[0].Fg, app.sidebarBorderColor()) {
+		t.Fatalf("focused comment pane border does not use its focus color: %+v", cells)
 	}
 }

@@ -7,7 +7,8 @@ import (
 )
 
 func TestCommentEditPreservesConcurrentCLIReply(t *testing.T) {
-	app := setupAppWithDoc(t, "# Plan\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "# Plan\n")
 	c := testComment()
 	app.tab().state.Comments = []review.Comment{c}
 	app.persist()
@@ -15,7 +16,7 @@ func TestCommentEditPreservesConcurrentCLIReply(t *testing.T) {
 		t.Fatal(app.err)
 	}
 
-	cli, err := review.OpenSession("", app.session.Key)
+	cli, err := review.OpenSessionAt(app.session.Key, app.session.Dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +32,7 @@ func TestCommentEditPreservesConcurrentCLIReply(t *testing.T) {
 	if app.err != nil {
 		t.Fatal(app.err)
 	}
-	saved, err := review.OpenSession("", app.session.Key)
+	saved, err := review.OpenSessionAt(app.session.Key, app.session.Dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	uv "github.com/charmbracelet/ultraviolet"
 )
 
 type terminalInputApp struct {
@@ -58,7 +57,7 @@ func TestImageResponseReplayPreservesTextInput(t *testing.T) {
 }
 
 func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
-	t.Parallel()
+	// Escape decoding uses a real clock deadline; keep this program test serial.
 	for _, tc := range []struct {
 		name   string
 		chunks []string
@@ -68,10 +67,9 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 		{"direct delayed mouse", []string{"\x1b[<35;", "20;10M"}, false},
 		{"direct delayed graphics", []string{"\x1b_Gi=123;", "OK\x1b\\"}, false},
 		{"delayed mouse", []string{"\x1b[91;3u<35;", "20;10M"}, true},
-		{"delayed graphics", []string{"\x1b[95;3uGi=123;", "OK\x1b[92;3u\x1b[91;3u2;1R"}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			app := setupParallelAppWithDoc(t, "source\n")
+			app := setupPrivateAppWithDoc(t, "source\n")
 			app.images.tmux = tc.tmux
 			app.modal = commentModal
 			app.modalTextarea.Focus()
@@ -87,7 +85,7 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 						writes <- err
 						return
 					}
-					// Confirmed responses must survive beyond the Alt-key deadline.
+					// Cross the Alt-key deadline and separate traffic from editor text.
 					time.Sleep(100 * time.Millisecond)
 				}
 				_, err := io.WriteString(writer, "after")
@@ -97,6 +95,9 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 			defer timer.Stop()
 			model, err := p.Run()
 			if err != nil {
+				if state, ok := model.(terminalInputApp); ok {
+					t.Fatalf("%v; editor input = %q", err, state.modalTextarea.Value())
+				}
 				t.Fatal(err)
 			}
 			if err := <-writes; err != nil {
@@ -111,19 +112,37 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 }
 
 func TestIdentifiedResponseIgnoresKeyDeadline(t *testing.T) {
-	d := imageDisplay{tmux: true}
-	feed := func(key tea.KeyPressMsg) tea.Msg {
-		msg, _ := d.decodeResponse(key)
-		return msg
-	}
+	app := setupPrivateAppWithDoc(t, "source\n")
+	app.images = imageDisplay{tmux: true, probeID: 123, checking: true, attempts: 1}
+	app.modal = commentModal
+	app.modalTextarea.Focus()
+	feed := func(msg tea.Msg) { app, _ = updateApp(app, msg) }
 	feed(tea.KeyPressMsg{Code: '_', Mod: tea.ModAlt})
 	feed(tea.KeyPressMsg{Code: 'G', Text: "Gi=123;"})
-	if msg, _ := d.decodeResponse(imageResponseTimeoutMsg{d.input.generation}); msg != nil || !d.input.confirmed {
-		t.Fatal("identified response was replayed at the Alt-key deadline")
+	feed(imageResponseTimeoutMsg{app.images.input.generation})
+	if !app.images.input.confirmed || app.modalTextarea.Value() != "" {
+		t.Fatal("identified graphics response was replayed at the Alt-key deadline")
 	}
 	feed(tea.KeyPressMsg{Code: 'O', Text: "OK"})
-	if _, ok := feed(tea.KeyPressMsg{Code: '\\', Mod: tea.ModAlt}).(uv.KittyGraphicsEvent); !ok {
-		t.Fatal("delayed response was not decoded")
+	feed(tea.KeyPressMsg{Code: '\\', Mod: tea.ModAlt})
+	if app.images.probeReply != "OK" {
+		t.Fatal("delayed graphics response was not decoded")
+	}
+	feed(tea.KeyPressMsg{Code: '[', Mod: tea.ModAlt})
+	feed(tea.KeyPressMsg{Code: '2', Text: "2;"})
+	feed(imageResponseTimeoutMsg{app.images.input.generation})
+	if !app.images.input.confirmed {
+		t.Fatal("identified cursor response expired at the Alt-key deadline")
+	}
+	feed(tea.KeyPressMsg{Code: '1', Text: "1R"})
+	if app.images.probeCursor == nil || app.modalTextarea.Value() != "" {
+		t.Fatal("terminal traffic entered the editor instead of completing the probe")
+	}
+	for _, r := range "after" {
+		feed(tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	if got := app.modalTextarea.Value(); got != "after" {
+		t.Fatalf("terminal traffic changed subsequent editor input: %q", got)
 	}
 }
 

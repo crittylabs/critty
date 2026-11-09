@@ -87,7 +87,8 @@ func resolve(t *testing.T, s *Store, id string, read func(context.Context, Targe
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 450*time.Millisecond)
 	defer cancel()
-	return s.Resolve(ctx, id, read)
+	target, _, err := s.ResolveWithDiagnostics(ctx, id, read)
+	return target, err
 }
 
 func TestNotificationSkipsScreensAndConsumesRequest(t *testing.T) {

@@ -37,6 +37,11 @@ func setupAppWithDoc(t *testing.T, content string) AppModel {
 func setupParallelAppWithDoc(t *testing.T, content string) AppModel {
 	t.Helper()
 	t.Parallel()
+	return setupPrivateAppWithDoc(t, content)
+}
+
+func setupPrivateAppWithDoc(t *testing.T, content string) AppModel {
+	t.Helper()
 	return newDocApp(t, content, func(path string) *review.Session {
 		sess, err := review.OpenDocSession(t.TempDir(), path)
 		if err != nil {

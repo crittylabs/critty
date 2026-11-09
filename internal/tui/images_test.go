@@ -239,6 +239,7 @@ func testPreviewTerminalRoundTrip(t *testing.T, lost int, encoded bool) {
 }
 
 func TestPreviewDecodeLimits(t *testing.T) {
+	t.Parallel()
 	data := previewPNG(t, 3, 2)
 	img, err := decodePreview(data)
 	if err != nil || img.Bounds().Dx() != 3 || img.Bounds().Dy() != 2 {
@@ -267,6 +268,7 @@ func TestImageProbeSequence(t *testing.T) {
 }
 
 func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		cursor  tea.CursorPositionMsg
@@ -305,6 +307,7 @@ func TestImageCapabilityRequiresVirtualPlacement(t *testing.T) {
 }
 
 func TestImageProbeRetriesAndIgnoresStaleResponses(t *testing.T) {
+	t.Parallel()
 	app := AppModel{images: newImageDisplay()}
 	app.images.checking = true
 	var previous int
@@ -345,7 +348,8 @@ func TestImageProbeRetriesAndIgnoresStaleResponses(t *testing.T) {
 }
 
 func TestImageProbeRetriesAfterSkippedQuery(t *testing.T) {
-	app := setupAppWithDoc(t, "source\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "source\n")
 	app.images = newImageDisplay()
 	app.images.checking = true
 	for attempt := 1; attempt <= maxImageProbeAttempts; attempt++ {
@@ -411,9 +415,10 @@ func TestImageProbeRetriesAfterSkippedQuery(t *testing.T) {
 }
 
 func TestImageProbeExhaustionAndManualRecheck(t *testing.T) {
+	t.Parallel()
 	for _, mouse := range []bool{false, true} {
 		t.Run(fmt.Sprintf("mouse=%t", mouse), func(t *testing.T) {
-			app := setupAppWithDoc(t, "source\n")
+			app := setupPrivateAppWithDoc(t, "source\n")
 			app.images = newImageDisplay()
 			app.images.checking = true
 			for attempt := 0; attempt < maxImageProbeAttempts; attempt++ {
@@ -454,7 +459,8 @@ func TestImageProbeExhaustionAndManualRecheck(t *testing.T) {
 }
 
 func TestImageManualRecheckHasNoAttemptLimit(t *testing.T) {
-	app := setupAppWithDoc(t, "source\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "source\n")
 	for cycle := 0; cycle < 5; cycle++ {
 		previous := app.images.probeID
 		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'I', Text: "I"})
@@ -477,9 +483,10 @@ func TestImageManualRecheckHasNoAttemptLimit(t *testing.T) {
 }
 
 func TestImageProbeDoesNotRetryOnTextInput(t *testing.T) {
+	t.Parallel()
 	for _, checking := range []bool{false, true} {
 		t.Run(fmt.Sprintf("checking=%t", checking), func(t *testing.T) {
-			app := setupAppWithDoc(t, "source\n")
+			app := setupPrivateAppWithDoc(t, "source\n")
 			app.images = newImageDisplay()
 			app.images.checking = checking
 			app.modal = commentModal
@@ -506,7 +513,7 @@ func TestImageProbeDoesNotRetryOnTextInput(t *testing.T) {
 			}
 		})
 	}
-	app := setupAppWithDoc(t, "source\n")
+	app := setupPrivateAppWithDoc(t, "source\n")
 	app.images = newImageDisplay()
 	app.images.enabled = true
 	id := app.images.probeID
@@ -517,6 +524,7 @@ func TestImageProbeDoesNotRetryOnTextInput(t *testing.T) {
 }
 
 func TestImageProbeRetriesWhenSelectingPreview(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, path, content string
 		binary, want        bool
@@ -527,7 +535,7 @@ func TestImageProbeRetriesWhenSelectingPreview(t *testing.T) {
 		{"remote image", "remote.md", "![remote](https://example.com/image.png)", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "text\n")
+			app := setupPrivateAppWithDoc(t, "text\n")
 			app.multiFile = true
 			app.images.checking = false
 			app.tabs = append(app.tabs, FileTab{path: tc.path, isBinary: tc.binary, isMarkdown: !tc.binary, doc: document.FromContent(tc.path, []byte(tc.content)), state: &fileReview{}})
@@ -548,7 +556,8 @@ func TestImageProbeRetriesWhenSelectingPreview(t *testing.T) {
 }
 
 func TestImagePlaceholderSurvivesRendering(t *testing.T) {
-	app := setupAppWithDoc(t, "text\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "text\n")
 	app.width, app.height = 100, 30
 	app.recalculateLayout()
 	img := &inlineImage{id: 0x123456, width: 30, height: 20, ready: true}
@@ -591,6 +600,7 @@ func TestImagePlaceholderSurvivesRendering(t *testing.T) {
 }
 
 func TestImagesUseDistinctPlacementIDs(t *testing.T) {
+	t.Parallel()
 	images := []inlineImage{
 		{id: 0x123456, columns: 32, rows: 16},
 		{id: 0x654321, columns: 40, rows: 6},
@@ -731,7 +741,7 @@ func TestImageDimensionsWithoutPreview(t *testing.T) {
 	}
 	for _, hidden := range []bool{false, true} {
 		t.Run(fmt.Sprintf("hidden=%t", hidden), func(t *testing.T) {
-			app := setupAppWithDoc(t, "text\n")
+			app := setupPrivateAppWithDoc(t, "text\n")
 			app.tab().path, app.tab().isBinary = "image.png", true
 			app.images = imageDisplay{hidden: hidden, attempts: maxImageProbeAttempts}
 			cmd := app.prepareImage()
@@ -762,7 +772,8 @@ func TestImageDimensionsWithoutPreview(t *testing.T) {
 }
 
 func TestPreviewComparisonLayout(t *testing.T) {
-	app := setupAppWithDoc(t, "text\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "text\n")
 	app.images.enabled = true
 	app.tab().path, app.tab().status, app.tab().isBinary = "file.png", "modified", true
 	app.tab().preview = imagePreview{
@@ -804,7 +815,8 @@ func TestPreviewComparisonLayout(t *testing.T) {
 }
 
 func TestPreviewFallbackAndResize(t *testing.T) {
-	app := setupAppWithDoc(t, "text\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "text\n")
 	app.tab().path, app.tab().isBinary = "file.png", true
 	if app.prepareImage() == nil || !app.images.checking || app.tab().preview.after.attempted {
 		t.Fatal("image must request detection before loading")

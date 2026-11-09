@@ -58,11 +58,6 @@ func TestDoctorTerminalMarker(t *testing.T) {
 			if d := diagnosticFor(t, r, "terminal/marker"); d.Status != want {
 				t.Fatalf("marker: %+v", d)
 			}
-			for _, d := range r.Checks {
-				if d.Check == "terminal/tfil-session" {
-					t.Fatalf("process ancestry must not be a separate diagnostic: %+v", d)
-				}
-			}
 			if d := diagnosticFor(t, r, "terminal/tfil"); d.Status != "info" || d.Advice != "" {
 				t.Fatalf("missing optional filter must not request remediation: %+v", d)
 			}

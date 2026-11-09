@@ -69,7 +69,7 @@ func TestResumedCodeShowsSnapshotOutsideCurrentChanges(t *testing.T) {
 }
 
 func TestReplacedAttachmentHistory(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Parallel()
 	sess, err := review.OpenSession(t.TempDir(), "history")
 	if err != nil {
 		t.Fatal(err)
@@ -136,6 +136,7 @@ func TestReplacedAttachmentHistory(t *testing.T) {
 }
 
 func TestAttachedDocumentMixedReview(t *testing.T) {
+	t.Parallel()
 	d := review.AttachedDocument{ID: "a_notice", Source: "/missing/notice.md", Name: "notice.md", Content: "# Notice\nPlease review\n"}
 	app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "notice.md", Status: gitpkg.StatusModified}}, "HEAD", AppConfig{Documents: []review.AttachedDocument{d}, Staged: true, Project: "project"})
 	if len(app.tabs) != 2 || app.tab().attachment == nil || app.tabs[1].path != "notice.md" {
@@ -180,7 +181,7 @@ func TestAttachedDocumentMixedReview(t *testing.T) {
 }
 
 func TestAttachedDocumentCommentsAndResume(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "plan.md")
 	if err := os.WriteFile(path, []byte("Plan\n"), 0o600); err != nil {

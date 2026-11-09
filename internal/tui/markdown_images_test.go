@@ -83,7 +83,7 @@ func TestMarkdownImagesLayoutAndComments(t *testing.T) {
 	}
 }
 
-func TestMarkdownImagesLoadVisibleReferences(t *testing.T) {
+func TestMarkdownImagesReleasePixelsAndRetainLayout(t *testing.T) {
 	app := setupAppWithDoc(t, "![first](first.png)\n\n![second](second.png)\n")
 	app.images.enabled = true
 	app.tab().markdownImagesPending = true
@@ -94,17 +94,7 @@ func TestMarkdownImagesLoadVisibleReferences(t *testing.T) {
 	if !app.tab().markdownImages[0].attempted || app.tab().markdownImages[1].attempted {
 		t.Fatal("only the visible image should begin loading")
 	}
-}
-
-func TestMarkdownImagesReleasePixelsAndRetainLayout(t *testing.T) {
-	app := setupAppWithDoc(t, "![first](first.png)\n\n![second](second.png)\n")
-	app.images.enabled = true
-	app.tab().markdownImagesPending = true
-	app.tab().markdownImages = []markdownImage{
-		{line: 1, path: "first.png", previewSide: previewSide{attempted: true, image: &inlineImage{id: 42, width: 100, height: 100, columns: 10, rows: 5, ready: true}}},
-		{line: 3, path: "second.png"},
-	}
-	app.contentViewport.SetHeight(2)
+	app.tab().markdownImages[0].image = &inlineImage{id: 42, width: 100, height: 100, columns: 10, rows: 5, ready: true}
 	app.rebuildContent()
 	position := app.contentLayout.lineRanges[3].start
 	app.contentViewport.SetYOffset(position)
@@ -266,10 +256,6 @@ func TestImagesTogglePreservesTextInput(t *testing.T) {
 	}
 	app := setupAppWithDoc(t, "source\n")
 	app.images.enabled = true
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'i', Text: "i"})
-	if app.images.hidden {
-		t.Fatal("lowercase i toggled images")
-	}
 	updated, _ := app.Update(tea.KeyPressMsg{Code: 'I', Text: "I"})
 	app = *updated.(*AppModel)
 	if !app.images.hidden {

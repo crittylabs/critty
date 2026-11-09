@@ -134,10 +134,15 @@ func diagnosticFor(t *testing.T, r doctorReport, name string) diagnostic {
 }
 
 func TestDoctorIntegrations(t *testing.T) {
-	for _, mode := range []string{"absent", "current", "missing", "stale", "unreadable", "global"} {
+	for _, mode := range []string{"absent", "current", "missing", "stale", "unreadable", "global", "home"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			project, global := filepath.Join(root, "project"), filepath.Join(root, "global")
+			if mode == "home" {
+				t.Chdir(root)
+				t.Setenv("HOME", root)
+				project, global = ".", "."
+			}
 			files := []integrationFile{}
 			for _, name := range []string{"skill", "resource"} {
 				files = append(files, integrationFile{dest: filepath.Join(project, name), globalDest: filepath.Join(global, name), content: func() ([]byte, error) { return []byte("current"), nil }})
@@ -182,8 +187,8 @@ func TestDoctorIntegrations(t *testing.T) {
 			if errors != want {
 				t.Fatalf("errors = %d, want %d: %+v", errors, want, r)
 			}
-			if mode == "global" && len(r.Checks) != 2 {
-				t.Fatalf("global files omitted: %+v", r)
+			if (mode == "global" || mode == "home") && len(r.Checks) != 2 {
+				t.Fatalf("global files omitted or checked twice: %+v", r)
 			}
 		})
 	}
@@ -460,21 +465,6 @@ func TestDoctorTerminalImageStatus(t *testing.T) {
 		if !tt.result.Checked && !strings.HasPrefix(d.Message, "skipped:") {
 			t.Fatalf("skip not reported: %+v", d)
 		}
-	}
-}
-
-func TestDoctorDeduplicatesHomeInstall(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Chdir(home)
-	if err := os.WriteFile("skill", []byte("current"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	f := integrationFile{dest: "skill", globalDest: "skill", content: func() ([]byte, error) { return []byte("current"), nil }}
-	r := doctorReport{}
-	r.checkIntegrations(map[string][]integrationFile{"codex": {f}})
-	if len(r.Checks) != 1 {
-		t.Fatalf("home install checked twice: %+v", r)
 	}
 }
 

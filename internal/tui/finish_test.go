@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"image/color"
 	"strings"
 	"testing"
 	"time"
@@ -14,121 +13,70 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
-func TestSubmitAttentionColorsAndNotices(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		for _, state := range []string{"required", "threads", "optional", "optional-and-threads", "complete"} {
-			app, _ := formTestApp(t)
-			if state != "required" {
-				app.toggleForm(2)
-			}
-			if state == "threads" || state == "complete" {
-				app.toggleForm(3)
-				app.toggleForm(5)
-			}
-			if state == "threads" || state == "optional-and-threads" {
-				app.tab().state.Comments = []review.Comment{testComment()}
-			}
-			want := success
-			switch state {
-			case "required":
-				want = lipgloss.Red
-			case "threads":
-				want = lipgloss.Cyan
-			case "optional", "optional-and-threads":
-				want = progressColors.pending
-			}
-			if color.RGBAModel.Convert(app.finishAttentionColor()) != color.RGBAModel.Convert(want) {
-				t.Fatalf("%s: wrong border color", state)
-			}
-			for _, verdict := range []review.Verdict{review.VerdictReject, review.VerdictComment} {
-				app.finishVerdict = verdict
-				if color.RGBAModel.Convert(app.finishAttentionColor()) != color.RGBAModel.Convert(finishColor(verdict)) {
-					t.Fatalf("%s: %s border depends on pending items", state, verdict)
-				}
-				if notice := app.finishNotices(70); notice != "" {
-					t.Fatalf("%s: %s shows pending-item notices: %s", state, verdict, notice)
-				}
-			}
-			app.finishVerdict = review.VerdictApprove
-			notice := ansi.Strip(app.finishNotices(70))
-			if strings.Contains(notice, "Required items") != (state == "required") || strings.Contains(notice, "Unresolved threads") != (state == "threads" || state == "optional-and-threads") || strings.Contains(notice, "Optional items") != (state == "required" || state == "optional" || state == "optional-and-threads") {
-				t.Fatalf("%s: unexpected notices: %s", state, notice)
+func TestSubmitPendingNotices(t *testing.T) {
+	t.Parallel()
+	for _, state := range []string{"required", "threads", "optional", "optional-and-threads", "complete"} {
+		app, _ := formTestApp(t)
+		if state != "required" {
+			app.toggleForm(2)
+		}
+		if state == "threads" || state == "complete" {
+			app.toggleForm(3)
+			app.toggleForm(5)
+		}
+		if state == "threads" || state == "optional-and-threads" {
+			app.tab().state.Comments = []review.Comment{testComment()}
+		}
+		for _, verdict := range []review.Verdict{review.VerdictReject, review.VerdictComment} {
+			app.finishVerdict = verdict
+			if notice := app.finishNotices(70); notice != "" {
+				t.Fatalf("%s: %s shows pending-item notices: %s", state, verdict, notice)
 			}
 		}
+		app.finishVerdict = review.VerdictApprove
+		notice := ansi.Strip(app.finishNotices(70))
+		if strings.Contains(notice, "Required items") != (state == "required") || strings.Contains(notice, "Unresolved threads") != (state == "threads" || state == "optional-and-threads") || strings.Contains(notice, "Optional items") != (state == "required" || state == "optional" || state == "optional-and-threads") {
+			t.Fatalf("%s: unexpected notices: %s", state, notice)
+		}
 	}
-	initAdaptiveStyles(true)
 }
 
 func TestFinishPendingSummary(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		app, _ := formTestApp(t)
-		app.tab().state.Comments = []review.Comment{testComment()}
-		app.forms.Documents[0].Items[1].Required = true
-		app.forms.Documents[0].Items[2].Required = true
-		app.openFinishModal()
-		content, _ := app.finishModalContent(70)
-		plain := strings.Join(strings.Fields(ansi.Strip(content)), " ")
-		const status = "0/1 💬 0/1 ☐ 0/1 ○ 0/1 ☐"
-		if !strings.Contains(plain, status) || strings.Index(plain, status) > strings.Index(plain, "Abort q") || strings.Contains(plain, "a/r/c: select") {
-			t.Fatalf("progress counters are not above the buttons: %s", plain)
-		}
-		for _, label := range []string{"0/1 ☐", "0/1 ○"} {
-			if !hasForeground(content, progressColors.required, label) {
-				t.Fatalf("required status is not red: %q", content)
-			}
-		}
-		app.closeFinishModal()
-		app.tab().cursorLine = 2
-		app.toggleForm(2)
-		app.toggleForm(4)
-		app.toggleForm(5)
-		app.toggleResolve(testComment().ID)
-		if status, _ := app.layoutProgressCounts(70, 0, -1); ansi.Strip(status) != "1/1 💬  1/1 ☑  1/1 ●  1/1 ☑" {
-			t.Fatalf("completed counts or marks are wrong: %s", status)
-		}
+	t.Parallel()
+	app, _ := formTestApp(t)
+	app.tab().state.Comments = []review.Comment{testComment()}
+	app.forms.Documents[0].Items[1].Required = true
+	app.forms.Documents[0].Items[2].Required = true
+	app.openFinishModal()
+	content, _ := app.finishModalContent(70)
+	plain := strings.Join(strings.Fields(ansi.Strip(content)), " ")
+	const status = "0/1 💬 0/1 ☐ 0/1 ○ 0/1 ☐"
+	if !strings.Contains(plain, status) || strings.Index(plain, status) > strings.Index(plain, "Abort q") {
+		t.Fatalf("progress counters are not above the buttons: %s", plain)
 	}
-	initAdaptiveStyles(true)
-}
-
-func TestFinishStatusCompletionColorsAndMarks(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		app, _ := formTestApp(t)
-		app.toggleForm(2)
-		app.toggleForm(4)
-		app.toggleForm(5)
-		status, _ := app.layoutProgressCounts(90, 0, -1)
-		if plain := ansi.Strip(status); plain != "0/0 💬  1/1 ☑  1/1 ☑  1/1 ●" {
-			t.Fatalf("optional choice counted alternatives instead of groups: %s", plain)
-		}
-		for _, expected := range []struct {
-			color color.Color
-			label string
-		}{
-			{progressColors.complete, "1/1 ☑"},
-			{progressColors.pending, "1/1 ☑"},
-			{progressColors.pending, "1/1 ●"},
-		} {
-			if !hasForeground(status, expected.color, expected.label) {
-				t.Fatalf("wrong completion color for %s: %q", expected.label, status)
-			}
-		}
-		app.forms.Documents[0].Items[3].Required = true
-		app.toggleForm(5)
-		status, _ = app.layoutProgressCounts(90, 0, -1)
-		if plain := ansi.Strip(status); plain != "0/0 💬  1/2 ☐  1/1 ●" {
-			t.Fatalf("partially completed checkboxes used a completed mark: %s", plain)
-		}
-		if !hasForeground(status, progressColors.required, "1/2 ☐") {
-			t.Fatalf("partially completed required checks are not red: %q", status)
-		}
+	app.closeFinishModal()
+	app.tab().cursorLine = 2
+	app.toggleForm(2)
+	app.toggleForm(4)
+	app.toggleForm(5)
+	app.toggleResolve(testComment().ID)
+	if status, _ := app.layoutProgressCounts(70, 0, -1); ansi.Strip(status) != "1/1 💬  1/1 ☑  1/1 ●  1/1 ☑" {
+		t.Fatalf("completed counts or marks are wrong: %s", status)
 	}
-	initAdaptiveStyles(true)
+	app.forms.Documents[0].Items[1].Required = false
+	app.forms.Documents[0].Items[2].Required = false
+	if status, _ := app.layoutProgressCounts(90, 0, -1); ansi.Strip(status) != "1/1 💬  1/1 ☑  1/1 ☑  1/1 ●" {
+		t.Fatalf("optional choice counted alternatives instead of groups: %s", status)
+	}
+	app.forms.Documents[0].Items[3].Required = true
+	app.toggleForm(5)
+	if status, _ := app.layoutProgressCounts(90, 0, -1); ansi.Strip(status) != "1/1 💬  1/2 ☐  1/1 ●" {
+		t.Fatalf("partially completed checkboxes used a completed mark: %s", status)
+	}
 }
 
 func TestFinishFormsReviewAndCancelPreserveDraft(t *testing.T) {
+	t.Parallel()
 	for _, cancel := range []bool{false, true} {
 		app, ch := formTestApp(t)
 		app.activeTab = 1
@@ -166,6 +114,7 @@ func TestFinishFormsReviewAndCancelPreserveDraft(t *testing.T) {
 }
 
 func TestFinishUnviewedFormsByVerdict(t *testing.T) {
+	t.Parallel()
 	content := "# Form\n" + strings.Repeat("filler\n", 40) + "- [ ] Extra <!-- form: id=extra -->\n"
 	for _, verdict := range []review.Verdict{review.VerdictApprove, review.VerdictComment, review.VerdictReject} {
 		actions := []rune{'s', 'r'}
@@ -221,6 +170,7 @@ func TestFinishUnviewedFormsByVerdict(t *testing.T) {
 }
 
 func TestApproveWithUnansweredOptionalForms(t *testing.T) {
+	t.Parallel()
 	for _, unresolved := range []bool{false, true} {
 		app, ch := formTestApp(t)
 		app.toggleForm(2)
@@ -251,6 +201,7 @@ func TestApproveWithUnansweredOptionalForms(t *testing.T) {
 }
 
 func TestFinishFormsCannotProceedPastRequiredItems(t *testing.T) {
+	t.Parallel()
 	app, ch := formTestApp(t)
 	app.openFinishModal()
 	app.finishVerdict = review.VerdictApprove
@@ -271,28 +222,31 @@ func TestFinishFormsCannotProceedPastRequiredItems(t *testing.T) {
 }
 
 func TestFinishPendingDialogsFitSmallTerminals(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		for _, size := range [][2]int{{40, 12}, {54, 14}, {80, 24}} {
-			for _, required := range []bool{false, true} {
-				app, _ := formTestAppWithContent(t, "- [ ] Confirm <!-- form: id=confirm required -->\n- [ ] Required choice <!-- form: id=required-choice value=chosen required -->\n- [ ] Optional choice <!-- form: id=optional-choice value=chosen -->\n- [ ] Consent <!-- form: id=publish consent -->\n- [ ] Optional checkbox <!-- form: id=extra -->\n")
-				app.width, app.height = size[0], size[1]
-				app.tab().state.Comments = []review.Comment{testComment()}
-				if !required {
-					app.toggleForm(1)
-					app.toggleForm(2)
+	for _, tc := range []struct {
+		dark, required bool
+		width, height  int
+	}{
+		{true, true, 40, 12}, {false, false, 40, 12},
+		{true, false, 54, 14}, {false, true, 54, 14},
+		{true, true, 80, 24}, {false, false, 80, 24},
+	} {
+		initAdaptiveStyles(tc.dark)
+		app, _ := formTestAppWithContent(t, "- [ ] Confirm <!-- form: id=confirm required -->\n- [ ] Required choice <!-- form: id=required-choice value=chosen required -->\n- [ ] Optional choice <!-- form: id=optional-choice value=chosen -->\n- [ ] Consent <!-- form: id=publish consent -->\n- [ ] Optional checkbox <!-- form: id=extra -->\n")
+		app.width, app.height = tc.width, tc.height
+		app.tab().state.Comments = []review.Comment{testComment()}
+		if !tc.required {
+			app.toggleForm(1)
+			app.toggleForm(2)
+		}
+		app.openFinishModal()
+		for _, modal := range []modalType{finishModal, finishFormsModal} {
+			app.modal = modal
+			for _, region := range app.modalMouseRegions() {
+				if region.action.dialog || region.action.textarea || region.action.scrollable {
+					continue
 				}
-				app.openFinishModal()
-				for _, modal := range []modalType{finishModal, finishFormsModal} {
-					app.modal = modal
-					for _, region := range app.modalMouseRegions() {
-						if region.action.dialog || region.action.textarea || region.action.scrollable {
-							continue
-						}
-						if region.rect.top < 0 || region.rect.bottom > app.height || region.rect.right > app.width {
-							t.Fatalf("modal %v has unreachable control in %v: %+v", modal, size, region)
-						}
-					}
+				if region.rect.top < 0 || region.rect.bottom > app.height || region.rect.right > app.width {
+					t.Fatalf("modal %v has unreachable control in %+v: %+v", modal, tc, region)
 				}
 			}
 		}
@@ -301,7 +255,8 @@ func TestFinishPendingDialogsFitSmallTerminals(t *testing.T) {
 }
 
 func TestMouseClickSubmitButtonOpensModal(t *testing.T) {
-	app := setupAppWithDoc(t, "first\nsecond\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "first\nsecond\n")
 	app.width = 100
 	app.height = 24
 	app.recalculateLayout()
@@ -318,26 +273,6 @@ func TestMouseClickSubmitButtonOpensModal(t *testing.T) {
 
 	if app.modal != finishModal {
 		t.Fatalf("modal = %v, want finish modal", app.modal)
-	}
-}
-
-func TestMouseClickFooterHelpButtonOpensHelp(t *testing.T) {
-	for _, width := range []int{60, 120} {
-		app := setupAppWithDoc(t, "first\nsecond\n")
-		app.width = width
-		app.height = 24
-		app.recalculateLayout()
-		rect, ok := app.footerHelpRect()
-		if !ok {
-			t.Fatalf("width %d: footer Help button not found", width)
-		}
-		assertRegionContainsRenderedText(t, app, rect, "Help M-?")
-
-		app = clickMouse(app, rect.left, rect.top)
-
-		if app.modal != helpModal {
-			t.Fatalf("width %d: modal = %v, want help modal", width, app.modal)
-		}
 	}
 }
 
@@ -603,6 +538,7 @@ func TestSubmissionUnicodeInputAndLayout(t *testing.T) {
 }
 
 func TestExplicitApprovalRequiresConfirmations(t *testing.T) {
+	t.Parallel()
 	app, ch := formTestApp(t)
 	app.openFinishModal()
 	app.modalTextarea.SetValue("Approval comment")

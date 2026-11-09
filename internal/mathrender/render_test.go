@@ -9,7 +9,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -136,7 +136,7 @@ func TestRendererFallback(t *testing.T) {
 					t.Fatalf("data=%d err=%v", len(data), err)
 				}
 			}
-			if !reflect.DeepEqual(calls, tc.want) {
+			if !slices.Equal(calls, tc.want) {
 				t.Fatalf("calls %v, want %v (including cache hit)", calls, tc.want)
 			}
 		})

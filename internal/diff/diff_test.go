@@ -2,7 +2,8 @@ package diff
 
 import (
 	"fmt"
-	"reflect"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestComputeLineDiff(t *testing.T) {
 		}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ComputeLineDiff(tt.old, tt.new); len(got)+len(tt.want) > 0 && !reflect.DeepEqual(got, tt.want) {
+			if got := ComputeLineDiff(tt.old, tt.new); !slices.Equal(got, tt.want) {
 				t.Errorf("ComputeLineDiff = %+v, want %+v", got, tt.want)
 			}
 		})
@@ -55,7 +56,7 @@ func TestMapOldLineToNew(t *testing.T) {
 		{"everything added", "", "a\nb\nc", map[int]int{}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := MapOldLineToNew(ComputeLineDiff(tt.old, tt.new)); !reflect.DeepEqual(got, tt.want) {
+			if got := MapOldLineToNew(ComputeLineDiff(tt.old, tt.new)); !maps.Equal(got, tt.want) {
 				t.Errorf("MapOldLineToNew = %v, want %v", got, tt.want)
 			}
 		})

@@ -15,6 +15,7 @@ import (
 )
 
 func TestMarkdownParagraphSourceLines(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		source string
 		want   []string
@@ -36,32 +37,30 @@ func TestMarkdownParagraphSourceLines(t *testing.T) {
 		{"| **first | second** |\n| --- | --- |", []string{"| **first | second** |", "| --- | --- |"}, 0, ""},
 		{"[label][ref]\n\n[ref]: https://example.org", []string{"[label][ref]", "", "[ref]: https://example.org"}, 0, ""},
 	} {
-		for _, dark := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/dark=%v", tt.source, dark), func(t *testing.T) {
-				initAdaptiveStyles(dark)
-				parsed := parseMarkdownSource(strings.Split(tt.source, "\n"), nil)
-				for i, line := range parsed.lines {
-					rendered := line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
-					if got := ansi.Strip(rendered); got != tt.want[i] {
-						t.Fatalf("line %d = %q, want %q", i+1, got, tt.want[i])
-					}
-					if strings.Contains(rendered, "\n") {
-						t.Fatal("rendering changed source line boundaries")
-					}
-					for _, row := range uv.NewStyledString(rendered).Lines(ansi.GraphemeWidth) {
-						for _, cell := range row {
-							if strings.TrimSpace(cell.Content) != "" && (cell.Style.Attrs&tt.attr != tt.attr || cell.Link.URL != tt.uri) {
-								t.Fatalf("line %d lost attributes/link: %+v", i+1, cell)
-							}
+		t.Run(tt.source, func(t *testing.T) {
+			parsed := parseMarkdownSource(strings.Split(tt.source, "\n"), nil)
+			for i, line := range parsed.lines {
+				rendered := line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+				if got := ansi.Strip(rendered); got != tt.want[i] {
+					t.Fatalf("line %d = %q, want %q", i+1, got, tt.want[i])
+				}
+				if strings.Contains(rendered, "\n") {
+					t.Fatal("rendering changed source line boundaries")
+				}
+				for _, row := range uv.NewStyledString(rendered).Lines(ansi.GraphemeWidth) {
+					for _, cell := range row {
+						if strings.TrimSpace(cell.Content) != "" && (cell.Style.Attrs&tt.attr != tt.attr || cell.Link.URL != tt.uri) {
+							t.Fatalf("line %d lost attributes/link: %+v", i+1, cell)
 						}
 					}
 				}
-			})
-		}
+			}
+		})
 	}
 }
 
 func TestMarkdownIncompleteContextIsLiteral(t *testing.T) {
+	t.Parallel()
 	lines := []string{"", "**cut", "middle**", "", "**complete", "paragraph**", "", "`cut"}
 	known := map[int]bool{2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true}
 	parsed := parseMarkdownSource(lines, known)
@@ -73,13 +72,16 @@ func TestMarkdownIncompleteContextIsLiteral(t *testing.T) {
 }
 
 func TestMarkdownTableInlineRendering(t *testing.T) {
-	const uri = "https://github.com/knu/avail/pull/54"
-	const content = "| PR | Notes |\n| --- | --- |\n| [avail #54](" + uri + ") | **bold** and `code` |\n"
+	t.Parallel()
+	const uri = "https://example.org/pull/1"
+	const content = "| PR | Notes |\n| --- | --- |\n| [change #1](" + uri + ") | **bold** and `code` |\n"
 	for _, attachment := range []bool{false, true} {
 		t.Run(fmt.Sprintf("attachment=%t", attachment), func(t *testing.T) {
-			app := setupAppWithDoc(t, content)
+			var app AppModel
 			if attachment {
 				app, _ = formTestAppWithContent(t, content)
+			} else {
+				app = setupPrivateAppWithDoc(t, content)
 			}
 			app.width, app.height = 100, 30
 			app.recalculateLayout()
@@ -96,6 +98,7 @@ func TestMarkdownTableInlineRendering(t *testing.T) {
 }
 
 func TestMarkdownTableCells(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name, source string
 		want         []string
@@ -105,7 +108,7 @@ func TestMarkdownTableCells(t *testing.T) {
 		{"unicode", "| 日本語 | é |", []string{"日本語", "é"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "| First | Second |\n| --- | --- |\n"+tt.source)
+			app := setupPrivateAppWithDoc(t, "| First | Second |\n| --- | --- |\n"+tt.source)
 			cells := app.tab().markdownTableCells(3, nil)
 			if len(cells) != len(tt.want) {
 				t.Fatalf("cells = %q, want %q", cells, tt.want)
@@ -120,6 +123,7 @@ func TestMarkdownTableCells(t *testing.T) {
 }
 
 func TestMarkdownCachedInlineCompatibilityAndImages(t *testing.T) {
+	t.Parallel()
 	for _, source := range []string{
 		`plain \*literal\* &amp; &#x1F600;`,
 		"**bold**  \t ",
@@ -145,6 +149,7 @@ func TestMarkdownCachedInlineCompatibilityAndImages(t *testing.T) {
 }
 
 func TestMarkdownEmptyLabels(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ source, want, uri string }{
 		{"![](./clip.mp4)", "!./clip.mp4", ""},
 		{"[](./guide.md)", "./guide.md", "./guide.md"},

@@ -14,6 +14,7 @@ import (
 )
 
 func TestCodeHighlighterKeepsInputsIndependent(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		path   string
 		inputs []string
@@ -53,6 +54,7 @@ func BenchmarkHighlightDeletedLines(b *testing.B) {
 }
 
 func TestCodeHighlighterKeepsLineCountWithBareCR(t *testing.T) {
+	t.Parallel()
 	content := "[alias]\n\tfix = sed \"s/\r$//\"\n[core]\n\teditor = vim\n"
 	got := newCodeHighlighter(codeLexer("config", content))(content)
 	want := []string{"[alias]", "\tfix = sed \"s/\r$//\"", "[core]", "\teditor = vim"}

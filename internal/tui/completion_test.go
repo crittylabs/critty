@@ -8,9 +8,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestFindCompletionToken(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		line       string
 		ok         bool
@@ -64,8 +66,13 @@ func newCompletionApp(t *testing.T) AppModel {
 	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(root)
 	app := newKillRingApp("")
+	sess, err := review.OpenSession(t.TempDir(), "completion")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.Meta.CWD = root
+	app.session = sess
 	app.modalTextarea.SetWidth(40)
 	return app
 }
@@ -85,6 +92,7 @@ func completionLabels(app AppModel) []string {
 }
 
 func TestFileCompletionFlow(t *testing.T) {
+	t.Parallel()
 	app := newCompletionApp(t)
 	typeText(&app, "@")
 	if app.completion.active() {
@@ -126,6 +134,7 @@ func TestFileCompletionFlow(t *testing.T) {
 }
 
 func TestFileCompletionDismissAndFallthrough(t *testing.T) {
+	t.Parallel()
 	app := newCompletionApp(t)
 	typeText(&app, "@ma")
 	editorMessage(&app, tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -164,6 +173,7 @@ func TestFileCompletionDismissAndFallthrough(t *testing.T) {
 }
 
 func TestFileCompletionMidLineReplacesQueryOnly(t *testing.T) {
+	t.Parallel()
 	app := newCompletionApp(t)
 	typeText(&app, "see @ma later")
 	for range len(" later") {
@@ -183,6 +193,7 @@ func TestFileCompletionMidLineReplacesQueryOnly(t *testing.T) {
 }
 
 func TestRenderCompletionMenu(t *testing.T) {
+	t.Parallel()
 	items := []completionItem{{name: "first"}, {name: "second", dir: true}, {name: "third"}}
 	menu := renderCompletionMenu(items, -1, 0, 80)
 	lines := strings.Split(menu, "\n")
@@ -216,7 +227,8 @@ func TestRenderCompletionMenu(t *testing.T) {
 }
 
 func TestCompletionMenuPlacement(t *testing.T) {
-	app := setupAppWithDoc(t, "one\ntwo\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "one\ntwo\n")
 	root := filepath.Dir(app.tabs[0].path)
 	for _, name := range []string{"alpha.go", "alpine.go"} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte("x"), 0o600); err != nil {

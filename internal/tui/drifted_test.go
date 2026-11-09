@@ -20,7 +20,7 @@ func TestClickRenderedDriftedBubblePreservesResolution(t *testing.T) {
 	for _, size := range [][2]int{{60, 24}, {80, 60}, {160, 24}} {
 		width, height := size[0], size[1]
 		t.Run(fmt.Sprintf("%dx%d", width, height), func(t *testing.T) {
-			app := setupParallelAppWithDoc(t, strings.Repeat("source line\n", 20))
+			app := setupPrivateAppWithDoc(t, strings.Repeat("source line\n", 20))
 			app.width, app.height = width, height
 			app.recalculateLayout()
 			app.tab().state.Comments = []review.Comment{
@@ -81,7 +81,8 @@ func TestClickRenderedDriftedBubblePreservesResolution(t *testing.T) {
 }
 
 func TestDriftedUnresolvedVisibleByDefault(t *testing.T) {
-	app := setupAppWithDoc(t, "source\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "source\n")
 	app.width, app.height = 100, 40
 	app.recalculateLayout()
 	app.tab().state.Comments = []review.Comment{
@@ -101,11 +102,12 @@ func TestDriftedUnresolvedVisibleByDefault(t *testing.T) {
 }
 
 func TestResolvedThreadsExpandOnKeyboardFocus(t *testing.T) {
+	t.Parallel()
 	for _, drifted := range []bool{false, true} {
 		for _, fold := range []bool{false, true} {
 			for _, key := range []rune{']', '[', tea.KeyDown, tea.KeyUp} {
 				t.Run(fmt.Sprintf("drifted=%t/fold=%t/key=%d", drifted, fold, key), func(t *testing.T) {
-					app := setupAppWithDoc(t, "one\ntwo\nthree\n")
+					app := setupPrivateAppWithDoc(t, "one\ntwo\nthree\n")
 					app.width, app.height = 120, 40
 					app.openAll = fold
 					app.recalculateLayout()
@@ -129,7 +131,8 @@ func TestResolvedThreadsExpandOnKeyboardFocus(t *testing.T) {
 }
 
 func TestDriftedMarkersOpenAndCollapseAllThreads(t *testing.T) {
-	app := setupAppWithDoc(t, strings.Repeat("long source ", 30)+"\nsecond\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, strings.Repeat("long source ", 30)+"\nsecond\n")
 	app.width, app.height = 100, 80
 	app.recalculateLayout()
 	comments := []review.Comment{
@@ -198,7 +201,8 @@ func TestDriftedMarkersOpenAndCollapseAllThreads(t *testing.T) {
 }
 
 func TestDriftedMarkerResolution(t *testing.T) {
-	app := setupAppWithDoc(t, "source\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "source\n")
 	app.width, app.height = 100, 30
 	app.recalculateLayout()
 	app.tab().state.Comments = []review.Comment{
@@ -226,9 +230,10 @@ func TestDriftedMarkerResolution(t *testing.T) {
 }
 
 func TestUnplacedCommentsStayReachable(t *testing.T) {
+	t.Parallel()
 	for _, kind := range []string{"past end", "missing old side", "partial diff", "missing file", "binary"} {
 		t.Run(kind, func(t *testing.T) {
-			app := setupAppWithDoc(t, "first\nsecond\n")
+			app := setupPrivateAppWithDoc(t, "first\nsecond\n")
 			app.width, app.height = 100, 35
 			app.recalculateLayout()
 			c := review.Comment{ID: "lost", StartLine: 2, EndLine: 2, Body: "lost body", Anchor: "original source"}
@@ -270,7 +275,8 @@ func TestUnplacedCommentsStayReachable(t *testing.T) {
 }
 
 func TestDriftedDeletedMarkerAndReadingView(t *testing.T) {
-	app := setupAppWithDoc(t, "new\n")
+	t.Parallel()
+	app := setupPrivateAppWithDoc(t, "new\n")
 	app.width, app.height = 100, 35
 	app.recalculateLayout()
 	app.tab().deletedAfter = map[int][]gitpkg.DeletedLine{0: {{OldLineNum: 1, Content: "deleted"}}}
