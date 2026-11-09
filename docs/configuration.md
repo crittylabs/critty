@@ -58,6 +58,21 @@ Unknown keys are ignored by the current loader.  Omit a key when no override is 
 
 The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
 
+## Preview caching
+
+Within one viewer, recently viewed Markdown images, math, and Mermaid diagrams
+keep their terminal images across file switches.  Hidden images are evicted
+in order of last use when decoded pixels exceed 64 MiB; visible images remain
+available even when they exceed that budget.  Known image dimensions and
+display rows remain with every loaded document after eviction, keeping the
+layout stable while pixels reload.  Failed rendering shows the source as
+usual.  Resizing recomputes
+the dimensions for the new pane size; reloading changed content invalidates them.
+
+Math, Mermaid, and SVG renderers each retain up to 16 MiB of generated PNGs,
+with at most 256 results.  These caches last for the viewer session and keep
+recently used entries when older results are evicted.
+
 ## SVG previews
 
 SVG images are previewed automatically when `rsvg-convert`, `merman-cli`, or `resvg` is available on PATH, in that order.  A command failure or invalid PNG output tries the next converter.  Merman uses Fontconfig's optional `fc-match` to select host fonts, sharing the Mermaid font-selection mechanism.  No converter is installed automatically, and SVG has no separate configuration switch.  `critty doctor` reports the available converters.

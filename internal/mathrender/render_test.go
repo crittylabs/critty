@@ -94,7 +94,7 @@ func TestRendererFallback(t *testing.T) {
 			if err := png.Encode(&imageData, im); err != nil {
 				t.Fatal(err)
 			}
-			r := &Renderer{ratex: "ratex", latex: "latex", dvipng: "dvipng", cache: make(map[string]result)}
+			r := &Renderer{ratex: "ratex", latex: "latex", dvipng: "dvipng"}
 			if tc.noLatex {
 				r.latex, r.dvipng = "", ""
 			}

@@ -33,7 +33,7 @@ func TestConversionFallbackAndCache(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
-			r := &Renderer{tools: []string{"rsvg-convert", "merman-cli", "resvg"}, cache: make(map[[32]byte]result)}
+			r := &Renderer{tools: []string{"rsvg-convert", "merman-cli", "resvg"}}
 			r.run = func(_ context.Context, exe, dir string, input []byte, args ...string) error {
 				index := len(calls)
 				calls = append(calls, exe)
@@ -129,7 +129,10 @@ func TestDiscoveryAndCancellation(t *testing.T) {
 	r.tools = []string{"rsvg-convert", "merman-cli"}
 	calls := 0
 	r.run = func(context.Context, string, string, []byte, ...string) error { calls++; cancel(); return ctx.Err() }
-	if _, err := r.Render(ctx, []byte("<svg/>")); err == nil || calls != 1 || len(r.cache) != 0 {
-		t.Fatal(err, calls, len(r.cache))
+	if _, err := r.Render(ctx, []byte("<svg/>")); err == nil || calls != 1 {
+		t.Fatal(err, calls)
+	}
+	if _, err := r.Render(context.Background(), []byte("<svg/>")); err == nil || calls <= 1 {
+		t.Fatal("cancellation was cached", err, calls)
 	}
 }

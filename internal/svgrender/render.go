@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crittylabs/critty/internal/rendercache"
+
 	"github.com/crittylabs/critty/internal/imageinfo"
 	"github.com/crittylabs/critty/internal/renderfont"
 )
@@ -38,12 +40,12 @@ type Renderer struct {
 	tools []string
 	fonts *renderfont.Selector
 	run   command
-	cache map[[32]byte]result
+	cache rendercache.Cache[[32]byte, result]
 }
 
 // New discovers converters in priority order. No executable is installed.
 func New() *Renderer {
-	r := &Renderer{run: runCommand, fonts: renderfont.New(), cache: make(map[[32]byte]result)}
+	r := &Renderer{run: runCommand, fonts: renderfont.New()}
 	for _, name := range []string{"rsvg-convert", "merman-cli", "resvg"} {
 		if path, err := exec.LookPath(name); err == nil {
 			r.tools = append(r.tools, path)
@@ -59,15 +61,12 @@ func (r *Renderer) Render(ctx context.Context, source []byte) ([]byte, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := sha256.Sum256(source)
-	if cached, ok := r.cache[key]; ok {
+	if cached, ok := r.cache.Get(key); ok {
 		return cached.data, cached.err
 	}
 	data, err := r.render(ctx, source)
-	if len(r.cache) >= 16 {
-		clear(r.cache)
-	}
 	if ctx.Err() == nil {
-		r.cache[key] = result{data, err}
+		r.cache.Put(key, result{data, err}, len(data))
 	}
 	return data, err
 }

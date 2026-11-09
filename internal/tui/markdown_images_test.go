@@ -83,8 +83,9 @@ func TestMarkdownImagesLayoutAndComments(t *testing.T) {
 	}
 }
 
-func TestMarkdownImagesReleasePixelsAndRetainLayout(t *testing.T) {
+func TestMarkdownImagesEvictPixelsAndRetainLayout(t *testing.T) {
 	app := setupAppWithDoc(t, "![first](first.png)\n\n![second](second.png)\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app.images.enabled = true
 	app.tab().markdownImagesPending = true
 	app.tab().markdownImages = []markdownImage{{line: 1, path: "first.png"}, {line: 3, path: "second.png"}}
@@ -94,13 +95,16 @@ func TestMarkdownImagesReleasePixelsAndRetainLayout(t *testing.T) {
 	if !app.tab().markdownImages[0].attempted || app.tab().markdownImages[1].attempted {
 		t.Fatal("only the visible image should begin loading")
 	}
-	app.tab().markdownImages[0].image = &inlineImage{id: 42, width: 100, height: 100, columns: 10, rows: 5, ready: true}
+	img := &inlineImage{id: 42, width: 4096, height: 4096, ready: true}
+	img.columns, img.rows = app.markdownImageSize(img)
+	app.tab().markdownImages[0].image = img
+	app.tab().markdownImages[1].image = &inlineImage{id: 43, width: 100, height: 100, columns: 2, rows: 2, ready: true}
 	app.rebuildContent()
 	position := app.contentLayout.lineRanges[3].start
 	app.contentViewport.SetYOffset(position)
 	output := strings.Join(rawMessages(app.releaseHiddenMarkdownImages()), "")
 	ref := &app.tab().markdownImages[0]
-	if ref.image != nil || ref.attempted || !strings.Contains(output, "a=d,d=I,q=2,i=42") {
+	if ref.image == nil || ref.image.id != 0 || ref.attempted || !strings.Contains(output, "a=d,d=I,q=2,i=42") {
 		t.Fatalf("offscreen pixels were not released: %+v %q", ref, output)
 	}
 	app.rebuildContent()
@@ -115,6 +119,23 @@ func TestMarkdownImagesReleasePixelsAndRetainLayout(t *testing.T) {
 	app.rebuildContent()
 	if app.contentLayout.lineRanges[3].start != position {
 		t.Fatal("reloading pixels changed the document layout")
+	}
+}
+
+func TestMarkdownImagesEvictLeastRecentlyUsed(t *testing.T) {
+	app := setupPrivateAppWithDoc(t, "Other document")
+	older := &inlineImage{id: 41, width: 3072, height: 3072, lastUsed: 1}
+	newer := &inlineImage{id: 42, width: 3072, height: 3072, columns: 10, rows: 5, ready: true, lastUsed: 2}
+	app.tabs = append(app.tabs, FileTab{markdownImages: []markdownImage{
+		{line: 1, columns: 10, rows: 5, previewSide: previewSide{image: older}},
+		{line: 2, previewSide: previewSide{image: newer}},
+	}})
+	output := strings.Join(rawMessages(app.releaseHiddenMarkdownImages()), "")
+	if older.id != 0 || newer.id != 42 || !strings.Contains(output, "i=41") || strings.Contains(output, "i=42") {
+		t.Fatal("pixel eviction did not keep the most recently used image")
+	}
+	if ref := app.tabs[1].markdownImages[0]; ref.columns != 10 || ref.rows != 5 || ref.image.width != 3072 {
+		t.Fatal("pixel eviction discarded geometry")
 	}
 }
 
@@ -305,5 +326,71 @@ func TestMarkdownImagesRejectRepositorySymlinkEscape(t *testing.T) {
 	app.multiFile = false
 	if refs := app.findMarkdownImages()().(markdownImagesMsg); len(refs.images) != 1 {
 		t.Fatal("standalone documents lost ordinary local references")
+	}
+}
+
+func TestMarkdownPreviewsRetainedAcrossTabSwitch(t *testing.T) {
+	for _, tc := range []struct {
+		name, source string
+		refs         func(string) []markdownImage
+	}{
+		{"math", "Before $x$ after.\nEnd", markdownMathRefs},
+		{"mermaid", "```mermaid\ngraph LR\nA-->B\n```\nEnd", markdownMermaidRefs},
+		{"image", "![image](image.png)\nEnd", func(string) []markdownImage { return []markdownImage{{line: 1, path: "image.png"}} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := setupPrivateAppWithDoc(t, tc.source)
+			other := setupPrivateAppWithDoc(t, "Other document")
+			app.tabs = append(app.tabs, *other.tab())
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+			app.images.enabled = true
+			app.images.cell = cellSize{width: 8, height: 16}
+			refs := tc.refs(tc.source)
+			img := &inlineImage{id: 42, width: 96, height: 144, ready: true}
+			img.columns, img.rows = app.markdownPreviewSize(refs[0], img)
+			refs[0].previewSide = previewSide{attempted: true, image: img}
+			refs[0].columns, refs[0].rows = img.columns, img.rows
+			app.tab().markdownImages, app.tab().markdownImagesPending = refs, true
+			app.rebuildContent()
+			end := strings.Count(tc.source, "\n") + 1
+			want := app.contentLayout.lineRanges[end]
+			app.activateTab(1)
+			app.rebuildContent()
+			app.releaseHiddenMarkdownImages()
+			app.activateTab(0)
+			app.rebuildContent()
+			if app.contentLayout.lineRanges[end] != want {
+				t.Fatal("switching files changed the layout")
+			}
+			if app.tab().markdownImages[0].image != img || !img.ready || img.id != 42 {
+				t.Fatal("cached image was discarded")
+			}
+			if app.prepareMarkdownImages() != nil {
+				t.Fatal("cached preview scheduled a reload")
+			}
+			// Pixel eviction and an in-flight reload keep the same small geometry.
+			img.id, img.ready = 0, false
+			app.tab().markdownImages[0].attempted = false
+			app.rebuildContent()
+			if app.contentLayout.lineRanges[end] != want {
+				t.Fatal("evicting pixels changed the layout")
+			}
+			app.prepareMarkdownImages()
+			app.rebuildContent()
+			if app.contentLayout.lineRanges[end] != want {
+				t.Fatal("reloading pixels changed the layout")
+			}
+			if refs[0].renderBody != "" {
+				app.tab().markdownImages[0].failed = true
+				app.rebuildContent()
+				marker := "$x$"
+				if tc.name == "mermaid" {
+					marker = "graph LR"
+				}
+				if !strings.Contains(ansi.Strip(app.contentViewport.GetContent()), marker) {
+					t.Fatal("failed rendering did not reveal source")
+				}
+			}
+		})
 	}
 }

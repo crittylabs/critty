@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crittylabs/critty/internal/rendercache"
+
 	"golang.org/x/image/draw"
 )
 
@@ -28,7 +30,7 @@ type Renderer struct {
 	mu                   sync.Mutex
 	ratex, latex, dvipng string
 	run                  command
-	cache                map[string]result
+	cache                rendercache.Cache[string, result]
 }
 
 type result struct {
@@ -46,7 +48,7 @@ func New(ratex string) *Renderer {
 	}
 	latex, _ := exec.LookPath("latex")
 	dvipng, _ := exec.LookPath("dvipng")
-	return &Renderer{ratex: ratex, latex: latex, dvipng: dvipng, run: runCommand, cache: make(map[string]result)}
+	return &Renderer{ratex: ratex, latex: latex, dvipng: dvipng, run: runCommand}
 }
 
 // FindRaTeX resolves an override or verifies the PNG CLI advertised by render.
@@ -100,14 +102,13 @@ func (r *Renderer) Render(ctx context.Context, formula string, inline, dark bool
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := fmt.Sprintf("%t:%t:%s", inline, dark, formula)
-	if v, ok := r.cache[key]; ok {
+	if v, ok := r.cache.Get(key); ok {
 		return v.data, v.err
 	}
 	data, err := r.render(ctx, formula, inline, dark)
-	if len(r.cache) >= 16 {
-		clear(r.cache)
+	if ctx.Err() == nil {
+		r.cache.Put(key, result{data, err}, len(data))
 	}
-	r.cache[key] = result{data, err}
 	return data, err
 }
 

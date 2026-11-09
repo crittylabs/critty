@@ -311,24 +311,77 @@ func (m AppModel) markdownImageVisible(ref markdownImage) bool {
 	return ok && r.start < top+m.contentViewport.Height() && r.end > top
 }
 
-// Keep dimensions when releasing pixels so scrolling back can reload the
-// image without changing the document's layout.
+const maxRetainedImageBytes = 64 << 20
+
+func (m *AppModel) releaseRetiredMarkdownImages(tabs []FileTab) tea.Cmd {
+	live := make(map[int]bool)
+	for _, tab := range m.tabs {
+		for _, ref := range tab.markdownImages {
+			if ref.image != nil {
+				live[ref.image.id] = true
+			}
+		}
+	}
+	var sequence strings.Builder
+	for _, tab := range tabs {
+		for _, ref := range tab.markdownImages {
+			if img := ref.image; img != nil && img.id != 0 && !live[img.id] {
+				fmt.Fprintf(&sequence, "\x1b_Ga=d,d=I,q=2,i=%d\x1b\\", img.id)
+			}
+		}
+	}
+	if sequence.Len() == 0 {
+		return nil
+	}
+	return tea.Raw(m.images.wrap(sequence.String()))
+}
+
+// Keep recently viewed pixels within a budget.  Visible images stay pinned;
+// evicted previews retain their geometry for the lifetime of the document.
 func (m *AppModel) releaseHiddenMarkdownImages() tea.Cmd {
 	if m.modal != noModal {
 		return nil
 	}
-	var sequence strings.Builder
+	m.images.cacheClock++
+	bytes := 0
 	for i := range m.tabs {
 		for j := range m.tabs[i].markdownImages {
 			ref := &m.tabs[i].markdownImages[j]
 			img := ref.image
-			if img == nil || img.id == 0 || i == m.activeTab && !m.images.hidden && m.markdownImageVisible(*ref) {
+			if img == nil || img.id == 0 {
 				continue
 			}
-			fmt.Fprintf(&sequence, "\x1b_Ga=d,d=I,q=2,i=%d\x1b\\", img.id)
-			ref.columns, ref.rows = img.columns, img.rows
-			ref.image, ref.attempted = nil, false
+			bytes += img.width * img.height * 4
+			if i == m.activeTab && !m.images.hidden && m.markdownImageVisible(*ref) {
+				img.lastUsed = m.images.cacheClock
+			}
 		}
+	}
+	if bytes <= maxRetainedImageBytes {
+		return nil
+	}
+	var hidden []*markdownImage
+	for i := range m.tabs {
+		for j := range m.tabs[i].markdownImages {
+			ref := &m.tabs[i].markdownImages[j]
+			if ref.image != nil && ref.image.id != 0 && !(i == m.activeTab && !m.images.hidden && m.markdownImageVisible(*ref)) {
+				hidden = append(hidden, ref)
+			}
+		}
+	}
+	sort.SliceStable(hidden, func(i, j int) bool { return hidden[i].image.lastUsed < hidden[j].image.lastUsed })
+	var sequence strings.Builder
+	for _, ref := range hidden {
+		if bytes <= maxRetainedImageBytes {
+			break
+		}
+		img := ref.image
+		fmt.Fprintf(&sequence, "\x1b_Ga=d,d=I,q=2,i=%d\x1b\\", img.id)
+		bytes -= img.width * img.height * 4
+		if img.columns > 0 && img.rows > 0 {
+			ref.columns, ref.rows = img.columns, img.rows
+		}
+		img.id, img.ready, ref.attempted = 0, false, false
 	}
 	if sequence.Len() == 0 {
 		return nil
@@ -346,7 +399,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 	loading := 0
 	for i := range t.markdownImages {
 		ref := &t.markdownImages[i]
-		if ref.image == nil && ref.attempted && !ref.failed {
+		if (ref.image == nil || ref.image.id == 0) && ref.attempted && !ref.failed {
 			loading++
 		}
 	}
@@ -355,7 +408,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 		if !m.markdownImageVisible(*ref) {
 			continue
 		}
-		if img := ref.image; img != nil {
+		if img := ref.image; img != nil && img.id != 0 {
 			cols, rows := m.markdownPreviewSize(*ref, img)
 			if cols == img.columns && rows == img.rows || cols == 0 || rows == 0 {
 				continue
@@ -364,10 +417,15 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 			ref.columns, ref.rows = cols, rows
 			msg := imageReadyMsg{path: t.path, before: ref.before, columns: cols, rows: rows, markdown: i + 1}
 			cmds = append(cmds, tea.Sequence(tea.Raw(m.images.wrap(img.placement())), func() tea.Msg { return msg }))
-		} else if ref.url == "" && !ref.attempted && loading < 2 {
-			ref.attempted = true
-			loading++
-			cmds = append(cmds, m.loadMarkdownImage(i))
+		} else {
+			if ref.image != nil {
+				ref.columns, ref.rows = m.markdownPreviewSize(*ref, ref.image)
+			}
+			if ref.url == "" && !ref.attempted && loading < 2 {
+				ref.attempted = true
+				loading++
+				cmds = append(cmds, m.loadMarkdownImage(i))
+			}
 		}
 	}
 	if len(cmds) > 0 {

@@ -247,7 +247,7 @@ func readReloadInputs(source *gitpkg.ReviewSource, filePath string, frozen bool,
 	return &next, fingerprint, nil
 }
 
-func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
+func (m *AppModel) finishReload(msg reloadMsg) (cmd tea.Cmd) {
 	if msg.request != m.reload.request {
 		return nil
 	}
@@ -327,6 +327,8 @@ func (m *AppModel) finishReload(msg reloadMsg) tea.Cmd {
 			next.tabs = append(next.tabs, tab)
 		}
 	}
+	oldTabs := m.tabs
+	defer func() { cmd = tea.Batch(cmd, m.releaseRetiredMarkdownImages(oldTabs)) }()
 	m.tabs, m.source, m.baseRef = next.tabs, next.source, next.baseRef
 	m.documentSnapshot = next.documentSnapshot
 	m.attachments = next.attachments

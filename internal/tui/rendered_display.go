@@ -285,6 +285,9 @@ func (line *markdownLine) previewSourceRange(start, end int) (int, int, bool) {
 }
 
 func previewPlaceholder(img *inlineImage) string {
+	if img.id == 0 {
+		return strings.TrimSuffix(strings.Repeat(strings.Repeat(" ", img.columns)+"\n", img.rows), "\n")
+	}
 	rows := strings.Split(img.placeholder(), "\n")
 	for i := range rows {
 		rows[i] = strings.TrimPrefix(rows[i], "  ")
@@ -347,8 +350,14 @@ func (m *AppModel) prepareRenderedDisplay() {
 func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
 	edits := make(map[int][]previewDisplayEdit)
 	for _, ref := range refs {
-		if ref.renderBody == "" || ref.image == nil || !ref.image.ready || ref.renderFirst < 1 || ref.line > len(source.lines) {
+		if ref.renderBody == "" || ref.failed || ref.renderFirst < 1 || ref.line > len(source.lines) {
 			continue
+		}
+		if ref.image == nil || !ref.image.ready {
+			if ref.columns <= 0 || ref.rows <= 0 {
+				continue
+			}
+			ref.image = &inlineImage{columns: ref.columns, rows: ref.rows}
 		}
 		blockMath := !ref.renderInline && ref.renderKind != renderedMermaid
 		if width := source.lines[ref.line-1].previewWidth; width > 0 && ref.image.columns > width && !blockMath {
@@ -411,18 +420,20 @@ func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
 			}
 		}
 		pos := 0
+		rendered := false
 		for _, edit := range replacements {
 			if edit.start < pos {
 				continue
 			}
 			appendSource(pos, edit.start)
 			if edit.token != nil {
+				rendered = true
 				line.previewTokens = append(line.previewTokens, *edit.token)
 			}
 			pos = edit.end
 		}
 		appendSource(pos, len(line.source))
-		line.previewHidden = strings.TrimSpace(ansi.Strip(line.render(nil, diffCommonTextBg, diffAddedTextBg, nil))) == ""
+		line.previewHidden = !rendered && strings.TrimSpace(ansi.Strip(line.render(nil, diffCommonTextBg, diffAddedTextBg, nil))) == ""
 	}
 }
 

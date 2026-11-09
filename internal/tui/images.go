@@ -40,6 +40,7 @@ type imageProbeTimeoutMsg struct{ id int }
 type imageProbeSkippedMsg struct{ id int }
 
 type imageDisplay struct {
+	cacheClock  uint64
 	cell        cellSize
 	probeID     int
 	probeReply  string
@@ -60,6 +61,7 @@ type imageDisplay struct {
 }
 
 type inlineImage struct {
+	lastUsed          uint64
 	id, width, height int
 	columns, rows     int
 	ready             bool

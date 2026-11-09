@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crittylabs/critty/internal/rendercache"
+
 	"github.com/crittylabs/critty/internal/renderfont"
 )
 
@@ -33,7 +35,7 @@ type Renderer struct {
 	fontSelector *renderfont.Selector
 	fonts        []string
 	run          command
-	cache        map[string]result
+	cache        rendercache.Cache[string, result]
 }
 
 // Find resolves a global command override, auto discovery, or explicit off.
@@ -51,7 +53,7 @@ func Find(setting, name string) (string, error) {
 func New(merman, mmdr string, fonts []string) *Renderer {
 	merman, _ = Find(merman, "merman-cli")
 	mmdr, _ = Find(mmdr, "mmdr")
-	return &Renderer{merman: merman, mmdr: mmdr, fontSelector: renderfont.New(), fonts: append([]string(nil), fonts...), run: runCommand, cache: make(map[string]result)}
+	return &Renderer{merman: merman, mmdr: mmdr, fontSelector: renderfont.New(), fonts: append([]string(nil), fonts...), run: runCommand}
 }
 
 func (r *Renderer) Available() bool {
@@ -63,15 +65,12 @@ func (r *Renderer) Render(ctx context.Context, source string, dark bool) ([]byte
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := fmt.Sprintf("%t:%s", dark, source)
-	if cached, ok := r.cache[key]; ok {
+	if cached, ok := r.cache.Get(key); ok {
 		return cached.data, cached.err
 	}
 	data, err := r.render(ctx, source, dark)
-	if len(r.cache) >= 16 {
-		clear(r.cache)
-	}
 	if ctx.Err() == nil {
-		r.cache[key] = result{data, err}
+		r.cache.Put(key, result{data, err}, len(data))
 	}
 	return data, err
 }

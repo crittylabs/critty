@@ -32,7 +32,7 @@ func TestRenderFallbackAndCache(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var calls []string
-			r := &Renderer{merman: "merman", mmdr: "mmdr", cache: make(map[string]result)}
+			r := &Renderer{merman: "merman", mmdr: "mmdr"}
 			r.run = func(_ context.Context, exe, dir, input string, args ...string) ([]byte, error) {
 				if input != "flowchart LR\n A-->B\n" {
 					t.Fatalf("source changed: %q", input)
@@ -102,7 +102,7 @@ func TestFontsAndDiscovery(t *testing.T) {
 }
 
 func TestInputAndDimensionLimits(t *testing.T) {
-	r := &Renderer{cache: make(map[string]result)}
+	r := &Renderer{}
 	if _, err := r.Render(context.Background(), strings.Repeat("x", (64<<10)+1), false); err == nil {
 		t.Fatal("oversized source accepted")
 	}
