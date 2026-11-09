@@ -855,10 +855,11 @@ func deletedDisplayLines(content, cached string, inline []gitpkg.InlineSegment, 
 	if len(inline) > 0 {
 		return inlineDiffDisplayLines(inline, isMarkdown, width, diffCommonTextBg, diffDeletedTextBg, decorate)
 	}
-	display := displaySourceText(content)
+	display := content
 	if cached != "" {
-		display = displaySourceText(cached)
+		display = cached
 	}
+	display = displaySourceText(display)
 	if isMarkdown {
 		display = highlightMarkdown(display)
 	}

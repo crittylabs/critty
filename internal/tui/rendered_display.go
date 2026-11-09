@@ -132,12 +132,14 @@ func (line *markdownLine) renderPreview(inline []gitpkg.InlineSegment, base, cha
 		for row := range height {
 			for _, box := range band {
 				i := row - (height-len(box.rows))/2
-				value := strings.Repeat(" ", box.width)
+				var value string
 				if i >= 0 && i < len(box.rows) {
 					value = box.rows[i]
 					plain := ansi.Strip(value)
 					line.previewMap = append(line.previewMap, previewDisplaySpan{offset, offset + len(plain), box.token, box.offset})
 					value += strings.Repeat(" ", max(0, box.width-ansi.StringWidth(value)))
+				} else {
+					value = strings.Repeat(" ", box.width)
 				}
 				output.WriteString(value)
 				offset += len(ansi.Strip(value))

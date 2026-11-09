@@ -31,10 +31,12 @@ func collectProjectSessions(directory string, all bool) ([]sessionStatus, error)
 		if project, ok := projects[entry.CWD]; ok {
 			return project
 		}
-		path := canonicalProjectDirectory(entry.CWD)
-		project := sessionProject{id: "directory:" + path, name: filepath.Base(path)}
+		var project sessionProject
 		if common := reviewGitCommonDir(entry.CWD); common != "" {
 			project = sessionProject{id: "git:" + common, name: gitProjectName(common)}
+		} else {
+			path := canonicalProjectDirectory(entry.CWD)
+			project = sessionProject{id: "directory:" + path, name: filepath.Base(path)}
 		}
 		projects[entry.CWD] = project
 		return project

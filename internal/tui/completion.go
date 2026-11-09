@@ -281,9 +281,8 @@ func (m *AppModel) moveCompletion(delta int) {
 func (m *AppModel) acceptCompletion() {
 	c := &m.completion
 	item := c.items[max(0, c.selected)]
-	text := escapeReferencePath(item.name)
+	text := item.name
 	if c.token.plain {
-		text = item.name
 		// Replace the rest of this component when the cursor is within it.
 		line := []rune(c.key.line)
 		end := c.key.column
@@ -296,6 +295,8 @@ func (m *AppModel) acceptCompletion() {
 		for range end - c.key.column {
 			m.modalTextarea, _ = m.modalTextarea.Update(tea.KeyPressMsg{Code: tea.KeyDelete})
 		}
+	} else {
+		text = escapeReferencePath(item.name)
 	}
 	if item.dir {
 		text += "/"

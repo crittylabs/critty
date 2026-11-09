@@ -316,21 +316,24 @@ func (m *markdownSource) addCodeFence(block *ast.CodeBlock, data []byte, base in
 	for start+length < len(source) && source[start+length] == marker {
 		length++
 	}
-	lineStart := strings.LastIndexByte(source[:start], '\n') + 1
-	var continuation strings.Builder
-	for _, r := range source[lineStart:start] {
-		if r == '>' || r == '\t' {
-			continuation.WriteRune(r)
-		} else {
-			continuation.WriteByte(' ')
-		}
-	}
-	prefix := continuation.String()
-	contentEnd := start + len(strings.SplitN(source[start:], "\n", 2)[0]) + 1
+	var prefix string
+	var contentEnd int
 	if segments := block.Value.Segments(); len(segments) > 0 {
 		contentEnd = segments[len(segments)-1].Stop
-		lineStart = strings.LastIndexByte(source[:segments[0].Start], '\n') + 1
+		lineStart := strings.LastIndexByte(source[:segments[0].Start], '\n') + 1
 		prefix = source[lineStart:segments[0].Start]
+	} else {
+		lineStart := strings.LastIndexByte(source[:start], '\n') + 1
+		var continuation strings.Builder
+		for _, r := range source[lineStart:start] {
+			if r == '>' || r == '\t' {
+				continuation.WriteRune(r)
+			} else {
+				continuation.WriteByte(' ')
+			}
+		}
+		prefix = continuation.String()
+		contentEnd = start + len(strings.SplitN(source[start:], "\n", 2)[0]) + 1
 	}
 	fence := strings.Repeat(string(marker), length)
 	end := len(source)

@@ -4093,9 +4093,11 @@ func (m AppModel) renderSidebarPane() string {
 	border := lipgloss.RoundedBorder()
 	line := lipgloss.NewStyle().Foreground(m.sidebarBorderColor())
 	tabRow := fillTabRow(strings.Join(m.sidebarTabs(), " "), width, border, line)
-	view := m.commentViewport.View()
+	var view string
 	if m.sidebarView == filesView {
 		view = m.renderFilesSidebar()
+	} else {
+		view = m.commentViewport.View()
 	}
 	body := lipgloss.NewStyle().
 		Width(width-2).

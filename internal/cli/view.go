@@ -49,9 +49,9 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	project := reviewProject(cfg.ProjectRoot)
-	if headerFlagSpecified("project") {
-		project = reviewProjectName
+	project := reviewProjectName
+	if !headerFlagSpecified("project") {
+		project = reviewProject(cfg.ProjectRoot)
 	}
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{

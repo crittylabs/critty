@@ -47,14 +47,20 @@ func decodeMacText(data []byte) (string, error) {
 }
 
 func readLinuxText(ctx context.Context) (string, error) {
-	name, args := "xclip", []string{"-selection", "clipboard", "-t", "TARGETS", "-o"}
+	name := "xclip"
 	if os.Getenv("WAYLAND_DISPLAY") != "" {
 		if _, err := exec.LookPath("wl-paste"); err == nil {
-			name, args = "wl-paste", []string{"--list-types"}
+			name = "wl-paste"
 		}
 	}
 	if _, err := exec.LookPath(name); err != nil {
 		return clipboard.ReadAll() // Keep xsel, Termux and WSL text backends.
+	}
+	var args []string
+	if name == "wl-paste" {
+		args = []string{"--list-types"}
+	} else {
+		args = []string{"-selection", "clipboard", "-t", "TARGETS", "-o"}
 	}
 	types, err := run(ctx, name, args...)
 	if err != nil {
@@ -86,9 +92,10 @@ func readLinuxText(ctx context.Context) (string, error) {
 	if selected == "" {
 		return "", errors.New("clipboard has no supported text format")
 	}
-	args = []string{"-selection", "clipboard", "-t", selected, "-o"}
 	if name == "wl-paste" {
 		args = []string{"--no-newline", "--type", selected}
+	} else {
+		args = []string{"-selection", "clipboard", "-t", selected, "-o"}
 	}
 	data, err := run(ctx, name, args...)
 	if err != nil {
