@@ -2,13 +2,14 @@
 
 ## Unreleased
 
+## 1.11.0
+
 ### Added
 
-- **Preview tool installation**: Run `critty install tools` to set up missing SVG, math, and Mermaid renderers with an existing mise or Homebrew installation.  `critty doctor` suggests the relevant install command when preview tools are missing.  Select individual features or a package manager, and inspect commands with `--dry-run`.  mise is preferred automatically; Homebrew's math setup uses the full TeX Live distribution.  Existing PATH tools and renderer settings are kept.  See [setup and requirements](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#install-preview-tools).
-- **SVG image previews**: Preview SVGs in Markdown, comments, editors, and the lightbox using `rsvg-convert`, Merman, or resvg found on PATH, in that order.  SVG file reviews retain the XML source and line coordinates below the preview, including saved attachment snapshots.  `I` / `M-i` toggle SVG with other images; missing or failed conversion leaves the source visible.  See [limits and supported resources](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#svg-previews).
 - **Math previews in Markdown**: Read `$...$` and `$$...$$` expressions as images in documents and comments, including suggestions and Markdown code blocks, in supported terminals.  Copying keeps their original TeX, and source-line navigation and review coordinates are retained.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH, then fall back to LaTeX plus dvipng; multiline expressions use LaTeX directly.  These optional tools are installed separately; `critty doctor` checks their executable availability.  Missing tools or failed rendering leave the source visible.  See [setup and limits](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#math-previews).
-
 - **Mermaid diagram previews**: Read fenced Mermaid blocks as diagrams in documents and comments through the optional native Merman CLI, with mmdr as fallback.  The comment editor keeps editable source with a preview below it; copying and review coordinates retain the source.  Missing tools or rendering failures leave the source visible.  `critty doctor` checks renderer and font-selection tools.  See [setup and compatibility limits](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#mermaid-previews).
+- **SVG image previews**: Preview SVGs in Markdown, comments, editors, and the lightbox using `rsvg-convert`, Merman, or resvg found on PATH, in that order.  SVG file reviews retain the XML source and line coordinates below the preview, including saved attachment snapshots.  `I` / `M-i` toggle SVG with other images; missing or failed conversion leaves the source visible.  See [limits and supported resources](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#svg-previews).
+- **Preview tool installation**: Run `critty install tools` to set up missing SVG, math, and Mermaid renderers with an existing mise or Homebrew installation.  `critty doctor` suggests the relevant install command when preview tools are missing.  Select individual features or a package manager, and inspect commands with `--dry-run`.  mise is preferred automatically; Homebrew's math setup uses the full TeX Live distribution.  Existing PATH tools and renderer settings are kept.  See [setup and requirements](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#install-preview-tools).
 
 ### Changed
 

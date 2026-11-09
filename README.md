@@ -51,6 +51,7 @@ For example:
 - **Plists and other encodings** — review binary plists and encoded text through your configured Git text converters.  Enable the converters you need in Critty's configuration.
 - **Review before editing** — review proposed changes to documents and configuration files outside Git while the originals stay untouched.  Create, split, rename, or delete files after approval.
 - **Inline image previews** — compare image changes, attach images alongside review documents, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
+- **Math, Mermaid, and SVG previews** — read formulas, diagrams, and vector images while keeping their source available for copying and review.  Install missing renderers with `critty install tools`; see [preview setup](#preview-tools).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
 - **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.
 - **Navigation and editing** — search across files as you type with regular expressions, word search, and a per-project query history; follow file and comment references; and return to each file where you left off.  Compact tabs leave more room for the document.
@@ -321,7 +322,21 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-Videos and screenshots captured with the v1.10.0 candidate.
+Math, Mermaid, and SVG previews below were captured with the v1.11.0 candidate.  Other videos and screenshots were captured with the v1.10.0 candidate.
+
+### Previewing math, Mermaid diagrams, and SVG images
+
+Read formulas, diagrams, and vector images alongside their source.  Missing renderers can be installed with `critty install tools`.
+
+https://github.com/user-attachments/assets/98ebbfc3-8f20-4f22-90a7-91ef3f64ce5e
+
+### Block and inline math expressions
+
+![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/93f64968-9774-4a9a-8b82-64ed8fe2b411)
+
+### Mermaid diagrams
+
+![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/a4316e7a-6d13-4352-9aed-72f5f99ce1f3)
 
 ### Navigating source and Markdown outlines
 
