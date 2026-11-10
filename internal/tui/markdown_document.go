@@ -33,6 +33,7 @@ const (
 	markdownLink
 	markdownCodePadding
 	markdownRendered
+	markdownDelimiter
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -380,6 +381,9 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 				style = style.Foreground(lipgloss.Color(entry.Colour.String()))
 			}
 			style = style.Bold(entry.Bold == chroma.Yes).Italic(entry.Italic == chroma.Yes).Underline(entry.Underline == chroma.Yes)
+		}
+		if token.style&markdownDelimiter != 0 {
+			style = mdHrStyle.Inherit(style)
 		}
 		if token.style&markdownBold != 0 {
 			style = mdBoldStyle.Inherit(style)

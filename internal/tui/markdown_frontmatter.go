@@ -27,6 +27,10 @@ func (m *markdownSource) parseFrontmatter(known map[int]bool) int {
 	if end == 0 {
 		return 0
 	}
+	for _, i := range []int{0, end - 1} {
+		line := &m.lines[i]
+		line.tokens = []markdownToken{{end: len(line.source), text: line.source, style: markdownDelimiter}}
+	}
 	stop := m.offsets[end-1] + len(m.lines[end-1].source)
 	iterator, err := lexers.Get("yaml").Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, m.source[:stop])
 	if err != nil {
@@ -56,7 +60,7 @@ func (m *markdownSource) parseFrontmatter(known map[int]bool) int {
 	if row != end-1 || column != len(m.lines[row].source) {
 		return end
 	}
-	for i := range tokens {
+	for i := 1; i < end-1; i++ {
 		m.lines[i].tokens = tokens[i]
 	}
 	return end
