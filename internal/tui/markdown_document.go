@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/extension"
@@ -42,6 +43,7 @@ type markdownToken struct {
 	style      markdownStyle
 	uri        string
 	sourceEnd  int
+	syntax     chroma.TokenType
 }
 
 type markdownLine struct {
@@ -112,7 +114,7 @@ func parseMarkdownSource(lines []string, known map[int]bool) *markdownSource {
 		result.lines[i] = markdownLine{source: line, literal: true,
 			tokens: []markdownToken{{end: len(line), text: line}}}
 	}
-	for start := 0; start < len(lines); {
+	for start := result.parseFrontmatter(known); start < len(lines); {
 		if known != nil && !known[start+1] {
 			start++
 			continue
@@ -372,6 +374,13 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			continue
 		}
 		style := lipgloss.NewStyle()
+		if token.syntax != 0 {
+			entry := codeHighlightStyle().Get(token.syntax)
+			if entry.Colour.IsSet() {
+				style = style.Foreground(lipgloss.Color(entry.Colour.String()))
+			}
+			style = style.Bold(entry.Bold == chroma.Yes).Italic(entry.Italic == chroma.Yes).Underline(entry.Underline == chroma.Yes)
+		}
 		if token.style&markdownBold != 0 {
 			style = mdBoldStyle.Inherit(style)
 		}

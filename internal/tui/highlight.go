@@ -30,11 +30,7 @@ func newCodeHighlighter(lexer chroma.Lexer, observers ...func(chroma.Token)) fun
 	}
 	lexer = chroma.Coalesce(lexer)
 
-	// Monokai's light foregrounds are unreadable on a light background.
-	style := styles.Get("monokai")
-	if !terminalIsDark {
-		style = styles.Get("monokailight")
-	}
+	style := codeHighlightStyle()
 	formatter := formatters.Get("terminal256")
 
 	// Chroma's default options turn a lone CR into a newline, which would
@@ -81,6 +77,14 @@ func newCodeHighlighter(lexer chroma.Lexer, observers ...func(chroma.Token)) fun
 
 		return lines
 	}
+}
+
+func codeHighlightStyle() *chroma.Style {
+	// Monokai's light foregrounds are unreadable on a light background.
+	if !terminalIsDark {
+		return styles.Get("monokailight")
+	}
+	return styles.Get("monokai")
 }
 
 func trimTrailingEmpty(lines []string) []string {
