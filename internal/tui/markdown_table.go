@@ -104,6 +104,12 @@ func (m *AppModel) highlightTableCells(ref lineRef, cells []string) {
 func (line *markdownLine) displayOffset(sourceOffset int) int {
 	offset := 0
 	for i, token := range line.displayTokens() {
+		if token.decoration != noDecoration {
+			if token.start < sourceOffset || token.start == sourceOffset && token.decoration == openingDecoration {
+				offset += len(line.displayTokenText(i))
+			}
+			continue
+		}
 		if token.start >= sourceOffset {
 			break
 		}

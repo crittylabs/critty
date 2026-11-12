@@ -26,8 +26,10 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 	suffix := line[len(content):]
 	source := []byte(prefix + content)
 	root := parser.New(parser.WithExtensions(extension.LinkifyParser), parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50))).Parse(source)
+	groupKeyboardNodes(root, source)
 	var render func(ast.Node, lipgloss.Style) string
 	linkDepth := 0
+	keyboardDepth := 0
 	decorate := func(text string) string {
 		if references != nil && linkDepth == 0 {
 			return references(text)
@@ -43,10 +45,25 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 	}
 	render = func(n ast.Node, style lipgloss.Style) string {
 		switch n := n.(type) {
+		case *keyboardNode:
+			if containsKeyboard(n) {
+				return children(n, style)
+			}
+			if n.FirstChild() == nil {
+				return ""
+			}
+			keyStyle := keyboardStyle().Inherit(style)
+			keyboardDepth++
+			label := children(n, keyStyle)
+			keyboardDepth--
+			return keyStyle.Render("⟦") + label + keyStyle.Render("⟧")
 		case *mathNode:
 			return style.Render(string(source[n.start:n.end]))
 		case *ast.Text:
 			text := n.Value.Str(source)
+			if keyboardDepth > 0 {
+				text = n.Value.Value(source)
+			}
 			if n.SoftLineBreak() || n.HardLineBreak() {
 				text += "\n"
 			}

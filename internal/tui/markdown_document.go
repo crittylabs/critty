@@ -34,6 +34,7 @@ const (
 	markdownCodePadding
 	markdownRendered
 	markdownDelimiter
+	markdownKeyboard
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -45,6 +46,7 @@ type markdownToken struct {
 	uri        string
 	sourceEnd  int
 	syntax     chroma.TokenType
+	decoration markdownDecoration
 }
 
 type markdownLine struct {
@@ -260,7 +262,11 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			}
 			part = strings.TrimSuffix(part, "\n")
 			if part != "" {
-				output[line] = append(output[line], markdownToken{start: column, end: column + len(part), text: part, style: style, uri: uri, sourceEnd: min(column+stop-from, len(m.lines[base+line].source))})
+				end := column + len(part)
+				if style&markdownKeyboard != 0 && style&markdownCode == 0 {
+					part = string(text.NewDecoder().Decode([]byte(part)))
+				}
+				output[line] = append(output[line], markdownToken{start: column, end: end, text: part, style: style, uri: uri, sourceEnd: min(column+stop-from, len(m.lines[base+line].source))})
 			}
 			if value != "" && len(value) >= stop-from {
 				value = value[stop-from:]
@@ -269,8 +275,30 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 		}
 	}
 	var render func(ast.Node, markdownStyle, string)
+	decorate := func(offset int, value string, style markdownStyle, uri string, kind markdownDecoration) {
+		pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > offset })-1)
+		p := projections[pi]
+		global := p.source + offset - p.local
+		row := lineAt(global)
+		column := global - offsets[row]
+		output[row] = append(output[row], markdownToken{start: column, end: column, text: value, style: style, uri: uri, decoration: kind})
+	}
 	render = func(n ast.Node, style markdownStyle, uri string) {
 		switch node := n.(type) {
+		case *keyboardNode:
+			if containsKeyboard(node) {
+				break
+			}
+			if node.FirstChild() == nil {
+				return
+			}
+			style |= markdownKeyboard
+			decorate(node.contentStart, "⟦", style, uri, openingDecoration)
+			for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+				render(child, style, uri)
+			}
+			decorate(node.contentEnd, "⟧", style, uri, closingDecoration)
+			return
 		case *mathNode:
 			emit(node.start, node.end, "", style, uri)
 			return
@@ -339,6 +367,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	context := parser.NewContext()
 	context.Set(markdownSourceRanges, ranges)
 	root := markdownInlineParser.Parse(input, parser.WithContext(context))
+	groupKeyboardNodes(root, input)
 	collectMarkdownMarkup(root, input, ranges)
 	project := func(offset int) int {
 		pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > offset })-1)
@@ -402,6 +431,9 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		if token.style&markdownCode != 0 {
 			style = mdCodeStyle.Inherit(style)
 		}
+		if token.style&markdownKeyboard != 0 {
+			style = keyboardStyle().Inherit(style)
+		}
 		uri := token.uri
 		write := func(value string, background lipgloss.Style) {
 			tokenStyle := style
@@ -414,7 +446,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			}
 			b.WriteString(linkedText(uri, value))
 		}
-		if len(inline) == 0 {
+		if len(inline) == 0 || token.decoration != noDecoration {
 			write(token.text, base)
 			continue
 		}
@@ -462,6 +494,10 @@ func (t *FileTab) markdownTableCellsWithInline(line int, links []linkSpan, inlin
 	for _, span := range parsed.cells {
 		cell := markdownLine{literal: true, source: parsed.source}
 		for _, token := range parsed.displayTokens() {
+			if token.decoration != noDecoration && token.start >= span[0] && token.start <= span[1] {
+				cell.tokens = append(cell.tokens, token)
+				continue
+			}
 			from, to := max(span[0], token.start), min(span[1], token.end)
 			if from >= to {
 				continue
@@ -492,6 +528,10 @@ func linkedMarkdownTokens(tokens []markdownToken, links []linkSpan) []markdownTo
 	}
 	var result []markdownToken
 	for _, token := range tokens {
+		if token.decoration != noDecoration {
+			result = append(result, token)
+			continue
+		}
 		cuts := []int{token.start, token.end}
 		if len(token.text) == token.end-token.start {
 			for _, link := range links {

@@ -89,6 +89,9 @@ func collectMarkdownMarkup(n ast.Node, source []byte, ranges map[ast.Node]markdo
 		return r.start, r.end
 	}
 	switch node := n.(type) {
+	case *keyboardNode:
+		ranges[n] = markdownMarkup{start: node.start, contentStart: node.contentStart, contentEnd: node.contentEnd, end: node.end}
+		return node.start, node.end
 	case *ast.Text:
 		i := node.Value.Index()
 		return i.Start, i.Stop
@@ -163,6 +166,14 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 		return line.previewSourceOffset(offset, end)
 	}
 	if offset == 0 && !end && line.previewTokens == nil {
+		for _, token := range line.tokens {
+			if token.text != "" {
+				if token.decoration != noDecoration {
+					return token.start
+				}
+				break
+			}
+		}
 		return 0
 	}
 	pos := 0
@@ -170,6 +181,9 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 		value := line.displayTokenText(i)
 		stop := pos + len(value)
 		if offset < stop || end && offset == stop && stop > pos {
+			if token.decoration != noDecoration {
+				return token.start
+			}
 			if token.style&markdownRendered != 0 {
 				if end {
 					return token.end
