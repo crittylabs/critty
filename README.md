@@ -53,7 +53,7 @@ For example:
 - **Inline image previews** — compare image changes, attach images alongside review documents, preview images while writing comments, and inspect local images in a zoomable lightbox.  [See an image review](#reviewing-an-image-replacement).
 - **Math, Mermaid, and SVG previews** — read formulas, diagrams, and vector images while keeping their source available for copying and review.  Install missing renderers with `critty install tools`; see [preview setup](#preview-tools).
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
-- **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.
+- **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.  YAML frontmatter has syntax highlighting, and its metadata stays out of the heading outline.
 - **Navigation and editing** — search across files as you type with regular expressions, word search, and a per-project query history; follow file and comment references; and return to each file where you left off.  Compact tabs leave more room for the document.
 - **Text Selection and Copying** — select text from documents, diffs, and input fields to reuse it, preserving Markdown formatting and link targets.  Undo a stray resolve, deletion, or edit with `C-z`.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
@@ -324,8 +324,6 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 ## Gallery
 
-All videos and the Math/Mermaid screenshots were captured with the v1.11.0 candidate.  Other screenshots were captured with the v1.10.0 candidate.
-
 ### Previewing math, Mermaid diagrams, and SVG images
 
 Read formulas, diagrams, and vector images alongside their source.  Missing renderers can be installed with `critty install tools`.
@@ -334,11 +332,11 @@ https://github.com/user-attachments/assets/d5eafe0a-76cb-40a1-8d61-f3827dd6f9da
 
 ### Block and inline math expressions
 
-![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/18cb5a58-72a1-469a-add7-ff471c5b8265)
+![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/18cb5a58-72a1-469a-add7-ff471c5b8265 "Captured with the v1.11.1 candidate")
 
 ### Mermaid diagrams
 
-![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/a34dac9b-77d8-436d-b275-9c400a2605e4)
+![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/a34dac9b-77d8-436d-b275-9c400a2605e4 "Captured with the v1.11.1 candidate")
 
 ### Navigating source and Markdown outlines
 
@@ -346,11 +344,11 @@ Follow the source outline as you move through code, or jump to a Markdown headin
 
 https://github.com/user-attachments/assets/e95cf2eb-a6cd-4157-a336-920054425319
 
-![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/feb5301d-43d9-4f80-b530-1cc436799ca7)
+![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/feb5301d-43d9-4f80-b530-1cc436799ca7 "Captured with the v1.10.0 candidate")
 
 ### Previewing an image attachment
 
-![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/e14f8d94-b268-4e8e-b68c-1cf5f866f4d5)
+![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/e14f8d94-b268-4e8e-b68c-1cf5f866f4d5 "Captured with the v1.10.0 candidate")
 
 ### Code review with inline comments
 
@@ -358,7 +356,7 @@ https://github.com/user-attachments/assets/f333c3d7-029f-47b5-a48c-4e4e92591c04
 
 ### Side-by-side code review
 
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/eab311dc-0db9-4120-be5c-00f6c8e8dce3)
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/eab311dc-0db9-4120-be5c-00f6c8e8dce3 "Captured with the v1.10.0 candidate")
 
 ### Review round trips with Claude Code
 
@@ -386,37 +384,37 @@ https://github.com/user-attachments/assets/8a6534ba-2afa-4bbc-bd7e-37b715bd809c
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/60ff80bf-0260-4450-9aa2-b33c9b4e29e0)
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/60ff80bf-0260-4450-9aa2-b33c9b4e29e0 "Captured with the v1.10.0 candidate")
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/c5837711-4916-49bf-93b4-aafc87f4c770)
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/c5837711-4916-49bf-93b4-aafc87f4c770 "Captured with the v1.10.0 candidate")
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/c0d9a10c-874a-47c9-adb0-2a99c1c7beee)
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/c0d9a10c-874a-47c9-adb0-2a99c1c7beee "Captured with the v1.10.0 candidate")
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/ec1c0884-3309-47c9-89cf-aa5be893e0cb)
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/ec1c0884-3309-47c9-89cf-aa5be893e0cb "Captured with the v1.10.0 candidate")
 
 ### Answering a questionnaire with form widgets
 
 See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/a43ffbb8-8950-43f9-a17e-ab2bc1148ab3)
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/a43ffbb8-8950-43f9-a17e-ab2bc1148ab3 "Captured with the v1.10.0 candidate")
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/0af43307-23be-4291-866b-7b80b644176e)
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/0af43307-23be-4291-866b-7b80b644176e "Captured with the v1.10.0 candidate")
 
 ### Approval checks for unfinished items
 
-![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/5cc64faa-4e2b-4250-afe0-e4352f82be4d)
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/5cc64faa-4e2b-4250-afe0-e4352f82be4d "Captured with the v1.10.0 candidate")
 
 ### Incremental search
 
-![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/5d1bc9c7-89f7-4281-a093-0760ed004584)
+![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/5d1bc9c7-89f7-4281-a093-0760ed004584 "Captured with the v1.10.0 candidate")
 
 ## Contributing
 

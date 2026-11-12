@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.11.2
+
 ### Added
 
 - **YAML frontmatter in Markdown**: Read document metadata with syntax highlighting.  Frontmatter keys and comments no longer appear as headings in the outline.
