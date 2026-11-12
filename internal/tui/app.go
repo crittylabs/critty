@@ -116,7 +116,7 @@ type AppModel struct {
 	svg            svgRenderer
 	commentImages  map[commentImageKey]*previewSide
 	imageBodies    map[string][]markdownImageRef
-	renderedBodies map[string]*commentRenderedBody
+	renderedBodies map[commentBodyKey]*commentRenderedBody
 	editorImages   editorImageState
 	lightbox       lightboxState
 	forms          *review.FormState
@@ -389,6 +389,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		fileTree:         newFileTree(),
 		outline:          newDocumentOutline(),
 		modalTextarea:    ta,
+		renderedBodies:   make(map[commentBodyKey]*commentRenderedBody),
 	}
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()
@@ -491,6 +492,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		fileTree:        newFileTree(),
 		outline:         newDocumentOutline(),
 		modalTextarea:   ta,
+		renderedBodies:  make(map[commentBodyKey]*commentRenderedBody),
 	}
 	m.addDocuments(cfg.Documents)
 	m.ensureOverallCommentsTab()

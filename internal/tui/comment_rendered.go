@@ -1,31 +1,71 @@
 package tui
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/alecthomas/chroma/v2"
+)
+
+type commentBodyKey struct {
+	body, language string
+}
 
 type commentRenderedBody struct {
 	source *markdownSource
 	refs   []markdownImage
 }
 
-func (m *AppModel) commentRenderedDisplay(body string, width int, show bool) *markdownSource {
-	if !show || (!m.math.Available() && !m.mermaid.Available()) || (!strings.Contains(body, "$") && !strings.Contains(body, "mermaid")) {
+func (m *AppModel) commentSuggestionLexer() chroma.Lexer {
+	if len(m.tabs) == 0 {
 		return nil
 	}
+	t := m.tab()
+	if t.lexer != nil {
+		return t.lexer
+	}
+	source := ""
+	if t.doc != nil {
+		source = t.doc.Content
+	}
+	return codeLexer(t.path, source)
+}
+
+func (m *AppModel) parsedComment(body string, lexer chroma.Lexer) *commentRenderedBody {
 	if m.renderedBodies == nil {
-		m.renderedBodies = make(map[string]*commentRenderedBody)
+		m.renderedBodies = make(map[commentBodyKey]*commentRenderedBody)
 	}
-	cached := m.renderedBodies[body]
+	key := commentBodyKey{body: body}
+	if lexer != nil {
+		key.language = lexer.Config().Name
+	}
+	cached := m.renderedBodies[key]
 	if cached == nil {
-		cached = &commentRenderedBody{source: parseMarkdownSource(strings.Split(body, "\n"), nil), refs: m.renderedRefs(body)}
-		if len(m.renderedBodies) < 128 {
-			m.renderedBodies[body] = cached
+		cached = &commentRenderedBody{source: parseMarkdownSource(strings.Split(body, "\n"), nil, lexer)}
+		if strings.Contains(body, "$") || strings.Contains(body, "mermaid") {
+			cached.refs = m.renderedRefs(body)
 		}
+		if len(m.renderedBodies) >= 128 {
+			clear(m.renderedBodies)
+		}
+		m.renderedBodies[key] = cached
 	}
+	return cached
+}
+
+func (m *AppModel) commentRenderedDisplay(body string, width int, show bool, suggestion ...chroma.Lexer) *markdownSource {
+	lexer := m.commentSuggestionLexer()
+	if len(suggestion) > 0 {
+		lexer = suggestion[0]
+	}
+	cached := m.parsedComment(body, lexer)
 	for i := range cached.source.lines {
 		cached.source.lines[i].previewTokens = nil
 		cached.source.lines[i].previewHidden = false
 		cached.source.lines[i].previewScroll = nil
 		cached.source.lines[i].previewWidth = width
+	}
+	if !show {
+		return cached.source
 	}
 	refs := make([]markdownImage, 0, len(cached.refs))
 	for _, ref := range cached.refs {

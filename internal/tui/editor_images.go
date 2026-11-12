@@ -171,7 +171,7 @@ func (m AppModel) editorImageBlocks() map[int][]string {
 // editorView renders the editor with previews under the visible rows of
 // their references, and returns each view row's text row, -1 for previews.
 func (m AppModel) editorView() (string, []int) {
-	view := m.modalTextarea.View()
+	view := m.highlightEditor(m.modalTextarea.View())
 	blocks := m.editorImageBlocks()
 	rows := strings.Split(view, "\n")
 	if len(blocks) == 0 {

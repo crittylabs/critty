@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
@@ -91,12 +92,12 @@ func (m *AppModel) linkCommentLine(line string, refs []markdownImageRef, lineNum
 	return linkedDisplayLine(line, spans, m.linkFileReferences)
 }
 
-func (m *AppModel) renderCommentContent(author, body, prefix string, width int) string {
+func (m *AppModel) renderCommentContent(author, body, prefix string, width int, suggestion ...chroma.Lexer) string {
 	style := m.commentAuthorStyle(author)
 	width = max(1, width)
 	refs := m.commentImageRefs(body)
 	showImages := !m.images.hidden && m.modal == noModal
-	renderSource := m.commentRenderedDisplay(body, width, showImages)
+	renderSource := m.commentRenderedDisplay(body, width, showImages, suggestion...)
 	var lines []string
 	prefixed := false
 	for i, line := range strings.Split(body, "\n") {
@@ -104,7 +105,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int) 
 			continue
 		}
 		content := style.Render(m.linkCommentLine(line, refs, i+1))
-		if renderSource != nil && renderSource.lines[i].previewTokens != nil {
+		if renderSource != nil && (renderSource.lines[i].previewTokens != nil || renderSource.lines[i].hasSyntax()) {
 			links := m.referenceSpans(line)
 			for _, ref := range refs {
 				if ref.line == i+1 {

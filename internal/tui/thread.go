@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/review"
@@ -17,7 +18,7 @@ type threadLayout struct {
 	starts []int
 }
 
-func (m *AppModel) layoutThread(author, body string, replies []review.Reply, editingID string, width int) threadLayout {
+func (m *AppModel) layoutThread(author, body string, replies []review.Reply, editingID string, width int, suggestion ...chroma.Lexer) threadLayout {
 	var layout threadLayout
 	appendComment := func(author, header, body string) {
 		if len(layout.lines) > 0 {
@@ -25,7 +26,7 @@ func (m *AppModel) layoutThread(author, body string, replies []review.Reply, edi
 		}
 		layout.starts = append(layout.starts, len(layout.lines))
 		style := m.commentAuthorStyle(author)
-		content := lipgloss.Wrap(style.Bold(true).Render(header), max(1, width), "") + "\n" + m.renderCommentContent(author, body, "", width)
+		content := lipgloss.Wrap(style.Bold(true).Render(header), max(1, width), "") + "\n" + m.renderCommentContent(author, body, "", width, suggestion...)
 		layout.lines = append(layout.lines, strings.Split(content, "\n")...)
 	}
 	name := author

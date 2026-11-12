@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Syntax highlighting in Markdown code blocks**: Read fenced code in documents, comments, and the comment editor with colors for light and dark terminals.  The fence language selects the syntax, and `suggestion` blocks in comments use the target file's language.  Multiline strings and comments keep their context; blocks without a recognized language remain plain text.
+
 ## 1.11.2
 
 ### Added

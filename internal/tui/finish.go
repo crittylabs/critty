@@ -404,7 +404,7 @@ func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
 				reference.WriteString("\n\n")
 			}
 			reference.WriteString(lipgloss.Wrap("Overall comment · round "+strconv.Itoa(c.ReviewRound), max(1, width-4), "") + "\n")
-			thread := m.layoutThread(c.Author, c.Body, c.Replies, "", max(1, width-4))
+			thread := m.layoutThread(c.Author, c.Body, c.Replies, "", max(1, width-4), nil)
 			latestThreadStart = strings.Count(reference.String(), "\n")
 			latestThread = thread
 			reference.WriteString(strings.Join(thread.lines, "\n"))

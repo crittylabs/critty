@@ -98,16 +98,20 @@ type markdownEdit struct {
 }
 
 type markdownSource struct {
-	lines    []markdownLine
-	source   string
-	offsets  []int
-	markup   []markdownMarkup
-	fences   []markdownFence
-	headings []outlineHeading
+	lines           []markdownLine
+	source          string
+	offsets         []int
+	markup          []markdownMarkup
+	fences          []markdownFence
+	headings        []outlineHeading
+	suggestionLexer chroma.Lexer
 }
 
-func parseMarkdownSource(lines []string, known map[int]bool) *markdownSource {
+func parseMarkdownSource(lines []string, known map[int]bool, suggestion ...chroma.Lexer) *markdownSource {
 	result := &markdownSource{lines: make([]markdownLine, len(lines)), source: strings.Join(lines, "\n"), offsets: make([]int, len(lines))}
+	if len(suggestion) > 0 {
+		result.suggestionLexer = suggestion[0]
+	}
 	for i, line := range lines {
 		if i > 0 {
 			result.offsets[i] = result.offsets[i-1] + len(lines[i-1]) + 1
@@ -177,6 +181,7 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		case *ast.CodeBlock:
 			if block := n.(*ast.CodeBlock); block.CodeBlockKind == ast.CodeBlockKindFenced && (!incomplete || start == 0 || lineAt(block.Pos()) > 0) {
 				m.addCodeFence(block, data, m.offsets[start])
+				m.highlightCodeBlock(block, data, m.offsets[start])
 			}
 			return
 		case *ast.HTMLBlock:
