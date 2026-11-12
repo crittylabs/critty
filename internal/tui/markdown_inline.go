@@ -81,9 +81,11 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 			if !markdownHasLabel(n, source) {
 				label = linkStyle.Inherit(style).Render(n.Destination.Str(source))
 			}
-			return linkedText(n.Destination.Str(source), label)
+			uri := n.Destination.Str(source)
+			return linkedText(uri, label+linkStyle.Inherit(style).Render(externalLinkSuffix(uri)))
 		case *ast.AutoLink:
-			return linkedText(n.Destination.Str(source), linkStyle.Inherit(style).Render(n.Label.Str(source)))
+			uri := n.Destination.Str(source)
+			return linkedText(uri, linkStyle.Inherit(style).Render(n.Label.Str(source)+externalLinkSuffix(uri)))
 		case *ast.Image:
 			// Previewable images get lightbox links from the image renderer.
 			if !markdownHasLabel(n, source) {
@@ -96,6 +98,13 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 		return children(n, style)
 	}
 	return strings.TrimPrefix(render(root, lipgloss.NewStyle()), prefix) + suffix
+}
+
+func externalLinkSuffix(uri string) string {
+	if _, ok := webImageURL(uri); ok {
+		return " ↗"
+	}
+	return ""
 }
 
 func markdownHasLabel(n ast.Node, source []byte) bool {

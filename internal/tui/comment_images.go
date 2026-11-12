@@ -105,7 +105,7 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int, 
 			continue
 		}
 		content := style.Render(m.linkCommentLine(line, refs, i+1))
-		if renderSource != nil && (renderSource.lines[i].previewTokens != nil || renderSource.lines[i].hasSyntax() || renderSource.lines[i].hasKeyboard()) {
+		if renderSource != nil && (renderSource.lines[i].previewTokens != nil || renderSource.lines[i].hasSyntax() || renderSource.lines[i].hasDecorations()) {
 			links := m.referenceSpans(line)
 			for _, ref := range refs {
 				if ref.line == i+1 {

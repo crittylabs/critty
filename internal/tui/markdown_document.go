@@ -27,6 +27,14 @@ var (
 
 type markdownStyle uint8
 
+type markdownDecoration uint8
+
+const (
+	noDecoration markdownDecoration = iota
+	openingDecoration
+	closingDecoration
+)
+
 const (
 	markdownBold markdownStyle = 1 << iota
 	markdownItalic
@@ -302,6 +310,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			from = stop
 		}
 	}
+	ranges := make(map[ast.Node]markdownMarkup)
 	var render func(ast.Node, markdownStyle, string)
 	decorate := func(offset int, value string, style markdownStyle, uri string, kind markdownDecoration) {
 		pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > offset })-1)
@@ -363,12 +372,28 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 				i := node.Destination.Index()
 				if i.Start >= 0 && i.Stop <= len(input) {
 					emit(i.Start, i.Stop, uri, style, uri)
+					if suffix := externalLinkSuffix(uri); suffix != "" {
+						decorate(i.Stop, suffix, style, uri, closingDecoration)
+					}
 				}
 				return
 			}
+			for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+				render(child, style, uri)
+			}
+			if suffix := externalLinkSuffix(uri); suffix != "" {
+				if r, ok := ranges[node]; ok {
+					decorate(r.contentEnd, suffix, style, uri, closingDecoration)
+				}
+			}
+			return
 		case *ast.AutoLink:
 			i := node.Label.Index()
-			emit(i.Start, i.Stop, node.Label.Str(input), style|markdownLink, node.Destination.Str(input))
+			uri = node.Destination.Str(input)
+			emit(i.Start, i.Stop, node.Label.Str(input), style|markdownLink, uri)
+			if suffix := externalLinkSuffix(uri); suffix != "" {
+				decorate(i.Stop, suffix, style|markdownLink, uri, closingDecoration)
+			}
 			return
 		case *ast.Image:
 			uri = node.Destination.Str(input)
@@ -391,7 +416,6 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			render(child, style, uri)
 		}
 	}
-	ranges := make(map[ast.Node]markdownMarkup)
 	context := parser.NewContext()
 	context.Set(markdownSourceRanges, ranges)
 	root := markdownInlineParser.Parse(input, parser.WithContext(context))
@@ -414,6 +438,15 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 		to = from + len(strings.TrimRight(m.lines[base+line].source[from:to], " \t\r"))
 		edits[line] = append(edits[line], markdownEdit{from, to, output[line]})
 	}
+}
+
+func (line *markdownLine) hasDecorations() bool {
+	for _, token := range line.tokens {
+		if token.decoration != noDecoration || token.style&(markdownKeyboard|markdownLink) != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {

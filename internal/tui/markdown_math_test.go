@@ -354,7 +354,7 @@ func TestMathSourcePreserved(t *testing.T) {
 		t.Fatalf("math source changed: %q", got)
 	}
 	linked := parseMarkdownSource([]string{`[$x$](https://example.com)`}, nil)
-	if got := ansi.Strip(linked.lines[0].render(nil, diffCommonTextBg, diffAddedTextBg, nil)); got != "$x$" {
+	if got := ansi.Strip(linked.lines[0].render(nil, diffCommonTextBg, diffAddedTextBg, nil)); got != "$x$ ↗" {
 		t.Fatalf("math link label=%q", got)
 	}
 	if refs := markdownImageRefs(`$\text{![code](not.png)}$`); len(refs) != 0 {

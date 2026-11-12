@@ -11,14 +11,6 @@ import (
 
 var keyboardKind = ast.NewNodeKind("Keyboard")
 
-type markdownDecoration uint8
-
-const (
-	noDecoration markdownDecoration = iota
-	openingDecoration
-	closingDecoration
-)
-
 type keyboardNode struct {
 	ast.BaseInline
 	start, contentStart, contentEnd, end int
@@ -85,13 +77,4 @@ func containsKeyboard(n ast.Node) bool {
 
 func keyboardStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(mdCodeStyle.GetForeground())
-}
-
-func (line *markdownLine) hasKeyboard() bool {
-	for _, token := range line.tokens {
-		if token.style&markdownKeyboard != 0 {
-			return true
-		}
-	}
-	return false
 }

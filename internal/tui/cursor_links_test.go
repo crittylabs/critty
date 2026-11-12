@@ -225,3 +225,29 @@ func TestLocalMarkdownLinkClick(t *testing.T) {
 		t.Fatal("click did not follow the local link")
 	}
 }
+
+func TestExternalLinkMarkClickAndSelection(t *testing.T) {
+	opened := stubOpener(t, false)
+	const uri = "https://example.org"
+	app := setupAppWithDoc(t, "[Site]("+uri+") after\n")
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	app.rebuildContent()
+	cells, _ := linkCells(app.contentViewport.GetContent(), uri)
+	if len(cells) != len("Site ")+1 {
+		t.Fatalf("link cells=%d, want label, space, and marker", len(cells))
+	}
+	left, top, _, _ := app.contentBounds()
+	mark := cells[len(cells)-1]
+	x, y := left+mark.X, top+mark.Y
+	app = pressMouse(app, x, y)
+	app, cmd := updateApp(app, tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft})
+	if status := openStatus(cmd); status != "Opened "+uri || len(*opened) != 1 {
+		t.Fatalf("marker click=%q, opened=%v", status, *opened)
+	}
+	app = pressMouse(app, x, y)
+	app = releaseMouse(app, x+1, y)
+	if got := app.selectedText(); got != "" || len(*opened) != 1 {
+		t.Fatalf("marker selection copied %q or opened the link", got)
+	}
+}

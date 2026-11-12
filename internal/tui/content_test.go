@@ -48,7 +48,7 @@ func TestRenderedContentLayoutTracksWrappedLines(t *testing.T) {
 
 func TestHighlightMarkdownNestedBoldLinkPreservesText(t *testing.T) {
 	line := "- **[Crit](https://crit.md/)-compatible agent workflow** — review commands"
-	want := "- Crit-compatible agent workflow — review commands"
+	want := "- Crit ↗-compatible agent workflow — review commands"
 	if got := ansi.Strip(highlightMarkdown(line)); got != want {
 		t.Fatalf("highlighted text = %q, want %q", got, want)
 	}

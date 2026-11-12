@@ -3,6 +3,9 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestCopyMarkdownSource(t *testing.T) {
@@ -50,6 +53,37 @@ func TestCopyMarkdownSource(t *testing.T) {
 			end := source.offsets[tt.endLine-1] + source.lines[tt.endLine-1].sourceOffset(tt.end, true)
 			if got := source.copySourceRange(start, end); got != tt.want {
 				t.Fatalf("copied = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExternalLinkMarkSourceMapping(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ source, selected, want string }{
+		{"[Site](https://example.org) after", "Site ↗", "[Site](https://example.org)"},
+		{"[Site](https://example.org) after", "↗", ""},
+		{"[Site](https://example.org) after", "after", "after"},
+		{"<https://example.org>", "https://example.org ↗", "<https://example.org>"},
+		{"https://example.org", "↗", ""},
+	} {
+		t.Run(tc.source+"/"+tc.selected, func(t *testing.T) {
+			parsed := parseMarkdownSource([]string{tc.source}, nil)
+			line := &parsed.lines[0]
+			plain := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil))
+			start := strings.Index(plain, tc.selected)
+			if start < 0 {
+				t.Fatalf("selection missing from %q", plain)
+			}
+			a, b := line.sourceOffset(start, false), line.sourceOffset(start+len(tc.selected), true)
+			if got := parsed.copySourceRange(a, b); got != tc.want {
+				t.Fatalf("copy=%q, want %q", got, tc.want)
+			}
+			if tc.selected == "after" {
+				from := strings.Index(tc.source, "after")
+				if got := plain[line.displayOffset(from):line.displayOffset(from+len("after"))]; got != "after" {
+					t.Fatalf("search mapping=%q", got)
+				}
 			}
 		})
 	}

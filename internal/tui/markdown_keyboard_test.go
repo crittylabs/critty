@@ -98,7 +98,7 @@ func TestKeyboardLinksAndWordDiff(t *testing.T) {
 	for _, links := range [][]linkSpan{nil, {{start: 0, end: len(source), uri: uri}}} {
 		inline := []gitpkg.InlineSegment{{Content: "[<kbd>"}, {Content: "Enter", Changed: true}, {Content: "</kbd>](" + uri + ")"}}
 		view := parsed.lines[0].render(inline, diffCommonTextBg, diffAddedTextBg, links)
-		if ansi.Strip(view) != "⟦Enter⟧" || !strings.Contains(view, ansi.SetHyperlink(uri)) {
+		if ansi.Strip(view) != "⟦Enter⟧ ↗" || !strings.Contains(view, ansi.SetHyperlink(uri)) {
 			t.Fatalf("keyboard lost decoration, label or link: %q", view)
 		}
 		if !strings.Contains(view, bgToAnsi(diffAddedTextBg.GetBackground())) {

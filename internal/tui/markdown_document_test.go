@@ -27,7 +27,7 @@ func TestMarkdownParagraphSourceLines(t *testing.T) {
 		{"`first\nsecond`", []string{" first", "second "}, 0, ""},
 		{"` foo `", []string{" foo "}, 0, ""},
 		{"`` `tick` ``", []string{" `tick` "}, 0, ""},
-		{"[first\nsecond](https://example.org/a_(b))", []string{"first", "second"}, 0, "https://example.org/a_(b)"},
+		{"[first\nsecond](https://example.org/a_(b))", []string{"first", "second ↗"}, 0, "https://example.org/a_(b)"},
 		{"- **first\n  second**", []string{"- first", "  second"}, 0, ""},
 		{"> *first\n> second*", []string{"▎ first", "▎ second"}, 0, ""},
 		{"`first\n\nsecond`", []string{"`first", "", "second`"}, 0, ""},
@@ -103,7 +103,7 @@ func TestMarkdownTableCells(t *testing.T) {
 		name, source string
 		want         []string
 	}{
-		{"nested link destination", "| plain | [label](https://example.org/a_(b)) |", []string{"plain", "label"}},
+		{"nested link destination", "| plain | [label](https://example.org/a_(b)) |", []string{"plain", "label ↗"}},
 		{"empty cell", "| | **bold** |", []string{"", "bold"}},
 		{"unicode", "| 日本語 | é |", []string{"日本語", "é"}},
 	} {
@@ -153,8 +153,8 @@ func TestMarkdownEmptyLabels(t *testing.T) {
 	for _, tc := range []struct{ source, want, uri string }{
 		{"![](./clip.mp4)", "!./clip.mp4", ""},
 		{"[](./guide.md)", "./guide.md", "./guide.md"},
-		{"before [ ](https://example.org) after", "before https://example.org after", "https://example.org"},
-		{"[](https://example.org/a**b**)", "https://example.org/a**b**", "https://example.org/a**b**"},
+		{"before [ ](https://example.org) after", "before https://example.org ↗ after", "https://example.org"},
+		{"[](https://example.org/a**b**)", "https://example.org/a**b** ↗", "https://example.org/a**b**"},
 		{"before ![ ](./chart.png) after", "before !./chart.png after", ""},
 		{"![](https://example.org/a**b**.png)", "!https://example.org/a**b**.png", ""},
 	} {
@@ -178,6 +178,50 @@ func TestMarkdownEmptyLabels(t *testing.T) {
 				t.Fatalf("copied source = %q, want %q", got, tc.source)
 			}
 		})
+	}
+}
+
+func TestMarkdownExternalLinkMarks(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ source, want string }{
+		{"[Site](https://example.org)", "Site ↗"},
+		{"[**Site**](http://example.org)", "Site ↗"},
+		{"<https://example.org>", "https://example.org ↗"},
+		{"https://example.org/path.", "https://example.org/path ↗."},
+		{"[Next](notes.md)", "Next"},
+		{"[Heading](#heading)", "Heading"},
+		{"[Email](mailto:reader@example.org)", "Email"},
+		{"![Image](https://example.org/chart.png)", "!Image"},
+		{"`https://example.org`", " https://example.org "},
+	} {
+		t.Run(tc.source, func(t *testing.T) {
+			parsed := parseMarkdownSource([]string{tc.source}, nil)
+			cached := parsed.lines[0].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+			for name, got := range map[string]string{"document": cached, "inline": highlightInline(tc.source)} {
+				if plain := ansi.Strip(got); plain != tc.want {
+					t.Fatalf("%s = %q, want %q", name, plain, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestExternalLinkMarksInComments(t *testing.T) {
+	app := NewApp("notes.md", AppConfig{})
+	const source = "[Site](https://example.org) and [Local](notes.md)"
+	if got := ansi.Strip(app.renderCommentContent("Reviewer", source, "", 80)); got != "Site ↗ and Local" {
+		t.Fatalf("comment=%q", got)
+	}
+	if got := ansi.Strip(app.renderCommentContent("Reviewer", "[first\nsecond](https://example.org)", "", 80)); got != "first\nsecond ↗" {
+		t.Fatalf("multiline comment=%q", got)
+	}
+	app.modal = commentModal
+	app.modalTextarea.SetValue(source)
+	app.modalTextarea.SetWidth(80)
+	app.modalTextarea.SetHeight(3)
+	view, _ := app.editorView()
+	if got := ansi.Strip(view); !strings.Contains(got, source) || strings.Contains(got, "↗") {
+		t.Fatalf("editor did not keep literal source: %q", got)
 	}
 }
 

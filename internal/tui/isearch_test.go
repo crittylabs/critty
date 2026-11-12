@@ -293,7 +293,7 @@ func TestISearchHiddenMatchPreservesLinkAndFormatting(t *testing.T) {
 		for _, cell := range row {
 			if cell.Link.URL == uri {
 				count++
-				if cell.Style.Attrs&uv.AttrBold == 0 {
+				if cell.Content != "↗" && strings.TrimSpace(cell.Content) != "" && cell.Style.Attrs&uv.AttrBold == 0 {
 					t.Fatal("highlighted link lost bold formatting")
 				}
 			}
