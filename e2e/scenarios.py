@@ -440,7 +440,9 @@ def transient_views() -> None:
     note.write_text("# Notes\n\nOriginal content.\n")
     subprocess.run(["git", "add", "notes.md"], cwd=work, env=env, check=True)
     subprocess.run(["git", "commit", "-qm", "base"], cwd=work, env=env, check=True)
-    note.write_text("# Notes\n\nChanged content.\n- [ ] Confirm\n")
+    note.write_text(
+        "# Notes\n\nChanged content.\n- [ ] Confirm\n\n[Linked guide](guide.md#details)\n"
+    )
     subprocess.run(["git", "add", "notes.md"], cwd=work, env=env, check=True)
 
     def snapshot() -> dict[str, tuple[int, bytes]]:
@@ -456,6 +458,7 @@ def transient_views() -> None:
         "# Questionnaire\n\n- [ ] Confirm demo <!-- form: id=confirm required -->\n"
     )
     patch = work / "input.diff"
+    (work / "guide.md").write_text("# Linked guide\n\n## Details\n\nDestination content.\n")
     patch.write_text(
         subprocess.run(
             ["git", "diff", "--cached"],
@@ -565,6 +568,22 @@ def transient_views() -> None:
             assert "Type your" not in screen(), screen()
             assert snapshot() == before, "view wrote files after edit keys"
             if name == "view-doc":
+                tmux("send-keys", "-t", pane, "g", "Down", "Down", "Down", "Down", "Down", "o")
+                wait_until(
+                    lambda: "Destination content." in screen() and "Back" in screen(),
+                    "view follows a local file and heading link",
+                )
+                # Ghostty's default Option+arrows emit word-motion sequences.
+                tmux("send-keys", "-l", "-t", pane, "\x1bb")
+                wait_until(
+                    lambda: "Changed content." in screen() and "Forward" in screen(),
+                    "view Back restores the original document",
+                )
+                tmux("send-keys", "-t", pane, "M-Right")
+                wait_until(
+                    lambda: "Destination content." in screen(),
+                    "view Forward restores the linked document",
+                )
                 rows = screen().splitlines()
                 y, row = next(
                     (y, row) for y, row in enumerate(rows, 1) if "Close q" in row

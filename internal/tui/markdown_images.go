@@ -182,6 +182,9 @@ func (t *FileTab) imageSide(before bool, markdown int) *previewSide {
 }
 
 func (m AppModel) imageSource() gitpkg.ReviewSource {
+	if m.readOnly && len(m.tabs) > 0 && m.tab().viewDocument {
+		return gitpkg.ReviewSource{}
+	}
 	if m.source != nil {
 		return *m.source
 	}
@@ -197,7 +200,7 @@ func (m AppModel) findMarkdownImages() tea.Cmd {
 	source := m.imageSource()
 	return func() tea.Msg {
 		msg := markdownImagesMsg{path: t.path, images: []markdownImage{}}
-		local := t.attachment != nil || !m.multiFile
+		local := t.attachment != nil || !m.multiFile || t.viewDocument
 		docPath := t.path
 		if t.attachment != nil {
 			docPath = t.attachment.Source

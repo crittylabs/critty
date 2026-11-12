@@ -6,6 +6,7 @@
 
 - **Keyboard labels in Markdown**: Read `<kbd>` labels as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested key combinations keep a single pair of brackets per key, and copying retains the Markdown source without the display brackets.
 - **Syntax highlighting in Markdown code blocks**: Read fenced code in documents, comments, and the comment editor with colors for light and dark terminals.  The fence language selects the syntax, and `suggestion` blocks in comments use the target file's language.  Multiline strings and comments keep their context; blocks without a recognized language remain plain text.
+- **Document browsing in view mode**: Follow local file and heading links without adding tabs, reusing existing tabs when available.  Back and Forward restore documents and reading positions, with up to 64 visits held in memory.  Web links open in the browser, and files Critty cannot display offer external opening.  Review editing remains disabled, and navigation saves no review or history files.
 
 ### Changed
 

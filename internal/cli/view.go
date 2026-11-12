@@ -21,7 +21,7 @@ var reviewDemo bool
 var viewCmd = &cobra.Command{
 	Use:     "view [file[:LINE]]",
 	Short:   "View changes or a document without reviewing or saving",
-	Long:    "View Git changes, a document, a supplied diff, or attachments in the current terminal.  Search and display controls work, but review editing and external applications are disabled.  Nothing is saved.",
+	Long:    "View Git changes, a document, a supplied diff, or attachments in the current terminal.  Follow local file and heading links, and use Back/Forward to restore reading positions.  Web links open in the browser; unsupported files offer to open externally.  Review editing is disabled, and nothing is saved.",
 	Args:    cobra.MaximumNArgs(1),
 	PreRunE: validateScopeFlags,
 	RunE:    func(_ *cobra.Command, args []string) error { return runReviewInput(args, true) },

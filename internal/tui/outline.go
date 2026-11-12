@@ -33,6 +33,14 @@ func newDocumentOutline() documentOutline {
 }
 
 func outlineHeadingLabel(n ast.Node, source []byte) string {
+	label := strings.Join(strings.Fields(outlineHeadingText(n, source)), " ")
+	if label == "" {
+		return "(untitled)"
+	}
+	return label
+}
+
+func outlineHeadingText(n ast.Node, source []byte) string {
 	var b strings.Builder
 	var visit func(ast.Node)
 	visit = func(n ast.Node) {
@@ -57,11 +65,7 @@ func outlineHeadingLabel(n ast.Node, source []byte) string {
 		}
 	}
 	visit(n)
-	label := strings.Join(strings.Fields(ansi.Strip(b.String())), " ")
-	if label == "" {
-		return "(untitled)"
-	}
-	return label
+	return strings.TrimSpace(ansi.Strip(b.String()))
 }
 
 // The title and heading rows share at most two thirds of the Files body.

@@ -57,6 +57,7 @@ const (
 	helpModal
 	gotoLineModal
 	openSourceModal
+	openExternalModal
 	fileSelectModal
 	lightboxModal
 	formTextModal
@@ -109,6 +110,7 @@ const displayTabWidth = 4
 type AppModel struct {
 	textSelection  contentTextSelection
 	readOnly       bool
+	browsing       viewNavigation
 	reload         reloadState
 	images         imageDisplay
 	math           *mathrender.Renderer
@@ -280,6 +282,10 @@ type renderedScreenLayout struct {
 	hasSplitButton      bool
 	finishButton        mouseRect
 	hasFinishButton     bool
+	backButton          mouseRect
+	hasBackButton       bool
+	forwardButton       mouseRect
+	hasForwardButton    bool
 	footerHelp          mouseRect
 	hasFooterHelp       bool
 	formListButton      mouseRect
@@ -611,7 +617,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
 		reloadCmd := app.resumeReload()
-		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnActivity(m.activeTab, msg), app.prepareImage(),
+		return app, tea.Batch(cmd, reloadCmd, app.syncViewWatch(), app.recheckImagesOnActivity(m.activeTab, msg), app.prepareImage(),
 			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	case *AppModel:
 		app.updateFinishVerdictOnInput(emptyBefore)
@@ -619,7 +625,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		app.refreshHeaderLayout(previousHeaderHeight)
 		app.markVisibleForms()
 		reloadCmd := app.resumeReload()
-		return app, tea.Batch(cmd, reloadCmd, app.recheckImagesOnActivity(m.activeTab, msg), app.prepareImage(),
+		return app, tea.Batch(cmd, reloadCmd, app.syncViewWatch(), app.recheckImagesOnActivity(m.activeTab, msg), app.prepareImage(),
 			app.scheduleEditorImages(), app.prepareCommentImages(), app.prepareLightbox())
 	}
 	return model, cmd
@@ -902,6 +908,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.focusNewReply()
 		return m, nil
 
+	case viewLinkLoadedMsg:
+		return m, m.finishViewLink(msg)
+
 	case sourceEditorReadyMsg:
 		if msg.err != nil {
 			m.locationError = msg.err.Error()
@@ -1024,7 +1033,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.modal == gotoLineModal || m.modal == openSourceModal {
+	if m.modal == gotoLineModal || m.modal == openSourceModal || m.modal == openExternalModal {
 		return m.handleLocationModal(msg)
 	}
 	if m.modal == fileSelectModal {
@@ -1120,6 +1129,14 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // handleReviewKey handles a key outside dialogs and search mode.
 func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.tab()
+	if m.readOnly {
+		switch msg.String() {
+		case "alt+left", "alt+b":
+			return m, m.stepViewHistory(false)
+		case "alt+right", "alt+f":
+			return m, m.stepViewHistory(true)
+		}
+	}
 	switch {
 	case isUndoKey(msg.String()):
 		m.undoReview()
@@ -2823,7 +2840,7 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 		if t.attachment.Removed {
 			pathNote = " (history, read-only)"
 		}
-	} else if m.filePath != "" && t.path != overallCommentsPath {
+	} else if m.filePath != "" && t.path != overallCommentsPath && !m.readOnly {
 		displayPath = m.filePath
 	}
 
@@ -2949,7 +2966,7 @@ func (m AppModel) renderReviewBar() string {
 		description += style.Render(scope) + reviewBarStyle.Render(" ")
 	}
 	description += reviewBarStyle.Render(subject)
-	buttons := []string{m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.submitButton()}
+	buttons := []string{m.viewHistoryButton(false), m.viewHistoryButton(true), m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.submitButton()}
 	var rows []string
 	row := ""
 	for _, button := range buttons {
@@ -3183,6 +3200,12 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if !t.selecting {
 		layout.finishButton, layout.hasFinishButton = buttonRect(header, 0, m.submitButton())
 	}
+	if button := m.viewHistoryButton(false); button != "" {
+		layout.backButton, layout.hasBackButton = buttonRect(header, 0, button)
+	}
+	if button := m.viewHistoryButton(true); button != "" {
+		layout.forwardButton, layout.hasForwardButton = buttonRect(header, 0, button)
+	}
 	layout.copyTextButton, layout.hasCopyTextButton = buttonRect(footer, footerTop, m.copyTextButton())
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
@@ -3405,7 +3428,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal != noModal && m.clickedModalDismiss(mouse) {
 		return m.handleKeyPress(tea.KeyPressMsg{Code: tea.KeyEscape})
 	}
-	if m.modal == gotoLineModal || m.modal == openSourceModal {
+	if m.modal == gotoLineModal || m.modal == openSourceModal || m.modal == openExternalModal {
 		return m.handleLocationModalMouse(mouse)
 	}
 	if m.modal == fileSelectModal {
@@ -3449,6 +3472,15 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	}
 	if m.modal != noModal {
 		return m, nil
+	}
+	if m.readOnly {
+		_, layout := m.renderReviewScreen()
+		if layout.hasBackButton && layout.backButton.contains(mouse) {
+			return m, m.stepViewHistory(false)
+		}
+		if layout.hasForwardButton && layout.forwardButton.contains(mouse) {
+			return m, m.stepViewHistory(true)
+		}
 	}
 	if m.handleHorizontalScrollClick(mouse) {
 		return m, nil
@@ -4354,7 +4386,7 @@ func (m AppModel) renderFooterHints() string {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
 	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
-		return m.renderFooterItems([]string{m.footerHelpButton(), m.outlineHint(), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close"), m.searchHint()})
+		return m.renderFooterItems([]string{m.footerHelpButton(), m.outlineHint(), k("o/M-o", "follow link"), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close"), m.searchHint()})
 	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
@@ -4547,6 +4579,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
 			{keys: "V · O", desc: "reading view / open all comments"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
+			{keys: "o/M-o · click", desc: "follow a link or open an image; local files stay in the viewer"},
+			{keys: "M-←/M-→ · M-b/M-f · Back/Forward", desc: "restore previous/next document and reading position (up to 64 visits)"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
 			{keys: "M-w", desc: "copy selected text or reference"},
@@ -4968,7 +5002,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 	innerWidth := modalWidth - 6
 
 	switch m.modal {
-	case gotoLineModal, openSourceModal:
+	case gotoLineModal, openSourceModal, openExternalModal:
 		content, locationRegions := m.locationModalContent(innerWidth)
 		regions = append(regions, locationRegions...)
 		modalContent = frameStyle.Width(modalWidth).Render(content)

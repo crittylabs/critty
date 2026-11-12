@@ -252,7 +252,11 @@ func (m *AppModel) handleLocationModalMouse(mouse tea.Mouse) (tea.Model, tea.Cmd
 }
 
 func (m *AppModel) confirmSourceEditor() tea.Cmd {
+	external := m.modal == openExternalModal
 	m.modal = noModal
+	if external {
+		return m.openLink(m.pendingLocation.path, false)
+	}
 	return m.openSourceEditor(m.pendingLocation)
 }
 
@@ -279,9 +283,13 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 	if m.pendingLocation.line > 0 {
 		target += fmt.Sprintf(" L%d", m.pendingLocation.line)
 	}
-	title, closeRegion := modalTitle("Open in editor?", width)
+	caption, explanation := "Open in editor?", "This location is not in the review."
+	if m.modal == openExternalModal {
+		caption, explanation = "Open in external application?", "This file cannot be displayed in Critty."
+	}
+	title, closeRegion := modalTitle(caption, width)
 	prefix := lipgloss.Wrap(title+"\n"+
-		target+"\nThis location is not in the review.\n\n", max(1, width), "")
+		target+"\n"+explanation+"\n\n", max(1, width), "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{
 		{rendered: m.renderPrimaryModalButton("Open", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
 		{rendered: m.renderModalButton("Cancel", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},

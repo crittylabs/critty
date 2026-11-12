@@ -4,6 +4,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
 
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
@@ -107,6 +108,8 @@ type markdownSource struct {
 	markup          []markdownMarkup
 	fences          []markdownFence
 	headings        []outlineHeading
+	headingText     []string
+	headingAnchors  map[string]int
 	suggestionLexer chroma.Lexer
 }
 
@@ -134,6 +137,13 @@ func parseMarkdownSource(lines []string, known map[int]bool, suggestion ...chrom
 		result.parseRun(start, end, known != nil)
 		start = end
 	}
+	ids := parser.NewIDs(parser.WithIDGenerator(markdownHeadingIDs{}))
+	result.headingAnchors = make(map[string]int, len(result.headings))
+	for i, heading := range result.headings {
+		id := string(ids.Generate([]byte(result.headingText[i]), ast.KindHeading))
+		result.headingAnchors[id] = heading.line
+	}
+	result.headingText = nil
 	return result
 }
 
@@ -158,6 +168,7 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		switch n.(type) {
 		case *ast.Paragraph, *ast.Heading, *extast.TableCell:
 			if heading, ok := n.(*ast.Heading); ok {
+				m.headingText = append(m.headingText, outlineHeadingText(heading, data))
 				m.headings = append(m.headings, outlineHeading{
 					line: start + lineAt(heading.Pos()) + 1, level: heading.Level,
 					label: outlineHeadingLabel(heading, data),
@@ -218,6 +229,22 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		line.tokens = append(line.tokens, markdownToken{start: pos, end: len(line.source), text: line.source[pos:]})
 		line.literal = false
 	}
+}
+
+// Heading anchors retain Unicode text and use numbered suffixes for duplicates.
+type markdownHeadingIDs struct{}
+
+func (markdownHeadingIDs) Generate(value []byte, _ ast.NodeKind) []byte {
+	return []byte(strings.Map(func(r rune) rune {
+		switch {
+		case unicode.IsLetter(r), unicode.IsNumber(r), unicode.IsMark(r), r == '-', r == '_':
+			return unicode.ToLower(r)
+		case r == ' ':
+			return '-'
+		default:
+			return -1
+		}
+	}, string(value)))
 }
 
 // Parse only paragraph content here. Reference definitions from another block

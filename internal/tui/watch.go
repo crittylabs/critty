@@ -64,6 +64,9 @@ func (m AppModel) startWatch() tea.Cmd {
 			files = append(files, d.Source)
 		}
 	}
+	if m.readOnly && len(m.tabs) > 0 && m.tab().viewDocument {
+		source, files = nil, []string{m.tab().path}
+	}
 	return func() tea.Msg {
 		w, err := newSourceWatcher(ctx, source, files)
 		return watchReadyMsg{epoch, w, err}

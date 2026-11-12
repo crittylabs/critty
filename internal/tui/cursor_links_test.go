@@ -202,7 +202,7 @@ func TestFollowLocalMarkdownLinks(t *testing.T) {
 	}
 }
 
-func TestLocalMarkdownLinkClickAndViewIsolation(t *testing.T) {
+func TestLocalMarkdownLinkClick(t *testing.T) {
 	app := setupAppWithDoc(t, "[Guide](guide.md)\n")
 	path := filepath.Join(filepath.Dir(app.tab().path), "guide.md")
 	app.tabs = append(app.tabs, FileTab{path: path,
@@ -223,10 +223,5 @@ func TestLocalMarkdownLinkClickAndViewIsolation(t *testing.T) {
 	app, _ = updateApp(app, tea.MouseReleaseMsg{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft})
 	if app.activeTab != 1 || app.modal != noModal {
 		t.Fatal("click did not follow the local link")
-	}
-	app.activateTab(0)
-	app.readOnly = true
-	if cmd, ok := app.followLink("guide.md"); cmd != nil || ok || app.activeTab != 0 || app.modal != noModal {
-		t.Fatal("view mode must not start following local files")
 	}
 }

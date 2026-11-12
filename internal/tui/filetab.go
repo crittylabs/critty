@@ -29,6 +29,7 @@ type FileTab struct {
 	markdownImagesPending bool
 	attachment            *review.AttachedDocument
 	path                  string
+	viewDocument          bool // local document reached by browsing in view mode
 	oldPath               string
 	status                string
 	textconv              gitpkg.Textconv
@@ -129,6 +130,9 @@ func (m *AppModel) activateTab(index int) bool {
 	}
 	m.saveTabViewport()
 	m.activeTab = index
+	if m.readOnly {
+		m.browsing.request++
+	}
 	return true
 }
 

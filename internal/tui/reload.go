@@ -98,6 +98,14 @@ func (m *AppModel) resumeReload() tea.Cmd {
 }
 
 func (m *AppModel) requestReload(force bool) tea.Cmd {
+	if m.readOnly && len(m.tabs) > 0 && m.tab().viewDocument {
+		if m.reloadBlocked() || m.reload.busy {
+			m.reload.pending = m.reload.pending || force
+			return nil
+		}
+		m.reload.busy = true
+		return m.loadViewLink(m.tab().path, "", true)
+	}
 	if !m.canReload() || m.err != nil {
 		return nil
 	}

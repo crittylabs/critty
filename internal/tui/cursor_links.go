@@ -190,6 +190,9 @@ func (m AppModel) localLinkPath(destination string, editor bool) (string, bool) 
 }
 
 func (m *AppModel) followLink(destination string) (tea.Cmd, bool) {
+	if m.readOnly {
+		return m.followViewLink(destination)
+	}
 	if !m.readOnly {
 		if path, ok := m.localLinkPath(destination, false); ok {
 			location := sourceLocation{path: path}
@@ -209,9 +212,6 @@ func (m *AppModel) followLink(destination string) (tea.Cmd, bool) {
 }
 
 func (m AppModel) openLink(destination string, editor bool) tea.Cmd {
-	if m.readOnly {
-		return nil
-	}
 	arg, ok := m.linkArgument(destination, editor)
 	if !ok {
 		return nil
