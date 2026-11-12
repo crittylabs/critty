@@ -106,16 +106,35 @@ func (m *AppModel) openSourceEditor(location sourceLocation) tea.Cmd {
 // navigateSource uses the new-side coordinates, matching the file on disk.
 // Complete documents include unchanged lines; partial patches may lack them.
 func (m *AppModel) navigateSource(location sourceLocation) tea.Cmd {
+	if m.focusSource(location) {
+		return nil
+	}
+	if regularFile(m.sourcePath(location.path)) {
+		m.pendingLocation = location
+		m.modal, m.modalFocus = openSourceModal, 1
+		m.locationError = ""
+	} else {
+		m.locationError = "File does not exist on disk."
+	}
+	return nil
+}
+
+func (m *AppModel) focusSource(location sourceLocation) bool {
 	path := m.sourcePath(location.path)
 	for i := range m.tabs {
 		t := &m.tabs[i]
-		if m.sourcePath(t.path) != path || t.outsideChanges {
+		matches := m.sourcePath(t.path) == path
+		if t.attachment != nil {
+			matches = matches || m.sourcePath(t.attachment.Source) == path
+		}
+		if !matches || (t.outsideChanges && location.line > 0) {
 			continue
 		}
 		if location.line > 0 && (t.doc == nil || !t.doc.HasLine(location.line)) {
 			continue
 		}
 		changed := m.activateTab(i)
+		m.locationError = ""
 		m.focused = contentPane
 		t.selecting, t.cursorOnAnnotation = false, false
 		t.cursorOnForm = false
@@ -132,16 +151,9 @@ func (m *AppModel) navigateSource(location sourceLocation) tea.Cmd {
 			m.positionTabViewport(1)
 		}
 		m.scrollToCursor()
-		return nil
+		return true
 	}
-	if regularFile(path) {
-		m.pendingLocation = location
-		m.modal, m.modalFocus = openSourceModal, 1
-		m.locationError = ""
-	} else {
-		m.locationError = "File does not exist on disk."
-	}
-	return nil
+	return false
 }
 
 const gotoLinePrompt = "Line: "

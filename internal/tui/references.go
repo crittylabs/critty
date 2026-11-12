@@ -296,6 +296,5 @@ func (m *AppModel) activateReference(uri string) (tea.Cmd, bool) {
 	if cmd, ok := m.openImageLink(uri); ok {
 		return cmd, true
 	}
-	cmd := m.openLink(uri, false)
-	return cmd, uri != "" && cmd != nil
+	return m.followLink(uri)
 }

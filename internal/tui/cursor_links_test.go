@@ -8,6 +8,8 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestMarkdownLinkRefs(t *testing.T) {
@@ -98,6 +100,7 @@ func TestOpenLinksRespectsRemoteAndSchemes(t *testing.T) {
 
 func TestOpenNonImageMarkdownTarget(t *testing.T) {
 	opened := stubOpener(t, false)
+	t.Setenv("EDITOR", "vi")
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "clip.mp4"), []byte("video"), 0o600); err != nil {
 		t.Fatal(err)
@@ -107,8 +110,10 @@ func TestOpenNonImageMarkdownTarget(t *testing.T) {
 	app.width, app.height = 100, 35
 	app.recalculateLayout()
 	app.rebuildContent()
-	if status := openStatus(app.openReferenceAtCursor()); status != "Opened ./clip.mp4" {
-		t.Fatalf("keyboard open: %q", status)
+	if cmd := app.openReferenceAtCursor(); cmd == nil || app.modal != noModal {
+		t.Fatalf("keyboard open: modal=%v cmd=%v", app.modal, cmd)
+	} else if ready := cmd().(sourceEditorReadyMsg); ready.err != nil || ready.cmd.Args[len(ready.cmd.Args)-1] != filepath.Join(dir, "clip.mp4") {
+		t.Fatalf("editor command: %+v", ready)
 	}
 	cells, _ := linkCells(app.contentViewport.GetContent(), "./clip.mp4")
 	if len(cells) == 0 {
@@ -118,14 +123,110 @@ func TestOpenNonImageMarkdownTarget(t *testing.T) {
 	point := cells[len(cells)-1]
 	app = pressMouse(app, left+point.X, top+point.Y)
 	app, cmd := updateApp(app, tea.MouseReleaseMsg{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft})
-	if status := openStatus(cmd); status != "Opened ./clip.mp4" || len(*opened) != 2 {
-		t.Fatalf("mouse open: %q opened=%v", status, *opened)
+	if cmd == nil || app.modal != noModal || len(*opened) != 0 {
+		t.Fatalf("mouse open: modal=%v opened=%v", app.modal, *opened)
 	}
 	app.session.Meta.CWD = dir
 	app.openLineComment()
 	app.modalTextarea.SetValue("![](./clip.mp4)")
 	app.modalTextarea.MoveToEnd()
-	if status := openStatus(app.openReferenceAtCursor()); status != "Opened ./clip.mp4" || len(*opened) != 3 {
+	if status := openStatus(app.openReferenceAtCursor()); status != "Opened ./clip.mp4" || len(*opened) != 1 {
 		t.Fatalf("editor open: %q opened=%v", status, *opened)
+	}
+}
+
+func TestFollowLocalMarkdownLinks(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		tab        bool
+		disk       bool
+		attachment bool
+		outside    bool
+	}{
+		{name: "review snapshot", tab: true},
+		{name: "existing file", tab: true, disk: true},
+		{name: "attachment source", tab: true, attachment: true},
+		{name: "retained tab", tab: true, outside: true},
+		{name: "editor fallback", disk: true},
+		{name: "missing file"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := stubOpener(t, false)
+			t.Setenv("EDITOR", "vi")
+			app := setupAppWithDoc(t, "[Guide](../guide%20file.md)\n")
+			dir := filepath.Dir(app.tab().path)
+			app.session.Meta.CWD = dir
+			// Resolve relative to the reviewed file, not the process directory.
+			app.tab().path = "docs/start.md"
+			path := filepath.Join(dir, "guide file.md")
+			if tc.disk {
+				if err := os.WriteFile(path, []byte("# Guide\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.tab {
+				target := FileTab{path: "guide file.md", doc: document.FromContent(path, []byte("# Guide\n")), state: &fileReview{}, outsideChanges: tc.outside}
+				if tc.attachment {
+					attachment := review.AttachedDocument{Source: path}
+					target.path, target.attachment = "saved.md", &attachment
+				}
+				app.tabs = append(app.tabs, target)
+			}
+			app.width, app.height = 100, 30
+			app.recalculateLayout()
+			app.rebuildContent()
+			app.tab().cursorLine = 1
+			model, cmd := app.updateMessage(tea.KeyPressMsg{Code: 'o'})
+			app = *model.(*AppModel)
+			if len(*opened) != 0 {
+				t.Fatal("local link must not invoke the system opener")
+			}
+			switch {
+			case tc.tab:
+				if cmd != nil || app.activeTab != 1 || app.modal != noModal || app.focused != contentPane {
+					t.Fatalf("navigation: tab=%d modal=%v", app.activeTab, app.modal)
+				}
+			case tc.disk:
+				if cmd == nil || app.modal != noModal || app.activeTab != 0 {
+					t.Fatalf("editor fallback: modal=%v tab=%d", app.modal, app.activeTab)
+				}
+				if ready := cmd().(sourceEditorReadyMsg); ready.err != nil || ready.cmd.Args[len(ready.cmd.Args)-1] != path {
+					t.Fatalf("editor command: %+v", ready)
+				}
+			default:
+				if app.activeTab != 0 || app.modal != noModal || app.locationError == "" {
+					t.Fatal("missing file must report an error without changing tabs")
+				}
+			}
+		})
+	}
+}
+
+func TestLocalMarkdownLinkClickAndViewIsolation(t *testing.T) {
+	app := setupAppWithDoc(t, "[Guide](guide.md)\n")
+	path := filepath.Join(filepath.Dir(app.tab().path), "guide.md")
+	app.tabs = append(app.tabs, FileTab{path: path,
+		doc: document.FromContent(path, []byte("# Guide\n")), state: &fileReview{}})
+	app.width, app.height = 100, 30
+	app.recalculateLayout()
+	app.rebuildContent()
+	cells, _ := linkCells(app.contentViewport.GetContent(), "guide.md")
+	if len(cells) == 0 {
+		t.Fatal("link has no clickable cells")
+	}
+	left, top, _, _ := app.contentBounds()
+	point := cells[len(cells)-1]
+	app = pressMouse(app, left+point.X, top+point.Y)
+	if app.activeTab != 0 {
+		t.Fatal("press must allow dragging to select the label")
+	}
+	app, _ = updateApp(app, tea.MouseReleaseMsg{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft})
+	if app.activeTab != 1 || app.modal != noModal {
+		t.Fatal("click did not follow the local link")
+	}
+	app.activateTab(0)
+	app.readOnly = true
+	if cmd, ok := app.followLink("guide.md"); cmd != nil || ok || app.activeTab != 0 || app.modal != noModal {
+		t.Fatal("view mode must not start following local files")
 	}
 }

@@ -142,13 +142,14 @@ func (m *AppModel) openReferenceAtCursor() tea.Cmd {
 					return m.openImageAtCursor()
 				}
 			}
-			return m.openLink(ref.destination, false)
+			cmd, _ := m.followLink(ref.destination)
+			return cmd
 		}
 	}
 	for _, ref := range markdownLinkRefs(t.doc.Content) {
 		if ref.line == t.cursorLine {
-			if _, ok := m.linkArgument(ref.destination, false); ok {
-				return m.openLink(ref.destination, false)
+			if cmd, ok := m.followLink(ref.destination); ok {
+				return cmd
 			}
 		}
 	}
@@ -159,13 +160,18 @@ func (m AppModel) linkArgument(destination string, editor bool) (string, bool) {
 	if web, ok := webImageURL(destination); ok {
 		return web, true
 	}
+	path, ok := m.localLinkPath(destination, editor)
+	return path, ok && regularFile(path)
+}
+
+func (m AppModel) localLinkPath(destination string, editor bool) (string, bool) {
 	u, err := url.Parse(destination)
 	if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" || u.Path == "" {
 		return "", false
 	}
 	path := filepath.FromSlash(u.Path)
 	if !filepath.IsAbs(path) {
-		base := m.tab().path
+		base := m.sourcePath(m.tab().path)
 		if editor {
 			base = "comment.md"
 			if m.session != nil {
@@ -175,12 +181,31 @@ func (m AppModel) linkArgument(destination string, editor bool) (string, bool) {
 				}
 			}
 		} else if m.tab().attachment != nil {
-			base = m.tab().attachment.Source
+			base = m.sourcePath(m.tab().attachment.Source)
 		}
 		path = filepath.Join(filepath.Dir(base), path)
 	}
 	abs, err := filepath.Abs(path)
-	return abs, err == nil && regularFile(abs)
+	return abs, err == nil
+}
+
+func (m *AppModel) followLink(destination string) (tea.Cmd, bool) {
+	if !m.readOnly {
+		if path, ok := m.localLinkPath(destination, false); ok {
+			location := sourceLocation{path: path}
+			if m.focusSource(location) {
+				return nil, true
+			}
+			if !regularFile(path) {
+				m.locationError = "File does not exist on disk."
+				return nil, true
+			}
+			m.locationError = ""
+			return m.openSourceEditor(location), true
+		}
+	}
+	cmd := m.openLink(destination, false)
+	return cmd, cmd != nil
 }
 
 func (m AppModel) openLink(destination string, editor bool) tea.Cmd {
