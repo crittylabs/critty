@@ -75,6 +75,9 @@ var (
 	// terminalIsDark records the background probe's answer for inputs that
 	// are created later and pick their default styles from it.
 	terminalIsDark = true
+	// The first background response initializes styles even when it matches
+	// the assumed dark background.  Cached Markdown must see that update.
+	markdownPaletteRevision uint64
 
 	commentBorderColor        = lipgloss.BrightBlack
 	commentFocusedBorderColor = lipgloss.BrightBlue
@@ -406,6 +409,7 @@ var (
 func initAdaptiveStyles(hasDarkBG bool) {
 	ld := lipgloss.LightDark(hasDarkBG)
 	terminalIsDark = hasDarkBG
+	markdownPaletteRevision++
 	textPrimary = ld(lipgloss.Black, lipgloss.BrightWhite)
 	textSecondary = ld(lipgloss.BrightBlack, muted)
 	textColors = newTextPalette(ld)

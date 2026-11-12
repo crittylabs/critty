@@ -7,6 +7,10 @@
 - **Keyboard labels in Markdown**: Read `<kbd>` labels as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested key combinations keep a single pair of brackets per key, and copying retains the Markdown source without the display brackets.
 - **Syntax highlighting in Markdown code blocks**: Read fenced code in documents, comments, and the comment editor with colors for light and dark terminals.  The fence language selects the syntax, and `suggestion` blocks in comments use the target file's language.  Multiline strings and comments keep their context; blocks without a recognized language remain plain text.
 
+### Fixed
+
+- **Markdown colors on dark terminals**: Inline code shows its shaded background immediately after opening a document in a dark terminal.
+
 ## 1.11.2
 
 ### Added

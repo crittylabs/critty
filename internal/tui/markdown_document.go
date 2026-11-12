@@ -70,6 +70,7 @@ type markdownRender struct {
 	text, plain string
 	width       int
 	dark, set   bool
+	palette     uint64
 	with        markdownInlineKey
 }
 
@@ -395,7 +396,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 	key := inlineKey(inline)
 	cacheable := len(links) == 0 && line.previewTokens == nil
 	slot := line.cacheSlot(key)
-	if cacheable && slot.set && slot.dark == terminalIsDark && slot.with == key {
+	if cacheable && slot.set && slot.dark == terminalIsDark && slot.palette == markdownPaletteRevision && slot.with == key {
 		return slot.text
 	}
 	var b strings.Builder
@@ -478,7 +479,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		result = highlightMarkdownBlock(result)
 	}
 	if cacheable {
-		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, set: true, with: key}
+		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, palette: markdownPaletteRevision, set: true, with: key}
 	}
 	return result
 }
