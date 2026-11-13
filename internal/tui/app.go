@@ -4385,9 +4385,6 @@ func (m AppModel) renderFooterHints() string {
 	if m.modal == noModal && m.hasTextSelection() {
 		return ansi.Truncate(m.copyTextButton()+footerStyle.Render(" · esc: cancel text selection"), m.width, "")
 	}
-	if m.readOnly && !m.isearch.active && m.locationError == "" && m.notice.text == "" && m.height >= footerMinHeight {
-		return m.renderFooterItems([]string{m.footerHelpButton(), m.outlineHint(), k("o/M-o", "follow link"), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close"), m.searchHint()})
-	}
 	if m.isearch.active {
 		controls, _ := m.isearchControls(0)
 		return m.renderISearchPrompt() + "\n" + controls
@@ -4403,7 +4400,13 @@ func (m AppModel) renderFooterHints() string {
 	}
 	t := m.tabs[m.activeTab]
 	var items []string
-	if t.selecting {
+	if m.readOnly {
+		if t.selecting {
+			items = []string{k("esc", "cancel"), k("v", "toggle select"), k("M-w", "copy reference")}
+		} else {
+			items = []string{k("s", "sidebar"), k("t", "files/comments"), k("o/M-o", "follow link"), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close")}
+		}
+	} else if t.selecting {
 		items = []string{
 			k("enter", "comment selection"),
 			k("esc", "cancel"),
@@ -4433,14 +4436,14 @@ func (m AppModel) renderFooterHints() string {
 		if len(t.state.Comments) > 0 {
 			items = append(items, k("r/space/R", "resolve/+next"))
 		}
-		if m.multiFile {
-			items = append([]string{
-				k("tab/S-tab", "⇵ tab"),
-				k("n/N", "⇵ all hunks & items"),
-			}, items...)
-		}
 	}
-	if row, ok := m.formRows[t.path][t.cursorLine]; ok && row.item != nil && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" {
+	if m.multiFile && !t.selecting {
+		items = append([]string{
+			k("tab/S-tab", "⇵ tab"),
+			k("n/N", "⇵ all hunks & items"),
+		}, items...)
+	}
+	if row, ok := m.formRows[t.path][t.cursorLine]; !m.readOnly && ok && row.item != nil && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" {
 		action := "answer"
 		if row.item.SelectAll != nil {
 			action = "select all"
@@ -4452,7 +4455,7 @@ func (m AppModel) renderFooterHints() string {
 		}
 		items = append([]string{k("space", action)}, items...)
 	}
-	if button := m.formListButton(); button != "" {
+	if button := m.formListButton(); !m.readOnly && button != "" {
 		items = append([]string{button}, items...)
 	}
 	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)

@@ -1146,6 +1146,17 @@ func TestReadOnlyViewer(t *testing.T) {
 	if !strings.Contains(plain, "View the document.") || strings.Contains(plain, "read-only") || strings.Contains(plain, "Review the") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
 		t.Fatalf("missing read-only UI: %s", plain)
 	}
+	for _, hint := range []string{"Images:", "s sidebar", "t files/comments"} {
+		if !strings.Contains(ansi.Strip(app.renderFooter()), hint) {
+			t.Fatalf("missing view footer control: %s", hint)
+		}
+	}
+	app.tab().selecting = true
+	footer := ansi.Strip(app.renderFooter())
+	if !strings.Contains(footer, "ESC cancel") || strings.Contains(footer, "comment selection") {
+		t.Fatalf("incorrect view selection hints: %s", footer)
+	}
+	app.tab().selecting = false
 	editorMessage(&app, tea.KeyPressMsg{Code: '/'})
 	if !app.isearch.active {
 		t.Fatal("read-only search unavailable")

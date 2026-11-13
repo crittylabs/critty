@@ -293,16 +293,19 @@ func TestImagesTogglePreservesTextInput(t *testing.T) {
 			t.Fatalf("M-i did not hide previews (read-only=%t)", readOnly)
 		}
 	}
-	app.readOnly = false
-	app.width, app.height = 100, 40
-	app.recalculateLayout()
-	_, layout := app.renderReviewScreen()
-	if !layout.hasImagesButton {
-		t.Fatal("missing clickable image toggle")
-	}
-	app, _ = updateApp(app, tea.MouseClickMsg{X: layout.imagesButton.left, Y: layout.imagesButton.top, Button: tea.MouseLeft})
-	if app.images.hidden {
-		t.Fatal("click did not restore images")
+	for _, readOnly := range []bool{false, true} {
+		app.readOnly = readOnly
+		app.images.hidden = true
+		app.width, app.height = 100, 40
+		app.recalculateLayout()
+		_, layout := app.renderReviewScreen()
+		if !layout.hasImagesButton {
+			t.Fatalf("missing clickable image toggle (read-only=%t)", readOnly)
+		}
+		app, _ = updateApp(app, tea.MouseClickMsg{X: layout.imagesButton.left, Y: layout.imagesButton.top, Button: tea.MouseLeft})
+		if app.images.hidden {
+			t.Fatalf("click did not restore images (read-only=%t)", readOnly)
+		}
 	}
 }
 

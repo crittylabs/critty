@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- **Viewer controls**: Read-only views show the same image-preview status and clickable toggle as reviews, including unavailable terminals.  Sidebar, file-switching, and change-navigation hints are also available; line selection shows cancel and copy actions.
 - **Markdown colors on dark terminals**: Inline code shows its shaded background immediately after opening a document in a dark terminal.
 
 ## 1.11.2
