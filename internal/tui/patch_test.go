@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -62,7 +64,7 @@ func TestBinaryChangeLabels(t *testing.T) {
 func TestTextChangeSummaryKeepsLineCounts(t *testing.T) {
 	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n")
-	if got := ansi.Strip(m.tab().changeSummary(false)); got != "(+1 -1)" {
+	if got := ansi.Strip(m.tab().changeSummary(false, icons.Plain)); got != "(+1 -1)" {
 		t.Fatalf("text summary = %q", got)
 	}
 	for _, tc := range []struct{ status, want string }{
@@ -76,11 +78,11 @@ func TestTextChangeSummaryKeepsLineCounts(t *testing.T) {
 			} else {
 				tab.deletedAfter = nil
 			}
-			if got := ansi.Strip(tab.changeSummary(false)); got != tc.want {
+			if got := ansi.Strip(tab.changeSummary(false, icons.Plain)); got != tc.want {
 				t.Fatalf("summary = %q, want %q", got, tc.want)
 			}
 			tab.changedLines, tab.deletedAfter = nil, nil
-			if got := ansi.Strip(tab.changeSummary(false)); got != tc.want[:2]+")" {
+			if got := ansi.Strip(tab.changeSummary(false, icons.Plain)); got != tc.want[:2]+")" {
 				t.Fatalf("empty file summary = %q", got)
 			}
 		})

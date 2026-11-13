@@ -212,10 +212,10 @@ func (m *AppModel) rebuildContent() {
 	if t.isBinary || t.doc == nil {
 		if t.isBinary {
 			if preview := m.renderImagePreview(); preview != "" {
-				layout.appendBlock(&b, "\n  Image "+t.changeSummary(false), contentMouseTarget{})
+				layout.appendBlock(&b, "\n  Image "+t.changeSummary(false, m.icons), contentMouseTarget{})
 				layout.appendBlock(&b, preview, contentMouseTarget{})
 			} else {
-				layout.appendBlock(&b, "\n  Binary file "+t.changeSummary(false)+" — cannot display content.", contentMouseTarget{})
+				layout.appendBlock(&b, "\n  Binary file "+t.changeSummary(false, m.icons)+" — cannot display content.", contentMouseTarget{})
 				if dimensions := t.imageDescription(); dimensions != "" {
 					layout.appendBlock(&b, dimensions, contentMouseTarget{})
 				}

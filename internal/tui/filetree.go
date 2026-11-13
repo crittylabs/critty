@@ -10,6 +10,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 // sidebarView selects what the sidebar pane shows, in tab order.  The file
@@ -22,7 +24,7 @@ const (
 )
 
 // treeIcons holds the markers drawn before tree entries.  They occupy the
-// same width so names align; Nerd Font glyphs can replace them later.
+// same width so names align when Nerd Font icons are disabled.
 type treeIcons struct {
 	dirOpen, dirClosed, file string
 }
@@ -256,6 +258,13 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 		if row.collapsed {
 			icon = defaultTreeIcons.dirClosed
 		}
+		if m.icons {
+			kind := icons.FolderOpen
+			if row.collapsed {
+				kind = icons.FolderClosed
+			}
+			icon = "  " + m.icons.Glyph(kind, "") + " "
+		}
 		label += "/"
 	}
 	style := lipgloss.NewStyle().Foreground(textSecondary)
@@ -275,13 +284,17 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 	}
 	if !row.isDir {
 		icon = m.tabs[row.tabIndex].unreadMarker()
+		if m.icons {
+			tab := &m.tabs[row.tabIndex]
+			icon += m.icons.Glyph(fileIcon(tab.displayPath(), tab.isBinary), "") + " "
+		}
 	}
 	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon) + style.Render(label)
 	if row.isDir && row.path == "" {
 		text += m.branchLabel(lipgloss.NewStyle().Foreground(textSecondary))
 	}
 	if !row.isDir {
-		if counts := m.tabs[row.tabIndex].changeSummary(m.width > 0 && m.width < 100); counts != "" {
+		if counts := m.tabs[row.tabIndex].changeSummary(m.width > 0 && m.width < 100, m.icons); counts != "" {
 			text += " " + counts
 		}
 		if indicator := indicators[row.tabIndex]; indicator != "" {

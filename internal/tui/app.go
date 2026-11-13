@@ -25,6 +25,7 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/imageinfo"
 	"github.com/crittylabs/critty/internal/mathrender"
 	"github.com/crittylabs/critty/internal/mermaidrender"
@@ -109,7 +110,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
-	nerdFonts      bool
+	icons          icons.Set
 	textSelection  contentTextSelection
 	readOnly       bool
 	browsing       viewNavigation
@@ -367,7 +368,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	}
 
 	m := AppModel{
-		nerdFonts:        cfg.NerdFonts,
+		icons:            icons.Set(cfg.NerdFonts),
 		readOnly:         cfg.ReadOnly,
 		isearch:          isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		searchHistory:    cfg.SearchHistory,
@@ -467,7 +468,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
-		nerdFonts:       cfg.NerdFonts,
+		icons:           icons.Set(cfg.NerdFonts),
 		readOnly:        cfg.ReadOnly,
 		isearch:         isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		searchHistory:   cfg.SearchHistory,
@@ -3277,7 +3278,7 @@ func (m *AppModel) tabLabels() []tabLabel {
 			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
 		}
 		suffix := ""
-		if counts := t.changeSummary(m.width > 0 && m.width < 100); counts != "" {
+		if counts := t.changeSummary(m.width > 0 && m.width < 100, m.icons); counts != "" {
 			suffix += " " + counts
 		}
 		if indicators[i] != "" {

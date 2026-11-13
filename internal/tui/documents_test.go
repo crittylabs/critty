@@ -11,6 +11,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -148,7 +149,7 @@ func TestAttachedDocumentMixedReview(t *testing.T) {
 	}
 	app.tabs[0].doc, app.tabs[0].state = doc, &fileReview{}
 	app.tabs[1].doc, app.tabs[1].state = document.FromContent("notice.md", []byte("Changed\n")), &fileReview{}
-	if app.tab().changeSummary(false) != "" || len(app.tab().changedLines) != 0 {
+	if app.tab().changeSummary(false, icons.Plain) != "" || len(app.tab().changedLines) != 0 {
 		t.Fatal("document rendered as diff")
 	}
 	app.syncFileTree()
