@@ -7,10 +7,68 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestCommentThreadsRenderMarkdown(t *testing.T) {
+	const body = "**Parent** and `code`\n*continued\nemphasis*"
+	const reply = "**Reply** with `value`"
+	for _, sidebar := range []bool{false, true} {
+		t.Run(fmt.Sprintf("sidebar=%t", sidebar), func(t *testing.T) {
+			app := setupAppWithDoc(t, "source\n")
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+			app.tab().state.Comments = []review.Comment{{ID: "thread", StartLine: 1, EndLine: 1, Author: "Reviewer", Body: body,
+				Replies: []review.Reply{{ID: "reply", Author: "Agent", Body: reply}}}}
+			app.selectComment(0, app.commentTargets(0)[0])
+			if sidebar {
+				app.focused, app.sidebarView = commentPane, commentsView
+			}
+			app.rebuildContent()
+			app.updateCommentSidebar()
+			view := app.contentViewport.GetContent()
+			if sidebar {
+				view = app.commentViewport.GetContent()
+			}
+			assertThreadMarkdown(t, view)
+			app.openCommentThread("thread")
+			assertThreadMarkdown(t, app.View().Content)
+			comment := app.tab().state.Comments[0]
+			if comment.Body != body || comment.Replies[0].Body != reply {
+				t.Fatal("rendering changed saved Markdown")
+			}
+		})
+	}
+}
+
+func assertThreadMarkdown(t *testing.T, view string) {
+	t.Helper()
+	plain := ansi.Strip(view)
+	for _, source := range []string{"**Parent**", "**Reply**", "`code`", "`value`", "*continued", "emphasis*"} {
+		if strings.Contains(plain, source) {
+			t.Fatalf("Markdown source remains visible: %q", source)
+		}
+	}
+	runes, styles := renderedCells(view)
+	text := string(runes)
+	for _, tc := range []struct {
+		label string
+		attr  uint8
+	}{{"Parent", uv.AttrBold}, {"Reply", uv.AttrBold}, {"continued", uv.AttrItalic}, {"emphasis", uv.AttrItalic}} {
+		start := strings.Index(text, tc.label)
+		if start < 0 {
+			t.Fatalf("label missing: %s", tc.label)
+		}
+		start = len([]rune(text[:start]))
+		for i := start; i < start+len([]rune(tc.label)); i++ {
+			if styles[i].Attrs&tc.attr == 0 {
+				t.Fatalf("label %s lost Markdown style", tc.label)
+			}
+		}
+	}
+}
 
 func TestThreadInitialOffset(t *testing.T) {
 	for _, tt := range []struct {

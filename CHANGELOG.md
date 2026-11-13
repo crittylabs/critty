@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Markdown in comment threads**: Read bold, italic, inline code, headings, and block quotes in the comment sidebar, inline threads, and reply context, including formatting that spans source lines.  Regular and emphasized text retain each author's color; links and code keep their dedicated colors.
 - **Keyboard labels in Markdown**: Read `<kbd>` labels as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested key combinations keep a single pair of brackets per key, and copying retains the Markdown source without the display brackets.
 - **External link markers**: Identify HTTP(S) links by a clickable `↗` after their label in documents and comments.  Copying keeps the Markdown source without the display marker.
 - **Syntax highlighting in Markdown code blocks**: Read fenced code in documents, comments, and the comment editor with colors for light and dark terminals.  The fence language selects the syntax, and `suggestion` blocks in comments use the target file's language.  Multiline strings and comments keep their context; blocks without a recognized language remain plain text.

@@ -46,6 +46,41 @@ func TestCommentCodeHighlighting(t *testing.T) {
 	}
 }
 
+func TestCommentMarkdownPreservesAuthorColors(t *testing.T) {
+	previousDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previousDark) })
+	const body = "plain **bold** *italic* after\n`code` [link](https://example.org) <kbd>Enter</kbd>"
+	for _, dark := range []bool{false, true} {
+		initAdaptiveStyles(dark)
+		app := NewApp("notes.md", AppConfig{Author: "Self"})
+		app.images.hidden = true
+		for _, author := range []string{"Alice", "Bob", "Alice", "Self"} {
+			view := app.renderCommentContent(author, body, "", 80)
+			runes, styles := renderedCells(view)
+			plain := string(runes)
+			for _, label := range []string{"plain", "bold", "italic", "after", "code", "link", "Enter"} {
+				start := strings.Index(plain, label)
+				if start < 0 {
+					t.Fatalf("label missing: %s", label)
+				}
+				start = len([]rune(plain[:start]))
+				want := app.commentAuthorStyle(author).GetForeground()
+				switch label {
+				case "code", "Enter":
+					want = mdCodeStyle.GetForeground()
+				case "link":
+					want = mdLinkStyle.GetForeground()
+				}
+				for i := start; i < start+len(label); i++ {
+					if !sameColor(styles[i].Fg, want) {
+						t.Fatalf("dark=%t author=%s label=%s: foreground=%v, want=%v", dark, author, label, styles[i].Fg, want)
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestSuggestionLanguageCache(t *testing.T) {
 	app := NewApp("main.go", AppConfig{})
 	const body = "```suggestion\ndef total(values):\n    return sum(values)\n```"

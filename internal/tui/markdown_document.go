@@ -80,6 +80,7 @@ type markdownRender struct {
 	width       int
 	dark, set   bool
 	palette     uint64
+	foreground  string
 	with        markdownInlineKey
 }
 
@@ -440,23 +441,16 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	}
 }
 
-func (line *markdownLine) hasDecorations() bool {
-	for _, token := range line.tokens {
-		if token.decoration != noDecoration || token.style&(markdownKeyboard|markdownLink) != 0 {
-			return true
-		}
-	}
-	return false
-}
-
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
 	if line.previewTokens != nil {
 		return line.renderPreview(inline, base, changed, links)
 	}
 	key := inlineKey(inline)
+	foreground := base.GetForeground()
+	foregroundKey := fgToAnsi(foreground)
 	cacheable := len(links) == 0 && line.previewTokens == nil
 	slot := line.cacheSlot(key)
-	if cacheable && slot.set && slot.dark == terminalIsDark && slot.palette == markdownPaletteRevision && slot.with == key {
+	if cacheable && slot.set && slot.dark == terminalIsDark && slot.palette == markdownPaletteRevision && slot.foreground == foregroundKey && slot.with == key {
 		return slot.text
 	}
 	var b strings.Builder
@@ -494,6 +488,9 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		}
 		if token.style&markdownKeyboard != 0 {
 			style = keyboardStyle().Inherit(style)
+		}
+		if foreground != nil && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter) == 0 {
+			style = style.Foreground(foreground)
 		}
 		uri := token.uri
 		write := func(value string, background lipgloss.Style) {
@@ -539,7 +536,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		result = highlightMarkdownBlock(result)
 	}
 	if cacheable {
-		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, palette: markdownPaletteRevision, set: true, with: key}
+		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, palette: markdownPaletteRevision, foreground: foregroundKey, set: true, with: key}
 	}
 	return result
 }
