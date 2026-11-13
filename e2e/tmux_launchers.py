@@ -178,7 +178,7 @@ def verify(binary: Path, tmux_binary: Path) -> None:
                 out_path, err_path = root / f"{name}.out", root / f"{name}.err"
                 with out_path.open("wb") as out, err_path.open("wb") as err:
                     process = subprocess.Popen(
-                        [str(binary), str(plan), *args],
+                        [str(binary), "review", str(plan), *args],
                         env=env,
                         stdout=out,
                         stderr=err,

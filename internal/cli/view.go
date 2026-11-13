@@ -27,7 +27,14 @@ var viewCmd = &cobra.Command{
 	RunE:    func(_ *cobra.Command, args []string) error { return runReviewInput(args, true) },
 }
 
-func transientReview(cmd *cobra.Command) bool { return cmd == viewCmd || reviewDemo }
+func defaultFileView(args []string) bool {
+	// --diff FILE leaves FILE positional because --diff also accepts stdin.
+	return rootSession == "" && reviewDiff == "" && !reviewCode && len(args) == 1
+}
+
+func transientReview(cmd *cobra.Command, args []string) bool {
+	return cmd == viewCmd || reviewDemo || cmd == rootCmd && defaultFileView(args)
+}
 
 func validateTransientFlags(cmd *cobra.Command) error {
 	mode := "view"

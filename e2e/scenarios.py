@@ -318,7 +318,9 @@ def project_sessions() -> None:
     cli("sessions", "stop", code.session)
     code.completed(None)
     (worktree / "note.md").write_text("# Saved standalone document\n")
-    document = Round("project-document", ["note.md", "--task", task], cwd=worktree)
+    document = Round(
+        "project-document", ["review", "note.md", "--task", task], cwd=worktree
+    )
     document.comment("Retain document feedback.")
     cli("sessions", "stop", document.session)
     document.completed(None)
@@ -458,7 +460,9 @@ def transient_views() -> None:
         "# Questionnaire\n\n- [ ] Confirm demo <!-- form: id=confirm required -->\n"
     )
     patch = work / "input.diff"
-    (work / "guide.md").write_text("# Linked guide\n\n## Details\n\nDestination content.\n")
+    (work / "guide.md").write_text(
+        "# Linked guide\n\n## Details\n\nDestination content.\n"
+    )
     patch.write_text(
         subprocess.run(
             ["git", "diff", "--cached"],
@@ -490,6 +494,7 @@ def transient_views() -> None:
     for name, args in [
         ("view-git", ["view"]),
         ("view-doc", ["view", "notes.md"]),
+        ("implicit-view-doc", ["notes.md:3", "--watch"]),
         ("view-patch", ["view", "--diff=input.diff"]),
         ("demo-forms", ["review", "--demo", "--null", "--attachment=form.md"]),
     ]:
@@ -568,7 +573,18 @@ def transient_views() -> None:
             assert "Type your" not in screen(), screen()
             assert snapshot() == before, "view wrote files after edit keys"
             if name == "view-doc":
-                tmux("send-keys", "-t", pane, "g", "Down", "Down", "Down", "Down", "Down", "o")
+                tmux(
+                    "send-keys",
+                    "-t",
+                    pane,
+                    "g",
+                    "Down",
+                    "Down",
+                    "Down",
+                    "Down",
+                    "Down",
+                    "o",
+                )
                 wait_until(
                     lambda: "Destination content." in screen() and "Back" in screen(),
                     "view follows a local file and heading link",
@@ -599,7 +615,7 @@ def transient_views() -> None:
         assert not (root / f"{name}.stderr").read_text()
         assert snapshot() == before, "transient mode wrote files on exit"
     report(
-        "view stays read-only; demo edits comments, answers forms, and submits without review files, exports, or migration"
+        "explicit and implicit file views stay read-only; demo edits and submits without review files, exports, or migration"
     )
 
 
@@ -681,7 +697,7 @@ def scenarios() -> None:
         (WORK / "copy-text.md").write_text(
             'Before `sample` after.\nLink: [long label](https://example.org/a_(b) "title")\n'
         )
-        copying = Round("copy-text", ["copy-text.md"])
+        copying = Round("copy-text", ["review", "copy-text.md"])
         tmux("resize-pane", "-t", copying.pane, "-x", "100")
         copying.wait_screen(
             "Before  sample  after.", "inline code rendered for copying"
@@ -735,7 +751,7 @@ def scenarios() -> None:
         )
         paragraph_source = "**日本語 é first\nsecond**\n\n`code\ncontinued`\n"
         (WORK / "paragraph.md").write_text(paragraph_source)
-        paragraph = Round("paragraph-markdown", ["paragraph.md"])
+        paragraph = Round("paragraph-markdown", ["review", "paragraph.md"])
         paragraph.wait_screen("continued", "multiline Markdown rendered")
         screen = paragraph.screen()
         assert "second**" not in screen and "`code" not in screen, screen
@@ -766,7 +782,7 @@ def scenarios() -> None:
         )
         outline_source += "```md\n# Not a section\n```\n"
         (WORK / "outline.md").write_text(outline_source)
-        outline = Round("markdown-outline", ["outline.md"])
+        outline = Round("markdown-outline", ["review", "outline.md"])
         tmux("resize-pane", "-t", outline.pane, "-x", "90", "-y", "28")
         outline_width = int(
             tmux("display-message", "-p", "-t", outline.pane, "#{pane_width}")
@@ -806,7 +822,7 @@ def scenarios() -> None:
             "func (s *Server) Serve() {\n println(1)\n}\n\nfunc Stop() {}\n"
         )
         (WORK / "outline.go").write_text(go_source)
-        go_outline = Round("go-outline", ["outline.go"])
+        go_outline = Round("go-outline", ["review", "outline.go"])
         go_outline.wait_screen(
             "func (*Server) Serve", "Go receiver appears in the outline"
         )
@@ -835,7 +851,9 @@ def scenarios() -> None:
             + "filler " * 30
             + "[target](https://hidden.example) |\n"
         )
-        table = Round("table-scroll", ["table.md", "--launcher", "tmux-split"])
+        table = Round(
+            "table-scroll", ["review", "table.md", "--launcher", "tmux-split"]
+        )
         tmux("resize-pane", "-t", table.pane, "-x", "60", "-y", "24")
         # The scroll button also exists before the resized frame is drawn.
         wait_until(
@@ -985,7 +1003,7 @@ def scenarios() -> None:
             ).stdout
         )["task"]["id"]
         default_approval = Round(
-            "default-approval", ["plan.md", "--task", history_task]
+            "default-approval", ["review", "plan.md", "--task", history_task]
         )
         default_approval.keys("q", "Enter")
         default_approval.completed(True)
@@ -993,7 +1011,9 @@ def scenarios() -> None:
             "Submit defaults to Approve when no comments are unresolved; Enter sends it"
         )
 
-        unchanged = Round("unchanged-feedback", ["plan.md", "--task", history_task])
+        unchanged = Round(
+            "unchanged-feedback", ["review", "plan.md", "--task", history_task]
+        )
         cli(
             "comment",
             "--session",
@@ -1110,7 +1130,7 @@ def scenarios() -> None:
         assert "critty history list" in history_checks["history/age"]["advice"]
         assert not json.loads(receipt.read_text())["pruned"]
         for verdict, action in [("approve", "a"), ("reject", "r"), ("comment", "c")]:
-            submission = Round(f"submit-{verdict}", ["plan.md"])
+            submission = Round(f"submit-{verdict}", ["review", "plan.md"])
             if verdict == "approve":
                 wait_until(
                     lambda current=submission: (
@@ -1168,7 +1188,7 @@ def scenarios() -> None:
             "previous overall feedback is visible, reachable with }, and individually resolvable"
         )
 
-        draft = Round("submit-draft", ["plan.md"])
+        draft = Round("submit-draft", ["review", "plan.md"])
         draft.keys("q", "BTab")
         draft.text("Saved draft.")
         draft.keys("Escape")
@@ -1206,7 +1226,7 @@ def scenarios() -> None:
         assert "Saved draft. Updated draft." in externally_resumed.out.read_text()
         report("overall comment draft survives Back, stop, and same-session resume")
 
-        first = Round("round1", ["plan.md"])
+        first = Round("round1", ["review", "plan.md"])
         listed = json.loads(cli("sessions", "--json").stdout)
         active = next(item for item in listed if item["key"] == first.session)
         assert active["running"] and active["status"] == "running", active
@@ -1259,7 +1279,7 @@ def scenarios() -> None:
             "same-session source refresh and approval preserve threads and resolve them"
         )
 
-        stopped = Round("stop", ["plan.md"])
+        stopped = Round("stop", ["review", "plan.md"])
         stopped.comment("Preserve this unfinished review.")
         cli("sessions", "stop", stopped.session)
         stopped.completed(None)
@@ -1588,7 +1608,7 @@ def scenarios() -> None:
         report(
             "failed result export returns nonzero without printing approval and retains the completed result"
         )
-        summary_failure = Round("summary-failure", ["plan.md"])
+        summary_failure = Round("summary-failure", ["review", "plan.md"])
         directory = summary_failure.directory()
         summary_failure.summary.mkdir()
         summary_failure.keys("q", "Enter")
@@ -1637,6 +1657,7 @@ elif operation == "close":
         custom = Round(
             "custom-launcher",
             [
+                "review",
                 "plan.md",
                 "--launcher",
                 "custom:/missing/launcher",
@@ -1667,14 +1688,16 @@ elif operation == "close":
         )
         try:
             (WORK / "launcher-check.json").unlink()
-            cli_first = Round("launcher-cli-priority", ["plan.md", "--launcher", "mux"])
+            cli_first = Round(
+                "launcher-cli-priority", ["review", "plan.md", "--launcher", "mux"]
+            )
             cli_first.finish(True)
             assert not (WORK / "launcher-check.json").exists()
             for name, args in [
-                ("launcher-config-only", ["plan.md"]),
+                ("launcher-config-only", ["review", "plan.md"]),
                 (
                     "launcher-config-fallback",
-                    ["plan.md", "--launcher", "custom:/missing/launcher"],
+                    ["review", "plan.md", "--launcher", "custom:/missing/launcher"],
                 ),
             ]:
                 configured = Round(name, args)
@@ -1693,7 +1716,8 @@ elif operation == "close":
             project_config.unlink()
         report("configured launchers follow CLI choices and precede implicit mux")
         fallback = Round(
-            "launcher-fallback", ["plan.md", "--launcher", "custom:/missing/launcher"]
+            "launcher-fallback",
+            ["review", "plan.md", "--launcher", "custom:/missing/launcher"],
         )
         fallback.finish(True)
         diagnostics = fallback.err.read_text()

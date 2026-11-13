@@ -12,6 +12,7 @@
 
 ### Changed
 
+- **Document viewing by default**: `critty <file[:LINE]>` opens a read-only view in the current terminal without saving a review or migrating stored data.  Use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes, and `--session` still resumes a saved review.
 - **Local Markdown links in reviews**: Follow a file link to its existing review tab, or open the file directly in your editor when it has no tab, instead of using the system's default application.  Relative links resolve from the document's source directory.
 
 ### Fixed

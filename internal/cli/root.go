@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 		"with or without a code diff. " +
 		"It provides an interactive TUI for humans and scriptable CLI commands for agents.\n\n" +
 		"Run `critty` to review the current git changes, `critty --staged` to review only the index, " +
-		"`critty <file>` to review a document, " +
+		"`critty <file>` to view a document without saving, `critty review <file>` to review it, " +
 		"or `critty sessions resume <id>` to resume a saved review.  Use `critty view` for a read-only view in the current terminal without saving a session.",
 	Args:         cobra.MaximumNArgs(1),
 	SilenceUsage: true,
@@ -36,6 +36,9 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("--session cannot be combined with --staged, --unstaged, or --scope")
 			}
 			return resumeReview(rootSession, args)
+		}
+		if defaultFileView(args) {
+			return runReviewInput(args, true)
 		}
 		return runReview(args)
 	},
@@ -60,7 +63,7 @@ func reconnectSession(key string) error {
 func Execute() int {
 	preRun := rootCmd.PersistentPreRunE
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if transientReview(cmd) {
+		if transientReview(cmd, args) {
 			if err := validateTransientFlags(cmd); err != nil {
 				return err
 			}
