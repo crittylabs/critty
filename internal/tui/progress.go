@@ -6,6 +6,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type progressKind int
@@ -80,7 +81,7 @@ func (m *AppModel) tabIndicators() []string {
 	indicators := m.tabFormIndicators()
 	for i, tab := range m.tabs {
 		if tab.state != nil && unresolvedCommentCount(tab.state.Comments) > 0 {
-			indicators[i] = "💬" + indicators[i]
+			indicators[i] = m.icons.Glyph(icons.Comment, "💬") + indicators[i]
 		}
 	}
 	return indicators

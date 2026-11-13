@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 func expandDisplayTabs(s string) string {
@@ -125,7 +126,7 @@ func (m *AppModel) rebuildContent() {
 	groups := m.commentMarkerGroups()
 	contentWidth := m.contentViewport.Width()
 	for _, ids := range groups {
-		width := lipgloss.Width(fmt.Sprintf("> ☑︎ 💬 %d", len(ids))) + 1
+		width := lipgloss.Width(fmt.Sprintf("> %s %s %d", m.icons.Glyph(icons.Checked, "☑︎"), m.icons.Glyph(icons.Comment, "💬"), len(ids))) + 1
 		contentWidth = min(contentWidth, m.contentViewport.Width()-width)
 	}
 	boxWidth := contentWidth - gutterWidth
@@ -549,7 +550,7 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 		lineLabel += " (deleted)"
 	}
 	if ann.drifted {
-		lineLabel += " (drifted)"
+		lineLabel += " (" + m.icons.Label(icons.Warning, "drifted") + ")"
 	}
 
 	var boxContent strings.Builder
@@ -559,7 +560,7 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 	if len(ann.replies) > 0 {
 		header += commentLineStyle.Render(" · ") + inlineLabelComment.Bold(false).Render(countNoun(len(ann.replies), "reply", "replies"))
 	}
-	header, button := renderCommentHeader(header, ann.resolved, m.canDeleteComment(ann.id), focused && !m.readOnly, max(1, maxWidth-4))
+	header, button := renderCommentHeader(header, ann.resolved, m.canDeleteComment(ann.id), focused && !m.readOnly, max(1, maxWidth-4), m.icons)
 	boxContent.WriteString(header)
 	if !collapsed {
 		boxContent.WriteString("\n")
@@ -602,11 +603,11 @@ func formLineBackground(selected, highlighted bool) lipgloss.Style {
 
 // renderResolution renders the resolution checkbox followed by label.  With
 // accessKey, the first letter of label is underlined as the toggle key.
-func renderResolution(resolved bool, label string, accessKey, focused bool) string {
-	checkbox := "☐"
+func renderResolution(resolved bool, label string, accessKey, focused bool, symbols icons.Set) string {
+	checkbox := symbols.Glyph(icons.Unchecked, "☐")
 	style := inlineLabelComment.Foreground(lipgloss.Yellow)
 	if resolved {
-		checkbox = "☑︎"
+		checkbox = symbols.Glyph(icons.Checked, "☑︎")
 		style = resolvedBadge
 	}
 	style = style.Background(buttonBackground)
@@ -629,13 +630,13 @@ func renderResolution(resolved bool, label string, accessKey, focused bool) stri
 // the buttons line up across threads.  When the label row is too narrow,
 // the arrows go first; the rest moves to its own row only when it does not
 // fit either.
-func renderCommentHeader(label string, resolved, deletable, focused bool, width int) (string, commentHeaderRegion) {
+func renderCommentHeader(label string, resolved, deletable, focused bool, width int, symbols icons.Set) (string, commentHeaderRegion) {
 	resolveLabel := "Resolve"
 	if resolved {
 		resolveLabel = "Resolved"
 	}
-	resolve := renderResolution(resolved, resolveLabel, true, focused)
-	resolveWidth := lipgloss.Width("☑︎ Resolved")
+	resolve := renderResolution(resolved, resolveLabel, true, focused, symbols)
+	resolveWidth := max(lipgloss.Width(symbols.Glyph(icons.Unchecked, "☐")+" Resolve"), lipgloss.Width(symbols.Glyph(icons.Checked, "☑︎")+" Resolved"))
 	group := func(arrows bool) (string, commentHeaderRegion) {
 		actions := lipgloss.NewStyle().Width(resolveWidth).Render(resolve)
 		region := commentHeaderRegion{resolve: mouseRect{right: resolveWidth, bottom: 1}}

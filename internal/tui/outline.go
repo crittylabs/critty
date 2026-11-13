@@ -11,6 +11,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type outlineHeading struct {
@@ -186,7 +188,7 @@ func (m AppModel) renderFilesSidebar() string {
 	if m.outline.viewport.Height() == 0 {
 		return view
 	}
-	title := "─ Outline "
+	title := "─ " + m.icons.Label(icons.Outline, "Outline") + " "
 	title += strings.Repeat("─", max(0, m.outline.viewport.Width()-ansi.StringWidth(title)))
 	title = ansi.Truncate(title, m.outline.viewport.Width(), "")
 	return view + "\n" + lipgloss.NewStyle().Foreground(m.sidebarBorderColor()).Render(title) + "\n" + m.outline.viewport.View()

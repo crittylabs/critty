@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -101,7 +102,7 @@ func (m *AppModel) decorateCommentMarkers(content string, layout *renderedConten
 		if !ok {
 			continue
 		}
-		label := commentLineStyle.Faint(true).Render("💬")
+		label := commentLineStyle.Faint(true).Render(m.icons.Glyph(icons.Comment, "💬"))
 		resolved := true
 		for _, id := range ids {
 			c, _ := m.driftedComment(id)
@@ -117,7 +118,7 @@ func (m *AppModel) decorateCommentMarkers(content string, layout *renderedConten
 		if len(ids) > 1 {
 			label += commentLineStyle.Foreground(lipgloss.Blue).Render(fmt.Sprintf(" %d", len(ids)))
 		}
-		label = renderResolution(resolved, "", false, false) + " " + label
+		label = renderResolution(resolved, "", false, false, m.icons) + " " + label
 		prefix := "  "
 		for _, id := range ids {
 			if id == m.selectedCommentID() {

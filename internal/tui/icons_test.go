@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/internal/review"
 )
 
 func TestNerdFontFileNavigation(t *testing.T) {
@@ -16,6 +17,7 @@ func TestNerdFontFileNavigation(t *testing.T) {
 		initAdaptiveStyles(dark)
 		app := newFileTreeTestApp()
 		app.icons = icons.Nerd
+		app.recalculateLayout()
 		app.tabs[0].unread, app.tabs[0].status = true, "modified"
 		app.updateCommentSidebar()
 		paths := strings.Join(treeRowPaths(app), "\n")
@@ -33,6 +35,7 @@ func TestNerdFontFileNavigation(t *testing.T) {
 		app.toggleTreeDir(5)
 		app.tabs[0].unread = true
 		app.icons = icons.Plain
+		app.recalculateLayout()
 		app.updateCommentSidebar()
 		if strings.Join(treeRowPaths(app), "\n") != paths {
 			t.Fatal("icon selection changed source paths or tree structure")
@@ -41,6 +44,44 @@ func TestNerdFontFileNavigation(t *testing.T) {
 		if !strings.Contains(plain, "▾") || strings.Contains(plain, icons.Nerd.Glyph(icons.Go, "")) || !strings.Contains(plain, "●") {
 			t.Fatalf("portable tree or unread marker changed: %s", plain)
 		}
+	}
+}
+
+func TestNerdFontCommentAndSidebarIcons(t *testing.T) {
+	app := setupPrivateAppWithDoc(t, "# Section\n\nsource\n")
+	app.icons = icons.Nerd
+	app.width, app.height = 100, 40
+	comment := review.Comment{ID: "thread", StartLine: 3, EndLine: 3, Author: "Reviewer", Body: "**Body**", Replies: []review.Reply{{ID: "reply", Author: "Agent", Body: "Reply body"}}}
+	app.tab().state.Comments = []review.Comment{comment}
+	app.selectComment(0, app.commentTargets(0)[0])
+	app.focused, app.sidebarView = commentPane, commentsView
+	app.recalculateLayout()
+	app.rebuildContent()
+	app.updateCommentSidebar()
+	view := ansi.Strip(app.commentViewport.GetContent())
+	for _, kind := range []icons.Kind{icons.Comment, icons.Reply, icons.Unchecked} {
+		if !strings.Contains(view, icons.Nerd.Glyph(kind, "")) {
+			t.Fatalf("comment icon missing: %d in %s", kind, view)
+		}
+	}
+	x := app.contentPaneWidth() + 2
+	for i, tab := range app.sidebarTabs() {
+		got, ok := app.sidebarTabAt(x)
+		if !ok || int(got) != i {
+			t.Fatalf("sidebar icon shifted mouse target %d", i)
+		}
+		x += ansi.StringWidth(tab) + 1
+	}
+	if !strings.Contains(ansi.Strip(app.renderFilesSidebar()), icons.Nerd.Glyph(icons.Outline, "")) {
+		t.Fatal("outline title icon missing")
+	}
+	if app.tab().state.Comments[0].Body != comment.Body || app.tab().state.Comments[0].StartLine != 3 {
+		t.Fatal("comment icons changed source or anchors")
+	}
+	app.tab().state.Comments[0].Resolved = true
+	app.updateCommentSidebar()
+	if !strings.Contains(ansi.Strip(app.commentViewport.GetContent()), icons.Nerd.Glyph(icons.Checked, "")) {
+		t.Fatal("resolved comment icon missing")
 	}
 }
 

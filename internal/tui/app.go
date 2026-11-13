@@ -2754,7 +2754,7 @@ func (m *AppModel) updateCommentSidebar() {
 			lineInfo += " (deleted)"
 		}
 		if it.drifted {
-			lineInfo += " (drifted)"
+			lineInfo += " (" + m.icons.Label(icons.Warning, "drifted") + ")"
 		}
 		lineInfo = commentLineStyle.Foreground(lipgloss.Cyan).Render(lineInfo)
 		if len(it.replies) > 0 {
@@ -2765,7 +2765,7 @@ func (m *AppModel) updateCommentSidebar() {
 		if isSelected {
 			prefix = cursorCol.Render(cursorMarker.Render(">"))
 		}
-		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), isSelected && !m.readOnly, max(1, m.commentViewport.Width()))
+		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), isSelected && !m.readOnly, max(1, m.commentViewport.Width()), m.icons)
 		button.translate(0, len(m.sidebarTargets))
 		button.id = it.id
 		m.sidebarActions = append(m.sidebarActions, button)
@@ -4054,7 +4054,11 @@ func (m AppModel) commentPanelWidth() int {
 	if m.viewMode {
 		return 0
 	}
-	return max(m.width/4, 26) // room for the Comments and Files tabs
+	minimum := 26 // room for the Comments and Files tabs
+	if m.icons {
+		minimum += ansi.StringWidth(m.icons.Glyph(icons.FolderOpen, "")) + ansi.StringWidth(m.icons.Glyph(icons.Comment, "")) + 2
+	}
+	return max(m.width/4, minimum)
 }
 
 // paneHorizontalPadding is the space between a pane's side borders and its body.
@@ -4094,8 +4098,8 @@ func (m AppModel) sidebarBorderColor() color.Color {
 // sidebarTabs renders the sidebar's tabs in order, marking the active view.
 func (m AppModel) sidebarTabs() []string {
 	labels := []string{
-		"Files",
-		fmt.Sprintf("Comments (%d)", unresolvedCommentCount(m.tab().state.Comments)),
+		m.icons.Label(icons.FolderOpen, "Files"),
+		m.icons.Label(icons.Comment, fmt.Sprintf("Comments (%d)", unresolvedCommentCount(m.tab().state.Comments))),
 	}
 	tabs := make([]string, len(labels))
 	for i, label := range labels {
@@ -5151,7 +5155,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		if m.hasModalResolution() {
 			comment, _ := m.driftedComment(m.editingID)
-			checkbox := renderResolution(comment.Resolved, "Resolved", false, false) + " " + modalBtnNormalKey.Render("M-r")
+			checkbox := renderResolution(comment.Resolved, "Resolved", false, false, m.icons) + " " + modalBtnNormalKey.Render("M-r")
 			checkboxWidth := lipgloss.Width(checkbox)
 			left := max(0, innerWidth-checkboxWidth-3)
 			title = ansi.Truncate(modalTitleStyle.MarginBottom(0).Render(titleText), max(0, left-1), "…")

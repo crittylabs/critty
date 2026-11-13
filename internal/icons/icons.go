@@ -37,9 +37,14 @@ const (
 	Removed
 	Renamed
 	Comment
+	Unchecked
+	Checked
+	Reply
+	Warning
+	Outline
 )
 
-// Codepoints from Nerd Fonts v3.4.0's glyphnames.json (Codicons, Seti, Devicons).
+// Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
 var glyphs = [...]string{
 	FolderClosed: "\uea83", FolderOpen: "\ueaf7", File: "\uea7b", Code: "\ueae9",
 	Binary: "\ueae8", Image: "\ueaea", Config: "\ue615", JSON: "\ue60b",
@@ -47,7 +52,8 @@ var glyphs = [...]string{
 	Ruby: "\ue739", JavaScript: "\ue781", TypeScript: "\ue628", Shell: "\ue691",
 	C: "\ue649", CPP: "\ue646", Java: "\ue66d", HTML: "\ue60e", CSS: "\ue614",
 	Added: "\ueadc", Modified: "\ueade", Removed: "\ueadf", Renamed: "\ueae0",
-	Comment: "\uea6b",
+	Comment:   "\uea6b",
+	Unchecked: "\U000f0131", Checked: "\U000f0132", Reply: "\uea7d", Warning: "\uea6c", Outline: "\ueb86",
 }
 
 func (s Set) Glyph(kind Kind, fallback string) string {
@@ -55,4 +61,11 @@ func (s Set) Glyph(kind Kind, fallback string) string {
 		return fallback
 	}
 	return glyphs[kind]
+}
+
+func (s Set) Label(kind Kind, label string) string {
+	if !s {
+		return label
+	}
+	return s.Glyph(kind, "") + " " + label
 }

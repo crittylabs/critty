@@ -796,7 +796,12 @@ def scenarios() -> None:
             ),
             "outline review redrawn after resize",
         )
-        outline.wait_screen("─ Outline", "Files shows a Markdown outline")
+        wait_until(
+            lambda: any(
+                "─" in row and "Outline" in row for row in outline.screen().splitlines()
+            ),
+            "Files shows a Markdown outline",
+        )
         outline.click("Part 01", last=True)
         outline.keys("Enter", "Enter")
         outline.text("Heading jump anchor.")

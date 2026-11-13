@@ -61,7 +61,7 @@ The header's `Split: off/on` control or `S` switches between unified and side-by
 
 ## Nerd Font detection
 
-Set `nerd_fonts = "on"` or `nerd_fonts = "off"` to force glyph support.  Project settings override global settings; `"auto"` restores detection.  When enabled, file-tree folders and file types use Nerd Font icons, and file status indicators use matching added, modified, deleted, and renamed symbols.  Unread markers and line counts remain visible.  `"off"` retains portable symbols and labels.  Use a Nerd Font Mono variant for consistent icon cell widths.
+Set `nerd_fonts = "on"` or `nerd_fonts = "off"` to force glyph support.  Project settings override global settings; `"auto"` restores detection.  When enabled, file-tree folders and file types use Nerd Font icons, and file status indicators use matching added, modified, deleted, and renamed symbols.  Comments, replies, resolution states, and sidebar section labels also use icons.  Unread markers and line counts remain visible.  `"off"` retains portable symbols and labels.  Use a Nerd Font Mono variant for consistent icon cell widths.
 
 Automatic detection runs once in the process displaying the TUI.  It uses [`charm.land/x/nerdfont`](https://github.com/charmbracelet/x/tree/nerdfont/v0.1.0/nerdfont): the `NERDFONT` environment override, Ghostty or kitty's bundled symbols, then installed font names from Fontconfig's optional `fc-list` and standard font directories.  The Fontconfig probe has a 500 ms deadline.  No fonts or tools are installed.  Explicit `on` and `off` settings take precedence over `NERDFONT`.
 

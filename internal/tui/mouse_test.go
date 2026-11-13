@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -466,66 +467,68 @@ func TestResolveButtonPositionSurvivesCollapse(t *testing.T) {
 func TestCommentHeaderActionsAlignRight(t *testing.T) {
 	t.Parallel()
 	const label = "comment L1 · 2 replies" // 22 columns
-	for _, tc := range []struct {
-		width     int
-		deletable bool
-		rows      int
-		arrows    bool
-	}{
-		{width: 80, deletable: false, rows: 1, arrows: true},
-		{width: 80, deletable: true, rows: 1, arrows: true},
-		{width: 40, deletable: false, rows: 1, arrows: false}, // arrows go before wrapping
-		{width: 40, deletable: true, rows: 1, arrows: false},
-		{width: 24, deletable: false, rows: 2, arrows: true}, // a new row has room again
-		{width: 24, deletable: true, rows: 2, arrows: true},
-		{width: 16, deletable: false, rows: 3, arrows: false}, // the label itself wraps
-		{width: 16, deletable: true, rows: 3, arrows: false},
-	} {
-		t.Run(fmt.Sprintf("width=%d/deletable=%t", tc.width, tc.deletable), func(t *testing.T) {
-			var open, resolved commentHeaderRegion
-			for _, state := range []bool{false, true} {
-				header, region := renderCommentHeader(label, state, tc.deletable, false, tc.width)
-				rows := strings.Split(ansi.Strip(header), "\n")
-				if len(rows) != tc.rows || region.resolve.top != tc.rows-1 {
-					t.Fatalf("header rows = %q, actions at row %d, want %d rows", rows, region.resolve.top, tc.rows)
-				}
-				row := rows[region.resolve.top]
-				if lipgloss.Width(row) != tc.width {
-					t.Fatalf("action row %q is %d wide, want %d", row, lipgloss.Width(row), tc.width)
-				}
-				last := region.resolve.right
-				if tc.arrows {
-					if got := ansi.Cut(row, region.up.left, region.up.right); got != "↑ " {
-						t.Fatalf("up region contains %q, want ↑", got)
+	for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
+		for _, tc := range []struct {
+			width     int
+			deletable bool
+			rows      int
+			arrows    bool
+		}{
+			{width: 80, deletable: false, rows: 1, arrows: true},
+			{width: 80, deletable: true, rows: 1, arrows: true},
+			{width: 40, deletable: false, rows: 1, arrows: false}, // arrows go before wrapping
+			{width: 40, deletable: true, rows: 1, arrows: false},
+			{width: 24, deletable: false, rows: 2, arrows: true}, // a new row has room again
+			{width: 24, deletable: true, rows: 2, arrows: true},
+			{width: 16, deletable: false, rows: 3, arrows: false}, // the label itself wraps
+			{width: 16, deletable: true, rows: 3, arrows: false},
+		} {
+			t.Run(fmt.Sprintf("nerd=%t/width=%d/deletable=%t", symbols, tc.width, tc.deletable), func(t *testing.T) {
+				var open, resolved commentHeaderRegion
+				for _, state := range []bool{false, true} {
+					header, region := renderCommentHeader(label, state, tc.deletable, false, tc.width, symbols)
+					rows := strings.Split(ansi.Strip(header), "\n")
+					if len(rows) != tc.rows || region.resolve.top != tc.rows-1 {
+						t.Fatalf("header rows = %q, actions at row %d, want %d rows", rows, region.resolve.top, tc.rows)
 					}
-					if got := ansi.Cut(row, region.down.left, region.down.right); got != " ↓" {
-						t.Fatalf("down region contains %q, want ↓", got)
+					row := rows[region.resolve.top]
+					if lipgloss.Width(row) != tc.width {
+						t.Fatalf("action row %q is %d wide, want %d", row, lipgloss.Width(row), tc.width)
 					}
-					last = region.down.right
-				} else if region.up.left != region.up.right || region.down.left != region.down.right || strings.ContainsAny(row, "↑↓") {
-					t.Fatalf("arrows should be omitted: row %q, region %+v", row, region)
-				}
-				slot := ansi.Cut(row, last+2, last+3)
-				if tc.deletable {
-					if got := ansi.Cut(row, region.delete.left, region.delete.right); got != "x" || region.delete.left != last+2 {
-						t.Fatalf("delete region %+v contains %q, want x after %d", region.delete, got, last)
+					last := region.resolve.right
+					if tc.arrows {
+						if got := ansi.Cut(row, region.up.left, region.up.right); got != "↑ " {
+							t.Fatalf("up region contains %q, want ↑", got)
+						}
+						if got := ansi.Cut(row, region.down.left, region.down.right); got != " ↓" {
+							t.Fatalf("down region contains %q, want ↓", got)
+						}
+						last = region.down.right
+					} else if region.up.left != region.up.right || region.down.left != region.down.right || strings.ContainsAny(row, "↑↓") {
+						t.Fatalf("arrows should be omitted: row %q, region %+v", row, region)
 					}
-				} else if region.delete.left != region.delete.right || slot != " " {
-					t.Fatalf("undeletable header should keep a blank x slot: region %+v, slot %q", region.delete, slot)
+					slot := ansi.Cut(row, last+2, last+3)
+					if tc.deletable {
+						if got := ansi.Cut(row, region.delete.left, region.delete.right); got != "x" || region.delete.left != last+2 {
+							t.Fatalf("delete region %+v contains %q, want x after %d", region.delete, got, last)
+						}
+					} else if region.delete.left != region.delete.right || slot != " " {
+						t.Fatalf("undeletable header should keep a blank x slot: region %+v, slot %q", region.delete, slot)
+					}
+					if last+3 != tc.width {
+						t.Fatalf("actions end at %d, want right edge %d", last+3, tc.width)
+					}
+					if state {
+						resolved = region
+					} else {
+						open = region
+					}
 				}
-				if last+3 != tc.width {
-					t.Fatalf("actions end at %d, want right edge %d", last+3, tc.width)
+				if open != resolved {
+					t.Fatalf("regions differ by resolution:\nopen     = %+v\nresolved = %+v", open, resolved)
 				}
-				if state {
-					resolved = region
-				} else {
-					open = region
-				}
-			}
-			if open != resolved {
-				t.Fatalf("regions differ by resolution:\nopen     = %+v\nresolved = %+v", open, resolved)
-			}
-		})
+			})
+		}
 	}
 }
 
