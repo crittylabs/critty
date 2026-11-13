@@ -12,6 +12,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/config"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/nerdfont"
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/tui"
 )
@@ -62,6 +63,7 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 	}
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
+		NerdFonts:     nerdfont.Detect(cfg.NerdFonts).Supported,
 		MathRaTeX:     cfg.MathRaTeX,
 		MermaidMerman: cfg.MermaidMerman,
 		MermaidMmdr:   cfg.MermaidMmdr,

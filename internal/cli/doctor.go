@@ -66,6 +66,7 @@ var doctorSections = map[string]string{
 	"svg":          "SVG previews",
 	"math":         "Math previews",
 	"mermaid":      "Mermaid previews",
+	"fonts":        "UI fonts",
 	"terminal":     "Terminal binding",
 	"launchers":    "Review launchers",
 	"history":      "Review history",
@@ -231,6 +232,7 @@ warnings or informational results. The former check command remains an alias.`,
 			r.checkSVG()
 			r.checkMath()
 			r.checkMermaid()
+			r.checkNerdFonts()
 			r.checkHistory()
 			r.checkTerminalBinding(request, notifyOnly)
 			origin := terminalbinding.CaptureOrigin(os.Getpid())

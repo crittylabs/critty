@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Nerd Font detection settings**: Select `auto`, `on`, or `off` with `nerd_fonts` for future UI icons, and inspect the result and reason with `critty doctor`.  Automatic detection estimates support from terminal signals and installed font names; existing UI icons remain unchanged.
 - **Markdown in comment threads**: Read bold, italic, inline code, headings, and block quotes in the comment sidebar, inline threads, and reply context, including formatting that spans source lines.  Regular and emphasized text retain each author's color; links and code keep their dedicated colors.
 - **Keyboard labels in Markdown**: Read `<kbd>` labels as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested key combinations keep a single pair of brackets per key, and copying retains the Markdown source without the display brackets.
 - **External link markers**: Identify HTTP(S) links by a clickable `↗` after their label in documents and comments.  Copying keeps the Markdown source without the display marker.

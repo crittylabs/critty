@@ -74,6 +74,7 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
+	NerdFonts        bool
 	Context          context.Context
 	ReadOnly         bool
 	Documents        []review.AttachedDocument
@@ -108,6 +109,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	nerdFonts      bool
 	textSelection  contentTextSelection
 	readOnly       bool
 	browsing       viewNavigation
@@ -365,6 +367,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	}
 
 	m := AppModel{
+		nerdFonts:        cfg.NerdFonts,
 		readOnly:         cfg.ReadOnly,
 		isearch:          isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		searchHistory:    cfg.SearchHistory,
@@ -464,6 +467,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		nerdFonts:       cfg.NerdFonts,
 		readOnly:        cfg.ReadOnly,
 		isearch:         isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		searchHistory:   cfg.SearchHistory,

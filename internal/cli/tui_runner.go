@@ -18,6 +18,7 @@ import (
 	"github.com/crittylabs/critty/internal/config"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/internal/nerdfont"
 	"github.com/crittylabs/critty/internal/prompt"
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/tui"
@@ -41,6 +42,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	finishCh := make(chan tui.FinishEvent, 4)
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
+		NerdFonts:        nerdfont.Detect(cfg.NerdFonts).Supported,
 		MathRaTeX:        cfg.MathRaTeX,
 		MermaidMerman:    cfg.MermaidMerman,
 		MermaidMmdr:      cfg.MermaidMmdr,
