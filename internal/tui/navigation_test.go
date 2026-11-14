@@ -11,6 +11,72 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
+func TestEmacsFileNavigation(t *testing.T) {
+	for _, readOnly := range []bool{false, true} {
+		t.Run(fmt.Sprintf("readOnly=%t", readOnly), func(t *testing.T) {
+			app := newScrollTestApp("notes.txt", strings.Split(strings.Repeat("line\n", 100), "\n"), false, 80, 20)
+			app.readOnly = readOnly
+			app.tab().cursorLine = 1
+			app.rebuildContent()
+			for _, step := range []struct {
+				key  tea.KeyPressMsg
+				line int
+			}{
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, 19},
+				{tea.KeyPressMsg{Code: tea.KeyPgDown}, 37},
+				{tea.KeyPressMsg{Code: tea.KeyPgUp}, 37},
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModAlt}, 20},
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModAlt}, 20},
+				{tea.KeyPressMsg{Code: '>', Mod: tea.ModAlt}, 101},
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, 101},
+				{tea.KeyPressMsg{Code: '<', Mod: tea.ModAlt}, 1},
+				{tea.KeyPressMsg{Code: '.', Mod: tea.ModAlt | tea.ModShift}, 101},
+				{tea.KeyPressMsg{Code: ',', Mod: tea.ModAlt | tea.ModShift}, 1},
+			} {
+				app, _ = updateApp(app, step.key)
+				if got := app.tab().cursorLine; got != step.line {
+					t.Fatalf("%s: line = %d, want %d", step.key.String(), got, step.line)
+				}
+			}
+		})
+	}
+}
+
+func TestEmacsPageScrollUsesViewport(t *testing.T) {
+	for _, tc := range []struct {
+		name                                              string
+		cursor, offset, direction, wantCursor, wantOffset int
+	}{
+		{"cursor at top", 1, 0, 1, 19, 18},
+		{"cursor in middle", 10, 0, 1, 19, 18},
+		{"cursor in overlap", 20, 0, 1, 20, 18},
+		{"page up", 35, 30, -1, 32, 12},
+		{"page up overlap", 32, 30, -1, 32, 12},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newScrollTestApp("notes.txt", strings.Split(strings.Repeat("line\n", 100), "\n"), false, 80, 20)
+			app.tab().cursorLine = tc.cursor
+			app.rebuildContent()
+			app.contentViewport.SetYOffset(tc.offset)
+			key := tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}
+			if tc.direction < 0 {
+				key.Mod = tea.ModAlt
+			}
+			app, _ = updateApp(app, key)
+			if app.tab().cursorLine != tc.wantCursor || app.contentViewport.YOffset() != tc.wantOffset {
+				t.Fatalf("cursor/offset = %d/%d, want %d/%d", app.tab().cursorLine, app.contentViewport.YOffset(), tc.wantCursor, tc.wantOffset)
+			}
+		})
+	}
+	app := newScrollTestApp("notes.txt", []string{"first", strings.Repeat("word ", 200), "last"}, false, 40, 10)
+	app.tab().cursorLine = 1
+	app.rebuildContent()
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
+	if app.contentViewport.YOffset() != 8 || app.tab().cursorLine != 2 {
+		t.Fatalf("wrapped page cursor/offset = %d/%d, want 2/8", app.tab().cursorLine, app.contentViewport.YOffset())
+	}
+}
+
 func TestFileTabNavigationKeepsPaneFocus(t *testing.T) {
 	for _, sidebar := range []bool{false, true} {
 		for _, comments := range []bool{false, true} {
@@ -219,21 +285,21 @@ func TestFileTabNavigationRestoresCommentViewport(t *testing.T) {
 func TestLineNavigation(t *testing.T) {
 	for _, tt := range []struct {
 		name        string
-		key         rune
+		key         tea.KeyPressMsg
 		start, want int
 	}{
-		{"home", tea.KeyHome, 8, 1},
-		{"end", tea.KeyEnd, 1, 10},
-		{"page down", tea.KeyPgDown, 1, 3},
-		{"page up", tea.KeyPgUp, 8, 6},
-		{"page up at start", tea.KeyPgUp, 2, 1},
-		{"page down at end", tea.KeyPgDown, 9, 10},
+		{"home", tea.KeyPressMsg{Code: tea.KeyHome}, 8, 1},
+		{"end", tea.KeyPressMsg{Code: tea.KeyEnd}, 1, 10},
+		{"half page down", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 1, 3},
+		{"half page up", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 8, 6},
+		{"half page up at start", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 2, 1},
+		{"half page down at end", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 9, 10},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app := setupAppWithDoc(t, strings.Repeat("line\n", 9)+"line")
 			app.contentViewport.SetHeight(5)
 			app.tab().cursorLine = tt.start
-			app = pressKey(app, tt.key)
+			app, _ = updateApp(app, tt.key)
 			if got := app.tab().cursorLine; got != tt.want {
 				t.Errorf("cursor line = %d, want %d", got, tt.want)
 			}

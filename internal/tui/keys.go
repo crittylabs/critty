@@ -27,6 +27,8 @@ type keyMap struct {
 	Down             key.Binding
 	HalfPageUp       key.Binding
 	HalfPageDown     key.Binding
+	PageUp           key.Binding
+	PageDown         key.Binding
 	Top              key.Binding
 	Bottom           key.Binding
 	NextComment      key.Binding
@@ -61,10 +63,12 @@ var keys = keyMap{
 	Tab:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "toggle sidebar")),
 	Up:               key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
 	Down:             key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
-	HalfPageUp:       key.NewBinding(key.WithKeys("ctrl+u", "shift+up", "pgup"), key.WithHelp("S-up", "half page up")),
-	HalfPageDown:     key.NewBinding(key.WithKeys("ctrl+d", "shift+down", "pgdown"), key.WithHelp("S-down", "half page down")),
-	Top:              key.NewBinding(key.WithKeys("g", "home", "<"), key.WithHelp("<", "file top")),
-	Bottom:           key.NewBinding(key.WithKeys("G", "end", ">"), key.WithHelp(">", "file bottom")),
+	HalfPageUp:       key.NewBinding(key.WithKeys("ctrl+u", "shift+up"), key.WithHelp("S-up", "half page up")),
+	HalfPageDown:     key.NewBinding(key.WithKeys("ctrl+d", "shift+down"), key.WithHelp("S-down", "half page down")),
+	PageUp:           key.NewBinding(key.WithKeys("alt+v", "pgup"), key.WithHelp("M-v/PgUp", "page up")),
+	PageDown:         key.NewBinding(key.WithKeys("ctrl+v", "pgdown"), key.WithHelp("C-v/PgDn", "page down")),
+	Top:              key.NewBinding(key.WithKeys("g", "home", "<", "alt+<", "alt+shift+,", "alt+shift+<"), key.WithHelp("</M-<", "file top")),
+	Bottom:           key.NewBinding(key.WithKeys("G", "end", ">", "alt+>", "alt+shift+.", "alt+shift+>"), key.WithHelp(">/M->", "file bottom")),
 	NextUnresolved:   key.NewBinding(key.WithKeys("}"), key.WithHelp("}", "next unresolved thread/required form")),
 	PrevUnresolved:   key.NewBinding(key.WithKeys("{"), key.WithHelp("{", "prev unresolved thread/required form")),
 	NextComment:      key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "next thread/form item")),

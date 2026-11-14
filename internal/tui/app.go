@@ -1391,6 +1391,12 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.focused == contentPane && (t.doc != nil || t.cursorOnAnnotation) {
 		moved := false
 		switch {
+		case key.Matches(msg, keys.PageDown):
+			m.scrollFilePage(1)
+			return m, nil
+		case key.Matches(msg, keys.PageUp):
+			m.scrollFilePage(-1)
+			return m, nil
 		case key.Matches(msg, keys.Down):
 			if t.cursorOnAnnotation {
 				anns := m.annotationsAfterLine(t.cursorLine, t.cursorSide)
@@ -4578,7 +4584,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	if m.readOnly {
 		return renderHelpGroup("View (read-only)", []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
-			{keys: "↑/↓,k/j · PgUp/PgDn", desc: "⇅ move / scroll"},
+			{keys: "↑/↓,k/j", desc: "⇅ move"},
+			{keys: "PgUp/PgDn · M-v/C-v", desc: "⇅ scroll file (2-row overlap)"},
+			{keys: "Home/End,g/G,</> · M-</M->", desc: "⇅ file top/bottom"},
 			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
 			{keys: "V · O", desc: "reading view / open all comments"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
@@ -4619,9 +4627,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	navigation := renderHelpGroup("Navigation", []helpItem{
 		{keys: "↑/↓,k/j", desc: "⇅ move"},
 		{keys: "←/→,h/l", desc: "scroll table"},
-		{keys: "PgUp/PgDn", desc: "⇅ half page"},
+		{keys: "PgUp/PgDn · M-v/C-v", desc: "⇅ scroll file (2-row overlap)"},
 		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page"},
-		{keys: "Home/End,g/G,</>", desc: "⇅ top/bottom"},
+		{keys: "Home/End,g/G,</> · M-</M->", desc: "⇅ top/bottom"},
 		{keys: "{/}", desc: "⇅ pending items"},
 		{keys: "[/]", desc: "⇅ all items"},
 		{keys: "n/N", desc: "⇵ all hunks & items"},

@@ -271,9 +271,9 @@ func (m *AppModel) handleFilesSidebarKey(msg tea.KeyPressMsg) bool {
 		next = 0
 	case key.Matches(msg, keys.Bottom):
 		next = len(o.rows) - 1
-	case key.Matches(msg, keys.HalfPageDown):
+	case key.Matches(msg, keys.HalfPageDown, keys.PageDown):
 		next += max(1, o.viewport.Height()/2)
-	case key.Matches(msg, keys.HalfPageUp):
+	case key.Matches(msg, keys.HalfPageUp, keys.PageUp):
 		next -= max(1, o.viewport.Height()/2)
 	case key.Matches(msg, keys.Confirm, keys.Cancel):
 		m.focused = contentPane

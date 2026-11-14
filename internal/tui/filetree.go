@@ -443,9 +443,9 @@ func (m *AppModel) handleFileTreeKey(msg tea.KeyPressMsg) bool {
 		m.setTreeCursor(tree.cursor + 1)
 	case key.Matches(msg, keys.Up):
 		m.setTreeCursor(tree.cursor - 1)
-	case key.Matches(msg, keys.HalfPageDown):
+	case key.Matches(msg, keys.HalfPageDown, keys.PageDown):
 		m.setTreeCursor(tree.cursor + max(1, tree.viewport.Height()/2))
-	case key.Matches(msg, keys.HalfPageUp):
+	case key.Matches(msg, keys.HalfPageUp, keys.PageUp):
 		m.setTreeCursor(tree.cursor - max(1, tree.viewport.Height()/2))
 	case key.Matches(msg, keys.Top):
 		m.setTreeCursor(0)

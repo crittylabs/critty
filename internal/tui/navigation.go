@@ -563,6 +563,50 @@ func (m *AppModel) selectChange(tabIndex int, chunk changeChunk, step int) {
 	}
 }
 
+// scrollFilePage leaves two rendered rows of overlap, like Emacs.  Keep the
+// current source position while visible, otherwise move it to the nearest edge.
+func (m *AppModel) scrollFilePage(direction int) {
+	height := m.contentViewport.Height()
+	m.contentViewport.SetYOffset(m.contentViewport.YOffset() + direction*max(1, height-2))
+	top := m.contentViewport.YOffset()
+	t := m.tab()
+	var first, last contentMouseTarget
+	found := false
+	for row := top; row < top+height; row++ {
+		x := 0
+		if row < len(m.contentLayout.columns) && m.contentLayout.columns[row].split > 0 && t.cursorSide != "old" {
+			x = m.contentLayout.columns[row].split + 3
+		}
+		target, ok := m.contentMouseTargetAt(x, row)
+		if !ok && x > 0 {
+			target, ok = m.contentMouseTargetAt(0, row)
+		}
+		if !ok || t.selecting && (target.annotation || target.side != t.selectSide) {
+			continue
+		}
+		if target.line == t.cursorLine && target.side == t.cursorSide && target.annotation == t.cursorOnAnnotation &&
+			(!target.annotation || target.annotationIndex == t.cursorAnnoIdx) {
+			return
+		}
+		if !found {
+			first, found = target, true
+		}
+		last = target
+	}
+	if !found {
+		return
+	}
+	target := first
+	if direction < 0 {
+		target = last
+	}
+	t.cursorLine, t.cursorSide = target.line, target.side
+	t.cursorOnAnnotation, t.cursorAnnoIdx = target.annotation, target.annotationIndex
+	t.cursorOnForm = false
+	m.rebuildContent()
+	m.contentViewport.SetYOffset(top)
+}
+
 func (m *AppModel) scrollToCursor() {
 	t := m.tab()
 	if t.cursorOnAnnotation {
