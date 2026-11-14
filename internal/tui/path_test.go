@@ -33,6 +33,7 @@ func TestProjectTreePaths(t *testing.T) {
 		{"absolute", repo, filepath.Join(repo, "internal", "a.go"), "internal/a.go"},
 		{"subdirectory", filepath.Join(repo, "internal"), filepath.Join(repo, "internal", "a.go"), "internal/a.go"},
 		{"relative", repo, "internal/a.go", "internal/a.go"},
+		{"relative parent traversal", parent, "project/../worktree/a.go", "worktree/a.go"},
 		{"linked worktree", worktree, filepath.Join(worktree, "a.go"), "a.go"},
 		{"non-git", parent, filepath.Join(parent, "notes", "a.md"), "notes/a.md"},
 		{"outside", repo, filepath.Join(parent, "a.go"), filepath.Join(parent, "a.go")},
@@ -44,6 +45,33 @@ func TestProjectTreePaths(t *testing.T) {
 				t.Fatalf("tree path = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestPathDisplayNormalizesParentTraversal(t *testing.T) {
+	parent := t.TempDir()
+	for _, name := range []string{"foo", "bar"} {
+		if err := os.MkdirAll(filepath.Join(parent, name, ".git"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := &pathDisplay{cwd: parent, roots: make(map[string]bool)}
+	for _, source := range []string{"foo/../bar/notes.md", "./foo/../bar/./notes.md", parent + "/foo/../bar/notes.md"} {
+		for _, tab := range []bool{false, true} {
+			rendered := p.render(source, lipgloss.NewStyle(), tab, true)
+			want := ansi.Strip(p.render(filepath.Clean(source), lipgloss.NewStyle(), tab, true))
+			if got := ansi.Strip(rendered); got != want {
+				t.Fatalf("tab=%t: displayed path = %q, want %q", tab, got, want)
+			}
+			if strings.Contains(ansi.Strip(rendered), "foo") || strings.Contains(ansi.Strip(rendered), "..") {
+				t.Fatalf("tab=%t: resolved path retains the departed project: %q", tab, ansi.Strip(rendered))
+			}
+			runes, styles := renderedCells(rendered)
+			start := strings.Index(string(runes), "bar")
+			if start < 0 || styles[len([]rune(string(runes)[:start]))].Attrs&uv.AttrBold == 0 {
+				t.Fatalf("tab=%t: destination project is not emphasized: %q", tab, string(runes))
+			}
+		}
 	}
 }
 

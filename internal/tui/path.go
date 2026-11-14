@@ -56,6 +56,9 @@ func (p *pathDisplay) repositoryRoot(dir string) string {
 }
 
 func (p *pathDisplay) treePath(path string) string {
+	if path != "" {
+		path = filepath.Clean(path)
+	}
 	if p == nil || p.cwd == "" || !filepath.IsAbs(path) {
 		return path
 	}
@@ -155,6 +158,9 @@ func (p *pathDisplay) render(path string, base lipgloss.Style, tab, fileBold boo
 
 func (p *pathDisplay) renderWithin(path string, base lipgloss.Style, tab, fileBold bool, width int) string {
 	base = base.Padding(0)
+	if path != "" {
+		path = filepath.Clean(path)
+	}
 	if p == nil {
 		p = &pathDisplay{}
 	}
