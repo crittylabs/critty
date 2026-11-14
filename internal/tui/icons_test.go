@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/icons"
@@ -196,6 +197,9 @@ func TestOutlineSymbolKinds(t *testing.T) {
 }
 
 func TestNerdFontOutlineNavigation(t *testing.T) {
+	if icons.Nerd.Glyph(icons.Heading, "") != icons.Nerd.Glyph(icons.Markdown, "") {
+		t.Fatal("Markdown files and headings use different icons")
+	}
 	previous := terminalIsDark
 	t.Cleanup(func() { initAdaptiveStyles(previous) })
 	for _, dark := range []bool{false, true} {
@@ -241,6 +245,21 @@ func TestNerdFontFileNavigation(t *testing.T) {
 		for _, mark := range []string{icons.Nerd.Glyph(icons.FolderOpen, ""), icons.Nerd.Glyph(icons.Go, ""), icons.Nerd.Glyph(icons.Modified, ""), "●"} {
 			if !strings.Contains(view, mark) {
 				t.Fatalf("dark=%t: missing marker %q in %s", dark, mark, view)
+			}
+		}
+		foreground := lipgloss.Color("#0082A2")
+		if dark {
+			foreground = lipgloss.Color("#00ADD8")
+		}
+		if !hasForeground(app.fileTree.viewport.GetContent(), foreground, icons.Nerd.Glyph(icons.Go, "")) {
+			t.Fatal("file type icon lost its independent foreground")
+		}
+		for i, row := range app.fileTree.rows {
+			if !row.isDir && row.tabIndex == 0 {
+				text := app.treeRowText(i, app.tabIndicators())
+				if !hasForeground(text, textPrimary, "z.go") || !hasForeground(text, unreadDotStyle.GetForeground(), "●") {
+					t.Fatalf("file icon changed filename or unread colors: %q", text)
+				}
 			}
 		}
 		left, top, _, _ := app.commentBounds()

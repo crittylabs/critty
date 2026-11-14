@@ -258,13 +258,6 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 		if row.collapsed {
 			icon = defaultTreeIcons.dirClosed
 		}
-		if m.icons {
-			kind := icons.FolderOpen
-			if row.collapsed {
-				kind = icons.FolderClosed
-			}
-			icon = "  " + m.icons.Glyph(kind, "") + " "
-		}
 		label += "/"
 	}
 	style := lipgloss.NewStyle().Foreground(textSecondary)
@@ -282,14 +275,22 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 			style = style.Foreground(activeAttachmentColor)
 		}
 	}
+	icon = style.Render(icon)
+	if row.isDir && m.icons == icons.Nerd {
+		kind := icons.FolderOpen
+		if row.collapsed {
+			kind = icons.FolderClosed
+		}
+		icon = "  " + m.renderFileTypeIcon(kind, style) + " "
+	}
 	if !row.isDir {
-		icon = m.tabs[row.tabIndex].unreadMarker()
+		icon = style.Render(m.tabs[row.tabIndex].unreadMarker())
 		if m.icons {
 			tab := &m.tabs[row.tabIndex]
-			icon += m.icons.Glyph(fileIcon(tab.displayPath(), tab.isBinary), "") + " "
+			icon += m.renderFileTypeIcon(fileIcon(tab.displayPath(), tab.isBinary), style) + " "
 		}
 	}
-	text := strings.Repeat(" ", row.depth*treeIndent) + style.Render(icon) + style.Render(label)
+	text := strings.Repeat(" ", row.depth*treeIndent) + icon + style.Render(label)
 	if row.isDir && row.path == "" {
 		text += m.branchLabel(lipgloss.NewStyle().Foreground(textSecondary))
 	}

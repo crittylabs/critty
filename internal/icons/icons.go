@@ -76,7 +76,7 @@ const (
 var glyphs = [...]string{
 	FolderClosed: "\uea83", FolderOpen: "\ueaf7", File: "\uea7b", Code: "\ueae9",
 	Binary: "\ueae8", Image: "\ueaea", Config: "\ue615", JSON: "\ue60b",
-	Markdown: "\ue609", Go: "\ue627", Python: "\ue73c", Rust: "\ue7a8",
+	Markdown: "\uf48a", Go: "\ue627", Python: "\ue73c", Rust: "\ue7a8",
 	Ruby: "\ue739", JavaScript: "\ue781", TypeScript: "\ue628", Shell: "\ue691",
 	C: "\ue649", CPP: "\ue646", Java: "\ue66d", HTML: "\ue60e", CSS: "\ue614",
 	Added: "\ueadc", Modified: "\ueade", Removed: "\ueadf", Renamed: "\ueae0",
@@ -84,7 +84,7 @@ var glyphs = [...]string{
 	Unchecked: "\U000f0131", Checked: "\U000f0132", Reply: "\uea7d", Warning: "\uea6c", Outline: "\ueb86",
 	Function: "\U000f0295", Method: "\uea8c", Class: "\ueb5b", Struct: "\uea91",
 	Interface: "\ueb61", Enum: "\uea95", Namespace: "\uea8b", Constant: "\ueb5d",
-	Variable: "\uea88", Heading: "\ueb1d",
+	Variable: "\uea88", Heading: "\uf48a",
 	Project: "\ueb30", Branch: "\uf418", Watch: "\uea70",
 	Copy: "\uebcc", Edit: "\uea73", Back: "\uea9b", Forward: "\uea9c", Close: "\uea76",
 	Send: "\uec0f", Save: "\ueb4b", External: "\ueb14", GoTo: "\uea94", Delete: "\uea81", Suggest: "\uea61",

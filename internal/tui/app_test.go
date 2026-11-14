@@ -1116,6 +1116,19 @@ func TestBackgroundColorUpdatesEditorStyles(t *testing.T) {
 	if terminalIsDark {
 		t.Fatal("terminalIsDark is still true after a light background probe")
 	}
+	for _, dark := range []bool{true, false} {
+		background := color.Color(color.White)
+		want := lipgloss.Color("#0082A2")
+		if dark {
+			background, want = color.Black, lipgloss.Color("#00ADD8")
+		}
+		app, _ = updateApp(app, tea.BackgroundColorMsg{Color: background})
+		app.icons = icons.Nerd
+		icon := app.renderFileTypeIcon(icons.Go, lipgloss.NewStyle())
+		if !hasForeground(icon, want, icons.Nerd.Glyph(icons.Go, "")) {
+			t.Fatalf("dark=%t: background probe did not select the upstream icon palette", dark)
+		}
+	}
 }
 
 func TestReadOnlyViewer(t *testing.T) {
