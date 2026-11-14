@@ -66,6 +66,10 @@ const (
 	GoTo
 	Delete
 	Suggest
+	RadioUnchecked
+	RadioChecked
+	Mixed
+	Check
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -84,6 +88,7 @@ var glyphs = [...]string{
 	Project: "\ueb30", Branch: "\uf418", Watch: "\uea70",
 	Copy: "\uebcc", Edit: "\uea73", Back: "\uea9b", Forward: "\uea9c", Close: "\uea76",
 	Send: "\uec0f", Save: "\ueb4b", External: "\ueb14", GoTo: "\uea94", Delete: "\uea81", Suggest: "\uea61",
+	RadioUnchecked: "\U000f0130", RadioChecked: "\U000f043e", Mixed: "\U000f0856", Check: "\ueab2",
 }
 
 func (s Set) Glyph(kind Kind, fallback string) string {

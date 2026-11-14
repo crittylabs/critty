@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type formListState struct {
@@ -192,12 +193,12 @@ func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMous
 			section = row.section
 			lines = append(lines, line{helpHeadingStyle.Render(ansi.Truncate(section, width, "…")), -1})
 		}
-		status, statusColor := "○", progressColors.pending
+		status, statusColor := m.icons.Glyph(icons.RadioUnchecked, "○"), progressColors.pending
 		switch {
 		case row.missing:
-			status, statusColor = "!", formChip.red
+			status, statusColor = m.icons.Glyph(icons.Warning, "!"), formChip.red
 		case row.answered:
-			status, statusColor = "✓", formChip.green
+			status, statusColor = m.icons.Glyph(icons.Check, "✓"), formChip.green
 		}
 		label := row.item.Label
 		if row.item.Choice || row.item.Rank {

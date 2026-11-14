@@ -12,6 +12,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -490,16 +491,16 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	} else if checkbox.Required && !form.Satisfied(*checkbox, answer) {
 		tint, tagColor = formChip.requiredBadge, formChip.red
 	}
-	symbol := "☐"
+	symbol := m.icons.Glyph(icons.Unchecked, "☐")
 	if form.IsTextField(*checkbox) {
-		symbol = "✎"
+		symbol = m.icons.Glyph(icons.Edit, "✎")
 	} else if checkbox.Choice {
-		symbol = "○"
+		symbol = m.icons.Glyph(icons.RadioUnchecked, "○")
 		if selected {
-			symbol = "●"
+			symbol = m.icons.Glyph(icons.RadioChecked, "●")
 		}
 	} else if selected {
-		symbol = "✓"
+		symbol = m.icons.Glyph(icons.Checked, "✓")
 	}
 	tag := lipgloss.NewStyle().Foreground(tagColor).Bold(true)
 	if checkbox.Required {
@@ -525,11 +526,11 @@ func (m *AppModel) selectAllState(d *review.FormDocument, item *form.Item) (sele
 // on color alone.
 func (m *AppModel) selectAllDisplay(d *review.FormDocument, item *form.Item, label string, background lipgloss.Style) string {
 	selected, total := m.selectAllState(d, item)
-	tint, tagColor, symbol := color.Color(lipgloss.Cyan), formChip.cyan, "☐"
+	tint, tagColor, symbol := color.Color(lipgloss.Cyan), formChip.cyan, m.icons.Glyph(icons.Unchecked, "☐")
 	if selected == total {
-		tint, tagColor, symbol = lipgloss.Green, formChip.green, "✓"
+		tint, tagColor, symbol = lipgloss.Green, formChip.green, m.icons.Glyph(icons.Checked, "✓")
 	} else if selected > 0 {
-		symbol = "⊟"
+		symbol = m.icons.Glyph(icons.Mixed, "⊟")
 	}
 	tag := lipgloss.NewStyle().Foreground(tagColor).Bold(true)
 	tags := tag.Render("All")

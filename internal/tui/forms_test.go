@@ -14,6 +14,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -510,36 +511,42 @@ func TestSubmissionSaveRetryPreservesDecisionAndComment(t *testing.T) {
 
 func TestSelectAllForm(t *testing.T) {
 	t.Parallel()
-	app, _ := formTestAppWithContent(t, "- [ ] Check all <!-- form: id=all select-all=api -->\n- [ ] Auth <!-- form: id=auth tags=api -->\n- [ ] Errors <!-- form: id=errors tags=api consent -->\n")
-	line := func() string {
-		return ansi.Strip(strings.Split(app.contentViewport.GetContent(), "\n")[0])
-	}
-	if !strings.Contains(line(), "☐  All Check all (0/2) 1 consent") {
-		t.Fatalf("initial display: %q", line())
-	}
-	if len(app.formReviewItems()) != 2 {
-		t.Fatal("select-all item counted as an answer")
-	}
-	app.toggleForm(1)
-	d := app.forms.Document(app.tab().path)
-	if !strings.Contains(line(), "✓  All Check all (2/2)") || d.Answers["errors"].Via != "all" || !d.Answers["errors"].Human {
-		t.Fatalf("select all: %q %+v", line(), d.Answers)
-	}
-	if !app.tab().cursorOnForm || app.tab().cursorLine != 1 {
-		t.Fatal("focus left the select-all item")
-	}
-	app.toggleForm(2)
-	if !strings.Contains(line(), "⊟  All Mixed Check all (1/2)") || d.Answers["auth"].Via != "" {
-		t.Fatalf("mixed: %q %+v", line(), d.Answers)
-	}
-	app.toggleForm(1)
-	app.toggleForm(1)
-	if !strings.Contains(line(), "☐  All Check all (0/2)") {
-		t.Fatalf("clear all: %q", line())
-	}
-	saved, err := app.session.LoadForms()
-	if err != nil || saved.Version != 2 || saved.Documents[0].Answers["auth"].Value != false || !saved.Documents[0].Answers["auth"].Human {
-		t.Fatalf("saved: %v %+v", err, saved)
+	for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
+		t.Run(fmt.Sprintf("nerd=%t", symbols), func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, "- [ ] Check all <!-- form: id=all select-all=api -->\n- [ ] Auth <!-- form: id=auth tags=api -->\n- [ ] Errors <!-- form: id=errors tags=api consent -->\n")
+			app.icons = symbols
+			app.rebuildContent()
+			line := func() string {
+				return ansi.Strip(strings.Split(app.contentViewport.GetContent(), "\n")[0])
+			}
+			if !strings.Contains(line(), symbols.Glyph(icons.Unchecked, "☐")+"  All Check all (0/2) 1 consent") {
+				t.Fatalf("initial display: %q", line())
+			}
+			if len(app.formReviewItems()) != 2 {
+				t.Fatal("select-all item counted as an answer")
+			}
+			app.toggleForm(1)
+			d := app.forms.Document(app.tab().path)
+			if !strings.Contains(line(), symbols.Glyph(icons.Checked, "✓")+"  All Check all (2/2)") || d.Answers["errors"].Via != "all" || !d.Answers["errors"].Human {
+				t.Fatalf("select all: %q %+v", line(), d.Answers)
+			}
+			if !app.tab().cursorOnForm || app.tab().cursorLine != 1 {
+				t.Fatal("focus left the select-all item")
+			}
+			app.toggleForm(2)
+			if !strings.Contains(line(), symbols.Glyph(icons.Mixed, "⊟")+"  All Mixed Check all (1/2)") || d.Answers["auth"].Via != "" {
+				t.Fatalf("mixed: %q %+v", line(), d.Answers)
+			}
+			app.toggleForm(1)
+			app.toggleForm(1)
+			if !strings.Contains(line(), symbols.Glyph(icons.Unchecked, "☐")+"  All Check all (0/2)") {
+				t.Fatalf("clear all: %q", line())
+			}
+			saved, err := app.session.LoadForms()
+			if err != nil || saved.Version != 2 || saved.Documents[0].Answers["auth"].Value != false || !saved.Documents[0].Answers["auth"].Human {
+				t.Fatalf("saved: %v %+v", err, saved)
+			}
+		})
 	}
 }
 
@@ -599,42 +606,50 @@ func TestFormTextAnswers(t *testing.T) {
 
 func TestFormListModal(t *testing.T) {
 	t.Parallel()
-	app, _ := formTestAppWithContent(t, "# Questions\n\n- [ ] All <!-- form: id=all select-all=r -->\n\n## Q1. Retry?\n\n- [ ] Bounded <!-- form: id=retry value=bounded tags=r -->\n- [ ] Manual <!-- form: id=retry value=manual -->\n\n## Q2. Why?\n\n- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Publish <!-- form: id=publish consent -->\n")
-	app.toggleForm(8)
-	view := func() string { return ansi.Strip(app.View().Content) }
-	if !strings.Contains(app.renderFooter(), "Answers") {
-		t.Fatal("no answer list button")
-	}
-	app = pressKey(app, 'F')
-	if app.modal != formListModal {
-		t.Fatal("F did not open the answer list")
-	}
-	for _, want := range []string{"Q1. Retry?", "✓ retry · Manual", "Q2. Why?", "! Reason", "○ Publish", "1 of 3 answered"} {
-		if !strings.Contains(view(), want) {
-			t.Fatalf("missing %q in %q", want, view())
-		}
-	}
-	if strings.Contains(view(), "All") {
-		t.Fatal("select-all item listed as an answer")
-	}
-	app = pressKey(app, 'u')
-	if strings.Contains(view(), "retry") || app.formList.selected != 0 {
-		t.Fatalf("filter kept answered items: %q", view())
-	}
-	app = pressKey(app, 'j')
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if app.modal != noModal || app.tab().cursorLine != 13 || !app.tab().cursorOnForm || app.focused != contentPane {
-		t.Fatalf("Enter did not go to Publish: modal %v line %d", app.modal, app.tab().cursorLine)
-	}
-	app = pressKey(app, 'F')
-	for _, region := range app.modalMouseRegions() {
-		if region.action.pick && region.action.pickIndex == 0 {
-			app = clickMouse(app, region.rect.left, region.rect.top)
-			break
-		}
-	}
-	if app.modal != noModal || app.tab().cursorLine != 12 {
-		t.Fatalf("click did not go to Reason: modal %v line %d", app.modal, app.tab().cursorLine)
+	for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
+		t.Run(fmt.Sprintf("nerd=%t", symbols), func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, "# Questions\n\n- [ ] All <!-- form: id=all select-all=r -->\n\n## Q1. Retry?\n\n- [ ] Bounded <!-- form: id=retry value=bounded tags=r -->\n- [ ] Manual <!-- form: id=retry value=manual -->\n\n## Q2. Why?\n\n- [ ] Reason <!-- form: id=reason text required -->\n- [ ] Publish <!-- form: id=publish consent -->\n")
+			app.icons = symbols
+			app.rebuildContent()
+			app.toggleForm(8)
+			view := func() string { return ansi.Strip(app.View().Content) }
+			if !strings.Contains(app.renderFooter(), "Answers") {
+				t.Fatal("no answer list button")
+			}
+			app = pressKey(app, 'F')
+			if app.modal != formListModal {
+				t.Fatal("F did not open the answer list")
+			}
+			for _, want := range []string{"Q1. Retry?", symbols.Glyph(icons.Check, "✓") + " retry · Manual", "Q2. Why?", symbols.Glyph(icons.Warning, "!") + " Reason", symbols.Glyph(icons.RadioUnchecked, "○") + " Publish", "1 of 3 answered"} {
+				if !strings.Contains(view(), want) {
+					t.Fatalf("missing %q in %q", want, view())
+				}
+			}
+			for _, row := range app.formListRows() {
+				if row.item.SelectAll != nil {
+					t.Fatal("select-all item listed as an answer")
+				}
+			}
+			app = pressKey(app, 'u')
+			if strings.Contains(view(), "retry") || app.formList.selected != 0 {
+				t.Fatalf("filter kept answered items: %q", view())
+			}
+			app = pressKey(app, 'j')
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyEnter})
+			if app.modal != noModal || app.tab().cursorLine != 13 || !app.tab().cursorOnForm || app.focused != contentPane {
+				t.Fatalf("Enter did not go to Publish: modal %v line %d", app.modal, app.tab().cursorLine)
+			}
+			app = pressKey(app, 'F')
+			for _, region := range app.modalMouseRegions() {
+				if region.action.pick && region.action.pickIndex == 0 {
+					app = clickMouse(app, region.rect.left, region.rect.top)
+					break
+				}
+			}
+			if app.modal != noModal || app.tab().cursorLine != 12 {
+				t.Fatalf("click did not go to Reason: modal %v line %d", app.modal, app.tab().cursorLine)
+			}
+		})
 	}
 }
 

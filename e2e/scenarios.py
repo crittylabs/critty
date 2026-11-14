@@ -538,7 +538,7 @@ def transient_views() -> None:
         if demo:
             tmux("send-keys", "-t", pane, "n", "Space")
             wait_until(
-                lambda: "✓" in screen() and "Confirm demo" in screen(),
+                lambda: re.search(r"[✓\U000f0132].*Confirm demo", screen()),
                 "demo form answered",
             )
             tmux("send-keys", "-t", pane, "f")
@@ -1360,20 +1360,20 @@ def scenarios() -> None:
             ],
         )
         form.comment("Pending form review thread.")
-        form.click(r"0/1 💬")
+        form.click(r"0/1 (?:💬|\uea6b)")
         form.keys("r")
         wait_until(
             lambda: all(c.get("resolved") for c in form.comments()),
             "form thread resolution",
         )
-        form.click(r"1/1 💬")
+        form.click(r"1/1 (?:💬|\uea6b)")
         form.keys("g")
         form.keys("j", "Space", "j", "j", "Space")
         form.keys("q")
         form.click(r"Overall comment \(optional\)")
         form.text("Keep this form review draft.")
         form.wait_screen("Keep this form review draft.", "overall draft input")
-        form.click(r"1/1 💬", last=True)
+        form.click(r"1/1 (?:💬|\uea6b)", last=True)
         form.settle()
         assert not form.result.exists(), "counter click submitted the review"
         form.keys("q", "BTab", "C-s", "Tab", "Tab", "Tab", "Enter")
