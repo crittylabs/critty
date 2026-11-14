@@ -34,11 +34,15 @@ func TestMarkdownCodeBlocks(t *testing.T) {
 			parsed := parseMarkdownSource(strings.Split(tt.source, "\n"), nil)
 			found := false
 			for _, line := range parsed.lines {
-				if got := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)); got != displaySourceText(line.source) {
-					t.Fatalf("rendered = %q, want %q", got, line.source)
+				want := displaySourceText(line.source)
+				if tt.name == "quote" {
+					want = "▎ " + strings.TrimPrefix(want, "> ")
+				}
+				if got := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)); got != want {
+					t.Fatalf("rendered = %q, want %q", got, want)
 				}
 				for _, token := range line.tokens {
-					if line.source[token.start:token.end] != token.text {
+					if token.style&markdownAtomic == 0 && line.source[token.start:token.end] != token.text {
 						t.Fatalf("token lost source coordinates: %+v", token)
 					}
 					if token.syntax != 0 && strings.Contains(token.text, tt.highlighted) {
@@ -101,8 +105,12 @@ func TestMarkdownCodeFenceStyles(t *testing.T) {
 				if row == 0 && tt.language != "" && !foundLanguage {
 					t.Fatal("language source span missing")
 				}
-				if got := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)); got != displaySourceText(line.source) {
-					t.Fatalf("rendered = %q, want %q", got, line.source)
+				want := displaySourceText(line.source)
+				if tt.name == "quote and CRLF" {
+					want = "▎ " + strings.TrimPrefix(want, "> ")
+				}
+				if got := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)); got != want {
+					t.Fatalf("rendered = %q, want %q", got, want)
 				}
 			}
 		})

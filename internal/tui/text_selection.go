@@ -23,6 +23,7 @@ type contentTextSpan struct {
 	literal             bool
 	mapped              bool
 	atomic              bool
+	hanging             int
 	right               int
 	clipLeft, clipRight int
 }
@@ -38,8 +39,12 @@ type contentTextSelection struct {
 	target           contentMouseTarget
 }
 
-func (l *renderedContentLayout) appendSourceBlock(b *strings.Builder, block string, target contentMouseTarget) {
+func (l *renderedContentLayout) appendSourceBlock(b *strings.Builder, block string, target contentMouseTarget, hanging ...int) {
+	before := len(l.textSpans)
 	l.addTextSpan(len(l.rows), 0, 0, block, target)
+	if len(hanging) > 0 && len(l.textSpans) > before {
+		l.textSpans[len(l.textSpans)-1].hanging = hanging[0]
+	}
 	l.appendBlock(b, block, target)
 }
 
@@ -444,6 +449,11 @@ func (m *AppModel) prepareTextSpans() {
 		span := &m.contentLayout.textSpans[i]
 		if span.mapped {
 			continue
+		}
+		if span.hanging > 0 {
+			span.text = ansi.Cut(span.text, span.hanging, ansi.StringWidth(span.text))
+			span.left += span.hanging
+			span.hanging = 0
 		}
 		key := flowKey{span.ref, span.column}
 		f := flows[key]

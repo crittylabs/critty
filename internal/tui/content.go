@@ -274,11 +274,11 @@ func (m *AppModel) rebuildContent() {
 			if isMarkdown && t.previewLineHidden(del.OldLineNum, true) {
 				// The closing line carries this expression's image.
 			} else if isMarkdown {
-				content, _, width, measured := t.markdownDisplayLineInfo(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
+				content := t.markdownDisplayLine(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
 				if len(del.Inline) == 0 {
 					content = inlineBackground(diffDeletedLineBg, content)
 				}
-				rows = markdownDisplayRowsMeasured(content, textWidth, width, measured, decorate)
+				rows = t.markdownWrapRows(del.OldLineNum, true, content, textWidth, decorate)
 			} else {
 				rows = deletedDisplayLines(del.Content, cached, del.Inline, false, textWidth, decorate)
 			}
@@ -288,7 +288,7 @@ func (m *AppModel) rebuildContent() {
 				} else if isSidebarHighlight {
 					content = inlineBackground(sidebarHighlightBg, ansi.Strip(content))
 				}
-				layout.appendSourceBlock(&b, t.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target)
+				layout.appendSourceBlock(&b, t.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target, t.markdownHanging(del.OldLineNum, true, wi, textWidth))
 			}
 			if images := m.renderMarkdownImages(del.OldLineNum, true); images != "" {
 				layout.appendBlock(&b, images, target)
@@ -375,13 +375,13 @@ func (m *AppModel) rebuildContent() {
 		} else if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
 			var rows []string
 			if isMarkdown {
-				content, _, width, measured := t.markdownDisplayLineInfo(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false))
-				rows = markdownDisplayRowsMeasured(content, textWidth, width, measured, decorate)
+				content := t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false))
+				rows = t.markdownWrapRows(lineNum, false, content, textWidth, decorate)
 			} else {
 				rows = inlineDiffDisplayLines(inlineChanges, false, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
 			}
 			for wi, styledLine := range rows {
-				layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+styledLine, lineTarget)
+				layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+styledLine, lineTarget, t.markdownHanging(lineNum, false, wi, textWidth))
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
 			var rows []string
@@ -494,8 +494,14 @@ func (m *AppModel) rebuildContent() {
 				}
 				layout.appendSourceRow(&b, marker+numStr+" "+displayLine, plain, lineTarget)
 			} else {
-				for wi, wl := range strings.Split(lipgloss.Wrap(displayLine, textWidth, ""), "\n") {
-					layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+wl, lineTarget)
+				var rows []string
+				if isMarkdown {
+					rows = t.markdownWrapRows(lineNum, false, displayLine, textWidth, nil)
+				} else {
+					rows = strings.Split(lipgloss.Wrap(displayLine, textWidth, ""), "\n")
+				}
+				for wi, wl := range rows {
+					layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+wl, lineTarget, t.markdownHanging(lineNum, false, wi, textWidth))
 				}
 			}
 		}

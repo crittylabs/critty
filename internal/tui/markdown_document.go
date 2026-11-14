@@ -51,6 +51,7 @@ const (
 	markdownCalloutTitle
 	markdownCalloutBar
 	markdownAtomic
+	markdownQuoteBar
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -75,6 +76,11 @@ type markdownLine struct {
 	ruleStart     int
 	literal       bool
 	codeBlock     bool
+	quoted        bool
+	calloutBody   bool
+	wrapStart     int
+	wrapExtra     int
+	wrapIndent    int
 	previewTokens []markdownToken
 	previewHidden bool
 	previewMap    []previewDisplaySpan
@@ -149,7 +155,7 @@ func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.R
 		if i > 0 {
 			result.offsets[i] = result.offsets[i-1] + len(lines[i-1]) + 1
 		}
-		result.lines[i] = markdownLine{source: line, literal: true,
+		result.lines[i] = markdownLine{source: line, literal: true, wrapStart: -1,
 			tokens: []markdownToken{{end: len(line), text: line}}}
 	}
 	for start := result.parseFrontmatter(known); start < len(lines); {
@@ -164,6 +170,7 @@ func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.R
 		result.parseRun(start, end, known != nil)
 		start = end
 	}
+	result.prepareWrapping()
 	ids := parser.NewIDs(parser.WithIDGenerator(markdownHeadingIDs{}))
 	result.headingAnchors = make(map[string]int, len(result.headings))
 	for i, heading := range result.headings {
@@ -219,6 +226,7 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 				}
 			}
 			m.parseBlock(data, segments, offsets, start, edits, lineAt)
+			m.markParagraphWrapping(n, segments, start, offsets, lineAt)
 			return
 		case *ast.CodeBlock:
 			if block := n.(*ast.CodeBlock); block.CodeBlockKind == ast.CodeBlockKindFenced && (!incomplete || start == 0 || lineAt(block.Pos()) > 0) {
@@ -271,6 +279,7 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		line.tokens = append(line.tokens, markdownToken{start: pos, end: len(line.source), text: line.source[pos:]})
 		line.literal = false
 	}
+	m.applyQuotePrefixes(root, data, context, start, offsets, lineAt, incomplete)
 	m.applyCallouts(root, data, context, start, offsets, incomplete)
 }
 
@@ -514,6 +523,12 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			continue
 		}
 		style := lipgloss.NewStyle()
+		if line.quoted && !line.calloutBody && !line.codeBlock && token.style&markdownQuoteBar == 0 {
+			style = style.Italic(true)
+		}
+		if token.style&markdownQuoteBar != 0 {
+			style = mdBlockquoteBar.Inherit(style)
+		}
 		if token.style&markdownCalloutTitle != 0 {
 			style = style.Background(calloutTitleBackground(token.callout)).Bold(true)
 		}
@@ -788,15 +803,6 @@ func (t *FileTab) markdownDisplayLineInfo(line int, before bool, fallback string
 		}
 	}
 	return display, "", 0, false
-}
-
-// markdownDisplayRowsMeasured wraps a rendered line, skipping the wrapping
-// pass when its measured width already fits.
-func markdownDisplayRowsMeasured(content string, width, contentWidth int, measured bool, decorate func(string) (string, bool)) []string {
-	if measured && decorate == nil && contentWidth <= width {
-		return []string{content}
-	}
-	return markdownDisplayRows(content, width, decorate)
 }
 
 func markdownDisplayRows(content string, width int, decorate func(string) (string, bool)) []string {

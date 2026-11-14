@@ -498,6 +498,7 @@ func fitDiffCell(text string, width int) string {
 type diffCellRow struct {
 	text, plain string
 	width       int
+	hanging     int
 }
 
 func (r diffCellRow) fit(width int) string {
@@ -511,7 +512,11 @@ func (r diffCellRow) fit(width int) string {
 // when the cell row was not wrapped.
 func (l *renderedContentLayout) addCellSpan(row, left, column int, cell diffCellRow, target contentMouseTarget) {
 	if cell.plain == "" || target.line <= 0 || target.annotation {
+		before := len(l.textSpans)
 		l.addTextSpan(row, left, column, cell.text, target)
+		if len(l.textSpans) > before {
+			l.textSpans[len(l.textSpans)-1].hanging = cell.hanging
+		}
 		return
 	}
 	l.textSpans = append(l.textSpans, contentTextSpan{row: row, left: left + gutterWidth, column: column,
@@ -625,7 +630,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		} else if line.changed && len(line.inline) == 0 {
 			content = inlineBackground(diffChangedLineBg, content)
 		}
-		rows = markdownDisplayRowsMeasured(content, textWidth, contentWidth, measured, decorate)
+		rows = t.markdownWrapRows(sourceLine, oldSide, content, textWidth, decorate)
 		if measured && decorate == nil && contentWidth <= textWidth {
 			plain, plainWidth = contentPlain, contentWidth
 		}
@@ -658,6 +663,9 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 			text = inlineBackground(sidebarHighlightBg, ansi.Strip(text))
 		}
 		cells[i] = diffCellRow{text: t.sourceRowGutter(sourceLine, oldSide, i, marker, num) + text}
+		if t.isMarkdown {
+			cells[i].hanging = t.markdownHanging(sourceLine, oldSide, i, textWidth)
+		}
 		if i == 0 {
 			cells[i].plain, cells[i].width = plain, gutterWidth+plainWidth
 		}

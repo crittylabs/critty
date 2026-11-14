@@ -16,6 +16,7 @@
 
 ### Changed
 
+- **Markdown wrapping**: Wrapped list items align with their text, and quotes repeat their nested vertical bars in documents and comments.  Callouts retain their colors across wrapped rows.  Decorative indentation and repeated bars stay out of copied Markdown, including in split diffs.
 - **Single-file viewing**: Read files at full width when no outline is available.  Files with headings or declarations show an Outline sidebar without Files or Comments tabs; hide it to use the full width.
 - **Markdown section dividers**: Thematic breaks extend across the available text width and use the same muted gray as frontmatter boundaries.  Resizing keeps the rule within its pane.  Rules select as a whole and copy as their original Markdown.
 - **Shell completion**: Complete subcommands and filenames together after `critty`, with subcommands listed first in shells that support ordered candidates.  Explicit paths keep native file completion.

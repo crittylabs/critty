@@ -228,7 +228,8 @@ func (m *markdownSource) applyCallout(n ast.Node, prefixes []quotePrefix, data [
 		line := lineAt(prefix.start)
 		raw := string(data[prefix.start:prefix.end])
 		indent := raw[:strings.IndexByte(raw, '>')]
-		m.lines[base+line].replaceCallout(prefix.start-offsets[line], prefix.end-offsets[line], indent+"▎ ", markdownCalloutBar, header.kind)
+		m.lines[base+line].replaceTokenRange(prefix.start-offsets[line], prefix.end-offsets[line], indent+"▎ ", markdownCalloutBar, header.kind)
+		m.lines[base+line].calloutBody = true
 	}
 	// CommonMark allows paragraph continuation lines without another '>'.
 	// Give these the same display bar without adding source bytes.
@@ -243,7 +244,8 @@ func (m *markdownSource) applyCallout(n ast.Node, prefixes []quotePrefix, data [
 				row := lineAt(segment.Start)
 				if !present[row] {
 					at := segment.Start - offsets[row]
-					m.lines[base+row].replaceCallout(at, at, "▎ ", markdownCalloutBar, header.kind)
+					m.lines[base+row].replaceTokenRange(at, at, "▎ ", markdownCalloutBar, header.kind)
+					m.lines[base+row].calloutBody = true
 					present[row] = true
 				}
 			}
@@ -255,7 +257,8 @@ func (m *markdownSource) applyCallout(n ast.Node, prefixes []quotePrefix, data [
 	continueParagraphs(n)
 	line := &m.lines[base+row]
 	from := first.Start - offsets[row]
-	line.replaceCallout(from, from+header.end, calloutIcon(header.kind, m.symbols)+header.label, markdownCalloutTitle, header.kind)
+	line.replaceTokenRange(from, from+header.end, calloutIcon(header.kind, m.symbols)+header.label, markdownCalloutTitle, header.kind)
+	line.wrapStart, line.wrapExtra = from, 2
 	if header.label == "" {
 		// Keep inline formatting and links in custom titles.
 		for i := range line.tokens {
@@ -276,7 +279,7 @@ func validCalloutName(name string) bool {
 	return true
 }
 
-func (line *markdownLine) replaceCallout(from, to int, value string, style markdownStyle, kind calloutKind) {
+func (line *markdownLine) replaceTokenRange(from, to int, value string, style markdownStyle, kind calloutKind) {
 	var result []markdownToken
 	inserted := false
 	for _, token := range line.tokens {

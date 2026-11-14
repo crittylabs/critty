@@ -126,7 +126,12 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int, 
 			prefixWidth = ansi.StringWidth(prefix)
 		}
 		prefixed = true
-		rows := strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")
+		var rows []string
+		if renderSource != nil {
+			rows = renderSource.lines[i].wrapRows(expandDisplayTabs(content), width, prefixWidth)
+		} else {
+			rows = strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")
+		}
 		if renderSource != nil && renderSource.lines[i].codeBlock && renderSource.lines[i].previewTokens == nil {
 			for row := range rows {
 				left := 0
