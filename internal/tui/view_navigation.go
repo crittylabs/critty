@@ -11,7 +11,9 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 const viewHistoryLimit = 64
@@ -241,13 +243,15 @@ func (m AppModel) viewHistoryButton(forward bool) string {
 		return ""
 	}
 	label, key, count := "Back", "M-←", len(m.browsing.back)
+	kind := icons.Back
 	if forward {
 		label, key, count = "Forward", "M-→", len(m.browsing.forward)
+		kind = icons.Forward
 	}
 	if count == 0 {
 		return ""
 	}
-	return renderBarButton(label, key)
+	return renderBarButton(m.icons.Label(kind, label), key)
 }
 
 func viewFragmentLine(tab *FileTab, fragment string) (int, bool) {

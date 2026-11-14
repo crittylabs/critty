@@ -2,15 +2,85 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestNerdFontCopyAndFinishTargets(t *testing.T) {
+	app := setupPrivateAppWithDoc(t, "`word`\n")
+	app.icons = icons.Nerd
+	app.width, app.height = 54, 18
+	app.recalculateLayout()
+	app.rebuildContent()
+	left, top, _, _ := app.contentBounds()
+	app = pressMouse(app, left+gutterWidth+1, top)
+	app = releaseMouse(app, left+gutterWidth+5, top)
+	_, layout := app.renderReviewScreen()
+	if !layout.hasCopyTextButton || layout.copyTextButton.bottom > app.height || !strings.Contains(app.copyTextButton(), icons.Nerd.Glyph(icons.Copy, "")) {
+		t.Fatal("Nerd Font copy button is missing or unreachable")
+	}
+	app, cmd := clickMouseCmd(app, layout.copyTextButton.left, layout.copyTextButton.top)
+	if cmd == nil || !reflect.DeepEqual(cmd(), tea.SetClipboard("`word`")()) {
+		t.Fatal("clicking the copy icon did not copy original Markdown")
+	}
+	_, layout = app.renderReviewScreen()
+	if !layout.hasFinishButton || !strings.Contains(app.submitButton(), icons.Nerd.Glyph(icons.Send, "")) {
+		t.Fatal("submit icon missing")
+	}
+	app = clickMouse(app, layout.finishButton.left, layout.finishButton.top)
+	if app.modal != finishModal {
+		t.Fatal("submit icon did not open finish dialog")
+	}
+	back := finishRegion(t, app, finishBack)
+	app = clickMouse(app, back.left, back.top)
+	if app.modal != noModal {
+		t.Fatal("back icon did not return to review")
+	}
+}
+
+func TestNerdFontViewHistoryTargets(t *testing.T) {
+	app := newViewNavigationApp(t, "# Start\n")
+	app.icons = icons.Nerd
+	start := app.tab().path
+	next := filepath.Join(filepath.Dir(start), "next.md")
+	if err := os.WriteFile(next, []byte("# Next\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	followViewTestLink(t, &app, "next.md")
+	_, layout := app.renderReviewScreen()
+	if !layout.hasBackButton || !strings.Contains(app.viewHistoryButton(false), icons.Nerd.Glyph(icons.Back, "")) {
+		t.Fatal("back icon missing")
+	}
+	app = clickMouse(app, layout.backButton.left, layout.backButton.top)
+	if app.tab().path != start {
+		t.Fatal("back icon did not restore document")
+	}
+	_, layout = app.renderReviewScreen()
+	if !layout.hasForwardButton || !strings.Contains(app.viewHistoryButton(true), icons.Nerd.Glyph(icons.Forward, "")) {
+		t.Fatal("forward icon missing")
+	}
+	app = clickMouse(app, layout.forwardButton.left, layout.forwardButton.top)
+	if app.tab().path != next {
+		t.Fatal("forward icon did not restore document")
+	}
+	_, layout = app.renderReviewScreen()
+	if !layout.hasFinishButton || !strings.Contains(app.submitButton(), icons.Nerd.Glyph(icons.Close, "")) {
+		t.Fatal("close icon missing")
+	}
+	_, cmd := clickMouseCmd(app, layout.finishButton.left, layout.finishButton.top)
+	if !isQuit(cmd) {
+		t.Fatal("close icon did not exit read-only viewer")
+	}
+}
 
 func TestNerdFontHeaderControls(t *testing.T) {
 	previous := terminalIsDark

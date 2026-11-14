@@ -3041,9 +3041,9 @@ func headerLabel(value string) string {
 // submitButton renders the button that opens the finish dialog.
 func (m AppModel) submitButton() string {
 	if m.readOnly {
-		return renderBarButton("Close", "q")
+		return renderBarButton(m.icons.Label(icons.Close, "Close"), "q")
 	}
-	return renderBarButton("Submit", "q")
+	return renderBarButton(m.icons.Label(icons.Send, "Submit"), "q")
 }
 
 // scopeWordStyle styles the scope word in the top bar: white on the
@@ -5057,12 +5057,12 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		title, closeRegion := modalTitle(titleText, innerWidth)
 		contextContent := m.renderContextPreview(side, start, end, innerWidth-4, 0)
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Close"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
 			buttonSpecs = append(buttonSpecs, modalButtonSpec{
-				rendered: m.renderModalButton("Suggest", "M-s", m.modalFocus == 3),
+				rendered: m.renderModalButton(m.icons.Label(icons.Suggest, "Suggest"), "M-s", m.modalFocus == 3),
 				action:   modalMouseAction{focus: 3},
 			})
 		}
@@ -5131,8 +5131,8 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
 		regions = append(regions, textareaRegion)
 		buttons, buttonRegions := layoutModalActions(append([]modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Close"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, m.editorPreviewButtons()...), innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
 		regions = append(regions, closeRegion)
@@ -5192,12 +5192,12 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 		}
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Close"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
 			buttonSpecs = append(buttonSpecs, modalButtonSpec{
-				rendered: m.renderModalButton("Suggest", "M-s", m.modalFocus == 3),
+				rendered: m.renderModalButton(m.icons.Label(icons.Suggest, "Suggest"), "M-s", m.modalFocus == 3),
 				action:   modalMouseAction{focus: 3},
 			})
 		}
@@ -5229,7 +5229,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			for i, target := range m.modalDeleteTargets() {
 				content += "\n"
 				deleteRow, deleteRegions := layoutModalActions([]modalButtonSpec{{
-					rendered: m.renderDangerModalButton(target.label, "", m.modalFocus == i+deleteStart),
+					rendered: m.renderDangerModalButton(m.icons.Label(icons.Delete, target.label), "", m.modalFocus == i+deleteStart),
 					action:   modalMouseAction{focus: i + deleteStart, deleteIndex: i},
 				}}, innerWidth, buttonY)
 				content += deleteRow

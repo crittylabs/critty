@@ -55,6 +55,17 @@ const (
 	Project
 	Branch
 	Watch
+	Copy
+	Edit
+	Back
+	Forward
+	Close
+	Send
+	Save
+	External
+	GoTo
+	Delete
+	Suggest
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -71,6 +82,8 @@ var glyphs = [...]string{
 	Interface: "\ueb61", Enum: "\uea95", Namespace: "\uea8b", Constant: "\ueb5d",
 	Variable: "\uea88", Heading: "\ueb1d",
 	Project: "\ueb30", Branch: "\uf418", Watch: "\uea70",
+	Copy: "\uebcc", Edit: "\uea73", Back: "\uea9b", Forward: "\uea9c", Close: "\uea76",
+	Send: "\uec0f", Save: "\ueb4b", External: "\ueb14", GoTo: "\uea94", Delete: "\uea81", Suggest: "\uea61",
 }
 
 func (s Set) Glyph(kind Kind, fallback string) string {

@@ -10,6 +10,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type sourceLocation struct {
@@ -274,8 +276,8 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 			action: modalMouseAction{lineInput: true},
 		}}
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Go", "enter", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Cancel", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.GoTo, "Go"), "enter", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Cancel"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, width, strings.Count(content, "\n"))
 		return content + buttons, append(append(regions, buttonRegions...), closeRegion)
 	}
@@ -284,15 +286,17 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 		target += fmt.Sprintf(" L%d", m.pendingLocation.line)
 	}
 	caption, explanation := "Open in editor?", "This location is not in the review."
+	openIcon := icons.Edit
 	if m.modal == openExternalModal {
 		caption, explanation = "Open in external application?", "This file cannot be displayed in Critty."
+		openIcon = icons.External
 	}
 	title, closeRegion := modalTitle(caption, width)
 	prefix := lipgloss.Wrap(title+"\n"+
 		target+"\n"+explanation+"\n\n", max(1, width), "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{
-		{rendered: m.renderPrimaryModalButton("Open", "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
-		{rendered: m.renderModalButton("Cancel", "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+		{rendered: m.renderPrimaryModalButton(m.icons.Label(openIcon, "Open"), "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},
+		{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Cancel"), "n / esc", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
 	}, width, strings.Count(prefix, "\n"))
 	return prefix + buttons, append(regions, closeRegion)
 }
