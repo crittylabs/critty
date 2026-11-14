@@ -7,14 +7,129 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/yuin/goldmark/v2/ast"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/text"
 )
 
-func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, base int) {
-	language, _ := block.Language(data)
+type codeFenceInfo struct {
+	lexer      chroma.Lexer
+	start, end int
+}
+
+func (m *markdownSource) codeFenceInfo(block *ast.CodeBlock, data []byte) codeFenceInfo {
+	index := block.Info.Index()
+	if index.IsEmpty() {
+		return codeFenceInfo{}
+	}
+	raw := string(data[index.Start:index.Stop])
+	language, start, end := "", 0, 0
+	if strings.HasPrefix(raw, "{") {
+		attrs, ok := parser.ParseAttributes(text.NewReader([]byte(raw), text.NewDecoder()))
+		if !ok {
+			return codeFenceInfo{}
+		}
+		for _, attr := range attrs {
+			if attr.Name != "class" {
+				continue
+			}
+			classes := strings.Fields(attr.Value.Str([]byte(raw)))
+			if len(classes) == 0 {
+				break
+			}
+			language = classes[0]
+			if spans := attr.Value.Indices(); len(spans) > 0 {
+				start, end = spans[0].Start, spans[0].Start+len(language)
+			} else {
+				start, end = fenceClassRange(raw, language)
+			}
+			break
+		}
+	} else {
+		language, _ = block.Language(data)
+		end = len(language)
+	}
 	lexer := lexers.Get(language)
 	if language == "suggestion" {
 		lexer = m.suggestionLexer
 	}
+	if start < end {
+		start, end = index.Start+start, index.Start+end
+	}
+	return codeFenceInfo{lexer: lexer, start: start, end: end}
+}
+
+// Goldmark merges multiple classes into a string without source positions.
+// Recover the first class span, skipping quoted attribute values.
+func fenceClassRange(raw, language string) (int, int) {
+	var quote byte
+	for i := 1; i < len(raw); i++ {
+		if quote != 0 {
+			if raw[i] == quote {
+				quote = 0
+			}
+			continue
+		}
+		if raw[i] == '\'' || raw[i] == '"' {
+			quote = raw[i]
+			continue
+		}
+		if raw[i] != '.' || raw[i-1] != ' ' && raw[i-1] != '\t' && raw[i-1] != '{' {
+			continue
+		}
+		end := i + 1
+		for end < len(raw) && raw[end] != ' ' && raw[end] != '\t' && raw[end] != '}' {
+			end++
+		}
+		if raw[i+1:end] == language {
+			return i + 1, end
+		}
+	}
+	return 0, 0
+}
+
+func (m *markdownSource) styleCodeFence(fence markdownFence, info codeFenceInfo) {
+	styleLine := func(start, end int, opening bool) {
+		row := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > start }) - 1
+		line := &m.lines[row]
+		column := start - m.offsets[row]
+		tokens := []markdownToken{{end: column, text: line.source[:column]}}
+		appendToken := func(from, to int, style markdownStyle) {
+			if from < to {
+				tokens = append(tokens, markdownToken{start: from, end: to, text: line.source[from:to], style: style})
+			}
+		}
+		appendToken(column, end-m.offsets[row], markdownDelimiter)
+		if opening {
+			from := end - m.offsets[row]
+			if info.start < info.end {
+				appendToken(from, info.start-m.offsets[row], markdownFenceAttribute)
+				style := markdownDelimiter
+				if info.lexer != nil {
+					style = markdownFenceLanguage
+				}
+				appendToken(info.start-m.offsets[row], info.end-m.offsets[row], style)
+				from = info.end - m.offsets[row]
+			}
+			appendToken(from, len(line.source), markdownFenceAttribute)
+		} else {
+			appendToken(end-m.offsets[row], len(line.source), markdownDelimiter)
+		}
+		line.tokens = tokens
+	}
+	styleLine(fence.start, fence.markerEnd, true)
+	if fence.closed {
+		row := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > fence.closingStart }) - 1
+		line := m.lines[row].source
+		openingRow := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > fence.start }) - 1
+		marker := m.lines[openingRow].source[fence.start-m.offsets[openingRow]]
+		column := strings.IndexByte(line, marker)
+		if column >= 0 {
+			styleLine(m.offsets[row]+column, fence.end, false)
+		}
+	}
+}
+
+func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, base int, lexer chroma.Lexer) {
 	if lexer == nil {
 		return
 	}

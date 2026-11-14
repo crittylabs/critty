@@ -325,11 +325,11 @@ type markdownFence struct {
 	closing                             string
 }
 
-func (m *markdownSource) addCodeFence(block *ast.CodeBlock, data []byte, base int) {
+func (m *markdownSource) addCodeFence(block *ast.CodeBlock, data []byte, base int) *markdownFence {
 	source := string(data)
 	start := block.Pos()
 	if start < 0 || start >= len(source) {
-		return
+		return nil
 	}
 	marker := source[start]
 	length := 0
@@ -366,6 +366,7 @@ func (m *markdownSource) addCodeFence(block *ast.CodeBlock, data []byte, base in
 		}
 	}
 	m.fences = append(m.fences, markdownFence{start: base + start, markerEnd: base + start + length, closingStart: base + min(contentEnd, len(source)), end: base + end, closed: closed, closing: prefix + fence})
+	return &m.fences[len(m.fences)-1]
 }
 
 func partialAutoLink(label, uri string) string {

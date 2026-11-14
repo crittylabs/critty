@@ -283,8 +283,10 @@ var (
 				Foreground(textPrimary).
 				Italic(true)
 
-	mdHrStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#646464"))
+	mdFenceLanguageStyle  = lipgloss.NewStyle().Foreground(accent)
+	mdFenceAttributeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#71848C"))
+	mdHrStyle             = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#646464"))
 
 	mdLinkStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.BrightCyan).
@@ -422,6 +424,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	fileMatchStyle = fileMatchStyle.Foreground(warning)
 	activeAttachmentColor = ld(textColors.brightYellow, lipgloss.Yellow)
 	mdHrStyle = mdHrStyle.Foreground(ld(lipgloss.Color("#9A9A9A"), lipgloss.Color("#646464")))
+	mdFenceAttributeStyle = mdFenceAttributeStyle.Foreground(ld(lipgloss.Color("#6B7C85"), lipgloss.Color("#71848C")))
 	mdH3Style = mdH3Style.Foreground(textColors.cyan)
 	mdH4Style = mdH4Style.Foreground(textColors.cyan)
 	mdLinkStyle = mdLinkStyle.Foreground(textColors.brightCyan)

@@ -25,7 +25,7 @@ var (
 	markdownInlineParser = paragraphParser()
 )
 
-type markdownStyle uint8
+type markdownStyle uint16
 
 type markdownDecoration uint8
 
@@ -44,6 +44,8 @@ const (
 	markdownRendered
 	markdownDelimiter
 	markdownKeyboard
+	markdownFenceLanguage
+	markdownFenceAttribute
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -205,8 +207,12 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			return
 		case *ast.CodeBlock:
 			if block := n.(*ast.CodeBlock); block.CodeBlockKind == ast.CodeBlockKindFenced && (!incomplete || start == 0 || lineAt(block.Pos()) > 0) {
-				m.addCodeFence(block, data, m.offsets[start])
-				m.highlightCodeBlock(block, data, m.offsets[start])
+				info := m.codeFenceInfo(block, data)
+				if fence := m.addCodeFence(block, data, m.offsets[start]); fence != nil {
+					info.start, info.end = info.start+m.offsets[start], info.end+m.offsets[start]
+					m.styleCodeFence(*fence, info)
+				}
+				m.highlightCodeBlock(block, data, m.offsets[start], info.lexer)
 			}
 			return
 		case *ast.HTMLBlock:
@@ -496,6 +502,12 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		if token.style&markdownDelimiter != 0 {
 			style = mdHrStyle.Inherit(style)
 		}
+		if token.style&markdownFenceLanguage != 0 {
+			style = mdFenceLanguageStyle.Inherit(style)
+		}
+		if token.style&markdownFenceAttribute != 0 {
+			style = mdFenceAttributeStyle.Inherit(style)
+		}
 		if token.style&markdownBold != 0 {
 			style = mdBoldStyle.Inherit(style)
 		}
@@ -511,7 +523,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		if token.style&markdownKeyboard != 0 {
 			style = keyboardStyle().Inherit(style)
 		}
-		if foreground != nil && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter) == 0 {
+		if foreground != nil && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter|markdownFenceLanguage|markdownFenceAttribute) == 0 {
 			style = style.Foreground(foreground)
 		}
 		uri := token.uri

@@ -17,6 +17,9 @@ func TestMarkdownCodeBlocks(t *testing.T) {
 	}{
 		{"go", "```go\nvar count = 42\n```", "var"},
 		{"alias and info", "~~~js title=example\nconst count = 42;\n~~~", "const"},
+		{"attributes", "```{#example .go .numberLines startFrom=\"10\"}\nvar count = 42\n```", "var"},
+		{"quoted attributes", "```{title=\".python and spaces\" .go .numberLines}\nvar count = 42\n```", "var"},
+		{"invalid attributes", "```{.go title=\"unclosed}\nvar count = 42\n```", ""},
 		{"quote", "> ```python\n> count = 42\n> ```", "42"},
 		{"list", "- Example\n\n  ```go\n  var count = 42\n  ```", "var"},
 		{"Unicode and tabs", "```go\n\tvar café = \"é\"\n```", "var"},
@@ -45,6 +48,62 @@ func TestMarkdownCodeBlocks(t *testing.T) {
 			}
 			if found != (tt.highlighted != "") {
 				t.Fatalf("syntax highlighting = %t, want %q", found, tt.highlighted)
+			}
+		})
+	}
+}
+
+func TestMarkdownCodeFenceStyles(t *testing.T) {
+	for _, tt := range []struct {
+		name, opening, language string
+		known                   bool
+	}{
+		{"supported", "```go", "go", true},
+		{"unknown", "```unknown-language", "unknown-language", false},
+		{"attributes after language", "~~~js title=\"Example code\"", "js", true},
+		{"attribute list", "```{#example .go .numberLines startFrom=\"10\"}", "go", true},
+		{"quoted value", "```{title=\".python\" .go .numberLines}", "go", true},
+		{"unknown class", "```{.unknown-language #example}", "unknown-language", false},
+		{"quote and CRLF", "> ```go\r", "go", true},
+		{"empty", "```", "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			prefix := ""
+			if strings.HasPrefix(tt.opening, "> ") {
+				prefix = "> "
+			}
+			marker := "````"
+			if strings.Contains(tt.opening, "~~~") {
+				marker = "~~~~"
+			}
+			parsed := parseMarkdownSource([]string{tt.opening, prefix + "var count = 42", prefix + marker}, nil)
+			for _, row := range []int{0, 2} {
+				line := parsed.lines[row]
+				foundLanguage := false
+				for _, token := range line.tokens {
+					if strings.Contains(token.text, marker[:3]) && token.style != markdownDelimiter {
+						t.Fatalf("fence is not muted: %+v", token)
+					}
+					if row == 0 && token.text == tt.language && tt.language != "" {
+						foundLanguage = true
+						want := markdownDelimiter
+						if tt.known {
+							want = markdownFenceLanguage
+						}
+						if token.style != want {
+							t.Fatalf("language style = %d, want %d", token.style, want)
+						}
+					}
+					if strings.Contains(token.text, "title=") && token.style != markdownFenceAttribute {
+						t.Fatalf("attribute is not muted: %+v", token)
+					}
+				}
+				if row == 0 && tt.language != "" && !foundLanguage {
+					t.Fatal("language source span missing")
+				}
+				if got := ansi.Strip(line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)); got != displaySourceText(line.source) {
+					t.Fatalf("rendered = %q, want %q", got, line.source)
+				}
 			}
 		})
 	}
