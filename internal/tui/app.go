@@ -4489,7 +4489,7 @@ func (m AppModel) renderFooterHints() string {
 			if !m.singleFileView() {
 				items = append([]string{k("s", "sidebar"), k("t", "files/comments")}, items...)
 			} else if len(m.outline.rows) > 0 {
-				items = append([]string{k("s/t", "file/outline"), k("V", "hide/show outline")}, items...)
+				items = append([]string{k("V", "hide/show outline")}, items...)
 			}
 		}
 	} else if t.selecting {
