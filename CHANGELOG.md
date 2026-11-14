@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- **Dimmed sidebar selections**: The current file and outline heading keep a uniform row background behind dialogs, including the blank space after their labels, in light and dark terminals.
 - **Project path display**: Resolve `.` and `..` before highlighting repository boundaries or abbreviating paths in headers, tabs, and the file tree.  A path such as `foo/../bar/notes.md` now identifies `bar` rather than highlighting the departed `foo` project.
 - **Viewer controls**: Read-only views show the same image-preview status and clickable toggle as reviews, including unavailable terminals.  Sidebar, file-switching, and change-navigation hints appear when applicable; line selection shows cancel and copy actions.
 - **Markdown colors on dark terminals**: Inline code shows its shaded background immediately after opening a document in a dark terminal.

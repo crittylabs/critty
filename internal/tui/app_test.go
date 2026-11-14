@@ -1104,6 +1104,47 @@ func TestDimRenderedDimsBackgrounds(t *testing.T) {
 	}
 }
 
+func TestDimRenderedSidebarSelection(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
+			t.Run(fmt.Sprintf("dark=%t/nerd=%t", dark, symbols), func(t *testing.T) {
+				initAdaptiveStyles(dark)
+				app := setupPrivateAppWithDoc(t, "# Heading\n\nBody.\n")
+				app.icons, app.sidebarView = symbols, filesView
+				app.tab().cursorLine = 1
+				app.width, app.height = 100, 36
+				app.recalculateLayout()
+				app.rebuildContent()
+				app.updateCommentSidebar()
+				var fileLine string
+				for i, row := range app.fileTree.rows {
+					if !row.isDir && row.tabIndex == app.activeTab {
+						fileLine = strings.Split(app.fileTree.viewport.GetContent(), "\n")[i]
+						break
+					}
+				}
+				for _, line := range []string{fileLine, strings.Split(app.outline.viewport.GetContent(), "\n")[0]} {
+					if line == "" {
+						t.Fatal("selected sidebar row is missing")
+					}
+					_, cells := renderedCells(dimRendered(line, ansi.StringWidth(line), 1))
+					for x, cell := range cells {
+						bg := cell.Bg
+						if cell.Attrs&uv.AttrReverse != 0 {
+							bg = cell.Fg
+						}
+						if !sameColor(bg, cells[0].Bg) {
+							t.Fatalf("selected row background changes at column %d", x)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestBackgroundColorUpdatesEditorStyles(t *testing.T) {
 	initAdaptiveStyles(true)
 	t.Cleanup(func() { initAdaptiveStyles(true) })

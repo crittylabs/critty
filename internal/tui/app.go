@@ -5426,6 +5426,10 @@ func dimRendered(s string, w, h int) string {
 			if cell == nil {
 				continue
 			}
+			if cell.Style.Attrs&uv.AttrReverse != 0 {
+				cell.Style.Attrs &^= uv.AttrReverse
+				cell.Style.Bg = dimBg
+			}
 			cell.Style.Fg = dim
 			if icons.IsTabEdge(cell.Content) {
 				cell.Style.Fg = dimBg
