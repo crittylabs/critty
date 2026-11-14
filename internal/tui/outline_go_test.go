@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/crittylabs/critty/internal/document"
 )
 
@@ -22,7 +23,7 @@ func TestGoOutlineDeclarations(t *testing.T) {
 		{"empty", "package p\nvar x = 1\n", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := parseGoOutline(tc.source, 0); !reflect.DeepEqual(got, tc.want) {
+			if got := parseGoOutline(tc.source, 0); !reflect.DeepEqual(outlineHeadings(got), tc.want) {
 				t.Fatalf("outline = %#v, want %#v", got, tc.want)
 			}
 		})
@@ -35,7 +36,7 @@ func TestGoOutlineCacheAndPartialSource(t *testing.T) {
 	tab := FileTab{doc: doc}
 	cache := tab.ensureGoOutline()
 	want := []outlineHeading{{2, 1, "func First"}, {5, 1, "type Second"}}
-	if !reflect.DeepEqual(cache.rows, want) {
+	if !reflect.DeepEqual(outlineHeadings(cache.rows), want) {
 		t.Fatalf("partial source = %#v, want %#v", cache.rows, want)
 	}
 	if tab.ensureGoOutline() != cache {

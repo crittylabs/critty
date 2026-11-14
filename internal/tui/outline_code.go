@@ -6,14 +6,16 @@ import (
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
+
 	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type codeOutlineCache struct {
 	doc           *document.Document
 	path, content string
 	partial       bool
-	rows          []outlineHeading
+	rows          []outlineSymbol
 }
 
 var outlineRubyHeredoc = regexp.MustCompile("^<<-?[\"'`]?([a-zA-Z_][a-zA-Z0-9_]*)")
@@ -52,7 +54,7 @@ func (t *FileTab) ensureCodeOutline() *codeOutlineCache {
 	if mask := t.outlineMask; mask != nil && mask.language == language && mask.source == t.doc.Content && t.doc.Known == nil {
 		c.rows = parseMaskedOutline(language, mask.code, 0)
 	} else {
-		c.rows = parseOutlineDocument(t.doc, func(source string, offset int) []outlineHeading {
+		c.rows = parseOutlineDocument(t.doc, func(source string, offset int) []outlineSymbol {
 			return parseCodeOutline(language, source, offset)
 		})
 	}
@@ -123,11 +125,11 @@ func maskRawStrings(language, source, code string) string {
 }
 
 // Gaps in a supplied diff must not carry lexical or nesting state across runs.
-func parseOutlineDocument(doc *document.Document, parse func(string, int) []outlineHeading) []outlineHeading {
+func parseOutlineDocument(doc *document.Document, parse func(string, int) []outlineSymbol) []outlineSymbol {
 	if doc.Known == nil {
 		return parse(doc.Content, 0)
 	}
-	var rows []outlineHeading
+	var rows []outlineSymbol
 	for start := 0; start < len(doc.Lines); {
 		if !doc.HasLine(start + 1) {
 			start++
@@ -195,6 +197,8 @@ func outlineCode(language, source string) string {
 
 type codeDeclaration struct {
 	label, kind string
+	name        string
+	symbol      icons.Kind
 	start, body int
 	generic     bool
 	prototype   bool
@@ -202,22 +206,23 @@ type codeDeclaration struct {
 	needsArrow  bool
 }
 
-func parseCodeOutline(language, source string, offset int) []outlineHeading {
+func parseCodeOutline(language, source string, offset int) []outlineSymbol {
 	return parseMaskedOutline(language, outlineCode(language, source), offset)
 }
 
 // parseMaskedOutline extracts declarations from source whose comments and
 // strings were already masked by outlineCode or a highlight pass.
-func parseMaskedOutline(language, code string, offset int) []outlineHeading {
+func parseMaskedOutline(language, code string, offset int) []outlineSymbol {
 	lines := strings.Split(code, "\n")
-	var rows []outlineHeading
+	var rows []outlineSymbol
 	type scope struct {
-		depth int
-		kind  string
+		depth  int
+		kind   string
+		symbol icons.Kind
 	}
 	var parents []scope
 	depth, base := 0, 0
-	opens := map[int]string{}
+	opens := map[int]scope{}
 	indented := language == "python" || language == "ruby" || language == "lua" || language == "vim"
 	open, close := byte('{'), byte('}')
 	if language == "emacs-lisp" {
@@ -263,7 +268,20 @@ func parseMaskedOutline(language, code string, offset int) []outlineHeading {
 			if container || packageLine {
 				level = len(parents) + 1
 			}
-			rows = append(rows, outlineHeading{line: i + 1 + offset, level: level, label: decl.label})
+			kind := decl.symbol
+			if kind == 0 {
+				kind = icons.Class
+				if decl.kind == "function" {
+					kind = icons.Function
+				}
+			}
+			if kind == icons.Function && len(parents) > 0 {
+				parent := parents[len(parents)-1]
+				if parent.kind == "type" && (parent.symbol == icons.Class || parent.symbol == icons.Struct || parent.symbol == icons.Interface || parent.symbol == icons.Enum) {
+					kind = icons.Method
+				}
+			}
+			rows = append(rows, outlineSymbol{outlineHeading{line: i + 1 + offset, level: level, label: decl.label}, kind, decl.name})
 			if container && !strings.Contains(text, ";") || packageLine && decl.prototype {
 				region, regionDepth = 1, depth
 			}
@@ -274,9 +292,9 @@ func parseMaskedOutline(language, code string, offset int) []outlineHeading {
 				decl.kind = "package"
 			}
 			if indented {
-				parents = append(parents, scope{indent, decl.kind})
+				parents = append(parents, scope{indent, decl.kind, kind})
 			} else if decl.body >= 0 {
-				opens[decl.body] = decl.kind
+				opens[decl.body] = scope{kind: decl.kind, symbol: kind}
 			}
 		}
 		if !indented {
@@ -284,8 +302,9 @@ func parseMaskedOutline(language, code string, offset int) []outlineHeading {
 				switch line[j] {
 				case open:
 					depth++
-					if kind, ok := opens[base+j]; ok {
-						parents = append(parents, scope{depth, kind})
+					if parent, ok := opens[base+j]; ok {
+						parent.depth = depth
+						parents = append(parents, parent)
 						delete(opens, base+j)
 					}
 				case close:

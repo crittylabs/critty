@@ -828,10 +828,8 @@ def scenarios() -> None:
         )
         (WORK / "outline.go").write_text(go_source)
         go_outline = Round("go-outline", ["review", "outline.go"])
-        go_outline.wait_screen(
-            "func (*Server) Serve", "Go receiver appears in the outline"
-        )
-        go_outline.click(r"func \(\*Server\) Serve")
+        go_outline.wait_screen("(*Server) Serve", "Go receiver appears in the outline")
+        go_outline.click(r"\(\*Server\) Serve")
         go_outline.keys("Enter", "Enter")
         go_outline.text("Go method anchor.")
         go_outline.keys("C-s")

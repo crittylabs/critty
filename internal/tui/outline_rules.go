@@ -3,6 +3,8 @@ package tui
 import (
 	"regexp"
 	"strings"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 const outlineIdentifier = `[\pL_$][\pL\pM\pN_$]*`
@@ -38,7 +40,32 @@ func outlineMatch(pattern *regexp.Regexp, text string) (codeDeclaration, bool) {
 	if kind == "sub" || kind == "def" || kind == "fn" || kind == "func" || kind == "fun" || kind == "function" {
 		category = "function"
 	}
-	return codeDeclaration{label: kind + " " + name, kind: category, start: m[1], body: -1}, true
+	return codeDeclaration{label: kind + " " + name, name: name, kind: category, symbol: outlineKeywordIcon(kind), start: m[1], body: -1}, true
+}
+
+func outlineKeywordIcon(keyword string) icons.Kind {
+	switch keyword {
+	case "struct", "union", "record", "cl-defstruct":
+		return icons.Struct
+	case "interface", "trait", "protocol", "@protocol":
+		return icons.Interface
+	case "enum":
+		return icons.Enum
+	case "namespace", "module", "mod", "package", "use-package":
+		return icons.Namespace
+	case "defconst":
+		return icons.Constant
+	case "defvar", "defvar-local", "defvaralias", "defcustom", "defgroup", "defface":
+		return icons.Variable
+	case "defmethod", "cl-defmethod":
+		return icons.Method
+	case "sub", "def", "fn", "func", "fun", "function", "defun", "cl-defun", "defmacro", "cl-defmacro", "defsubst", "cl-defsubst", "defalias", "cl-defgeneric", "defgeneric", "defsetf", "cl-defsetf":
+		return icons.Function
+	}
+	if strings.HasPrefix(keyword, "define-") || strings.HasPrefix(keyword, "fu") || keyword == "def!" {
+		return icons.Function
+	}
+	return icons.Class
 }
 
 func outlineDeclaration(language, text string) (codeDeclaration, bool) {
@@ -48,7 +75,8 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 			return decl, true
 		}
 		if m := outlineZigType.FindStringSubmatchIndex(text); m != nil {
-			return codeDeclaration{label: "const " + text[m[2]:m[3]], kind: "type", start: m[1], body: -1}, true
+			name := text[m[2]:m[3]]
+			return codeDeclaration{label: "const " + name, name: name, kind: "type", symbol: outlineKeywordIcon(text[m[4]:m[5]]), start: m[1], body: -1}, true
 		}
 		return codeDeclaration{}, false
 	case "perl":
@@ -60,30 +88,32 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 			return decl, true
 		}
 		if m := outlineLuaValue.FindStringSubmatchIndex(text); m != nil {
-			return codeDeclaration{label: "function " + text[m[2]:m[3]], kind: "function", body: -1}, true
+			name := text[m[2]:m[3]]
+			return codeDeclaration{label: "function " + name, name: name, kind: "function", body: -1}, true
 		}
 		return codeDeclaration{}, false
 	case "vim":
 		return outlineMatch(outlineVim, text)
 	case "objective-c":
 		if m := outlineObjCType.FindStringSubmatchIndex(text); m != nil {
-			return codeDeclaration{label: strings.TrimSpace(text[m[2]:m[3]]) + " " + strings.TrimSpace(text[m[4]:m[5]]), kind: "type", body: -1}, true
+			name := strings.TrimSpace(text[m[4]:m[5]])
+			return codeDeclaration{label: strings.TrimSpace(text[m[2]:m[3]]) + " " + name, name: name, kind: "type", symbol: outlineKeywordIcon(text[m[2]:m[3]]), body: -1}, true
 		}
 		return outlineDeclaration("cpp", text)
 	case "python":
 		return outlineMatch(outlinePython, text)
 	case "ruby":
 		if strings.HasPrefix(text, "class << ") {
-			return codeDeclaration{label: text, kind: "type", body: -1}, true
+			return codeDeclaration{label: text, name: strings.TrimPrefix(text, "class "), kind: "type", body: -1}, true
 		}
 		return outlineMatch(outlineRuby, text)
 	case "rust":
-		if outlineRustImpl.MatchString(text) {
+		if match := outlineRustImpl.FindStringIndex(text); match != nil {
 			end := len(text)
 			if i := strings.IndexAny(text, "{\n"); i >= 0 {
 				end = i
 			}
-			return codeDeclaration{label: strings.TrimSpace(text[:end]), kind: "type", body: -1}, true
+			return codeDeclaration{label: strings.TrimSpace(text[:end]), name: strings.TrimSpace(text[match[1]:end]), kind: "type", body: -1}, true
 		}
 		return outlineMatch(outlineRust, text)
 	case "javascript", "typescript":
@@ -91,11 +121,11 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 			return decl, true
 		}
 		if m := outlineJSVariable.FindStringSubmatchIndex(text); m != nil {
-			return outlineJSValue(text, m[1], text[m[2]:m[3]]+" "+text[m[4]:m[5]])
+			return outlineJSValue(text, m[1], text[m[2]:m[3]]+" "+text[m[4]:m[5]], text[m[4]:m[5]])
 		}
 		for _, pattern := range []*regexp.Regexp{outlineJSField, outlineJSProperty} {
 			if m := pattern.FindStringSubmatchIndex(text); m != nil {
-				if decl, ok := outlineJSValue(text, m[1], text[m[2]:m[3]]); ok {
+				if decl, ok := outlineJSValue(text, m[1], text[m[2]:m[3]], text[m[2]:m[3]]); ok {
 					return decl, true
 				}
 			}
@@ -115,7 +145,11 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 			return decl, ok
 		}
 		if m := outlineCompanion.FindStringSubmatchIndex(text); m != nil {
-			return codeDeclaration{label: strings.TrimSpace(text[:m[1]]), kind: "type", start: m[1], body: -1}, true
+			name := "companion"
+			if m[2] >= 0 {
+				name = text[m[2]:m[3]]
+			}
+			return codeDeclaration{label: strings.TrimSpace(text[:m[1]]), name: name, kind: "type", start: m[1], body: -1}, true
 		}
 		if decl, ok := outlineMatch(outlineKotlinFunction, text); ok && decl.label != "fun interface" {
 			return decl, true
@@ -129,7 +163,8 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 			return decl, true
 		}
 		if m := outlineTypedef.FindStringSubmatchIndex(text); m != nil {
-			return codeDeclaration{label: "typedef " + text[m[2]:m[3]], kind: "type", body: -1}, true
+			name := text[m[2]:m[3]]
+			return codeDeclaration{label: "typedef " + name, name: name, kind: "type", body: -1}, true
 		}
 	case "bash":
 		if m := outlineShell.FindStringSubmatchIndex(text); m != nil {
@@ -139,7 +174,7 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 					name = text[m[i]:m[i+1]]
 				}
 			}
-			return codeDeclaration{label: "function " + name, kind: "function", start: m[1], body: -1}, true
+			return codeDeclaration{label: "function " + name, name: name, kind: "function", start: m[1], body: -1}, true
 		}
 		return codeDeclaration{}, false
 	}
@@ -167,9 +202,9 @@ func outlineDeclaration(language, text string) (codeDeclaration, bool) {
 	return codeDeclaration{}, false
 }
 
-func outlineJSValue(text string, start int, label string) (codeDeclaration, bool) {
+func outlineJSValue(text string, start int, label, name string) (codeDeclaration, bool) {
 	value := text[start:]
-	decl := codeDeclaration{label: label, kind: "function", start: start, body: -1}
+	decl := codeDeclaration{label: label, name: name, kind: "function", start: start, body: -1}
 	switch {
 	case strings.HasPrefix(value, "{"):
 		decl.kind = "type"

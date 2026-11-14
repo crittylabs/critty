@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -9,6 +10,76 @@ import (
 	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestOutlineSymbolKinds(t *testing.T) {
+	for _, tc := range []struct {
+		language, source string
+		want             []icons.Kind
+		names            []string
+	}{
+		{"go", "package p\ntype Server struct{}\ntype Reader interface{}\ntype Name = string\nfunc New() {}\nfunc (*Server) Run() {}\n", []icons.Kind{icons.Struct, icons.Interface, icons.Class, icons.Function, icons.Method}, []string{"Server", "Reader", "Name", "New", "(*Server) Run"}},
+		{"cpp", "namespace example {\nclass Server {\n void run() {}\n};\nvoid finish() {}\n}\n", []icons.Kind{icons.Namespace, icons.Class, icons.Method, icons.Function}, []string{"example", "Server", "run()", "finish()"}},
+		{"python", "class Server:\n def run(self):\n  def nested():\n   pass\ndef finish():\n pass\n", []icons.Kind{icons.Class, icons.Method, icons.Function, icons.Function}, []string{"Server", "run", "nested", "finish"}},
+		{"typescript", "interface Server {\n run(): void;\n}\nconst start = () => {};\nconst api = {\n stop() {}\n};\n", []icons.Kind{icons.Interface, icons.Method, icons.Function, icons.Class, icons.Method}, []string{"Server", "run()", "start", "api", "stop()"}},
+		{"rust", "mod example {\n struct Server;\n impl Server {\n  fn run(&self) {}\n }\n fn finish() {}\n}\n", []icons.Kind{icons.Namespace, icons.Struct, icons.Class, icons.Method, icons.Function}, []string{"example", "Server", "Server", "run", "finish"}},
+		{"zig", "const Kind = enum { ready };\nconst Server = struct {\n fn run() void {}\n};\n", []icons.Kind{icons.Enum, icons.Struct, icons.Method}, []string{"Kind", "Server", "run"}},
+		{"emacs-lisp", "(use-package example\n :config\n (defun run ()\n  (cl-defun nested () t)))\n(defconst ready t)\n(defvar value nil)\n", []icons.Kind{icons.Namespace, icons.Function, icons.Function, icons.Constant, icons.Variable}, []string{"example", "run", "nested", "ready", "value"}},
+	} {
+		t.Run(tc.language, func(t *testing.T) {
+			rows := parseCodeOutline(tc.language, tc.source, 0)
+			if tc.language == "go" {
+				rows = parseGoOutline(tc.source, 0)
+			}
+			var got []icons.Kind
+			for i, row := range rows {
+				got = append(got, row.kind)
+				if i >= len(tc.names) {
+					t.Fatalf("unexpected row: %+v", row)
+				}
+				if label := ansi.Strip(row.displayLabel(icons.Nerd)); label != icons.Nerd.Label(row.kind, tc.names[i]) {
+					t.Fatalf("Nerd Font label = %q, want name %q", label, tc.names[i])
+				}
+				if row.displayLabel(icons.Plain) != row.label {
+					t.Fatal("plain label changed")
+				}
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("kinds = %v, want %v; rows = %+v", got, tc.want, rows)
+			}
+		})
+	}
+}
+
+func TestNerdFontOutlineNavigation(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		initAdaptiveStyles(dark)
+		app := outlineTestApp(t, "# Root\n## Child\n")
+		app.icons = icons.Nerd
+		app.recalculateLayout()
+		app.updateCommentSidebar()
+		view := ansi.Strip(app.outline.viewport.GetContent())
+		if !hasForeground(app.outline.viewport.GetContent(), mdCodeStyle.GetForeground(), icons.Nerd.Glyph(icons.Heading, "")) {
+			t.Fatal("outline icon does not use the inline-code foreground")
+		}
+		if !strings.Contains(view, icons.Nerd.Label(icons.Heading, "Child")) {
+			t.Fatalf("heading icon missing: %s", view)
+		}
+		left, top, _, _ := app.commentBounds()
+		app = clickMouse(app, left+3, top+app.fileTree.viewport.Height()+2)
+		if app.tab().cursorLine != 2 {
+			t.Fatal("outline icon shifted the mouse target")
+		}
+		rows := outlineHeadings(app.outline.rows)
+		app.icons = icons.Plain
+		app.recalculateLayout()
+		app.updateCommentSidebar()
+		if !reflect.DeepEqual(outlineHeadings(app.outline.rows), rows) || strings.Contains(app.outline.viewport.GetContent(), icons.Nerd.Glyph(icons.Heading, "")) {
+			t.Fatal("portable outline changed source metadata or retained icons")
+		}
+	}
+}
 
 func TestNerdFontFileNavigation(t *testing.T) {
 	previous := terminalIsDark

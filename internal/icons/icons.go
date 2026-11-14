@@ -42,6 +42,16 @@ const (
 	Reply
 	Warning
 	Outline
+	Function
+	Method
+	Class
+	Struct
+	Interface
+	Enum
+	Namespace
+	Constant
+	Variable
+	Heading
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -54,6 +64,9 @@ var glyphs = [...]string{
 	Added: "\ueadc", Modified: "\ueade", Removed: "\ueadf", Renamed: "\ueae0",
 	Comment:   "\uea6b",
 	Unchecked: "\U000f0131", Checked: "\U000f0132", Reply: "\uea7d", Warning: "\uea6c", Outline: "\ueb86",
+	Function: "\U000f0295", Method: "\uea8c", Class: "\ueb5b", Struct: "\uea91",
+	Interface: "\ueb61", Enum: "\uea95", Namespace: "\uea8b", Constant: "\ueb5d",
+	Variable: "\uea88", Heading: "\ueb1d",
 }
 
 func (s Set) Glyph(kind Kind, fallback string) string {

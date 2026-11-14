@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/crittylabs/critty/internal/document"
 )
 
@@ -41,7 +42,7 @@ func TestCodeOutlineDeclarations(t *testing.T) {
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			language := outlineLanguage(codeLexer(tc.path, tc.source))
-			if got := parseCodeOutline(language, tc.source, 0); !reflect.DeepEqual(got, tc.want) {
+			if got := parseCodeOutline(language, tc.source, 0); !reflect.DeepEqual(outlineHeadings(got), tc.want) {
 				t.Fatalf("outline:\ngot  %+v\nwant %+v\nmasked:\n%s", got, tc.want, outlineCode(language, tc.source))
 			}
 		})
@@ -121,7 +122,7 @@ func TestCodeOutlineCacheAndFragments(t *testing.T) {
 	doc.Known = map[int]bool{2: true, 5: true, 6: true}
 	tab := FileTab{path: doc.Path, doc: doc}
 	cache := tab.ensureCodeOutline()
-	if want := []outlineHeading{{2, 1, "def first"}, {5, 1, "def second"}}; !reflect.DeepEqual(cache.rows, want) {
+	if want := []outlineHeading{{2, 1, "def first"}, {5, 1, "def second"}}; !reflect.DeepEqual(outlineHeadings(cache.rows), want) {
 		t.Fatalf("fragment lines or hierarchy changed: %+v", cache.rows)
 	}
 	if tab.ensureCodeOutline() != cache {

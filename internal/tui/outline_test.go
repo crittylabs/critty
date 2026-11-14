@@ -8,9 +8,21 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
+
+func outlineHeadings(rows []outlineSymbol) []outlineHeading {
+	if rows == nil {
+		return nil
+	}
+	headings := make([]outlineHeading, len(rows))
+	for i, row := range rows {
+		headings[i] = row.outlineHeading
+	}
+	return headings
+}
 
 func TestMarkdownOutlineParsing(t *testing.T) {
 	for _, tc := range []struct {
@@ -25,7 +37,7 @@ func TestMarkdownOutlineParsing(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			parsed := parseMarkdownSource(strings.Split(tc.source, "\n"), tc.known)
-			if !reflect.DeepEqual(parsed.headings, tc.want) {
+			if !reflect.DeepEqual(outlineHeadings(parsed.headings), tc.want) {
 				t.Fatalf("headings = %#v, want %#v", parsed.headings, tc.want)
 			}
 		})

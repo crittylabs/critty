@@ -3,10 +3,12 @@ package tui
 import (
 	"regexp"
 	"strings"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 var outlineZig = regexp.MustCompile(`^(?:(?:pub|export|extern|inline|noinline)\s+)*(fn)\s+(` + outlineIdentifier + `)`)
-var outlineZigType = regexp.MustCompile(`^(?:pub\s+)?const\s+(` + outlineIdentifier + `)\s*=\s*(?:(?:packed|extern)\s+)?(?:struct|enum|union|opaque)\b`)
+var outlineZigType = regexp.MustCompile(`^(?:pub\s+)?const\s+(` + outlineIdentifier + `)\s*=\s*(?:(?:packed|extern)\s+)?(struct|enum|union|opaque)\b`)
 var outlinePerl = regexp.MustCompile(`^(?:(?:my|our|state)\s+)?(package|sub)\s+(` + outlineIdentifier + `(?:::` + outlineIdentifier + `)*)`)
 var outlineElisp = regexp.MustCompile(`^\((use-package|(?:cl-)?def(?:un|macro|subst|var(?:-local|alias)?|const|custom|group|face|alias|class|method|generic|struct|type|setf)|define-(?:minor|derived|globalized-minor|global-minor|generic)-mode)\s+([^\s()]+)`)
 var outlineLua = regexp.MustCompile(`^(?:local\s+)?(function)\s+(` + outlineIdentifier + `(?:(?:\.|:)` + outlineIdentifier + `)*)`)
@@ -45,5 +47,5 @@ func outlineObjCSelector(lines []string, first int) codeDeclaration {
 			name += part[1] + ":"
 		}
 	}
-	return codeDeclaration{label: text[:1] + " " + name, kind: "function", body: -1}
+	return codeDeclaration{label: text[:1] + " " + name, kind: "function", symbol: icons.Method, body: -1}
 }
