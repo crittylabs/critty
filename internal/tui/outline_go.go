@@ -10,13 +10,14 @@ import (
 	"strings"
 
 	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type goOutlineCache struct {
 	doc     *document.Document
 	content string
 	partial bool
-	rows    []outlineHeading
+	rows    []outlineSymbol
 }
 
 func (t *FileTab) ensureGoOutline() *goOutlineCache {
@@ -29,7 +30,7 @@ func (t *FileTab) ensureGoOutline() *goOutlineCache {
 	return c
 }
 
-func parseGoOutline(source string, offset int) []outlineHeading {
+func parseGoOutline(source string, offset int) []outlineSymbol {
 	fset := token.NewFileSet()
 	// Standalone diff fragments may not contain the package clause.
 	var scan scanner.Scanner
@@ -45,14 +46,14 @@ func parseGoOutline(source string, offset int) []outlineHeading {
 	if file == nil {
 		return nil
 	}
-	var rows []outlineHeading
-	appendEntry := func(pos token.Pos, name *ast.Ident, label string) {
+	var rows []outlineSymbol
+	appendEntry := func(pos token.Pos, name *ast.Ident, label, short string, kind icons.Kind) {
 		if name == nil || name.Name == "_" || name.Name == "" {
 			return
 		}
 		line := fset.PositionFor(pos, false).Line + offset
 		if line > 0 {
-			rows = append(rows, outlineHeading{line: line, level: 1, label: label})
+			rows = append(rows, outlineSymbol{outlineHeading{line: line, level: 1, label: label}, kind, short})
 		}
 	}
 	for _, decl := range file.Decls {
@@ -61,22 +62,31 @@ func parseGoOutline(source string, offset int) []outlineHeading {
 			if decl.Name == nil {
 				continue
 			}
-			label := "func "
+			name := decl.Name.Name
+			kind := icons.Function
 			if decl.Recv != nil && len(decl.Recv.List) > 0 {
+				kind = icons.Method
 				var receiver bytes.Buffer
 				if err := format.Node(&receiver, fset, decl.Recv.List[0].Type); err != nil {
 					continue
 				}
-				label += "(" + strings.Join(strings.Fields(receiver.String()), " ") + ") "
+				name = "(" + strings.Join(strings.Fields(receiver.String()), " ") + ") " + name
 			}
-			appendEntry(decl.Pos(), decl.Name, label+decl.Name.Name)
+			appendEntry(decl.Pos(), decl.Name, "func "+name, name, kind)
 		case *ast.GenDecl:
 			if decl.Tok != token.TYPE {
 				continue
 			}
 			for _, spec := range decl.Specs {
 				if spec, ok := spec.(*ast.TypeSpec); ok && spec.Name != nil {
-					appendEntry(spec.Pos(), spec.Name, "type "+spec.Name.Name)
+					kind := icons.Class
+					switch spec.Type.(type) {
+					case *ast.StructType:
+						kind = icons.Struct
+					case *ast.InterfaceType:
+						kind = icons.Interface
+					}
+					appendEntry(spec.Pos(), spec.Name, "type "+spec.Name.Name, spec.Name.Name, kind)
 				}
 			}
 		}

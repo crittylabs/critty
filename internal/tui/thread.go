@@ -8,6 +8,7 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -33,7 +34,7 @@ func (m *AppModel) layoutThread(author, body string, replies []review.Reply, edi
 	if name == "" {
 		name = "anonymous"
 	}
-	appendComment(author, "Comment — "+name, body)
+	appendComment(author, m.icons.Glyph(icons.Comment, "Comment")+" — "+name, body)
 	for i, reply := range replies {
 		if editingID != "" && reply.ID == editingID {
 			continue
@@ -42,7 +43,7 @@ func (m *AppModel) layoutThread(author, body string, replies []review.Reply, edi
 		if name == "" {
 			name = "anonymous"
 		}
-		header := "↳ " + name + " " + commentLineStyle.Bold(false).Render(fmt.Sprintf("(#%d)", i+1))
+		header := m.icons.Glyph(icons.Reply, "↳") + " " + name + " " + commentLineStyle.Bold(false).Render(fmt.Sprintf("(#%d)", i+1))
 		appendComment(reply.Author, header, reply.Body)
 	}
 	return layout

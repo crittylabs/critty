@@ -11,6 +11,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type outlineHeading struct {
@@ -18,8 +20,26 @@ type outlineHeading struct {
 	label       string
 }
 
+type outlineSymbol struct {
+	outlineHeading
+	kind icons.Kind
+	name string
+}
+
+func (s outlineSymbol) displayLabel(symbols icons.Set) string {
+	label := s.label
+	if symbols && s.name != "" {
+		label = s.name
+	}
+	if !symbols {
+		return label
+	}
+	icon := lipgloss.NewStyle().Foreground(mdCodeStyle.GetForeground()).Render(symbols.Glyph(s.kind, ""))
+	return icon + " " + label
+}
+
 type documentOutline struct {
-	rows       []outlineHeading
+	rows       []outlineSymbol
 	source     any
 	active     int
 	focused    bool
@@ -93,7 +113,7 @@ func (m *AppModel) layoutFilesSidebar() {
 func (m *AppModel) syncOutline() {
 	o := &m.outline
 	var source any
-	var rows []outlineHeading
+	var rows []outlineSymbol
 	if len(m.tabs) > 0 {
 		t := m.tab()
 		if t.isMarkdown && t.doc != nil {
@@ -160,7 +180,7 @@ func (m *AppModel) renderOutline() {
 				prefix = cursorMarker.Render(">") + " "
 			}
 		}
-		line := prefix + style.Render(strings.Repeat(" ", depth*treeIndent)+heading.label)
+		line := prefix + style.Render(strings.Repeat(" ", depth*treeIndent)+heading.displayLabel(m.icons))
 		line = ansi.Truncate(line, o.viewport.Width(), "…")
 		if i == o.active {
 			padding := strings.Repeat(" ", max(0, o.viewport.Width()-ansi.StringWidth(line)))
@@ -186,7 +206,7 @@ func (m AppModel) renderFilesSidebar() string {
 	if m.outline.viewport.Height() == 0 {
 		return view
 	}
-	title := "─ Outline "
+	title := "─ " + m.icons.Label(icons.Outline, "Outline") + " "
 	title += strings.Repeat("─", max(0, m.outline.viewport.Width()-ansi.StringWidth(title)))
 	title = ansi.Truncate(title, m.outline.viewport.Width(), "")
 	return view + "\n" + lipgloss.NewStyle().Foreground(m.sidebarBorderColor()).Render(title) + "\n" + m.outline.viewport.View()

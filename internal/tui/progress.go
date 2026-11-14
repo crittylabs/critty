@@ -6,6 +6,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type progressKind int
@@ -80,7 +81,7 @@ func (m *AppModel) tabIndicators() []string {
 	indicators := m.tabFormIndicators()
 	for i, tab := range m.tabs {
 		if tab.state != nil && unresolvedCommentCount(tab.state.Comments) > 0 {
-			indicators[i] = "💬" + indicators[i]
+			indicators[i] = m.icons.Glyph(icons.Comment, "💬") + indicators[i]
 		}
 	}
 	return indicators
@@ -97,10 +98,7 @@ func (m *AppModel) tabFormIndicators() []string {
 			if !kinds[kind] {
 				continue
 			}
-			symbol := "☐"
-			if kind == progressRequiredChoices || kind == progressOptionalChoices {
-				symbol = "○"
-			}
+			symbol := kind.symbol(false, m.icons)
 			foreground := progressColors.pending
 			if kind <= progressRequiredChoices {
 				foreground = progressColors.required
@@ -111,7 +109,24 @@ func (m *AppModel) tabFormIndicators() []string {
 	return indicators
 }
 
-func (p progressCount) render(focused bool) string {
+func (k progressKind) symbol(complete bool, symbols icons.Set) string {
+	switch k {
+	case progressThreads:
+		return symbols.Glyph(icons.Comment, "💬")
+	case progressRequiredChoices, progressOptionalChoices:
+		if complete {
+			return symbols.Glyph(icons.RadioChecked, "●")
+		}
+		return symbols.Glyph(icons.RadioUnchecked, "○")
+	default:
+		if complete {
+			return symbols.Glyph(icons.Checked, "☑")
+		}
+		return symbols.Glyph(icons.Unchecked, "☐")
+	}
+}
+
+func (p progressCount) render(focused bool, symbols icons.Set) string {
 	foreground := progressColors.pending
 	if p.kind <= progressRequiredChoices {
 		foreground = progressColors.required
@@ -119,21 +134,7 @@ func (p progressCount) render(focused bool) string {
 			foreground = progressColors.complete
 		}
 	}
-	symbol := "☐"
-	switch p.kind {
-	case progressThreads:
-		symbol = "💬"
-	case progressRequiredChoices, progressOptionalChoices:
-		symbol = "○"
-	}
-	if p.total > 0 && p.complete == p.total {
-		switch symbol {
-		case "☐":
-			symbol = "☑"
-		case "○":
-			symbol = "●"
-		}
-	}
+	symbol := p.kind.symbol(p.total > 0 && p.complete == p.total, symbols)
 	// Counters are clickable, so they share the gray background of buttons;
 	// the focused one is underlined.
 	style := lipgloss.NewStyle().Foreground(foreground).Background(buttonBackground).Bold(true).Underline(focused)
@@ -145,7 +146,7 @@ func (m *AppModel) layoutProgressCounts(width, top int, focused progressKind) (s
 	counts := m.progressCounts()
 	unwrappedWidth := 0
 	for _, count := range counts {
-		rendered := count.render(count.kind == focused)
+		rendered := count.render(count.kind == focused, m.icons)
 		unwrappedWidth += lipgloss.Width(rendered) + 2
 		specs = append(specs, modalButtonSpec{rendered: rendered, action: modalMouseAction{focus: int(count.kind)}})
 	}

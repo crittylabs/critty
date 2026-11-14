@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -34,6 +35,7 @@ func TestSubmitProgressCountersFocusAndNavigate(t *testing.T) {
 		for _, kind := range []progressKind{progressThreads, progressRequiredChecks, progressRequiredChoices, progressOptionalChecks, progressOptionalChoices} {
 			t.Run(fmt.Sprintf("complete=%t/kind=%d", complete, kind), func(t *testing.T) {
 				app := progressTestApp(t, complete)
+				app.icons = icons.Set(complete)
 				app.activeTab = 1
 				app.openFinishModal()
 				app.modalTextarea.SetValue("Keep this overall draft.")
@@ -79,6 +81,7 @@ func TestProgressCounterMouseRegionsSurviveWrappingAndResize(t *testing.T) {
 			dark, modal := (k+i)%2 == 0, (k/2+i)%2 == 1
 			initAdaptiveStyles(dark)
 			app := progressTestApp(t, false)
+			app.icons = icons.Set((k+i/2)%2 == 0)
 			app.activeTab = 1
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 24})
 			if modal {
@@ -111,8 +114,8 @@ func TestProgressCounterMouseRegionsSurviveWrappingAndResize(t *testing.T) {
 			for _, count := range app.progressCounts() {
 				if count.kind == kind {
 					row := strings.Split(app.View().Content, "\n")[rect.top]
-					if text := ansi.Strip(ansi.Cut(row, rect.left, rect.right)); text != ansi.Strip(count.render(false)) {
-						t.Fatalf("counter mouse region contains %q, want %q", text, ansi.Strip(count.render(false)))
+					if text := ansi.Strip(ansi.Cut(row, rect.left, rect.right)); text != ansi.Strip(count.render(false, app.icons)) {
+						t.Fatalf("counter mouse region contains %q, want %q", text, ansi.Strip(count.render(false, app.icons)))
 					}
 				}
 			}

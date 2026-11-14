@@ -13,6 +13,7 @@ import (
 	gitpkg "github.com/crittylabs/critty/internal/git"
 
 	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -344,7 +345,7 @@ func computeChangeChunks(diff *gitpkg.DiffInfo) []changeChunk {
 }
 
 // changeSummary combines file status and line counts, or just colored markers.
-func (t *FileTab) changeSummary(compact bool) string {
+func (t *FileTab) changeSummary(compact bool, symbols icons.Set) string {
 	if t.attachment != nil {
 		return ""
 	}
@@ -352,16 +353,18 @@ func (t *FileTab) changeSummary(compact bool) string {
 	if !t.outsideChanges {
 		switch t.status {
 		case "added", "untracked":
-			counts = append(counts, tabAddedCount.Render("A"))
+			counts = append(counts, tabAddedCount.Render(symbols.Glyph(icons.Added, "A")))
 		case "deleted":
-			counts = append(counts, tabDeletedCount.Render("D"))
+			counts = append(counts, tabDeletedCount.Render(symbols.Glyph(icons.Removed, "D")))
 		default:
-			if t.isBinary {
+			if t.isBinary || symbols == icons.Nerd && (t.status == "modified" || t.status == "renamed") {
 				marker := "M"
+				kind := icons.Modified
 				if t.status == "renamed" {
 					marker = "R"
+					kind = icons.Renamed
 				}
-				counts = append(counts, tabCountDelimiter.Foreground(warning).Render(marker))
+				counts = append(counts, tabCountDelimiter.Foreground(warning).Render(symbols.Glyph(kind, marker)))
 			}
 		}
 	}

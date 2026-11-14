@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+
 	"github.com/crittylabs/critty/internal/document"
 )
 
@@ -64,7 +65,7 @@ func TestDetectedScriptUsesOneLanguageForDisplayAndOutline(t *testing.T) {
 		t.Fatalf("script was not highlighted without changing its text: %q", tab.chromaLines)
 	}
 	outline := tab.ensureCodeOutline()
-	if outline == nil || len(outline.rows) != 2 || outline.rows[1] != (outlineHeading{3, 2, "def run"}) {
+	if outline == nil || len(outline.rows) != 2 || outline.rows[1].outlineHeading != (outlineHeading{3, 2, "def run"}) {
 		t.Fatalf("script outline does not match its display language: %+v", outline)
 	}
 }

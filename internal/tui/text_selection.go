@@ -8,6 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 // Text spans exclude gutters, annotations, images and split-diff padding.
@@ -415,7 +417,7 @@ func lineEditorCursor(editor lineEditor, prompt string, rect mouseRect) *tea.Cur
 }
 
 func (m AppModel) copyTextButton() string {
-	return m.renderModalButton("Copy text", "M-w", false)
+	return m.renderModalButton(m.icons.Label(icons.Copy, "Copy text"), "M-w", false)
 }
 
 // Wrapping can omit spaces between words. Keep those spaces when copying

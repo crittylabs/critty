@@ -33,6 +33,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `output` | String selecting review storage. |
 | `author` | String used for comment attribution. |
 | `split` | Boolean enabling side-by-side diffs initially; defaults to `false` (unified). |
+| `nerd_fonts` | String selecting Nerd Font support: `auto` (default), `on`, or `off`. |
 | `ignore_patterns` | Array of glob strings excluded from review input. |
 | `launchers` | Ordered array of launcher names or custom launcher specifications. |
 | `textconv_drivers` | Array of Git diff driver names or glob patterns enabled for text conversion; defaults to `[]`. |
@@ -57,6 +58,14 @@ Global settings are applied first, followed by project settings.  Settings merge
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.
 
 The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
+
+## Nerd Font detection
+
+Set `nerd_fonts = "on"` or `nerd_fonts = "off"` to force glyph support.  Project settings override global settings; `"auto"` restores detection.  When enabled, file-tree folders and file types use Nerd Font icons, and file status indicators use matching added, modified, deleted, and renamed symbols.  Comments, replies, resolution states, and sidebar section labels also use icons.  Unread markers and line counts remain visible.  `"off"` retains portable symbols and labels.  Use a Nerd Font Mono variant for consistent icon cell widths.
+
+Automatic detection runs once in the process displaying the TUI.  It uses [`charm.land/x/nerdfont`](https://github.com/charmbracelet/x/tree/nerdfont/v0.1.0/nerdfont): the `NERDFONT` environment override, Ghostty or kitty's bundled symbols, then installed font names from Fontconfig's optional `fc-list` and standard font directories.  The Fontconfig probe has a 500 ms deadline.  No fonts or tools are installed.  Explicit `on` and `off` settings take precedence over `NERDFONT`.
+
+Detection estimates availability, not the terminal's selected font or actual glyph coverage.  Powerline font names also count as a positive signal, although they may contain only a subset of Nerd Font icons.  kitty's bundled symbols require version 0.36 or later.  Remote sessions inspect the remote host's fonts, which may differ from the display host.  Use `critty doctor` to see the effective result and reason, and force the setting if icons are missing or detection fails.
 
 ## Preview caching
 

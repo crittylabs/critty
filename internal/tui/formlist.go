@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 type formListState struct {
@@ -165,10 +166,10 @@ func (m *AppModel) handleFormListMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 // formListModalContent shows headings between rows, keeping the selected
 // row visible within maxLines.
 func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitle("Answers", width)
+	title, closeRegion := m.modalTitle("Answers", width)
 	content := title + "\n"
 	filter, filterRegions := layoutModalButtonRow([]modalButtonSpec{{
-		rendered: renderResolution(m.formList.unansweredOnly, "Unanswered only", false, false) + " " + modalBtnNormalKey.Render("u"),
+		rendered: renderResolution(m.formList.unansweredOnly, "Unanswered only", false, false, m.icons) + " " + modalBtnNormalKey.Render("u"),
 		action:   modalMouseAction{focus: 1},
 	}}, width, strings.Count(content, "\n"))
 	content += filter + "\n\n"
@@ -192,12 +193,12 @@ func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMous
 			section = row.section
 			lines = append(lines, line{helpHeadingStyle.Render(ansi.Truncate(section, width, "…")), -1})
 		}
-		status, statusColor := "○", progressColors.pending
+		status, statusColor := m.icons.Glyph(icons.RadioUnchecked, "○"), progressColors.pending
 		switch {
 		case row.missing:
-			status, statusColor = "!", formChip.red
+			status, statusColor = m.icons.Glyph(icons.Warning, "!"), formChip.red
 		case row.answered:
-			status, statusColor = "✓", formChip.green
+			status, statusColor = m.icons.Glyph(icons.Check, "✓"), formChip.green
 		}
 		label := row.item.Label
 		if row.item.Choice || row.item.Rank {

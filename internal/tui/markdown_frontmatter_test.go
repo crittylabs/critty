@@ -21,7 +21,7 @@ func TestMarkdownFrontmatter(t *testing.T) {
 				source := "---\ntitle: '**literal** &amp;'\nenabled: true\ncount: 42\n# Metadata\ndescription: |\n  ## Literal heading\n  [label](https://example.org)\ntags: [one, two]\n" + closing + "\n# Body\n\n**bold**"
 				parsed := parseMarkdownSource(strings.Split(source, "\n"), nil)
 				wantHeadings := []outlineHeading{{line: 11, level: 1, label: "Body"}}
-				if !reflect.DeepEqual(parsed.headings, wantHeadings) {
+				if !reflect.DeepEqual(outlineHeadings(parsed.headings), wantHeadings) {
 					t.Fatalf("headings = %#v, want %#v", parsed.headings, wantHeadings)
 				}
 				for i := range 10 {
@@ -87,7 +87,7 @@ func TestMarkdownFrontmatterBoundaries(t *testing.T) {
 func TestMarkdownFrontmatterOutlineView(t *testing.T) {
 	const source = "---\ntitle: Example\n# Metadata\n---\n# Body\n\nText\n"
 	app := outlineTestApp(t, source)
-	if want := []outlineHeading{{line: 5, level: 1, label: "Body"}}; !reflect.DeepEqual(app.outline.rows, want) {
+	if want := []outlineHeading{{line: 5, level: 1, label: "Body"}}; !reflect.DeepEqual(outlineHeadings(app.outline.rows), want) {
 		t.Fatalf("outline rows = %#v, want %#v", app.outline.rows, want)
 	}
 	view := ansi.Strip(app.contentViewport.GetContent())

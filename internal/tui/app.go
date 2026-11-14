@@ -25,6 +25,7 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/form"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/imageinfo"
 	"github.com/crittylabs/critty/internal/mathrender"
 	"github.com/crittylabs/critty/internal/mermaidrender"
@@ -74,6 +75,7 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
+	NerdFonts        bool
 	Context          context.Context
 	ReadOnly         bool
 	Documents        []review.AttachedDocument
@@ -108,6 +110,7 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
+	icons          icons.Set
 	textSelection  contentTextSelection
 	readOnly       bool
 	browsing       viewNavigation
@@ -365,6 +368,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	}
 
 	m := AppModel{
+		icons:            icons.Set(cfg.NerdFonts),
 		readOnly:         cfg.ReadOnly,
 		isearch:          isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		searchHistory:    cfg.SearchHistory,
@@ -464,6 +468,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		icons:           icons.Set(cfg.NerdFonts),
 		readOnly:        cfg.ReadOnly,
 		isearch:         isearchState{isearchOptions: isearchOptions{allFiles: true}},
 		searchHistory:   cfg.SearchHistory,
@@ -2755,7 +2760,7 @@ func (m *AppModel) updateCommentSidebar() {
 			lineInfo += " (deleted)"
 		}
 		if it.drifted {
-			lineInfo += " (drifted)"
+			lineInfo += " (" + m.icons.Label(icons.Warning, "drifted") + ")"
 		}
 		lineInfo = commentLineStyle.Foreground(lipgloss.Cyan).Render(lineInfo)
 		if len(it.replies) > 0 {
@@ -2766,7 +2771,7 @@ func (m *AppModel) updateCommentSidebar() {
 		if isSelected {
 			prefix = cursorCol.Render(cursorMarker.Render(">"))
 		}
-		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), isSelected && !m.readOnly, max(1, m.commentViewport.Width()))
+		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), isSelected && !m.readOnly, max(1, m.commentViewport.Width()), m.icons)
 		button.translate(0, len(m.sidebarTargets))
 		button.id = it.id
 		m.sidebarActions = append(m.sidebarActions, button)
@@ -2952,7 +2957,7 @@ func (m AppModel) renderReviewBar() string {
 	subject += "."
 	text := renderBrand() + reviewBarStyle.Render(" ")
 	if m.project != "" {
-		text += reviewBarStyle.Bold(true).Render(headerLabel(m.project))
+		text += reviewBarStyle.Bold(true).Render(m.icons.Label(icons.Project, headerLabel(m.project)))
 		text += m.branchLabel(reviewBarStyle.Foreground(textSecondary))
 		if m.topic != "" && m.topic != m.branch {
 			text += reviewBarStyle.Render(" · " + headerLabel(m.topic))
@@ -3027,7 +3032,7 @@ func (m AppModel) branchLabel(style lipgloss.Style) string {
 	if m.branch == "" {
 		return ""
 	}
-	return style.Bold(false).Render(" (" + headerLabel(m.branch) + ")")
+	return style.Bold(false).Render(" (" + m.icons.Label(icons.Branch, headerLabel(m.branch)) + ")")
 }
 
 func headerLabel(value string) string {
@@ -3042,9 +3047,9 @@ func headerLabel(value string) string {
 // submitButton renders the button that opens the finish dialog.
 func (m AppModel) submitButton() string {
 	if m.readOnly {
-		return renderBarButton("Close", "q")
+		return renderBarButton(m.icons.Label(icons.Close, "Close"), "q")
 	}
-	return renderBarButton("Submit", "q")
+	return renderBarButton(m.icons.Label(icons.Send, "Submit"), "q")
 }
 
 // scopeWordStyle styles the scope word in the top bar: white on the
@@ -3279,7 +3284,7 @@ func (m *AppModel) tabLabels() []tabLabel {
 			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
 		}
 		suffix := ""
-		if counts := t.changeSummary(m.width > 0 && m.width < 100); counts != "" {
+		if counts := t.changeSummary(m.width > 0 && m.width < 100, m.icons); counts != "" {
 			suffix += " " + counts
 		}
 		if indicators[i] != "" {
@@ -4055,7 +4060,11 @@ func (m AppModel) commentPanelWidth() int {
 	if m.viewMode {
 		return 0
 	}
-	return max(m.width/4, 26) // room for the Comments and Files tabs
+	minimum := 26 // room for the Comments and Files tabs
+	if m.icons {
+		minimum += ansi.StringWidth(m.icons.Glyph(icons.FolderOpen, "")) + ansi.StringWidth(m.icons.Glyph(icons.Comment, "")) + 2
+	}
+	return max(m.width/4, minimum)
 }
 
 // paneHorizontalPadding is the space between a pane's side borders and its body.
@@ -4095,8 +4104,8 @@ func (m AppModel) sidebarBorderColor() color.Color {
 // sidebarTabs renders the sidebar's tabs in order, marking the active view.
 func (m AppModel) sidebarTabs() []string {
 	labels := []string{
-		"Files",
-		fmt.Sprintf("Comments (%d)", unresolvedCommentCount(m.tab().state.Comments)),
+		m.icons.Label(icons.FolderOpen, "Files"),
+		m.icons.Label(icons.Comment, fmt.Sprintf("Comments (%d)", unresolvedCommentCount(m.tab().state.Comments))),
 	}
 	tabs := make([]string, len(labels))
 	for i, label := range labels {
@@ -4784,7 +4793,7 @@ func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegi
 }
 
 func (m AppModel) helpHeader(innerWidth int) (string, modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (M-? / ESC to close)"), innerWidth)
+	title, closeRegion := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (M-? / ESC to close)"), innerWidth)
 	legend := helpLegendStyle.Render("C-: ctrl+, M-: meta/alt+, S-: shift+, RET: enter, DEL: backspace")
 	return title + "\n" + lipgloss.Wrap(legend, innerWidth, ""), closeRegion
 }
@@ -4934,23 +4943,28 @@ func dismissesModal(regions []modalMouseRegion, mouse tea.Mouse) bool {
 	return !inside
 }
 
-// modalTitleRow renders a dialog title with a close "x" at the right edge of
+func (m AppModel) modalCloseButton() string {
+	return closeButtonStyle.Render(m.icons.Glyph(icons.Close, "x"))
+}
+
+// modalTitleRow renders a dialog title with a close button at the right edge of
 // the dialog body, returning the row and the region that closes the dialog.
-func modalTitleRow(title string, width int) (string, modalMouseRegion) {
-	closeButton := closeButtonStyle.Render("x")
-	title = ansi.Truncate(title, max(0, width-1-lipgloss.Width(closeButton)), "…")
-	gap := max(1, width-lipgloss.Width(title)-lipgloss.Width(closeButton))
+func (m AppModel) modalTitleRow(title string, width int) (string, modalMouseRegion) {
+	closeButton := m.modalCloseButton()
+	closeWidth := lipgloss.Width(closeButton)
+	title = ansi.Truncate(title, max(0, width-1-closeWidth), "…")
+	gap := max(1, width-lipgloss.Width(title)-closeWidth)
 	region := modalMouseRegion{
-		rect:   mouseRect{left: width - 1, right: width, bottom: 1},
+		rect:   mouseRect{left: width - closeWidth, right: width, bottom: 1},
 		action: modalMouseAction{close: true, focus: -1}, // not a button focus index
 	}
 	return title + strings.Repeat(" ", gap) + closeButton, region
 }
 
-// modalTitle renders a dialog title row with a close "x" followed by a blank
+// modalTitle renders a dialog title row with a close button followed by a blank
 // line, as modalTitleStyle's bottom margin used to provide.
-func modalTitle(text string, width int) (string, modalMouseRegion) {
-	row, region := modalTitleRow(modalTitleStyle.MarginBottom(0).Render(text), width)
+func (m AppModel) modalTitle(text string, width int) (string, modalMouseRegion) {
+	row, region := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Render(text), width)
 	return row + "\n", region
 }
 
@@ -5053,15 +5067,15 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		if start != end {
 			titleText = fmt.Sprintf("Add Comment (lines %d-%d)", start, end)
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		contextContent := m.renderContextPreview(side, start, end, innerWidth-4, 0)
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Close"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
 			buttonSpecs = append(buttonSpecs, modalButtonSpec{
-				rendered: m.renderModalButton("Suggest", "M-s", m.modalFocus == 3),
+				rendered: m.renderModalButton(m.icons.Label(icons.Suggest, "Suggest"), "M-s", m.modalFocus == 3),
 				action:   modalMouseAction{focus: 3},
 			})
 		}
@@ -5115,7 +5129,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 				}
 			}
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		path := contextBoxStyle.Width(innerWidth - 2).Render(context)
 		textareaView := m.clipboardTextareaView()
 		pathInput := m.pathInputType() != ""
@@ -5124,14 +5138,14 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		}
 		before := title + "\n" + path + "\n\n"
 		if pathInput {
-			title, closeRegion = modalTitleRow(modalTitleStyle.MarginBottom(0).Render(titleText), innerWidth)
+			title, closeRegion = m.modalTitleRow(modalTitleStyle.MarginBottom(0).Render(titleText), innerWidth)
 			before = title + "\n" + path + "\n"
 		}
 		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
 		regions = append(regions, textareaRegion)
 		buttons, buttonRegions := layoutModalActions(append([]modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Close"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}, m.editorPreviewButtons()...), innerWidth, strings.Count(prefix, "\n"))
 		regions = append(regions, buttonRegions...)
 		regions = append(regions, closeRegion)
@@ -5151,14 +5165,15 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		} else if m.editingReplyID != "" {
 			titleText = "Edit Reply"
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		if m.hasModalResolution() {
 			comment, _ := m.driftedComment(m.editingID)
-			checkbox := renderResolution(comment.Resolved, "Resolved", false, false) + " " + modalBtnNormalKey.Render("M-r")
+			checkbox := renderResolution(comment.Resolved, "Resolved", false, false, m.icons) + " " + modalBtnNormalKey.Render("M-r")
 			checkboxWidth := lipgloss.Width(checkbox)
-			left := max(0, innerWidth-checkboxWidth-3)
+			closeButton := m.modalCloseButton()
+			left := max(0, innerWidth-checkboxWidth-2-lipgloss.Width(closeButton))
 			title = ansi.Truncate(modalTitleStyle.MarginBottom(0).Render(titleText), max(0, left-1), "…")
-			title = lipgloss.NewStyle().Width(left).Render(title) + checkbox + "  " + closeButtonStyle.Render("x") + "\n"
+			title = lipgloss.NewStyle().Width(left).Render(title) + checkbox + "  " + closeButton + "\n"
 			regions = append(regions, modalMouseRegion{
 				rect:   mouseRect{left: left, right: left + checkboxWidth, bottom: 1},
 				action: modalMouseAction{resolve: true},
@@ -5191,12 +5206,12 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			}
 		}
 		buttonSpecs := []modalButtonSpec{
-			{rendered: m.renderPrimaryModalButton("Save", "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
-			{rendered: m.renderModalButton("Close", "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
+			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
+			{rendered: m.renderModalButton(m.icons.Label(icons.Close, "Close"), "esc", m.modalFocus == 2), action: modalMouseAction{focus: 2}},
 		}
 		if m.canSuggest() {
 			buttonSpecs = append(buttonSpecs, modalButtonSpec{
-				rendered: m.renderModalButton("Suggest", "M-s", m.modalFocus == 3),
+				rendered: m.renderModalButton(m.icons.Label(icons.Suggest, "Suggest"), "M-s", m.modalFocus == 3),
 				action:   modalMouseAction{focus: 3},
 			})
 		}
@@ -5228,7 +5243,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 			for i, target := range m.modalDeleteTargets() {
 				content += "\n"
 				deleteRow, deleteRegions := layoutModalActions([]modalButtonSpec{{
-					rendered: m.renderDangerModalButton(target.label, "", m.modalFocus == i+deleteStart),
+					rendered: m.renderDangerModalButton(m.icons.Label(icons.Delete, target.label), "", m.modalFocus == i+deleteStart),
 					action:   modalMouseAction{focus: i + deleteStart, deleteIndex: i},
 				}}, innerWidth, buttonY)
 				content += deleteRow
@@ -5256,7 +5271,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		regions = append(regions, closeRegion)
 
 	case discardChangesModal:
-		title, closeRegion := modalTitle("Discard changes?", innerWidth)
+		title, closeRegion := m.modalTitle("Discard changes?", innerWidth)
 		info := "Your unsaved comment changes will be lost."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
@@ -5272,7 +5287,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		if targets := m.modalDeleteTargets(); m.pendingDelete >= 0 && m.pendingDelete < len(targets) && targets[m.pendingDelete].replyID != "" {
 			titleText = "Delete reply?"
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		info := "This cannot be undone."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{

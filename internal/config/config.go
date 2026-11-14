@@ -20,6 +20,7 @@ import (
 
 // Config is the resolved (merged) configuration.
 type Config struct {
+	NerdFonts        string            `json:"nerd_fonts"`
 	MermaidMerman    string            `json:"mermaid_merman,omitempty"`
 	MermaidMmdr      string            `json:"mermaid_mmdr,omitempty"`
 	MermaidFonts     []string          `json:"mermaid_fonts,omitempty"`
@@ -44,6 +45,7 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
+	NerdFonts        *string           `toml:"nerd_fonts"`
 	MermaidMerman    string            `toml:"mermaid_merman"`
 	MermaidMmdr      string            `toml:"mermaid_mmdr"`
 	MermaidFonts     []string          `toml:"mermaid_fonts"`
@@ -74,7 +76,7 @@ func ProjectPath(root string) string {
 // Load merges global and project configuration.  projectRoot may be empty
 // to skip the project level.  Missing files are not errors.
 func Load(projectRoot string) (*Config, error) {
-	cfg := &Config{}
+	cfg := &Config{NerdFonts: "auto"}
 
 	global, err := readFile(GlobalPath())
 	if err != nil {
@@ -160,12 +162,18 @@ func readFile(path string) (*fileConfig, error) {
 	if err := toml.Unmarshal(data, &fc); err != nil {
 		return nil, fmt.Errorf("parsing config %s: %w", path, err)
 	}
+	if fc.NerdFonts != nil && !slices.Contains([]string{"auto", "on", "off"}, *fc.NerdFonts) {
+		return nil, fmt.Errorf("nerd_fonts in %s must be auto, on, or off", path)
+	}
 	return &fc, nil
 }
 
 func apply(cfg *Config, fc *fileConfig) {
 	if fc == nil {
 		return
+	}
+	if fc.NerdFonts != nil {
+		cfg.NerdFonts = *fc.NerdFonts
 	}
 	if fc.Output != "" {
 		cfg.Output = fc.Output

@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -223,16 +224,18 @@ func TestFinishFormsCannotProceedPastRequiredItems(t *testing.T) {
 
 func TestFinishPendingDialogsFitSmallTerminals(t *testing.T) {
 	for _, tc := range []struct {
-		dark, required bool
-		width, height  int
+		dark, required, nerd bool
+		width, height        int
 	}{
-		{true, true, 40, 12}, {false, false, 40, 12},
-		{true, false, 54, 14}, {false, true, 54, 14},
-		{true, true, 80, 24}, {false, false, 80, 24},
+		{true, true, false, 40, 12}, {false, false, false, 40, 12},
+		{true, false, false, 54, 14}, {false, true, false, 54, 14},
+		{true, true, false, 80, 24}, {false, false, false, 80, 24},
+		{true, true, true, 40, 12}, {false, false, true, 54, 14},
 	} {
 		initAdaptiveStyles(tc.dark)
 		app, _ := formTestAppWithContent(t, "- [ ] Confirm <!-- form: id=confirm required -->\n- [ ] Required choice <!-- form: id=required-choice value=chosen required -->\n- [ ] Optional choice <!-- form: id=optional-choice value=chosen -->\n- [ ] Consent <!-- form: id=publish consent -->\n- [ ] Optional checkbox <!-- form: id=extra -->\n")
 		app.width, app.height = tc.width, tc.height
+		app.icons = icons.Set(tc.nerd)
 		app.tab().state.Comments = []review.Comment{testComment()}
 		if !tc.required {
 			app.toggleForm(1)

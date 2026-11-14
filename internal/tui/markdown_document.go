@@ -18,6 +18,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 )
 
 var (
@@ -120,7 +121,7 @@ type markdownSource struct {
 	offsets         []int
 	markup          []markdownMarkup
 	fences          []markdownFence
-	headings        []outlineHeading
+	headings        []outlineSymbol
 	headingText     []string
 	headingAnchors  map[string]int
 	suggestionLexer chroma.Lexer
@@ -182,10 +183,10 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		case *ast.Paragraph, *ast.Heading, *extast.TableCell:
 			if heading, ok := n.(*ast.Heading); ok {
 				m.headingText = append(m.headingText, outlineHeadingText(heading, data))
-				m.headings = append(m.headings, outlineHeading{
+				m.headings = append(m.headings, outlineSymbol{outlineHeading: outlineHeading{
 					line: start + lineAt(heading.Pos()) + 1, level: heading.Level,
 					label: outlineHeadingLabel(heading, data),
-				})
+				}, kind: icons.Heading})
 			}
 			segments := n.(ast.BlockNode).Source()
 			if len(segments) == 0 {
