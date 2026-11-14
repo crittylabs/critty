@@ -4653,9 +4653,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	if m.readOnly {
 		items := []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
-			{keys: "↑/↓,k/j", desc: "⇅ move"},
-			{keys: "PgUp/PgDn · M-v/C-v", desc: "⇅ scroll file (2-row overlap)"},
-			{keys: "Home/End,g/G,</> · M-</M->", desc: "⇅ file top/bottom"},
+			{keys: "↑/↓,k/j", desc: "next/previous line"},
+			{keys: "PgUp/PgDn · M-v/C-v", desc: "next/previous page (2-row overlap)"},
+			{keys: "Home/End,g/G,</> · M-</M->", desc: "file top/bottom"},
 			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "o/M-o · click", desc: "follow a link or open an image; local files stay in the viewer"},
@@ -4705,11 +4705,11 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, columnWidth)
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
-		{keys: "↑/↓,k/j", desc: "⇅ move"},
+		{keys: "↑/↓,k/j", desc: "next/previous line"},
 		{keys: "←/→,h/l", desc: "scroll table"},
-		{keys: "PgUp/PgDn · M-v/C-v", desc: "⇅ scroll file (2-row overlap)"},
+		{keys: "PgUp/PgDn · M-v/C-v", desc: "next/previous page (2-row overlap)"},
 		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page"},
-		{keys: "Home/End,g/G,</> · M-</M->", desc: "⇅ top/bottom"},
+		{keys: "Home/End,g/G,</> · M-</M->", desc: "top/bottom"},
 		{keys: "{/}", desc: "⇅ pending items"},
 		{keys: "[/]", desc: "⇅ all items"},
 		{keys: "n/N", desc: "⇵ all hunks & items"},
