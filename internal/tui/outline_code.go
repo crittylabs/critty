@@ -44,7 +44,7 @@ func (t *FileTab) ensureCodeOutline() *codeOutlineCache {
 	}
 	lexer := t.lexer
 	if lexer == nil {
-		lexer = codeLexer(t.path, t.doc.Content)
+		lexer = t.codeLexer(t.doc.Content)
 	}
 	language := outlineLanguage(lexer)
 	if language == "" {

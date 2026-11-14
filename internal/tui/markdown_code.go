@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
-	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/parser"
 	"github.com/yuin/goldmark/v2/text"
@@ -48,8 +47,8 @@ func (m *markdownSource) codeFenceInfo(block *ast.CodeBlock, data []byte) codeFe
 		language, _ = block.Language(data)
 		end = len(language)
 	}
-	lexer := lexers.Get(language)
-	if language == "suggestion" {
+	lexer := m.syntax.Lexer(language)
+	if language == "suggestion" && !m.syntax.HasAlias(language) {
 		lexer = m.suggestionLexer
 	}
 	if start < end {

@@ -41,6 +41,8 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `cleanup_on_approve` | Boolean enabling removal of eligible approved reviews. |
 | `disable_stats` | Boolean disabling review statistics. |
 | `prompts` | Table mapping prompt keys to overrides. |
+| `syntax.aliases` | Table mapping code-fence language names to supported syntax languages. |
+| `syntax.files` | Ordered array of filename patterns and syntax languages. |
 | `history` | Global-only table controlling task retention. |
 | `math_ratex` | Global-only RaTeX selection: `auto` (default), `off`, a command name, or an absolute executable path. |
 | `mermaid_merman`, `mermaid_mmdr` | Global-only Mermaid CLI selections with the same `auto`, `off`, command, or absolute path values. |
@@ -54,10 +56,49 @@ Global settings are applied first, followed by project settings.  Settings merge
 - Project `launchers` replaces the global array.  `[]` clears that array; omission inherits it.  CLI launcher flags still take precedence, and the launcher resolver supplies its normal defaults.
 - Project `textconv_drivers` replaces the global array.  `[]` disables inherited conversions; omission inherits the global patterns.  For example, `["plist", "cp932"]` enables those Git diff drivers, `["plist*"]` matches names with that prefix, and `["*"]` enables all configured converters.  Patterns also support `?` and character classes such as `[12]`; invalid patterns are errors.  Unmatched drivers remain disabled, preserving inline image previews.
 - Prompt tables merge by key.  A project value replaces the corresponding global value and leaves other keys intact.
+- Syntax aliases merge by case-insensitive name.  Project filename rules precede global rules; the first matching rule wins.  An empty rule array adds no rules and retains inherited rules.
 
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.
 
 The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
+
+## Syntax associations
+
+Define custom code-fence language names and associate filenames with supported
+languages in either settings file:
+
+```toml
+[syntax.aliases]
+mygo = "go"
+notes = "markdown"
+
+[[syntax.files]]
+pattern = "*.notes"
+language = "notes"
+
+[[syntax.files]]
+pattern = "Buildfile.*"
+language = "mygo"
+```
+
+Aliases are case-insensitive and may refer to other aliases or override built-in
+language names.  Targets are names or aliases supported by the syntax highlighter,
+such as `go`, `ruby`, `python`, `markdown`, or `text` (plain text).  A fence such as
+`mygo` or `{.mygo title="Example"}` uses the chosen language, including in comments
+and editor previews.  A `suggestion` fence uses its target file's associated
+language unless an explicit alias overrides `suggestion`.
+
+File patterns match the basename, with case-sensitive `*`, `?`, and character
+classes such as `[ch]`.  Directory separators are unsupported.  Put specific
+patterns before broad ones.  Matching rules override built-in extension and
+shebang detection; unmatched files keep normal detection.  The selected language
+also controls outlines where supported.  Mapping a file to `markdown` enables
+Markdown rendering; mapping it to `text` keeps it plain.  To disable an inherited
+association, add a project rule mapping that pattern to `text`.
+
+Unknown languages, alias cycles, duplicate alias names differing only in case,
+and invalid patterns are configuration errors.  Associations select existing
+formats; they do not define new syntax grammars or change source text.
 
 ## Nerd Font detection
 

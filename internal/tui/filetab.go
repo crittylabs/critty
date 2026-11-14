@@ -15,6 +15,7 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/syntax"
 )
 
 // fileReview holds the in-memory comments for one tab; they are written
@@ -77,6 +78,7 @@ type FileTab struct {
 	// Cached rendering data (computed once per tab switch, not per keystroke)
 	highlighted       bool // language detection and highlight caches are current
 	lexer             chroma.Lexer
+	syntax            *syntax.Rules
 	outlineMask       *outlineMask // masked source from the highlight pass, nil when unavailable
 	chromaLines       []string     // display-ready syntax-highlighted lines (nil for markdown)
 	plainLines        []string     // display text without styling, parallel to chromaLines
@@ -187,9 +189,23 @@ func markdownPath(path string) bool {
 // detectLanguage selects the lexer once per document so repeated highlight
 // passes and the outline share it.
 func (ft *FileTab) detectLanguage() {
-	ft.isMarkdown = markdownPath(ft.path)
-	ft.lexer = codeLexer(ft.path, ft.doc.Content)
+	ft.lexer = ft.codeLexer(ft.doc.Content)
+	ft.isMarkdown = ft.markdownFile()
 	ft.isCode = isCodeLexer(ft.lexer)
+}
+
+func (ft *FileTab) markdownFile() bool {
+	if lexer, ok := ft.syntax.Match(ft.path); ok {
+		return lexer.Config().Name == "markdown"
+	}
+	return markdownPath(ft.path)
+}
+
+func (ft *FileTab) codeLexer(source string) chroma.Lexer {
+	if lexer, ok := ft.syntax.Match(ft.path); ok {
+		return lexer
+	}
+	return codeLexer(ft.path, source)
 }
 
 // highlightSource renders the document once and keeps display-ready lines,

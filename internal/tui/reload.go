@@ -301,6 +301,7 @@ func (m *AppModel) finishReload(msg reloadMsg) (cmd tea.Cmd) {
 	}
 	for i := range next.tabs {
 		tab := &next.tabs[i]
+		tab.syntax = m.syntax
 		if previous, ok := old[tab.path]; ok {
 			tab.unread = previous.unread || tabContentChanged(previous, *tab)
 			tab.cursorLine, tab.cursorSide = previous.cursorLine, previous.cursorSide
@@ -329,6 +330,7 @@ func (m *AppModel) finishReload(msg reloadMsg) (cmd tea.Cmd) {
 				continue
 			}
 			tab := newFileTab(path, nil)
+			tab.syntax = m.syntax
 			tab.outsideChanges = true
 			if snapshot, ok := m.session.CJ.RoundState.Files[path]; ok {
 				tab.doc = document.FromContent(path, []byte(snapshot.Content))

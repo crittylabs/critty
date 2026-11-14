@@ -32,6 +32,7 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 	"github.com/crittylabs/critty/internal/searchhistory"
 	"github.com/crittylabs/critty/internal/svgrender"
+	"github.com/crittylabs/critty/internal/syntax"
 )
 
 type pane int
@@ -75,6 +76,7 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
+	Syntax           *syntax.Rules
 	NerdFonts        bool
 	Context          context.Context
 	ReadOnly         bool
@@ -146,6 +148,7 @@ type AppModel struct {
 	multiFile  bool // true when in code review mode
 	fileSelect fileSelectState
 	paths      *pathDisplay
+	syntax     *syntax.Rules
 
 	// Single-file mode (legacy)
 	filePath         string
@@ -362,12 +365,14 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	ta := newModalTextarea()
 
 	tab := FileTab{
+		syntax:     cfg.Syntax,
 		path:       filePath,
 		cursorLine: 1,
 		isBinary:   imagePath(filePath) && !imageinfo.SVGPath(filePath),
 	}
 
 	m := AppModel{
+		syntax:           cfg.Syntax,
 		icons:            icons.Set(cfg.NerdFonts),
 		readOnly:         cfg.ReadOnly,
 		isearch:          isearchState{isearchOptions: isearchOptions{allFiles: true}},
@@ -431,6 +436,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			}
 		}
 		ft := newFileTab(f.Path, diff)
+		ft.syntax = cfg.Syntax
 		ft.oldPath = f.OldPath
 		ft.textconv = f.Textconv
 		ft.loadErr = diffErr
@@ -457,6 +463,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			snapshot, hasSnapshot := cfg.Session.CJ.RoundState.Files[path]
 			if !present[path] && (len(file.Comments) > 0 || len(files) == 0 && hasSnapshot && !snapshot.Partial) {
 				tab := newFileTab(path, nil)
+				tab.syntax = cfg.Syntax
 				tab.outsideChanges = true
 				if hasSnapshot && !snapshot.Partial {
 					tab.doc = document.FromContent(path, []byte(snapshot.Content))
@@ -468,6 +475,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		syntax:          cfg.Syntax,
 		icons:           icons.Set(cfg.NerdFonts),
 		readOnly:        cfg.ReadOnly,
 		isearch:         isearchState{isearchOptions: isearchOptions{allFiles: true}},
@@ -520,6 +528,7 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 			continue
 		}
 		tab := newFileTab(d.Path(), nil)
+		tab.syntax = m.syntax
 		m.attachments[d.Path()] = d
 		tab.attachment = &d
 		tab.isBinary = d.Image != ""
@@ -887,7 +896,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if t.isBinary || t.outsideChanges {
 				continue
 			}
-			if markdownPath(t.path) {
+			if t.markdownFile() {
 				t.ensureHighlightCache()
 				continue
 			}

@@ -19,6 +19,7 @@ import (
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/internal/syntax"
 )
 
 var (
@@ -125,10 +126,15 @@ type markdownSource struct {
 	headingText     []string
 	headingAnchors  map[string]int
 	suggestionLexer chroma.Lexer
+	syntax          *syntax.Rules
 }
 
 func parseMarkdownSource(lines []string, known map[int]bool, suggestion ...chroma.Lexer) *markdownSource {
-	result := &markdownSource{lines: make([]markdownLine, len(lines)), source: strings.Join(lines, "\n"), offsets: make([]int, len(lines))}
+	return parseMarkdownWithSyntax(lines, known, nil, suggestion...)
+}
+
+func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.Rules, suggestion ...chroma.Lexer) *markdownSource {
+	result := &markdownSource{syntax: rules, lines: make([]markdownLine, len(lines)), source: strings.Join(lines, "\n"), offsets: make([]int, len(lines))}
 	if len(suggestion) > 0 {
 		result.suggestionLexer = suggestion[0]
 	}
@@ -672,7 +678,7 @@ func (t *FileTab) ensureMarkdownCache() {
 	if t.doc == nil || !t.isMarkdown || t.markdown != nil && t.markdown.doc == t.doc && t.markdown.diff == t.diff && t.markdown.content == t.doc.Content && t.markdown.partial == (t.doc.Known != nil) {
 		return
 	}
-	cache := &markdownCache{doc: t.doc, diff: t.diff, content: t.doc.Content, partial: t.doc.Known != nil, after: parseMarkdownSource(t.doc.Lines, t.doc.Known)}
+	cache := &markdownCache{doc: t.doc, diff: t.diff, content: t.doc.Content, partial: t.doc.Known != nil, after: parseMarkdownWithSyntax(t.doc.Lines, t.doc.Known, t.syntax)}
 	if t.diff != nil {
 		oldLines := make(map[int]string)
 		old := 1
@@ -705,7 +711,7 @@ func (t *FileTab) ensureMarkdownCache() {
 				known[n] = true
 			}
 		}
-		cache.before = parseMarkdownSource(lines, known)
+		cache.before = parseMarkdownWithSyntax(lines, known, t.syntax)
 	}
 	t.markdown = cache
 }
@@ -727,7 +733,7 @@ func (t *FileTab) markdownDisplayLine(line int, before bool, fallback string, in
 		return source.lines[line-1].render(inline, base, changed, images)
 	}
 	// Standalone deleted lines and test fixtures may have no document cache.
-	source = parseMarkdownSource([]string{fallback}, nil)
+	source = parseMarkdownWithSyntax([]string{fallback}, nil, t.syntax)
 	return source.lines[0].render(inline, base, changed, images)
 }
 

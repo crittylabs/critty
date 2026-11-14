@@ -15,11 +15,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/crittylabs/critty/internal/history"
+	"github.com/crittylabs/critty/internal/syntax"
 	"github.com/crittylabs/critty/internal/xdg"
 )
 
 // Config is the resolved (merged) configuration.
 type Config struct {
+	Syntax           syntax.Config     `json:"syntax,omitempty"`
+	SyntaxRules      *syntax.Rules     `json:"-"`
 	NerdFonts        string            `json:"nerd_fonts"`
 	MermaidMerman    string            `json:"mermaid_merman,omitempty"`
 	MermaidMmdr      string            `json:"mermaid_mmdr,omitempty"`
@@ -45,6 +48,7 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
+	Syntax           syntax.Config     `toml:"syntax"`
 	NerdFonts        *string           `toml:"nerd_fonts"`
 	MermaidMerman    string            `toml:"mermaid_merman"`
 	MermaidMmdr      string            `toml:"mermaid_mmdr"`
@@ -101,6 +105,10 @@ func Load(projectRoot string) (*Config, error) {
 		apply(cfg, project)
 	}
 
+	cfg.SyntaxRules, err = syntax.Compile(cfg.Syntax)
+	if err != nil {
+		return nil, err
+	}
 	for _, pattern := range cfg.TextconvDrivers {
 		if _, err := path.Match(pattern, ""); err != nil {
 			return nil, fmt.Errorf("invalid textconv_drivers pattern %q: %w", pattern, err)
@@ -165,6 +173,9 @@ func readFile(path string) (*fileConfig, error) {
 	if fc.NerdFonts != nil && !slices.Contains([]string{"auto", "on", "off"}, *fc.NerdFonts) {
 		return nil, fmt.Errorf("nerd_fonts in %s must be auto, on, or off", path)
 	}
+	if err := fc.Syntax.ValidateNames(); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
 	return &fc, nil
 }
 
@@ -172,6 +183,7 @@ func apply(cfg *Config, fc *fileConfig) {
 	if fc == nil {
 		return
 	}
+	cfg.Syntax = syntax.Merge(cfg.Syntax, fc.Syntax)
 	if fc.NerdFonts != nil {
 		cfg.NerdFonts = *fc.NerdFonts
 	}

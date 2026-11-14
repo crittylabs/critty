@@ -142,7 +142,7 @@ func (m *AppModel) finishViewLink(msg viewLinkLoadedMsg) tea.Cmd {
 		m.modal, m.modalFocus = openExternalModal, 1
 		return nil
 	}
-	tab := FileTab{path: msg.path, doc: msg.doc, state: &fileReview{}, cursorLine: 1, viewDocument: true,
+	tab := FileTab{path: msg.path, syntax: m.syntax, doc: msg.doc, state: &fileReview{}, cursorLine: 1, viewDocument: true,
 		isBinary: imagePath(msg.path) && !strings.HasSuffix(strings.ToLower(msg.path), ".svg")}
 	if !tab.isBinary {
 		tab.ensureHighlightCache()

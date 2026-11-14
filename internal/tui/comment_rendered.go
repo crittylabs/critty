@@ -27,7 +27,7 @@ func (m *AppModel) commentSuggestionLexer() chroma.Lexer {
 	if t.doc != nil {
 		source = t.doc.Content
 	}
-	return codeLexer(t.path, source)
+	return t.codeLexer(source)
 }
 
 func (m *AppModel) parsedComment(body string, lexer chroma.Lexer) *commentRenderedBody {
@@ -40,7 +40,7 @@ func (m *AppModel) parsedComment(body string, lexer chroma.Lexer) *commentRender
 	}
 	cached := m.renderedBodies[key]
 	if cached == nil {
-		cached = &commentRenderedBody{source: parseMarkdownSource(strings.Split(body, "\n"), nil, lexer)}
+		cached = &commentRenderedBody{source: parseMarkdownWithSyntax(strings.Split(body, "\n"), nil, m.syntax, lexer)}
 		if strings.Contains(body, "$") || strings.Contains(body, "mermaid") {
 			cached.refs = m.renderedRefs(body)
 		}
