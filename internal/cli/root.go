@@ -28,8 +28,9 @@ var rootCmd = &cobra.Command{
 		"Run `critty` to review the current git changes, `critty --staged` to review only the index, " +
 		"`critty <file>` to view a document without saving, `critty review <file>` to review it, " +
 		"or `critty sessions resume <id>` to resume a saved review.  Use `critty view` for a read-only view in the current terminal without saving a session.",
-	Args:         cobra.MaximumNArgs(1),
-	SilenceUsage: true,
+	Args:              cobra.MaximumNArgs(1),
+	ValidArgsFunction: completeRootFiles,
+	SilenceUsage:      true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if rootSession != "" {
 			if reviewStaged || reviewUnstaged || reviewScope != "" {
@@ -42,6 +43,54 @@ var rootCmd = &cobra.Command{
 		}
 		return runReview(args)
 	},
+}
+
+func completeRootFiles(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	// When no command matches, let the shell handle paths, quoting, and directories.
+	commandNames := make(map[string]bool)
+	matchingCommand := false
+	for _, sub := range cmd.Commands() {
+		commandNames[sub.Name()] = true
+		for _, alias := range sub.Aliases {
+			commandNames[alias] = true
+		}
+		if (sub.IsAvailableCommand() || sub.Name() == "help") && strings.HasPrefix(sub.Name(), toComplete) {
+			matchingCommand = true
+		}
+	}
+	if !matchingCommand {
+		return nil, cobra.ShellCompDirectiveDefault
+	}
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveKeepOrder
+	}
+	var files []cobra.Completion
+	directive := cobra.ShellCompDirectiveKeepOrder | cobra.ShellCompDirectiveNoFileComp
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || !strings.HasPrefix(name, toComplete) || strings.ContainsAny(name, "\t\r\n") {
+			continue
+		}
+		directory := entry.IsDir()
+		if entry.Type()&os.ModeSymlink != 0 {
+			info, err := os.Stat(name)
+			directory = err == nil && info.IsDir()
+		}
+		if directory {
+			name += "/"
+			// Keep directory candidates open for the next path component.
+			directive |= cobra.ShellCompDirectiveNoSpace
+		} else if commandNames[name] {
+			name = "./" + name
+		}
+		files = append(files, name)
+	}
+	// Cobra appends these after its command candidates; preserve that order.
+	return files, directive
 }
 
 // reconnectSession restores a saved review in its original working directory.
