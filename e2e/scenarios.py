@@ -870,13 +870,22 @@ def scenarios() -> None:
         table.keys("C-s")
         table.text("hidden.example")
         table.wait_screen("target", "search reveals a wrapped link in a hidden column")
-        table.keys("Enter", "Left", "Left", "Left", "Left")
-        table.wait_screen("StartColumn", "left arrow returns to the first table column")
+
+        def return_to_first_column(key: str) -> None:
+            def move_left() -> bool:
+                screen = table.screen()
+                if "StartColumn" in screen and "◀" not in screen:
+                    return True
+                table.keys(key)
+                return False
+
+            wait_until(move_left, f"{key} returns the table to its left edge")
+
+        table.keys("Enter")
+        return_to_first_column("Left")
         table.keys("l")
         table.wait_screen("◀", "l scrolls the table right")
-        table.keys("h", "h", "h", "h")
-        table.wait_screen("StartColumn", "h scrolls the table left")
-        wait_until(lambda: "◀" not in table.screen(), "table reaches its left edge")
+        return_to_first_column("h")
         table.click("▶")
         table.wait_screen("◀", "right edge button scrolls the table")
         table.keys("Enter")

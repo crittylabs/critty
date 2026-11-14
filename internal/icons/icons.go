@@ -91,11 +91,13 @@ var glyphs = [...]string{
 	RadioUnchecked: "\U000f0130", RadioChecked: "\U000f043e", Mixed: "\U000f0856", Check: "\ueab2",
 }
 
+// Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.
+// Portable fallbacks retain their original width.
 func (s Set) Glyph(kind Kind, fallback string) string {
 	if !s || int(kind) >= len(glyphs) {
 		return fallback
 	}
-	return glyphs[kind]
+	return glyphs[kind] + " "
 }
 
 func (s Set) Label(kind Kind, label string) string {
