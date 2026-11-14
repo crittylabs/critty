@@ -681,7 +681,6 @@ var (
 	reCheckbox   = regexp.MustCompile(`^(\s*[-*+]\s)\[([ xX])\]\s(.*)$`)
 	reNumList    = regexp.MustCompile(`^(\s*\d+\.\s)(.*)$`)
 	reBlockquote = regexp.MustCompile(`^(\s*>\s?)(.*)$`)
-	reHr         = regexp.MustCompile(`^(\s*)([-*_]{3,})\s*$`)
 	reTableRow   = regexp.MustCompile(`^\s*\|.*\|\s*$`)
 	reTableSep   = regexp.MustCompile(`^\s*\|[\s:]*[-]+[\s:|-]*\|\s*$`)
 )
@@ -697,10 +696,6 @@ func highlightMarkdownBlock(line string) string {
 
 func highlightMarkdownWith(line string, inline func(string) string) string {
 	trimmed := strings.TrimSpace(line)
-
-	if reHr.MatchString(line) {
-		return mdHrStyle.Render("─────────────────────────────────")
-	}
 
 	if strings.HasPrefix(trimmed, "#### ") {
 		return mdH4Style.Render(inline(line))
@@ -840,6 +835,7 @@ func inlineDiffDisplayLines(segments []gitpkg.InlineSegment, isMarkdown bool, wi
 			source.WriteString(segment.Content)
 		}
 		parsed := parseMarkdownSource([]string{source.String()}, nil)
+		parsed.lines[0].previewWidth = width
 		return markdownDisplayRows(parsed.lines[0].render(segments, base, changed, nil), width, decorate)
 	}
 	var b strings.Builder

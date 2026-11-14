@@ -63,6 +63,8 @@ type markdownLine struct {
 	tokens        []markdownToken
 	cells         [][2]int
 	tableSep      bool
+	thematicBreak bool
+	ruleStart     int
 	literal       bool
 	previewTokens []markdownToken
 	previewHidden bool
@@ -210,9 +212,13 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		case *ast.HTMLBlock:
 			return
 		case *ast.ThematicBreak:
-			for _, seg := range n.(ast.BlockNode).Source() {
-				m.lines[start+lineAt(seg.Start)].literal = false
+			row := lineAt(n.Pos())
+			if incomplete && (row == 0 && start > 0 || row == len(offsets)-1) {
+				return
 			}
+			line := &m.lines[start+row]
+			line.thematicBreak = true
+			line.ruleStart = max(0, n.Pos()-offsets[row])
 		}
 		for child := n.FirstChild(); child != nil; child = child.NextSibling() {
 			visit(child)
@@ -442,6 +448,22 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 }
 
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
+	if line.thematicBreak {
+		prefix := highlightMarkdownBlock(line.source[:line.ruleStart])
+		width := max(1, line.previewWidth-ansi.StringWidth(prefix))
+		style := mdHrStyle
+		if len(inline) > 0 {
+			background := base.GetBackground()
+			for _, segment := range inline {
+				if segment.Changed {
+					background = changed.GetBackground()
+					break
+				}
+			}
+			style = style.Background(background)
+		}
+		return prefix + style.Render(strings.Repeat("─", width))
+	}
 	if line.previewTokens != nil {
 		return line.renderPreview(inline, base, changed, links)
 	}

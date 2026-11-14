@@ -389,3 +389,73 @@ func TestMarkdownCodeWordDiffHighlightsChangedText(t *testing.T) {
 		}
 	}
 }
+
+func TestMarkdownThematicBreaks(t *testing.T) {
+	for _, marker := range []string{"---", "***", "___", "- - -", "* * *", "> ---", "  ***"} {
+		t.Run(marker, func(t *testing.T) {
+			parsed := parseMarkdownSource([]string{"Before", "", marker, "", "After"}, nil)
+			line := &parsed.lines[2]
+			if !line.thematicBreak {
+				t.Fatal("parser did not mark thematic break")
+			}
+			for _, width := range []int{12, 70} {
+				line.previewWidth = width
+				view := line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+				if !strings.ContainsRune(view, '─') || ansi.StringWidth(view) != width {
+					t.Fatalf("rule at width %d: %q", width, view)
+				}
+				if !hasForeground(view, mdHrStyle.GetForeground(), "─") {
+					t.Fatal("rule lost its muted color")
+				}
+				start := parsed.offsets[2] + line.sourceOffset(3, false)
+				end := parsed.offsets[2] + line.sourceOffset(9, true)
+				if got := parsed.copySourceRange(start, end); got != marker {
+					t.Fatalf("rule copy = %q, want source %q", got, marker)
+				}
+			}
+			inline := []gitpkg.InlineSegment{{Content: marker, Changed: true}}
+			changed := lipgloss.NewStyle().Background(lipgloss.Color("#286028"))
+			view := line.render(inline, lipgloss.NewStyle(), changed, nil)
+			for _, cells := range uv.NewStyledString(view).Lines(ansi.GraphemeWidth) {
+				for _, cell := range cells {
+					if cell.Content == "─" && !sameColor(cell.Style.Bg, changed.GetBackground()) {
+						t.Fatal("rule lost its word-diff background")
+					}
+				}
+			}
+		})
+	}
+	for _, source := range []string{"Title\n---", "```md\n---\n```", "    ---", "Before\n\n\\---", "Before\n\n-*_*", "---\ntitle: Example\n---"} {
+		parsed := parseMarkdownSource(strings.Split(source, "\n"), nil)
+		for _, line := range parsed.lines {
+			if line.thematicBreak {
+				t.Fatalf("non-rule was expanded: %q", source)
+			}
+		}
+	}
+}
+
+func TestMarkdownRuleWidthFollowsResize(t *testing.T) {
+	app := newScrollTestApp("notes.md", []string{"Before", "", "---", "", "After"}, true, 80, 30)
+	for _, width := range []int{80, 32, 100} {
+		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 30})
+		line := &app.tab().markdown.after.lines[2]
+		view := line.render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+		if got, want := ansi.StringWidth(view), max(1, app.contentViewport.Width()-gutterWidth-1); got != want {
+			t.Fatalf("rule width = %d, want pane width %d", got, want)
+		}
+		if app.tab().doc.Lines[2] != "---" {
+			t.Fatal("resizing changed source")
+		}
+	}
+}
+
+func TestCommentRuleFitsAuthorPrefix(t *testing.T) {
+	app := setupAppWithDoc(t, "Text")
+	for _, prefix := range []string{"", "Reviewer: "} {
+		view := app.renderCommentContent("Reviewer", "---", prefix, 28)
+		if strings.ContainsRune(view, '\n') || ansi.StringWidth(view) != 28 || !strings.ContainsRune(view, '─') {
+			t.Fatalf("prefixed comment rule overflowed: %q", view)
+		}
+	}
+}

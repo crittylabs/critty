@@ -20,6 +20,7 @@ type contentTextSpan struct {
 	tableSource         string
 	literal             bool
 	mapped              bool
+	atomic              bool
 	right               int
 	clipLeft, clipRight int
 }
@@ -152,6 +153,14 @@ func (s contentTextSelection) bounds() (textPoint, textPoint) {
 	a, b := s.anchor, s.cursor
 	if a.span > b.span || a.span == b.span && a.offset > b.offset {
 		a, b = b, a
+	}
+	if a != b {
+		if s.spans[a.span].atomic {
+			a.offset = 0
+		}
+		if s.spans[b.span].atomic {
+			b.offset = len(s.spans[b.span].text)
+		}
 	}
 	return a, b
 }
@@ -416,6 +425,7 @@ func (m *AppModel) prepareTextSpans() {
 		text   string
 		source string
 		offset int
+		atomic bool
 	}
 	type flowKey struct {
 		ref    lineRef
@@ -446,18 +456,28 @@ func (m *AppModel) prepareTextSpans() {
 				}
 			}
 			raw := value
+			atomic := false
 			if t.isMarkdown {
 				display, plain, _, measured := t.markdownDisplayLineInfo(span.ref.line, span.ref.side == "old", value, nil, nil)
 				value = plain
 				if !measured {
 					value = ansi.Strip(display)
 				}
+				if t.markdown != nil {
+					source := t.markdown.after
+					if span.ref.side == "old" {
+						source = t.markdown.before
+					}
+					if source != nil && span.ref.line > 0 && span.ref.line <= len(source.lines) {
+						atomic = source.lines[span.ref.line-1].thematicBreak
+					}
+				}
 			} else if plain, _, ok := t.displayLineInfo(span.ref.line - 1); ok && span.ref.side != "old" && span.source == "" {
 				value = plain
 			} else {
 				value = displaySourceText(value)
 			}
-			f = &flow{text: value, source: raw}
+			f = &flow{text: value, source: raw, atomic: atomic}
 			flows[key] = f
 		}
 		if span.literal {
@@ -469,6 +489,7 @@ func (m *AppModel) prepareTextSpans() {
 			f.offset += offset + len(span.text)
 		}
 		span.source = f.source
+		span.atomic = f.atomic
 	}
 }
 

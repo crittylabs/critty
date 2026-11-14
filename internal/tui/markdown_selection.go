@@ -162,6 +162,12 @@ func rawTextOffset(raw, rendered string, offset int, end bool) int {
 }
 
 func (line *markdownLine) sourceOffset(offset int, end bool) int {
+	if line.thematicBreak {
+		if end {
+			return len(line.source)
+		}
+		return 0
+	}
 	if line.previewTokens != nil && len(line.previewMap) > 0 {
 		return line.previewSourceOffset(offset, end)
 	}

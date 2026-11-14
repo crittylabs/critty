@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
+
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
@@ -113,6 +114,9 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int, 
 						links = append(links, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
 					}
 				}
+			}
+			if !prefixed && prefix != "" && renderSource.lines[i].thematicBreak {
+				renderSource.lines[i].previewWidth = max(1, width-ansi.StringWidth(prefix))
 			}
 			content = style.Render(renderSource.lines[i].render(nil, style, style, links))
 		}

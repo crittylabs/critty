@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -269,5 +270,51 @@ func TestTextSelectionSplitUsesBeforeMarkdownContext(t *testing.T) {
 	app = releaseMouse(app, left+span.left+5, y)
 	if got := app.selectedText(); got != "code" {
 		t.Fatalf("copied = %q, want literal code body without unselected backquotes", got)
+	}
+}
+
+func TestMarkdownRuleSelectionIsAtomic(t *testing.T) {
+	previous := terminalIsDark
+	initAdaptiveStyles(true)
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, tc := range []struct {
+		name                           string
+		startLine, start, endLine, end int
+		want                           string
+	}{
+		{"inside", 3, 8, 3, 16, "---"},
+		{"reverse", 3, 16, 3, 8, "---"},
+		{"ending on rule", 1, 2, 3, 16, "fore\n\n---"},
+		{"starting on rule", 3, 8, 5, 3, "---\n\nAft"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := setupAppWithDoc(t, "Before\n\n---\n\nAfter")
+			app.width, app.height = 100, 30
+			app.recalculateLayout()
+			app.rebuildContent()
+			find := func(line int) contentTextSpan {
+				for _, span := range app.contentLayout.textSpans {
+					if span.ref.line == line {
+						return span
+					}
+				}
+				t.Fatalf("missing line %d", line)
+				return contentTextSpan{}
+			}
+			start, end, rule := find(tc.startLine), find(tc.endLine), find(3)
+			left, top, _, _ := app.contentBounds()
+			app = pressMouse(app, left+start.left+tc.start, top+start.row)
+			app = moveMouse(app, left+end.left+tc.end, top+end.row)
+			app = releaseMouse(app, left+end.left+tc.end, top+end.row)
+			if got := app.selectedText(); got != tc.want {
+				t.Fatalf("copied %q, want %q", got, tc.want)
+			}
+			rows := uv.NewStyledString(app.contentViewport.GetContent()).Lines(ansi.GraphemeWidth)
+			for _, cell := range rows[rule.row][rule.left : rule.left+ansi.StringWidth(rule.text)] {
+				if !sameColor(cell.Style.Bg, textSelectionBg.GetBackground()) {
+					t.Fatal("rule is only partially highlighted")
+				}
+			}
+		})
 	}
 }
