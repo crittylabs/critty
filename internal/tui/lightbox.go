@@ -244,7 +244,7 @@ func (m AppModel) lightboxContent() (string, int, []modalMouseRegion) {
 	if room := innerWidth - lipgloss.Width(size) - 3; lipgloss.Width(label) > room && room > 1 {
 		label = ansi.TruncateLeft(label, lipgloss.Width(label)-room+1, "…")
 	}
-	title, closeRegion := modalTitle(label+size, innerWidth)
+	title, closeRegion := m.modalTitle(label+size, innerWidth)
 	body := "  Loading image…"
 	var regions []modalMouseRegion
 	if img.ready {

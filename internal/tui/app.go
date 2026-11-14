@@ -4785,7 +4785,7 @@ func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegi
 }
 
 func (m AppModel) helpHeader(innerWidth int) (string, modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (M-? / ESC to close)"), innerWidth)
+	title, closeRegion := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Render("Keyboard Help  (M-? / ESC to close)"), innerWidth)
 	legend := helpLegendStyle.Render("C-: ctrl+, M-: meta/alt+, S-: shift+, RET: enter, DEL: backspace")
 	return title + "\n" + lipgloss.Wrap(legend, innerWidth, ""), closeRegion
 }
@@ -4935,23 +4935,28 @@ func dismissesModal(regions []modalMouseRegion, mouse tea.Mouse) bool {
 	return !inside
 }
 
-// modalTitleRow renders a dialog title with a close "x" at the right edge of
+func (m AppModel) modalCloseButton() string {
+	return closeButtonStyle.Render(m.icons.Glyph(icons.Close, "x"))
+}
+
+// modalTitleRow renders a dialog title with a close button at the right edge of
 // the dialog body, returning the row and the region that closes the dialog.
-func modalTitleRow(title string, width int) (string, modalMouseRegion) {
-	closeButton := closeButtonStyle.Render("x")
-	title = ansi.Truncate(title, max(0, width-1-lipgloss.Width(closeButton)), "…")
-	gap := max(1, width-lipgloss.Width(title)-lipgloss.Width(closeButton))
+func (m AppModel) modalTitleRow(title string, width int) (string, modalMouseRegion) {
+	closeButton := m.modalCloseButton()
+	closeWidth := lipgloss.Width(closeButton)
+	title = ansi.Truncate(title, max(0, width-1-closeWidth), "…")
+	gap := max(1, width-lipgloss.Width(title)-closeWidth)
 	region := modalMouseRegion{
-		rect:   mouseRect{left: width - 1, right: width, bottom: 1},
+		rect:   mouseRect{left: width - closeWidth, right: width, bottom: 1},
 		action: modalMouseAction{close: true, focus: -1}, // not a button focus index
 	}
 	return title + strings.Repeat(" ", gap) + closeButton, region
 }
 
-// modalTitle renders a dialog title row with a close "x" followed by a blank
+// modalTitle renders a dialog title row with a close button followed by a blank
 // line, as modalTitleStyle's bottom margin used to provide.
-func modalTitle(text string, width int) (string, modalMouseRegion) {
-	row, region := modalTitleRow(modalTitleStyle.MarginBottom(0).Render(text), width)
+func (m AppModel) modalTitle(text string, width int) (string, modalMouseRegion) {
+	row, region := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Render(text), width)
 	return row + "\n", region
 }
 
@@ -5054,7 +5059,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		if start != end {
 			titleText = fmt.Sprintf("Add Comment (lines %d-%d)", start, end)
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		contextContent := m.renderContextPreview(side, start, end, innerWidth-4, 0)
 		buttonSpecs := []modalButtonSpec{
 			{rendered: m.renderPrimaryModalButton(m.icons.Label(icons.Save, "Save"), "C-s", m.modalFocus == 1), action: modalMouseAction{focus: 1}},
@@ -5116,7 +5121,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 				}
 			}
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		path := contextBoxStyle.Width(innerWidth - 2).Render(context)
 		textareaView := m.clipboardTextareaView()
 		pathInput := m.pathInputType() != ""
@@ -5125,7 +5130,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		}
 		before := title + "\n" + path + "\n\n"
 		if pathInput {
-			title, closeRegion = modalTitleRow(modalTitleStyle.MarginBottom(0).Render(titleText), innerWidth)
+			title, closeRegion = m.modalTitleRow(modalTitleStyle.MarginBottom(0).Render(titleText), innerWidth)
 			before = title + "\n" + path + "\n"
 		}
 		prefix, textareaRegion := layoutModalTextarea(before, textareaView, innerWidth)
@@ -5152,14 +5157,15 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		} else if m.editingReplyID != "" {
 			titleText = "Edit Reply"
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		if m.hasModalResolution() {
 			comment, _ := m.driftedComment(m.editingID)
 			checkbox := renderResolution(comment.Resolved, "Resolved", false, false, m.icons) + " " + modalBtnNormalKey.Render("M-r")
 			checkboxWidth := lipgloss.Width(checkbox)
-			left := max(0, innerWidth-checkboxWidth-3)
+			closeButton := m.modalCloseButton()
+			left := max(0, innerWidth-checkboxWidth-2-lipgloss.Width(closeButton))
 			title = ansi.Truncate(modalTitleStyle.MarginBottom(0).Render(titleText), max(0, left-1), "…")
-			title = lipgloss.NewStyle().Width(left).Render(title) + checkbox + "  " + closeButtonStyle.Render("x") + "\n"
+			title = lipgloss.NewStyle().Width(left).Render(title) + checkbox + "  " + closeButton + "\n"
 			regions = append(regions, modalMouseRegion{
 				rect:   mouseRect{left: left, right: left + checkboxWidth, bottom: 1},
 				action: modalMouseAction{resolve: true},
@@ -5257,7 +5263,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		regions = append(regions, closeRegion)
 
 	case discardChangesModal:
-		title, closeRegion := modalTitle("Discard changes?", innerWidth)
+		title, closeRegion := m.modalTitle("Discard changes?", innerWidth)
 		info := "Your unsaved comment changes will be lost."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{
@@ -5273,7 +5279,7 @@ func (m AppModel) renderWithModalLayout(background string) (string, []modalMouse
 		if targets := m.modalDeleteTargets(); m.pendingDelete >= 0 && m.pendingDelete < len(targets) && targets[m.pendingDelete].replyID != "" {
 			titleText = "Delete reply?"
 		}
-		title, closeRegion := modalTitle(titleText, innerWidth)
+		title, closeRegion := m.modalTitle(titleText, innerWidth)
 		info := "This cannot be undone."
 		prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", innerWidth, "")
 		buttons, buttonRegions := layoutModalActions([]modalButtonSpec{

@@ -264,7 +264,7 @@ func (m *AppModel) confirmSourceEditor() tea.Cmd {
 
 func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 	if m.modal == gotoLineModal {
-		title, closeRegion := modalTitle("Go to line", width)
+		title, closeRegion := m.modalTitle("Go to line", width)
 		prefix := title + "\n"
 		text, _ := m.lineInput.view(max(1, width-lipgloss.Width(gotoLinePrompt)), strconv.Itoa(max(1, m.tab().cursorLine)))
 		content := prefix + gotoLinePrompt + text + "\n\n"
@@ -291,7 +291,7 @@ func (m AppModel) locationModalContent(width int) (string, []modalMouseRegion) {
 		caption, explanation = "Open in external application?", "This file cannot be displayed in Critty."
 		openIcon = icons.External
 	}
-	title, closeRegion := modalTitle(caption, width)
+	title, closeRegion := m.modalTitle(caption, width)
 	prefix := lipgloss.Wrap(title+"\n"+
 		target+"\n"+explanation+"\n\n", max(1, width), "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{

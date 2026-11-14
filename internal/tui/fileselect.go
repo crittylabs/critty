@@ -249,7 +249,7 @@ func renderFileRow(path string, positions []int, suffix string, selected bool) s
 
 func (m AppModel) fileSelectModalContent(width, maxRows int) (string, []modalMouseRegion) {
 	s := m.fileSelect
-	title, closeRegion := modalTitle("Open file", width)
+	title, closeRegion := m.modalTitle("Open file", width)
 	prefix := title + "\n"
 	text, _ := s.input.view(max(1, width-lipgloss.Width(fileSelectPrompt)), "file name")
 	content := prefix + fileSelectPrompt + text + "\n\n"

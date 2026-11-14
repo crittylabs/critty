@@ -389,7 +389,7 @@ func (m AppModel) finishNotices(width int) string {
 }
 
 func (m AppModel) finishModalContent(width int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Submit review"), width)
+	title, closeRegion := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Submit review"), width)
 	content := title + "\n"
 	choices, _ := m.finishChoices(width, 0)
 	var reference strings.Builder
@@ -655,7 +655,7 @@ func (m AppModel) finishFormsContent(width int) (string, []modalMouseRegion) {
 	if len(m.missingForms()) > 0 {
 		titleColor = progressColors.required
 	}
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(titleColor).Render("Unanswered form items"), width)
+	title, closeRegion := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(titleColor).Render("Unanswered form items"), width)
 	prefix := title + "\n"
 	if m.canSubmitWithForms() {
 		count := len(m.unviewedForms())
@@ -763,7 +763,7 @@ func (m *AppModel) handleFinishConfirmationMouse(mouse tea.Mouse) (tea.Model, te
 }
 
 func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Resolve all & approve?"), width)
+	title, closeRegion := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(success).Render("Resolve all & approve?"), width)
 	count := lipgloss.NewStyle().Foreground(lipgloss.Red).Render(fmt.Sprintf("%d unresolved thread(s)", m.unresolvedTotal()))
 	info := "Resolve all " + count + " before approving?"
 	prefix := lipgloss.Wrap(title+"\n"+info+"\n\n", width, "")
@@ -780,7 +780,7 @@ func (m AppModel) finishResolveContent(width int) (string, []modalMouseRegion) {
 }
 
 func (m AppModel) finishAbortContent(width int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(finishColor(review.VerdictReject)).Render("Abort review?"), width)
+	title, closeRegion := m.modalTitleRow(modalTitleStyle.MarginBottom(0).Foreground(finishColor(review.VerdictReject)).Render("Abort review?"), width)
 	prefix := lipgloss.Wrap(title+"\nExit without submitting?  Your comments and draft will be kept.\n\n", width, "")
 	buttons, regions := layoutModalActions([]modalButtonSpec{
 		{rendered: m.renderDangerModalButton(m.icons.Label(icons.Close, "Abort"), "y", m.modalFocus == 0), action: modalMouseAction{focus: 0}},

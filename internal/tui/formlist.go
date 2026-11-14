@@ -165,7 +165,7 @@ func (m *AppModel) handleFormListMouse(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 // formListModalContent shows headings between rows, keeping the selected
 // row visible within maxLines.
 func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMouseRegion) {
-	title, closeRegion := modalTitle("Answers", width)
+	title, closeRegion := m.modalTitle("Answers", width)
 	content := title + "\n"
 	filter, filterRegions := layoutModalButtonRow([]modalButtonSpec{{
 		rendered: renderResolution(m.formList.unansweredOnly, "Unanswered only", false, false, m.icons) + " " + modalBtnNormalKey.Render("u"),
