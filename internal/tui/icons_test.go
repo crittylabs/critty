@@ -16,6 +16,56 @@ import (
 	"github.com/crittylabs/critty/internal/review"
 )
 
+func TestNerdFontTabFrames(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		for _, width := range []int{45, 80, 110} {
+			t.Run(fmt.Sprintf("dark=%t/width=%d", dark, width), func(t *testing.T) {
+				initAdaptiveStyles(dark)
+				app := newFileTreeTestApp()
+				app.icons = icons.Nerd
+				app.width, app.height = width, 36
+				app.recalculateLayout()
+				app.rebuildContent()
+				app.updateCommentSidebar()
+				for y, row := range strings.Split(app.View().Content, "\n") {
+					if got := ansi.StringWidth(row); got != width {
+						t.Fatalf("row %d width = %d, want %d", y, got, width)
+					}
+				}
+				for _, item := range app.tabBarItems() {
+					app = clickMouse(app, item.left+item.width-1, app.headerHeight())
+					if app.activeTab != item.target {
+						t.Fatal("tab's right edge does not select its file")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestNerdFontTabDimming(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		initAdaptiveStyles(dark)
+		for _, style := range []lipgloss.Style{activeTabStyle, inactiveTabStyle} {
+			app := AppModel{icons: icons.Nerd}
+			tab := app.renderTabLabel(style, icons.Nerd.Label(icons.Comment, "Notes"))
+			runes, cells := renderedCells(dimRendered(tab, ansi.StringWidth(tab), 1))
+			if !sameColor(cells[0].Fg, cells[1].Bg) || !sameColor(cells[len(cells)-1].Fg, cells[1].Bg) {
+				t.Fatalf("dark=%t: tab edges do not match the dimmed background", dark)
+			}
+			for i, r := range runes {
+				if r == 'N' && !sameColor(cells[1].Fg, cells[i].Fg) {
+					t.Fatalf("dark=%t: icon and label have different dimmed colors", dark)
+				}
+			}
+		}
+	}
+}
+
 func TestNerdFontCopyAndFinishTargets(t *testing.T) {
 	app := setupPrivateAppWithDoc(t, "`word`\n")
 	app.icons = icons.Nerd

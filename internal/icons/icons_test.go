@@ -9,8 +9,12 @@ import (
 func TestNerdGlyphWidth(t *testing.T) {
 	for kind := range glyphs {
 		glyph := Nerd.Glyph(Kind(kind), "fallback")
-		if width := ansi.StringWidth(glyph); width != 2 {
-			t.Errorf("icon %d reserves %d cells, want 2", kind, width)
+		want := 2
+		if Kind(kind) == Close || Kind(kind) == TabLeft || Kind(kind) == TabRight {
+			want = 1
+		}
+		if width := ansi.StringWidth(glyph); width != want {
+			t.Errorf("icon %d reserves %d cells, want %d", kind, width, want)
 		}
 	}
 }

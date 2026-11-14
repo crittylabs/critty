@@ -36,7 +36,7 @@ func TestSingleFileViewSidebar(t *testing.T) {
 			}
 			tabs := app.sidebarTabs()
 			if tc.outline {
-				if len(tabs) != 1 || !strings.HasSuffix(strings.TrimSpace(ansi.Strip(tabs[0])), "Outline") || app.outline.viewport.Height() != app.commentViewport.Height() {
+				if len(tabs) != 1 || !strings.Contains(ansi.Strip(tabs[0]), "Outline") || app.outline.viewport.Height() != app.commentViewport.Height() {
 					t.Fatalf("outline does not fill its only sidebar tab: %v", tabs)
 				}
 			} else {

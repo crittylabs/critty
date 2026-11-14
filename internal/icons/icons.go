@@ -70,6 +70,8 @@ const (
 	RadioChecked
 	Mixed
 	Check
+	TabLeft
+	TabRight
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -89,15 +91,24 @@ var glyphs = [...]string{
 	Copy: "\uebcc", Edit: "\uea73", Back: "\uea9b", Forward: "\uea9c", Close: "\uea76",
 	Send: "\uec0f", Save: "\ueb4b", External: "\ueb14", GoTo: "\uea94", Delete: "\uea81", Suggest: "\uea61",
 	RadioUnchecked: "\U000f0130", RadioChecked: "\U000f043e", Mixed: "\U000f0856", Check: "\ueab2",
+	TabLeft: "\ue0b2", TabRight: "\ue0b0",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.
-// Portable fallbacks retain their original width.
+// Close buttons, Powerline tab edges, and portable fallbacks keep their width.
 func (s Set) Glyph(kind Kind, fallback string) string {
 	if !s || int(kind) >= len(glyphs) {
 		return fallback
 	}
+	if kind == Close || kind == TabLeft || kind == TabRight {
+		return glyphs[kind]
+	}
 	return glyphs[kind] + " "
+}
+
+// IsTabEdge identifies shapes painted with a tab's background color.
+func IsTabEdge(glyph string) bool {
+	return glyph == glyphs[TabLeft] || glyph == glyphs[TabRight]
 }
 
 func (s Set) Label(kind Kind, label string) string {

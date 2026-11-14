@@ -3360,7 +3360,7 @@ func (m *AppModel) renderTabWithin(labels []tabLabel, i, width int, fill bool) s
 			}
 		}
 	}
-	return inlineBackground(style, style.Render(label))
+	return m.renderTabLabel(style, label)
 }
 
 func (m *AppModel) renderTabOverflowIndicator(text string) string {
@@ -3379,7 +3379,7 @@ func (m *AppModel) renderTabOverflowWidth(text string, width int, backwards bool
 		}
 		text = ansi.Truncate(text, max(1, width-style.GetHorizontalFrameSize()), "…")
 	}
-	return inlineBackground(style, style.Render(text))
+	return m.renderTabLabel(style, text)
 }
 
 func (m *AppModel) tabOverflowText(count int, backwards bool) string {
@@ -4132,7 +4132,7 @@ func (m AppModel) sidebarTabs() []string {
 		if sidebarView(i) == m.sidebarView {
 			style = activeTabStyle
 		}
-		tabs[i] = inlineBackground(style, style.Render(label))
+		tabs[i] = m.renderTabLabel(style, label)
 	}
 	return tabs
 }
@@ -5427,6 +5427,9 @@ func dimRendered(s string, w, h int) string {
 				continue
 			}
 			cell.Style.Fg = dim
+			if icons.IsTabEdge(cell.Content) {
+				cell.Style.Fg = dimBg
+			}
 			if cell.Style.Bg != nil {
 				cell.Style.Bg = dimBg
 			}

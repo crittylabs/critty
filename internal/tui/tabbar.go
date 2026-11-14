@@ -5,7 +5,24 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/crittylabs/critty/internal/icons"
 )
+
+func (m AppModel) renderTabLabel(style lipgloss.Style, label string) string {
+	width := style.GetWidth()
+	if !m.icons || width > 0 && width < 3 {
+		return inlineBackground(style, style.Render(label))
+	}
+	body := style.Padding(0)
+	if width > 0 {
+		body = body.Width(width - 2)
+	}
+	edge := lipgloss.NewStyle().Foreground(style.GetBackground())
+	return edge.Render(m.icons.Glyph(icons.TabLeft, "")) +
+		inlineBackground(body, body.Render(label)) +
+		edge.Render(m.icons.Glyph(icons.TabRight, ""))
+}
 
 type tabBarItem struct {
 	text        string
