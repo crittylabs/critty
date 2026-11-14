@@ -78,6 +78,17 @@ const (
 	Check
 	TabLeft
 	TabRight
+	Info
+	Flame
+	Question
+	Error
+	Bug
+	List
+	Quote
+	Clipboard
+	Report
+	Bolt
+	Stop
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -98,6 +109,9 @@ var glyphs = [...]string{
 	Send: "\uec0f", Save: "\ueb4b", External: "\ueb14", GoTo: "\uea94", Delete: "\uea81", Suggest: "\uea61",
 	RadioUnchecked: "\U000f0130", RadioChecked: "\U000f043e", Mixed: "\U000f0856", Check: "\ueab2",
 	TabLeft: "\ue0b2", TabRight: "\ue0b0",
+	Info: "\uea74", Flame: "\ueaf2", Question: "\ueb32", Error: "\uea87",
+	Bug: "\ueaaf", List: "\ueb17", Quote: "\ueb33", Clipboard: "\ueac0",
+	Report: "\uf50a", Bolt: "\U000f140b", Stop: "\uf46e",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.

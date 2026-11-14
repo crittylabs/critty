@@ -68,9 +68,10 @@ var (
 	// textPrimary and textSecondary are the foregrounds of emphasized and
 	// regular text on the terminal background.  initAdaptiveStyles swaps
 	// them for dark colors on a light background.
-	textPrimary      color.Color = lipgloss.BrightWhite
-	textSecondary    color.Color = muted
-	buttonBackground color.Color = lipgloss.Color("#3a3a3a")
+	textPrimary        color.Color = lipgloss.BrightWhite
+	textSecondary      color.Color = muted
+	buttonBackground   color.Color = lipgloss.Color("#3a3a3a")
+	terminalBackground color.Color = lipgloss.Color("#10141c")
 
 	// terminalIsDark records the background probe's answer for inputs that
 	// are created later and pick their default styles from it.
@@ -411,6 +412,7 @@ var (
 func initAdaptiveStyles(hasDarkBG bool) {
 	ld := lipgloss.LightDark(hasDarkBG)
 	terminalIsDark = hasDarkBG
+	terminalBackground = ld(lipgloss.Color("#FFFFFF"), lipgloss.Color("#10141c"))
 	markdownPaletteRevision++
 	textPrimary = ld(lipgloss.Black, lipgloss.BrightWhite)
 	textSecondary = ld(lipgloss.BrightBlack, muted)

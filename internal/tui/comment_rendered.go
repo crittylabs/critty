@@ -40,7 +40,7 @@ func (m *AppModel) parsedComment(body string, lexer chroma.Lexer) *commentRender
 	}
 	cached := m.renderedBodies[key]
 	if cached == nil {
-		cached = &commentRenderedBody{source: parseMarkdownWithSyntax(strings.Split(body, "\n"), nil, m.syntax, lexer)}
+		cached = &commentRenderedBody{source: parseMarkdownWithSyntax(strings.Split(body, "\n"), nil, m.syntax, m.icons, lexer)}
 		if strings.Contains(body, "$") || strings.Contains(body, "mermaid") {
 			cached.refs = m.renderedRefs(body)
 		}

@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	markdownBlockParser  = parser.New(parser.WithExtensions(extension.TableParser))
+	markdownBlockParser  = parser.New(parser.WithExtensions(extension.TableParser), parser.WithBlockParsers(util.Prioritized[parser.BlockParser](calloutQuoteParser{parser.NewBlockquoteParser()}, 799)))
 	markdownInlineParser = paragraphParser()
 )
 
@@ -48,6 +48,9 @@ const (
 	markdownKeyboard
 	markdownFenceLanguage
 	markdownFenceAttribute
+	markdownCalloutTitle
+	markdownCalloutBar
+	markdownAtomic
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -60,6 +63,7 @@ type markdownToken struct {
 	sourceEnd  int
 	syntax     chroma.TokenType
 	decoration markdownDecoration
+	callout    calloutKind
 }
 
 type markdownLine struct {
@@ -127,14 +131,15 @@ type markdownSource struct {
 	headingAnchors  map[string]int
 	suggestionLexer chroma.Lexer
 	syntax          *syntax.Rules
+	symbols         icons.Set
 }
 
 func parseMarkdownSource(lines []string, known map[int]bool, suggestion ...chroma.Lexer) *markdownSource {
-	return parseMarkdownWithSyntax(lines, known, nil, suggestion...)
+	return parseMarkdownWithSyntax(lines, known, nil, icons.Plain, suggestion...)
 }
 
-func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.Rules, suggestion ...chroma.Lexer) *markdownSource {
-	result := &markdownSource{syntax: rules, lines: make([]markdownLine, len(lines)), source: strings.Join(lines, "\n"), offsets: make([]int, len(lines))}
+func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.Rules, symbols icons.Set, suggestion ...chroma.Lexer) *markdownSource {
+	result := &markdownSource{syntax: rules, symbols: symbols, lines: make([]markdownLine, len(lines)), source: strings.Join(lines, "\n"), offsets: make([]int, len(lines))}
 	if len(suggestion) > 0 {
 		result.suggestionLexer = suggestion[0]
 	}
@@ -178,7 +183,8 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		}
 	}
 	data := []byte(source.String())
-	root := markdownBlockParser.Parse(data)
+	context := parser.NewContext()
+	root := markdownBlockParser.Parse(data, parser.WithContext(context))
 	edits := make([][]markdownEdit, len(offsets))
 	lineAt := func(offset int) int {
 		return max(0, sort.Search(len(offsets), func(i int) bool { return offsets[i] > offset })-1)
@@ -257,6 +263,7 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		line.tokens = append(line.tokens, markdownToken{start: pos, end: len(line.source), text: line.source[pos:]})
 		line.literal = false
 	}
+	m.applyCallouts(root, data, context, start, offsets, incomplete)
 }
 
 // Heading anchors retain Unicode text and use numbered suffixes for duplicates.
@@ -499,6 +506,9 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			continue
 		}
 		style := lipgloss.NewStyle()
+		if token.style&markdownCalloutTitle != 0 {
+			style = style.Background(calloutTitleBackground(token.callout)).Bold(true)
+		}
 		if token.syntax != 0 {
 			entry := codeHighlightStyle().Get(token.syntax)
 			if entry.Colour.IsSet() {
@@ -521,6 +531,9 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		if token.style&markdownItalic != 0 {
 			style = mdItalicStyle.Inherit(style)
 		}
+		if token.callout != 0 {
+			style = style.Foreground(calloutColor(token.callout))
+		}
 		if token.style&markdownLink != 0 {
 			style = mdLinkStyle.Inherit(style)
 		}
@@ -530,7 +543,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		if token.style&markdownKeyboard != 0 {
 			style = keyboardStyle().Inherit(style)
 		}
-		if foreground != nil && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter|markdownFenceLanguage|markdownFenceAttribute) == 0 {
+		if foreground != nil && token.callout == 0 && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter|markdownFenceLanguage|markdownFenceAttribute) == 0 {
 			style = style.Foreground(foreground)
 		}
 		uri := token.uri
@@ -547,6 +560,20 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		}
 		if len(inline) == 0 || token.decoration != noDecoration {
 			write(token.text, base)
+			continue
+		}
+		if token.style&markdownAtomic != 0 {
+			background := base
+			offset := 0
+			for _, segment := range inline {
+				end := offset + len(segment.Content)
+				if segment.Changed && offset < token.end && end > token.start {
+					background = changed
+					break
+				}
+				offset = end
+			}
+			write(token.text, background)
 			continue
 		}
 		for segmentIndex < len(inline) && segmentStart+len(inline[segmentIndex].Content) <= token.start {
@@ -678,7 +705,7 @@ func (t *FileTab) ensureMarkdownCache() {
 	if t.doc == nil || !t.isMarkdown || t.markdown != nil && t.markdown.doc == t.doc && t.markdown.diff == t.diff && t.markdown.content == t.doc.Content && t.markdown.partial == (t.doc.Known != nil) {
 		return
 	}
-	cache := &markdownCache{doc: t.doc, diff: t.diff, content: t.doc.Content, partial: t.doc.Known != nil, after: parseMarkdownWithSyntax(t.doc.Lines, t.doc.Known, t.syntax)}
+	cache := &markdownCache{doc: t.doc, diff: t.diff, content: t.doc.Content, partial: t.doc.Known != nil, after: parseMarkdownWithSyntax(t.doc.Lines, t.doc.Known, t.syntax, t.symbols)}
 	if t.diff != nil {
 		oldLines := make(map[int]string)
 		old := 1
@@ -711,7 +738,7 @@ func (t *FileTab) ensureMarkdownCache() {
 				known[n] = true
 			}
 		}
-		cache.before = parseMarkdownWithSyntax(lines, known, t.syntax)
+		cache.before = parseMarkdownWithSyntax(lines, known, t.syntax, t.symbols)
 	}
 	t.markdown = cache
 }
@@ -733,7 +760,7 @@ func (t *FileTab) markdownDisplayLine(line int, before bool, fallback string, in
 		return source.lines[line-1].render(inline, base, changed, images)
 	}
 	// Standalone deleted lines and test fixtures may have no document cache.
-	source = parseMarkdownWithSyntax([]string{fallback}, nil, t.syntax)
+	source = parseMarkdownWithSyntax([]string{fallback}, nil, t.syntax, t.symbols)
 	return source.lines[0].render(inline, base, changed, images)
 }
 

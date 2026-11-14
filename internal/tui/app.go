@@ -366,6 +366,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 
 	tab := FileTab{
 		syntax:     cfg.Syntax,
+		symbols:    icons.Set(cfg.NerdFonts),
 		path:       filePath,
 		cursorLine: 1,
 		isBinary:   imagePath(filePath) && !imageinfo.SVGPath(filePath),
@@ -437,6 +438,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		}
 		ft := newFileTab(f.Path, diff)
 		ft.syntax = cfg.Syntax
+		ft.symbols = icons.Set(cfg.NerdFonts)
 		ft.oldPath = f.OldPath
 		ft.textconv = f.Textconv
 		ft.loadErr = diffErr
@@ -464,6 +466,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			if !present[path] && (len(file.Comments) > 0 || len(files) == 0 && hasSnapshot && !snapshot.Partial) {
 				tab := newFileTab(path, nil)
 				tab.syntax = cfg.Syntax
+				tab.symbols = icons.Set(cfg.NerdFonts)
 				tab.outsideChanges = true
 				if hasSnapshot && !snapshot.Partial {
 					tab.doc = document.FromContent(path, []byte(snapshot.Content))
@@ -529,6 +532,7 @@ func (m *AppModel) addDocuments(docs []review.AttachedDocument) {
 		}
 		tab := newFileTab(d.Path(), nil)
 		tab.syntax = m.syntax
+		tab.symbols = m.icons
 		m.attachments[d.Path()] = d
 		tab.attachment = &d
 		tab.isBinary = d.Image != ""
@@ -809,6 +813,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		recolor := msg.IsDark() != terminalIsDark
 		var clearMath strings.Builder
 		initAdaptiveStyles(msg.IsDark())
+		terminalBackground = msg.Color
 		if recolor {
 			for key, side := range m.commentImages {
 				if key.renderBody == "" {

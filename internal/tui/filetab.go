@@ -79,6 +79,7 @@ type FileTab struct {
 	highlighted       bool // language detection and highlight caches are current
 	lexer             chroma.Lexer
 	syntax            *syntax.Rules
+	symbols           icons.Set
 	outlineMask       *outlineMask // masked source from the highlight pass, nil when unavailable
 	chromaLines       []string     // display-ready syntax-highlighted lines (nil for markdown)
 	plainLines        []string     // display text without styling, parallel to chromaLines

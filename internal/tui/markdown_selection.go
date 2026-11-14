@@ -190,7 +190,7 @@ func (line *markdownLine) sourceOffset(offset int, end bool) int {
 			if token.decoration != noDecoration {
 				return token.start
 			}
-			if token.style&markdownRendered != 0 {
+			if token.style&(markdownRendered|markdownAtomic) != 0 {
 				if end {
 					return token.end
 				}
