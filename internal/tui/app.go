@@ -283,32 +283,36 @@ func (r *commentHeaderRegion) translate(x, y int) {
 }
 
 type renderedScreenLayout struct {
-	watchIndicator       mouseRect
-	hasWatchIndicator    bool
-	copyTextButton       mouseRect
-	hasCopyTextButton    bool
-	whitespaceButton     mouseRect
-	hasWhitespaceButton  bool
-	splitButton          mouseRect
-	hasSplitButton       bool
-	finishButton         mouseRect
-	hasFinishButton      bool
-	backButton           mouseRect
-	hasBackButton        bool
-	forwardButton        mouseRect
-	hasForwardButton     bool
-	footerHelp           mouseRect
-	hasFooterHelp        bool
-	formListButton       mouseRect
-	hasFormListButton    bool
-	imagesButton         mouseRect
-	hasImagesButton      bool
-	lineNumbersButton    mouseRect
-	hasLineNumbersButton bool
-	modalRegions         []modalMouseRegion
-	isearchCursor        *tea.Cursor
-	isearchRegions       []isearchMouseRegion
-	progressRegions      []progressRegion
+	watchIndicator         mouseRect
+	hasWatchIndicator      bool
+	copyTextButton         mouseRect
+	hasCopyTextButton      bool
+	whitespaceButton       mouseRect
+	hasWhitespaceButton    bool
+	splitButton            mouseRect
+	hasSplitButton         bool
+	finishButton           mouseRect
+	hasFinishButton        bool
+	backButton             mouseRect
+	hasBackButton          bool
+	forwardButton          mouseRect
+	hasForwardButton       bool
+	footerHelp             mouseRect
+	hasFooterHelp          bool
+	formListButton         mouseRect
+	hasFormListButton      bool
+	imagesButton           mouseRect
+	hasImagesButton        bool
+	lineNumbersButton      mouseRect
+	hasLineNumbersButton   bool
+	copyContentButton      mouseRect
+	hasCopyContentButton   bool
+	copyReferenceButton    mouseRect
+	hasCopyReferenceButton bool
+	modalRegions           []modalMouseRegion
+	isearchCursor          *tea.Cursor
+	isearchRegions         []isearchMouseRegion
+	progressRegions        []progressRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -1206,12 +1210,11 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.focusOutline()
 		return m, nil
 	}
+	if msg.String() == "@" {
+		return m, m.copyReference()
+	}
 	if msg.String() == "alt+w" {
-		if m.focused == contentPane && m.hasTextSelection() {
-			return m, m.copySelectedText()
-		}
-		cmd := m.copyReference()
-		return m, cmd
+		return m, m.copyFocusedContent()
 	}
 	if (msg.String() == "o" || msg.String() == "alt+o") && !t.selecting {
 		return m, m.openReferenceAtCursor()
@@ -3258,6 +3261,8 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
 	layout.lineNumbersButton, layout.hasLineNumbersButton = buttonRect(footer, footerTop, m.lineNumbersButton())
+	layout.copyContentButton, layout.hasCopyContentButton = buttonRect(footer, footerTop, m.copyContentButton())
+	layout.copyReferenceButton, layout.hasCopyReferenceButton = buttonRect(footer, footerTop, m.copyReferenceButton())
 	if button := m.formListButton(); button != "" {
 		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
 	}
@@ -3581,6 +3586,12 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if imageLayout.hasFormListButton && imageLayout.formListButton.contains(mouse) {
 		m.openFormList()
 		return m, nil
+	}
+	if imageLayout.hasCopyContentButton && imageLayout.copyContentButton.contains(mouse) {
+		return m, m.copyFocusedContent()
+	}
+	if imageLayout.hasCopyReferenceButton && imageLayout.copyReferenceButton.contains(mouse) {
+		return m, m.copyReference()
 	}
 	if imageLayout.hasLineNumbersButton && imageLayout.lineNumbersButton.contains(mouse) {
 		m.toggleLineNumbers()
@@ -4472,9 +4483,9 @@ func (m AppModel) renderFooterHints() string {
 	var items []string
 	if m.readOnly {
 		if t.selecting {
-			items = []string{k("esc", "cancel"), k("v", "toggle select"), k("M-w", "copy reference")}
+			items = []string{k("esc", "cancel"), k("v", "toggle select")}
 		} else {
-			items = []string{k("o/M-o", "follow link"), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close")}
+			items = []string{k("o/M-o", "follow link"), k("v", "select lines"), k("q", "close")}
 			if !m.singleFileView() {
 				items = append([]string{k("s", "sidebar"), k("t", "files/comments")}, items...)
 			} else if len(m.outline.rows) > 0 {
@@ -4530,10 +4541,12 @@ func (m AppModel) renderFooterHints() string {
 		}
 		items = append([]string{k("space", action)}, items...)
 	}
+	controls := []string{m.footerHelpButton(), m.imagesButton(), m.lineNumbersButton()}
 	if button := m.formListButton(); !m.readOnly && button != "" {
-		items = append([]string{button}, items...)
+		controls = append(controls, button)
 	}
-	items = append([]string{m.footerHelpButton(), m.imagesButton(), m.lineNumbersButton()}, items...)
+	controls = append(controls, m.copyContentButton(), m.copyReferenceButton())
+	items = append(controls, items...)
 	if !t.selecting {
 		items = append(items, m.outlineHint())
 	}
@@ -4662,7 +4675,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "M-←/M-→ · M-b/M-f · Back/Forward", desc: "restore previous/next document and reading position (up to 64 visits)"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
-			{keys: "M-w", desc: "copy selected text or reference"},
+			{keys: "M-w", desc: "copy selected text, current line, or selected lines"},
+			{keys: "@", desc: "copy file/line reference"},
 			{keys: "#", desc: "toggle line numbers (all files)"},
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
@@ -4720,7 +4734,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
 		{keys: "/ ?", desc: "search text"},
 		{keys: "M-e/g", desc: "editor/line"},
-		{keys: "M-w", desc: "copy text/ref"},
+		{keys: "M-w", desc: "copy selected text, lines, or thread"},
+		{keys: "@", desc: "copy file/line reference or comment ID"},
 		{keys: "M-p", desc: "open file"},
 		{keys: "S · ←/→", desc: "split diff · diff side"},
 		{keys: "↑/↓", desc: "⇅ choose file"},

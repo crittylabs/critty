@@ -155,7 +155,7 @@ func TestCopyReferenceAndYank(t *testing.T) {
 	app := setupAppWithDoc(t, "one\ntwo\n")
 	app.tab().path = "dir/日本 file\\(x).go"
 	app.tab().cursorLine = 2
-	editorMeta(&app, 'w')
+	app = pressKey(app, '@')
 	want := `@dir/日本\ file\\\(x\).go L2`
 	if len(app.killRing.entries) != 1 || app.killRing.entries[0] != want {
 		t.Fatalf("ring = %#v, want %q", app.killRing.entries, want)
@@ -163,8 +163,8 @@ func TestCopyReferenceAndYank(t *testing.T) {
 	app.tab().state.Comments = []review.Comment{{ID: "c_abcdef", Scope: "file", Body: "thread"}}
 	app.focused = commentPane
 	app.updateCommentSidebar()
-	editorMeta(&app, 'w')
-	editorMeta(&app, 'w')
+	app = pressKey(app, '@')
+	app = pressKey(app, '@')
 	if len(app.killRing.entries) != 3 || app.killRing.entries[0] != "c_abcdef" || app.killRing.entries[1] != "c_abcdef" {
 		t.Fatalf("copies should be separate entries: %#v", app.killRing.entries)
 	}
@@ -194,7 +194,7 @@ func TestCopySourceReferenceWithoutNewSideLine(t *testing.T) {
 		if old {
 			app.tab().cursorLine, app.tab().cursorSide = 1, "old"
 		}
-		editorMeta(&app, 'w')
+		app = pressKey(app, '@')
 		if app.killRing.entries[0] != "@file.go" {
 			t.Fatalf("invalid new-side line copied: %q", app.killRing.entries[0])
 		}
@@ -221,7 +221,7 @@ func TestCommentReferenceNavigation(t *testing.T) {
 			if app.activeTab != 1 || app.viewMode || app.selectedCommentID() != "c_abcdef" || !app.tab().state.Comments[0].Resolved {
 				t.Fatal("reference did not focus the resolved target")
 			}
-			editorMeta(&app, 'w')
+			app = pressKey(app, '@')
 			if app.killRing.entries[0] != "c_abcdef" {
 				t.Fatal("focused inline thread did not copy its ID")
 			}

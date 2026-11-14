@@ -212,7 +212,7 @@ Drag across text in a document or diff, then press `M-w` or click **Copy text**.
 
 Input fields select the same way: drag in the comment editor or a single-line input, copy with `M-w` or **Copy text**, paste the clipboard with `C-v`, and press `C-z` to undo the last deletion, overwrite, or paste.
 
-Without a text selection, `M-w` copies a file reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, `M-o` follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
+Without a text selection, `M-w` copies the current source line or selected line range.  On a comment it copies the body; on a thread it copies the parent and all replies with author names, retaining the original Markdown.  Press `@` to copy a file/line reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, `M-o` follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
 
 Search covers all review files by default.  Use the **Files** button or `M-s m` during search to restrict it to the current file.  Selecting lines keeps search in that file.  Regular expressions support backreferences and lookaround.  Press `M-e` to edit a long query in place, and `M-p` / `M-n` to recall earlier queries; Critty remembers them per repository, with their regexp, word, and case settings, across its worktrees.
 

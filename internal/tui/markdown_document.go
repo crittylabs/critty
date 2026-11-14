@@ -730,25 +730,10 @@ func (t *FileTab) ensureMarkdownCache() {
 	}
 	cache := &markdownCache{doc: t.doc, diff: t.diff, content: t.doc.Content, partial: t.doc.Known != nil, after: parseMarkdownWithSyntax(t.doc.Lines, t.doc.Known, t.syntax, t.symbols)}
 	if t.diff != nil {
-		oldLines := make(map[int]string)
-		old := 1
+		oldLines := t.beforeSourceLines()
 		last := 0
-		for n := 0; n <= t.doc.LineCount(); n++ {
-			for _, del := range t.diff.DeletedAfter[n] {
-				oldLines[del.OldLineNum] = del.Content
-				old = del.OldLineNum + 1
-				last = max(last, del.OldLineNum)
-			}
-			next := n + 1
-			if !t.doc.HasLine(next) || t.diff.ChangedLines[next] {
-				continue
-			}
-			if mapped := t.diff.CommonLines[next]; mapped > 0 {
-				old = mapped
-			}
-			oldLines[old] = t.doc.Lines[n]
-			last = max(last, old)
-			old++
+		for n := range oldLines {
+			last = max(last, n)
 		}
 		lines := make([]string, last)
 		var known map[int]bool

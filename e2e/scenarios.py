@@ -745,9 +745,33 @@ def scenarios() -> None:
             ),
             "partial link source saved as comment",
         )
+        copying.click("Before")
+        copying.keys("M-w")
+        copying.wait_screen("Copied text", "current source line copied")
+        copying.keys("Enter")
+        copying.wait_screen("Add Comment (line 1)", "comment editor for the current line")
+        copying.keys("C-y", "C-s")
+        wait_until(
+            lambda: any(c["body"] == "Before `sample` after." for c in copying.comments()),
+            "whole source line saved without display padding",
+        )
+        copying.click("Link:")
+        copying.keys("@")
+        copying.wait_screen("Copied reference", "reference copied with @")
+        copying.keys("f")
+        copying.wait_screen("Add Reply", "reply editor for the reference")
+        copying.keys("C-y", "C-s")
+        wait_until(
+            lambda: any(
+                r["body"].endswith("copy-text.md L2")
+                for c in copying.comments()
+                for r in c.get("replies", [])
+            ),
+            "file and line reference pasted from the kill ring",
+        )
         copying.finish(False)
         report(
-            "dragging code and partial links copies Markdown source, retaining delimiters and link targets"
+            "M-w copies source selections and current lines; @ copies references; editors retain copy and yank"
         )
         paragraph_source = "**日本語 é first\nsecond**\n\n`code\ncontinued`\n"
         (WORK / "paragraph.md").write_text(paragraph_source)

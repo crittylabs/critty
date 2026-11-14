@@ -422,3 +422,37 @@ func (t *FileTab) changeSummary(compact bool, symbols icons.Set) string {
 	}
 	return tabCountDelimiter.Render("(") + text + tabCountDelimiter.Render(")")
 }
+
+// beforeSourceLines reconstructs only known original text, independent of
+// whitespace filtering and split/unified display order.
+func (t *FileTab) beforeSourceLines() map[int]string {
+	lines := make(map[int]string)
+	if t.doc == nil {
+		return lines
+	}
+	if t.diff == nil {
+		for _, deleted := range t.deletedAfter {
+			for _, line := range deleted {
+				lines[line.OldLineNum] = line.Content
+			}
+		}
+		return lines
+	}
+	old := 1
+	for n := 0; n <= t.doc.LineCount(); n++ {
+		for _, del := range t.diff.DeletedAfter[n] {
+			lines[del.OldLineNum] = del.Content
+			old = del.OldLineNum + 1
+		}
+		next := n + 1
+		if !t.doc.HasLine(next) || t.diff.ChangedLines[next] {
+			continue
+		}
+		if mapped := t.diff.CommonLines[next]; mapped > 0 {
+			old = mapped
+		}
+		lines[old] = t.doc.Lines[n]
+		old++
+	}
+	return lines
+}

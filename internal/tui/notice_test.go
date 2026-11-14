@@ -25,8 +25,8 @@ func TestCopyNoticeExpires(t *testing.T) {
 			app := setupAppWithDoc(t, "one\ntwo\n")
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 80, Height: tc.height})
 			footer, viewport := app.renderFooter(), app.contentViewport.Height()
-			app, cmd := updateApp(app, tea.KeyPressMsg{Code: 'w', Mod: tea.ModAlt})
-			if cmd == nil || !strings.Contains(ansi.Strip(app.renderFooter()), "Copied to kill ring:") || !hasForeground(app.renderFooter(), footerNoticeStyle.GetForeground(), "Copied") {
+			app, cmd := updateApp(app, tea.KeyPressMsg{Code: '@'})
+			if cmd == nil || !strings.Contains(ansi.Strip(app.renderFooter()), "Copied reference") || !hasForeground(app.renderFooter(), footerNoticeStyle.GetForeground(), "Copied") {
 				t.Fatal("copy did not show a styled timed notice")
 			}
 			app = pressKey(app, tea.KeyDown)

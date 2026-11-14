@@ -35,10 +35,7 @@ func (m *AppModel) copyReference() tea.Cmd {
 			text += " L" + strconv.Itoa(t.cursorLine)
 		}
 	}
-	m.killRing.interrupt()
-	m.killRing.add(text, false)
-	m.killRing.interrupt()
-	return m.flashNotice("Copied to kill ring: " + text)
+	return tea.Batch(m.copyText(text), m.flashNotice("Copied reference to kill ring and system clipboard: "+text))
 }
 
 func (m *AppModel) commentReferenceTab(id string) (int, bool) {
