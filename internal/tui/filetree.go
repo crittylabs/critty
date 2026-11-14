@@ -281,13 +281,13 @@ func (m *AppModel) treeRowText(i int, indicators []string) string {
 		if row.collapsed {
 			kind = icons.FolderClosed
 		}
-		icon = "  " + m.renderFileTypeIcon(kind, style) + " "
+		icon = "  " + m.renderFileTypeIcon(kind, style)
 	}
 	if !row.isDir {
 		icon = style.Render(m.tabs[row.tabIndex].unreadMarker())
 		if m.icons {
 			tab := &m.tabs[row.tabIndex]
-			icon += m.renderFileTypeIcon(fileIcon(tab.displayPath(), tab.isBinary), style) + " "
+			icon += m.renderFileTypeIcon(fileIcon(tab.displayPath(), tab.isBinary), style)
 		}
 	}
 	text := strings.Repeat(" ", row.depth*treeIndent) + icon + style.Render(label)

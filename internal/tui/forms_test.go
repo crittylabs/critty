@@ -519,7 +519,11 @@ func TestSelectAllForm(t *testing.T) {
 			line := func() string {
 				return ansi.Strip(strings.Split(app.contentViewport.GetContent(), "\n")[0])
 			}
-			if !strings.Contains(line(), symbols.Glyph(icons.Unchecked, "☐")+"  All Check all (0/2) 1 consent") {
+			gap := "  "
+			if symbols {
+				gap = ""
+			}
+			if !strings.Contains(line(), symbols.Glyph(icons.Unchecked, "☐")+gap+"All Check all (0/2) 1 consent") {
 				t.Fatalf("initial display: %q", line())
 			}
 			if len(app.formReviewItems()) != 2 {
@@ -527,19 +531,19 @@ func TestSelectAllForm(t *testing.T) {
 			}
 			app.toggleForm(1)
 			d := app.forms.Document(app.tab().path)
-			if !strings.Contains(line(), symbols.Glyph(icons.Checked, "✓")+"  All Check all (2/2)") || d.Answers["errors"].Via != "all" || !d.Answers["errors"].Human {
+			if !strings.Contains(line(), symbols.Glyph(icons.Checked, "✓")+gap+"All Check all (2/2)") || d.Answers["errors"].Via != "all" || !d.Answers["errors"].Human {
 				t.Fatalf("select all: %q %+v", line(), d.Answers)
 			}
 			if !app.tab().cursorOnForm || app.tab().cursorLine != 1 {
 				t.Fatal("focus left the select-all item")
 			}
 			app.toggleForm(2)
-			if !strings.Contains(line(), symbols.Glyph(icons.Mixed, "⊟")+"  All Mixed Check all (1/2)") || d.Answers["auth"].Via != "" {
+			if !strings.Contains(line(), symbols.Glyph(icons.Mixed, "⊟")+gap+"All Mixed Check all (1/2)") || d.Answers["auth"].Via != "" {
 				t.Fatalf("mixed: %q %+v", line(), d.Answers)
 			}
 			app.toggleForm(1)
 			app.toggleForm(1)
-			if !strings.Contains(line(), symbols.Glyph(icons.Unchecked, "☐")+"  All Check all (0/2)") {
+			if !strings.Contains(line(), symbols.Glyph(icons.Unchecked, "☐")+gap+"All Check all (0/2)") {
 				t.Fatalf("clear all: %q", line())
 			}
 			saved, err := app.session.LoadForms()
@@ -620,7 +624,7 @@ func TestFormListModal(t *testing.T) {
 			if app.modal != formListModal {
 				t.Fatal("F did not open the answer list")
 			}
-			for _, want := range []string{"Q1. Retry?", symbols.Glyph(icons.Check, "✓") + " retry · Manual", "Q2. Why?", symbols.Glyph(icons.Warning, "!") + " Reason", symbols.Glyph(icons.RadioUnchecked, "○") + " Publish", "1 of 3 answered"} {
+			for _, want := range []string{"Q1. Retry?", symbols.Join(symbols.Glyph(icons.Check, "✓"), "retry · Manual"), "Q2. Why?", symbols.Join(symbols.Glyph(icons.Warning, "!"), "Reason"), symbols.Join(symbols.Glyph(icons.RadioUnchecked, "○"), "Publish"), "1 of 3 answered"} {
 				if !strings.Contains(view(), want) {
 					t.Fatalf("missing %q in %q", want, view())
 				}

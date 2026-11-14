@@ -29,3 +29,19 @@ func TestGlyphFallback(t *testing.T) {
 		t.Errorf("portable icon = %q, want unchanged fallback", got)
 	}
 }
+
+func TestNerdLabelStartsAfterTwoCells(t *testing.T) {
+	for _, kind := range []Kind{Project, Comment, Close, Unchecked} {
+		label := Nerd.Label(kind, "Name")
+		if got := ansi.Cut(label, 2, 6); got != "Name" || ansi.StringWidth(label) != 6 {
+			t.Errorf("icon %d label starts outside its two-cell field: %q", kind, label)
+		}
+	}
+	if got := Plain.Label(Comment, "Name"); got != "Name" {
+		t.Errorf("portable label changed: %q", got)
+	}
+	styled := "\x1b[31m" + Nerd.Glyph(Comment, "") + "\x1b[m"
+	if got := ansi.Strip(ansi.Cut(Nerd.Join(styled, "Name"), 2, 6)); got != "Name" {
+		t.Errorf("styled icon shifted the label: %q", got)
+	}
+}

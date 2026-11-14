@@ -35,7 +35,7 @@ func (s outlineSymbol) displayLabel(symbols icons.Set) string {
 		return label
 	}
 	icon := lipgloss.NewStyle().Foreground(mdCodeStyle.GetForeground()).Render(symbols.Glyph(s.kind, ""))
-	return icon + " " + label
+	return symbols.Join(icon, label)
 }
 
 type documentOutline struct {

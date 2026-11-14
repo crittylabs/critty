@@ -66,6 +66,29 @@ func TestNerdFontTabDimming(t *testing.T) {
 	}
 }
 
+func TestNerdFontLabelSpacing(t *testing.T) {
+	app := AppModel{icons: icons.Nerd}
+	for _, tc := range []struct {
+		name, rendered string
+		kind           icons.Kind
+	}{
+		{"file", app.renderFileTypeIcon(icons.Go, lipgloss.NewStyle()) + "Name", icons.Go},
+		{"outline", (outlineSymbol{outlineHeading: outlineHeading{label: "Name"}, kind: icons.Heading}).displayLabel(icons.Nerd), icons.Heading},
+		{"button", app.iconBarButton(icons.Watch, "Name"), icons.Watch},
+		{"resolution", renderResolution(false, "Name", true, false, icons.Nerd), icons.Unchecked},
+		{"form", app.renderFormBadge(icons.Nerd.Glyph(icons.Unchecked, ""), "Name", lipgloss.Cyan, lipgloss.NewStyle()), icons.Unchecked},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			text := ansi.Strip(tc.rendered)
+			icon := strings.Index(text, strings.TrimSpace(icons.Nerd.Glyph(tc.kind, "")))
+			label := strings.Index(text, "Name")
+			if icon < 0 || label <= icon || ansi.StringWidth(text[icon:label]) != 2 {
+				t.Fatalf("label does not follow the two-cell icon field: %q", text)
+			}
+		})
+	}
+}
+
 func TestNerdFontCopyAndFinishTargets(t *testing.T) {
 	app := setupPrivateAppWithDoc(t, "`word`\n")
 	app.icons = icons.Nerd

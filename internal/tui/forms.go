@@ -512,8 +512,15 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 	if checkbox.Consent {
 		label += " " + tag.Render("Consent")
 	}
-	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
-	return indent + badge + inlineColors(background, " "+label, true), lipgloss.Width(indent), true
+	return indent + m.renderFormBadge(symbol, label, tint, background), lipgloss.Width(indent), true
+}
+
+func (m AppModel) renderFormBadge(symbol, label string, tint color.Color, background lipgloss.Style) string {
+	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + m.icons.Join(symbol, ""))
+	if !m.icons {
+		label = " " + label
+	}
+	return badge + inlineColors(background, label, true)
 }
 
 // selectAllState reports how many targets of a select-all item are selected.
@@ -549,8 +556,7 @@ func (m *AppModel) selectAllDisplay(d *review.FormDocument, item *form.Item, lab
 	} else if consents > 1 {
 		label += " " + tag.Render(fmt.Sprintf("%d consents", consents))
 	}
-	badge := lipgloss.NewStyle().Foreground(formChip.badgeSymbol).Background(tint).Bold(true).Render(" " + symbol + " ")
-	return badge + inlineColors(background, " "+tags+" "+label, true)
+	return m.renderFormBadge(symbol, tags+" "+label, tint, background)
 }
 
 func (m *AppModel) formSummary(width int) string {

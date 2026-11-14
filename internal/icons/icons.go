@@ -1,6 +1,12 @@
 // Package icons selects Nerd Font glyphs with caller-owned portable fallbacks.
 package icons
 
+import (
+	"strings"
+
+	"github.com/charmbracelet/x/ansi"
+)
+
 type Set bool
 
 const (
@@ -115,5 +121,15 @@ func (s Set) Label(kind Kind, label string) string {
 	if !s {
 		return label
 	}
-	return s.Glyph(kind, "") + " " + label
+	return s.Join(s.Glyph(kind, ""), label)
+}
+
+// Join places a label after a two-cell Nerd Font field or a portable separator.
+// The glyph may already contain ANSI styling.
+func (s Set) Join(glyph, label string) string {
+	gap := " "
+	if s {
+		gap = strings.Repeat(" ", max(0, 2-ansi.StringWidth(glyph)))
+	}
+	return glyph + gap + label
 }

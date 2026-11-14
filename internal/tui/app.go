@@ -4075,7 +4075,7 @@ func (m AppModel) commentPanelWidth() int {
 	}
 	minimum := 26 // room for the Comments and Files tabs
 	if m.icons {
-		minimum += ansi.StringWidth(m.icons.Glyph(icons.FolderOpen, "")) + ansi.StringWidth(m.icons.Glyph(icons.Comment, "")) + 2
+		minimum += ansi.StringWidth(m.icons.Glyph(icons.FolderOpen, "")) + ansi.StringWidth(m.icons.Glyph(icons.Comment, ""))
 	}
 	return max(m.width/4, minimum)
 }

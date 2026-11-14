@@ -34,7 +34,7 @@ func (m *AppModel) layoutThread(author, body string, replies []review.Reply, edi
 	if name == "" {
 		name = "anonymous"
 	}
-	appendComment(author, m.icons.Glyph(icons.Comment, "Comment")+" — "+name, body)
+	appendComment(author, m.icons.Join(m.icons.Glyph(icons.Comment, "Comment"), "— "+name), body)
 	for i, reply := range replies {
 		if editingID != "" && reply.ID == editingID {
 			continue
@@ -43,7 +43,7 @@ func (m *AppModel) layoutThread(author, body string, replies []review.Reply, edi
 		if name == "" {
 			name = "anonymous"
 		}
-		header := m.icons.Glyph(icons.Reply, "↳") + " " + name + " " + commentLineStyle.Bold(false).Render(fmt.Sprintf("(#%d)", i+1))
+		header := m.icons.Join(m.icons.Glyph(icons.Reply, "↳"), name) + " " + commentLineStyle.Bold(false).Render(fmt.Sprintf("(#%d)", i+1))
 		appendComment(reply.Author, header, reply.Body)
 	}
 	return layout

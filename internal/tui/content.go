@@ -126,7 +126,8 @@ func (m *AppModel) rebuildContent() {
 	groups := m.commentMarkerGroups()
 	contentWidth := m.contentViewport.Width()
 	for _, ids := range groups {
-		width := lipgloss.Width(fmt.Sprintf("> %s %s %d", m.icons.Glyph(icons.Checked, "☑︎"), m.icons.Glyph(icons.Comment, "💬"), len(ids))) + 1
+		markers := m.icons.Join(m.icons.Glyph(icons.Checked, "☑︎"), m.icons.Join(m.icons.Glyph(icons.Comment, "💬"), strconv.Itoa(len(ids))))
+		width := lipgloss.Width("> "+markers) + 1
 		contentWidth = min(contentWidth, m.contentViewport.Width()-width)
 	}
 	boxWidth := contentWidth - gutterWidth
@@ -618,9 +619,9 @@ func renderResolution(resolved bool, label string, accessKey, focused bool, symb
 	case label == "":
 		return style.Render(checkbox)
 	case accessKey:
-		return style.Render(checkbox+" ") + renderAccessKey(label, style)
+		return style.Render(symbols.Join(checkbox, "")) + renderAccessKey(label, style)
 	default:
-		return style.Render(checkbox + " " + label)
+		return style.Render(symbols.Join(checkbox, label))
 	}
 }
 
@@ -636,7 +637,7 @@ func renderCommentHeader(label string, resolved, deletable, focused bool, width 
 		resolveLabel = "Resolved"
 	}
 	resolve := renderResolution(resolved, resolveLabel, true, focused, symbols)
-	resolveWidth := max(lipgloss.Width(symbols.Glyph(icons.Unchecked, "☐")+" Resolve"), lipgloss.Width(symbols.Glyph(icons.Checked, "☑︎")+" Resolved"))
+	resolveWidth := max(lipgloss.Width(symbols.Join(symbols.Glyph(icons.Unchecked, "☐"), "Resolve")), lipgloss.Width(symbols.Join(symbols.Glyph(icons.Checked, "☑︎"), "Resolved")))
 	group := func(arrows bool) (string, commentHeaderRegion) {
 		actions := lipgloss.NewStyle().Width(resolveWidth).Render(resolve)
 		region := commentHeaderRegion{resolve: mouseRect{right: resolveWidth, bottom: 1}}

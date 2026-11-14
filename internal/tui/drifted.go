@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -116,9 +116,9 @@ func (m *AppModel) decorateCommentMarkers(content string, layout *renderedConten
 			}
 		}
 		if len(ids) > 1 {
-			label += commentLineStyle.Foreground(lipgloss.Blue).Render(fmt.Sprintf(" %d", len(ids)))
+			label = m.icons.Join(label, commentLineStyle.Foreground(lipgloss.Blue).Render(strconv.Itoa(len(ids))))
 		}
-		label = renderResolution(resolved, "", false, false, m.icons) + " " + label
+		label = m.icons.Join(renderResolution(resolved, "", false, false, m.icons), label)
 		prefix := "  "
 		for _, id := range ids {
 			if id == m.selectedCommentID() {

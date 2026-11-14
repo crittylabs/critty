@@ -368,6 +368,7 @@ func (t *FileTab) changeSummary(compact bool, symbols icons.Set) string {
 			}
 		}
 	}
+	hasStatusIcon := symbols && len(counts) > 0
 	if t.isBinary {
 		if compact {
 			return strings.Join(counts, "")
@@ -398,5 +399,9 @@ func (t *FileTab) changeSummary(compact bool, symbols icons.Set) string {
 	if compact {
 		return strings.Join(counts, "")
 	}
-	return tabCountDelimiter.Render("(") + strings.Join(counts, " ") + tabCountDelimiter.Render(")")
+	text := strings.Join(counts, " ")
+	if hasStatusIcon && len(counts) > 1 {
+		text = symbols.Join(counts[0], strings.Join(counts[1:], " "))
+	}
+	return tabCountDelimiter.Render("(") + text + tabCountDelimiter.Render(")")
 }

@@ -204,7 +204,7 @@ func (m AppModel) formListModalContent(width, maxLines int) (string, []modalMous
 		if row.item.Choice || row.item.Rank {
 			label = row.item.ID
 		}
-		text := lipgloss.NewStyle().Foreground(statusColor).Bold(true).Render(status) + " " + label
+		text := m.icons.Join(lipgloss.NewStyle().Foreground(statusColor).Bold(true).Render(status), label)
 		if row.answer != "" {
 			text += footerStyle.Render(" · " + row.answer)
 		}

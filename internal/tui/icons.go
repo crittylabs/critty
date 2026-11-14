@@ -13,7 +13,7 @@ func (m AppModel) iconBarButton(kind icons.Kind, button string) string {
 	if !m.icons {
 		return button
 	}
-	return modalBtnFocusedLabel.Padding(0).Render(m.icons.Glyph(kind, "")+" ") + button
+	return m.icons.Join(modalBtnFocusedLabel.Padding(0).Render(m.icons.Glyph(kind, "")), button)
 }
 
 // Colors follow nvim-web-devicons 0dc0cfb0c6858041174a53c7aa4adaf65e994b3c,
