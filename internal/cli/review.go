@@ -554,6 +554,9 @@ func buildTUICommand(mode *reviewMode, host string) (string, error) {
 		return "", fmt.Errorf("missing review session ID")
 	}
 	command := fmt.Sprintf("%s %s _tui --session %s", envPrefix, shellEscape(crittyBin), shellEscape(mode.sessionKey))
+	if maxWrapWidthFlag.Changed {
+		command += " --max-wrap-width " + strconv.Itoa(maxWrapWidth)
+	}
 	if reviewWatch {
 		command += " --watch"
 	}
@@ -603,4 +606,11 @@ func init() {
 			panic(err)
 		}
 	}
+}
+
+func configuredWrapWidth(cfg *config.Config) int {
+	if maxWrapWidthFlag.Changed {
+		return maxWrapWidth
+	}
+	return cfg.MaxWrapWidth
 }

@@ -22,9 +22,9 @@ func (m AppModel) markdownPreviewSize(ref markdownImage, img *inlineImage) (int,
 	if ref.renderBody == "" {
 		return m.markdownImageSize(img)
 	}
-	width := max(1, m.contentViewport.Width()-gutterWidth-1)
+	width := max(1, m.contentViewport.Width()-m.sourceGutterWidth()-1)
 	if m.alternateDiff(m.tab()) {
-		width = max(1, (m.contentViewport.Width()-3)/2-gutterWidth-1)
+		width = max(1, (m.contentViewport.Width()-3)/2-m.sourceGutterWidth()-1)
 	}
 	if ref.renderKind == renderedMermaid {
 		return img.fit(width, max(5, m.contentViewport.Height()-2), m.images.cell)
@@ -96,7 +96,8 @@ type previewDisplaySpan struct {
 
 type previewDisplayBand struct{ start, height int }
 
-func (t *FileTab) sourceRowGutter(line int, before bool, row int, marker, number string) string {
+func (m *AppModel) sourceRowGutter(line int, before bool, row int, marker, number string) string {
+	t := m.tab()
 	if t.markdown != nil {
 		source := t.markdown.after
 		if before {
@@ -120,10 +121,19 @@ func (t *FileTab) sourceRowGutter(line int, before bool, row int, marker, number
 					} else if position == band.height-1 {
 						bracket = "⎝"
 					}
+					if m.hideLineNumbers {
+						return lineNumStyle.Width(1).Render(bracket)
+					}
 					return " " + lineNumStyle.Render(bracket) + " "
 				}
 			}
 		}
+	}
+	if m.hideLineNumbers {
+		if row == 0 {
+			return marker
+		}
+		return " "
 	}
 	if row == 0 {
 		return marker + number + " "
@@ -328,9 +338,9 @@ func (m *AppModel) prepareRenderedDisplay() {
 			source.lines[i].previewHidden = false
 			source.lines[i].previewBands = nil
 			source.lines[i].previewScroll = nil
-			source.lines[i].previewWidth = max(1, m.contentViewport.Width()-gutterWidth-1)
+			source.lines[i].previewWidth = max(1, m.contentViewport.Width()-m.sourceGutterWidth()-1)
 			if m.alternateDiff(t) {
-				source.lines[i].previewWidth = max(1, (m.contentViewport.Width()-3)/2-gutterWidth-1)
+				source.lines[i].previewWidth = max(1, (m.contentViewport.Width()-3)/2-m.sourceGutterWidth()-1)
 			}
 		}
 		if !m.images.enabled || m.images.hidden || m.isearch.active || t.selecting {
@@ -343,11 +353,11 @@ func (m *AppModel) prepareRenderedDisplay() {
 				refs = append(refs, ref)
 			}
 		}
-		projectRenderedDisplay(source, refs)
+		projectRenderedDisplay(source, refs, m.sourceGutterWidth())
 	}
 }
 
-func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
+func projectRenderedDisplay(source *markdownSource, refs []markdownImage, gutter int) {
 	edits := make(map[int][]previewDisplayEdit)
 	for _, ref := range refs {
 		if ref.renderBody == "" || ref.failed || ref.renderFirst < 1 || ref.line > len(source.lines) {
@@ -379,7 +389,7 @@ func projectRenderedDisplay(source *markdownSource, refs []markdownImage) {
 				preview := previewPlaceholder(ref.image)
 				width := source.lines[line-1].previewWidth
 				if blockMath && width > 2 && ref.image.columns > width {
-					viewport := &horizontalBlockViewport{startLine: ref.renderFirst, endLine: ref.line, left: gutterWidth, compactEdges: true,
+					viewport := &horizontalBlockViewport{startLine: ref.renderFirst, endLine: ref.line, left: gutter, compactEdges: true,
 						window: horizontalViewport{width: width, contentWidth: ref.image.columns}}
 					viewport.window.offset = max(0, min(ref.renderOffset, ref.image.columns-width+1))
 					if viewport.window.offset > 0 {

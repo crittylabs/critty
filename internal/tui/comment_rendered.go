@@ -76,7 +76,7 @@ func (m *AppModel) commentRenderedDisplay(body string, width int, show bool, sug
 		}
 	}
 	if m.images.enabled {
-		projectRenderedDisplay(cached.source, refs)
+		projectRenderedDisplay(cached.source, refs, 0)
 	}
 	return cached.source
 }

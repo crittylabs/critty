@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/crittylabs/critty/internal/config"
 	"github.com/crittylabs/critty/internal/ipc"
@@ -15,6 +16,8 @@ import (
 )
 
 var rootSession string
+var maxWrapWidth int
+var maxWrapWidthFlag *pflag.Flag
 
 var rootCmd = &cobra.Command{
 	Use:     "critty [file[:LINE]]",
@@ -112,6 +115,9 @@ func reconnectSession(key string) error {
 func Execute() int {
 	preRun := rootCmd.PersistentPreRunE
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if maxWrapWidth < 0 {
+			return fmt.Errorf("--max-wrap-width must be nonnegative")
+		}
 		if transientReview(cmd, args) {
 			if err := validateTransientFlags(cmd); err != nil {
 				return err
@@ -149,6 +155,8 @@ func runStartupMigration() error {
 }
 
 func init() {
+	rootCmd.PersistentFlags().IntVar(&maxWrapWidth, "max-wrap-width", 0, "maximum document text wrapping width in columns, excluding the gutter (0: unlimited)")
+	maxWrapWidthFlag = rootCmd.PersistentFlags().Lookup("max-wrap-width")
 	rootCmd.PreRunE = validateScopeFlags
 	rootCmd.Flags().StringVar(&reviewScope, "scope", "", "review scope: all (default), staged, unstaged, COMMIT, A..B, or A...B (omitted B means HEAD; COMMIT compares with its first parent)")
 	rootCmd.Flags().StringVar(&rootSession, "session", "", "resume a saved review session by ID")

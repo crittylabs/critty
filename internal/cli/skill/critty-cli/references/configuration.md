@@ -13,6 +13,8 @@ launchers = ["mux", "desktop-terminal"]
 textconv_drivers = ["plist", "cp932"] # opt in by Git diff driver name
 cleanup_on_approve = false
 split = false # true starts diff reviews in side-by-side view
+max_wrap_width = 0 # unlimited document text wrapping width
+# line_numbers = true # overrides the mode default (view: false, review: true)
 
 [prompts]
 "on_finish_approved:diff" = "file:.critty/prompts/approved.md"
@@ -23,6 +25,8 @@ Quote prompt keys containing `:` or `.`.  These characters are part of the key, 
 `textconv_drivers` enables Git text conversion for matching diff driver names or glob patterns.  `["plist*"]` matches a prefix; `["*"]` enables all configured converters.  `?` and character classes are also supported; invalid patterns are errors.  It defaults to no drivers.  Project arrays replace global arrays, and `[]` disables inherited drivers.  Unmatched image drivers retain inline image previews.  See [Git text conversions](../SKILL.md#git-text-conversions) for coordinates and JSON metadata.
 
 `split` chooses the initial diff view and follows boolean precedence.  Runtime view changes are display-only: source text, comment sides and coordinates, and saved review data remain independent of the view.  Supplied unified patches support both views without original files; unavailable context is never filled from unrelated worktree content.
+
+`max_wrap_width` caps document text wrapping width in terminal columns, excluding the gutter; `0` (the default) uses the available width.  Project values override global values, including `0`.  The CLI `--max-wrap-width N` overrides settings for that invocation and is forwarded to launched review terminals.  Frames and tabs keep their width, and text stays left-aligned.  Comment and dialog widths are independent.  `line_numbers` overrides the mode default (view off, review on); omission inherits the global setting or the mode default.  These settings affect display, not source text or saved review coordinates.
 
 `syntax.aliases` maps case-insensitive fence language names to supported languages or other aliases.  `syntax.files` is an ordered array of tables with `pattern` and `language`; patterns match case-sensitive basenames.  Project aliases override global keys, and project file rules precede global rules, with the first match winning.  These settings affect highlighting, supported outlines, and Markdown rendering in reviews and views, including comment fences.  Use `text` to force plain text.  Invalid patterns, unknown languages, and alias cycles fail configuration loading.  See [syntax associations](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#syntax-associations) for examples and limits.
 

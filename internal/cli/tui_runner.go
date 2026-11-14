@@ -42,6 +42,8 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	finishCh := make(chan tui.FinishEvent, 4)
 	branch, _ := gitpkg.CurrentBranch()
 	appCfg := tui.AppConfig{
+		MaxWrapWidth:     configuredWrapWidth(cfg),
+		LineNumbers:      cfg.LineNumbers,
 		Syntax:           cfg.SyntaxRules,
 		NerdFonts:        nerdfont.Detect(cfg.NerdFonts).Supported,
 		MathRaTeX:        cfg.MathRaTeX,

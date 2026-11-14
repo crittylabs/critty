@@ -32,6 +32,8 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | --- | --- |
 | `output` | String selecting review storage. |
 | `author` | String used for comment attribution. |
+| `max_wrap_width` | Nonnegative integer limiting document text wrapping width in terminal columns, excluding the gutter.  Defaults to `0` (unlimited). |
+| `line_numbers` | Optional boolean overriding the mode default: off in `view`, on in `review`. |
 | `split` | Boolean enabling side-by-side diffs initially; defaults to `false` (unified). |
 | `nerd_fonts` | String selecting Nerd Font support: `auto` (default), `on`, or `off`. |
 | `ignore_patterns` | Array of glob strings excluded from review input. |
@@ -61,6 +63,23 @@ Global settings are applied first, followed by project settings.  Settings merge
 Unknown keys are ignored by the current loader.  Omit a key when no override is intended; TOML has no `null`.
 
 The header's `Split: off/on` control or `S` switches between unified and side-by-side diffs for the open review.  Runtime changes do not edit settings or comment coordinates.  Split views show all available source lines, including unchanged lines outside diff hunks.  Narrow panes temporarily use unified rendering and return to two columns when widened.  Both views support supplied unified patches without source files; missing context remains unavailable.
+
+## Reading layout
+
+Documents use the available pane width by default.  Set `max_wrap_width = 80`
+to cap the text wrapping width at 80 terminal columns, excluding the marker and
+line-number gutter.  The CLI option `--max-wrap-width 80` overrides the setting
+for the current invocation; `--max-wrap-width 0` removes an inherited cap.
+Narrow panes use the available width.  The pane frame and tabs keep their width;
+capped text stays left-aligned with unused space on the right.  These options
+apply to document and file content, including review diffs, rather than comment
+text or dialog fields.  Tables retain their horizontal scrolling controls.
+
+Line numbers are hidden in `view` and shown in `review` by default.  Set
+`line_numbers = true` or `false` to override both modes.  Press `#` or click the
+footer's Lines button to toggle them across the open files.  Hidden numbers
+leave a one-column gutter for cursor and change markers.  Toggling changes only
+the display; source coordinates, copied text, and configuration files are unchanged.
 
 ## Syntax associations
 

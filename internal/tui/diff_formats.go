@@ -163,7 +163,7 @@ type diffAttention struct {
 // captureDiffAttention prefers the focused source or thread when visible,
 // otherwise the first visible source.  It also works across a resize.
 func (m *AppModel) captureDiffAttention() diffAttention {
-	if !m.multiFile || len(m.tabs) == 0 || m.tab().state == nil {
+	if len(m.tabs) == 0 || m.tab().state == nil {
 		return diffAttention{}
 	}
 	t := m.tab()
@@ -386,6 +386,7 @@ func alignDiffRows(before, after []*diffLine, pairs map[int]int) []diffRow {
 func (m *AppModel) rebuildDiffContent() {
 	t := m.tab()
 	layout := newRenderedContentLayout()
+	layout.gutter = m.sourceGutterWidth()
 	var b strings.Builder
 	m.appendSVGPreview(&b, &layout)
 	width := m.contentViewport.Width()
@@ -399,7 +400,7 @@ func (m *AppModel) rebuildDiffContent() {
 			if m.viewMode || ann.drifted && m.threadCollapsed(ann.id, ann.resolved, true, focused) {
 				continue
 			}
-			box, button := m.renderAnnotationBox(ann, max(1, width-gutterWidth), focused)
+			box, button := m.renderAnnotationBox(ann, max(1, width-m.sourceGutterWidth()), focused)
 			button.translate(0, len(layout.rows))
 			button.id = ann.id
 			layout.actions = append(layout.actions, button)
@@ -519,7 +520,7 @@ func (l *renderedContentLayout) addCellSpan(row, left, column int, cell diffCell
 		}
 		return
 	}
-	l.textSpans = append(l.textSpans, contentTextSpan{row: row, left: left + gutterWidth, column: column,
+	l.textSpans = append(l.textSpans, contentTextSpan{row: row, left: left + l.gutter, column: column,
 		ref: lineRef{line: target.line, side: target.side}, text: cell.plain})
 }
 
@@ -612,7 +613,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 	default:
 		num = t.renderLineNumber(n)
 	}
-	textWidth := max(1, width-gutterWidth-1)
+	textWidth := max(1, width-m.sourceGutterWidth()-1)
 	decorate := m.isearchDecorator(ref)
 	var rows []string
 	plain, plainWidth := "", 0 // known for an unwrapped row only
@@ -662,12 +663,12 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		} else if highlighted {
 			text = inlineBackground(sidebarHighlightBg, ansi.Strip(text))
 		}
-		cells[i] = diffCellRow{text: t.sourceRowGutter(sourceLine, oldSide, i, marker, num) + text}
+		cells[i] = diffCellRow{text: m.sourceRowGutter(sourceLine, oldSide, i, marker, num) + text}
 		if t.isMarkdown {
 			cells[i].hanging = t.markdownHanging(sourceLine, oldSide, i, textWidth)
 		}
 		if i == 0 {
-			cells[i].plain, cells[i].width = plain, gutterWidth+plainWidth
+			cells[i].plain, cells[i].width = plain, m.sourceGutterWidth()+plainWidth
 		}
 	}
 	return cells, target

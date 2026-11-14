@@ -21,6 +21,8 @@ import (
 
 // Config is the resolved (merged) configuration.
 type Config struct {
+	MaxWrapWidth     int               `json:"max_wrap_width"`
+	LineNumbers      *bool             `json:"line_numbers,omitempty"`
 	Syntax           syntax.Config     `json:"syntax,omitempty"`
 	SyntaxRules      *syntax.Rules     `json:"-"`
 	NerdFonts        string            `json:"nerd_fonts"`
@@ -48,6 +50,8 @@ type Config struct {
 // fileConfig is the on-disk shape; booleans are pointers so a project file
 // can explicitly override a global true with false.
 type fileConfig struct {
+	MaxWrapWidth     *int              `toml:"max_wrap_width"`
+	LineNumbers      *bool             `toml:"line_numbers"`
 	Syntax           syntax.Config     `toml:"syntax"`
 	NerdFonts        *string           `toml:"nerd_fonts"`
 	MermaidMerman    string            `toml:"mermaid_merman"`
@@ -173,6 +177,9 @@ func readFile(path string) (*fileConfig, error) {
 	if fc.NerdFonts != nil && !slices.Contains([]string{"auto", "on", "off"}, *fc.NerdFonts) {
 		return nil, fmt.Errorf("nerd_fonts in %s must be auto, on, or off", path)
 	}
+	if fc.MaxWrapWidth != nil && *fc.MaxWrapWidth < 0 {
+		return nil, fmt.Errorf("max_wrap_width in %s must be nonnegative", path)
+	}
 	if err := fc.Syntax.ValidateNames(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
@@ -182,6 +189,12 @@ func readFile(path string) (*fileConfig, error) {
 func apply(cfg *Config, fc *fileConfig) {
 	if fc == nil {
 		return
+	}
+	if fc.MaxWrapWidth != nil {
+		cfg.MaxWrapWidth = *fc.MaxWrapWidth
+	}
+	if fc.LineNumbers != nil {
+		cfg.LineNumbers = fc.LineNumbers
 	}
 	cfg.Syntax = syntax.Merge(cfg.Syntax, fc.Syntax)
 	if fc.NerdFonts != nil {

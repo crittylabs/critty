@@ -76,6 +76,8 @@ type FinishEvent struct {
 
 // AppConfig carries the cross-cutting dependencies of the TUI.
 type AppConfig struct {
+	MaxWrapWidth     int
+	LineNumbers      *bool
 	Syntax           *syntax.Rules
 	NerdFonts        bool
 	Context          context.Context
@@ -112,23 +114,25 @@ const gutterWidth = 7
 const displayTabWidth = 4
 
 type AppModel struct {
-	icons          icons.Set
-	textSelection  contentTextSelection
-	readOnly       bool
-	browsing       viewNavigation
-	reload         reloadState
-	images         imageDisplay
-	math           *mathrender.Renderer
-	mermaid        *mermaidrender.Renderer
-	svg            svgRenderer
-	commentImages  map[commentImageKey]*previewSide
-	imageBodies    map[string][]markdownImageRef
-	renderedBodies map[commentBodyKey]*commentRenderedBody
-	editorImages   editorImageState
-	lightbox       lightboxState
-	forms          *review.FormState
-	formRows       map[string]map[int]formRow
-	formViewed     map[string]map[int]bool
+	hideLineNumbers bool
+	maxWrapWidth    int
+	icons           icons.Set
+	textSelection   contentTextSelection
+	readOnly        bool
+	browsing        viewNavigation
+	reload          reloadState
+	images          imageDisplay
+	math            *mathrender.Renderer
+	mermaid         *mermaidrender.Renderer
+	svg             svgRenderer
+	commentImages   map[commentImageKey]*previewSide
+	imageBodies     map[string][]markdownImageRef
+	renderedBodies  map[commentBodyKey]*commentRenderedBody
+	editorImages    editorImageState
+	lightbox        lightboxState
+	forms           *review.FormState
+	formRows        map[string]map[int]formRow
+	formViewed      map[string]map[int]bool
 	// formTargets maps select-all IDs to item indices by document path.
 	formTargets   map[string]map[string][]int
 	formList      formListState
@@ -249,6 +253,7 @@ func (r mouseRect) contains(mouse tea.Mouse) bool {
 }
 
 type renderedContentLayout struct {
+	gutter           int
 	horizontalBlocks []horizontalBlockViewport
 	textSpans        []contentTextSpan
 	columns          []diffMouseRow
@@ -278,34 +283,37 @@ func (r *commentHeaderRegion) translate(x, y int) {
 }
 
 type renderedScreenLayout struct {
-	watchIndicator      mouseRect
-	hasWatchIndicator   bool
-	copyTextButton      mouseRect
-	hasCopyTextButton   bool
-	whitespaceButton    mouseRect
-	hasWhitespaceButton bool
-	splitButton         mouseRect
-	hasSplitButton      bool
-	finishButton        mouseRect
-	hasFinishButton     bool
-	backButton          mouseRect
-	hasBackButton       bool
-	forwardButton       mouseRect
-	hasForwardButton    bool
-	footerHelp          mouseRect
-	hasFooterHelp       bool
-	formListButton      mouseRect
-	hasFormListButton   bool
-	imagesButton        mouseRect
-	hasImagesButton     bool
-	modalRegions        []modalMouseRegion
-	isearchCursor       *tea.Cursor
-	isearchRegions      []isearchMouseRegion
-	progressRegions     []progressRegion
+	watchIndicator       mouseRect
+	hasWatchIndicator    bool
+	copyTextButton       mouseRect
+	hasCopyTextButton    bool
+	whitespaceButton     mouseRect
+	hasWhitespaceButton  bool
+	splitButton          mouseRect
+	hasSplitButton       bool
+	finishButton         mouseRect
+	hasFinishButton      bool
+	backButton           mouseRect
+	hasBackButton        bool
+	forwardButton        mouseRect
+	hasForwardButton     bool
+	footerHelp           mouseRect
+	hasFooterHelp        bool
+	formListButton       mouseRect
+	hasFormListButton    bool
+	imagesButton         mouseRect
+	hasImagesButton      bool
+	lineNumbersButton    mouseRect
+	hasLineNumbersButton bool
+	modalRegions         []modalMouseRegion
+	isearchCursor        *tea.Cursor
+	isearchRegions       []isearchMouseRegion
+	progressRegions      []progressRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
 	return renderedContentLayout{
+		gutter:     gutterWidth,
 		lineRanges: make(map[int]renderedRange),
 		oldRanges:  make(map[int]renderedRange),
 	}
@@ -373,6 +381,8 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 	}
 
 	m := AppModel{
+		hideLineNumbers:  cfg.ReadOnly && cfg.LineNumbers == nil || cfg.LineNumbers != nil && !*cfg.LineNumbers,
+		maxWrapWidth:     cfg.MaxWrapWidth,
 		syntax:           cfg.Syntax,
 		icons:            icons.Set(cfg.NerdFonts),
 		readOnly:         cfg.ReadOnly,
@@ -478,6 +488,8 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	}
 
 	m := AppModel{
+		hideLineNumbers: cfg.ReadOnly && cfg.LineNumbers == nil || cfg.LineNumbers != nil && !*cfg.LineNumbers,
+		maxWrapWidth:    cfg.MaxWrapWidth,
 		syntax:          cfg.Syntax,
 		icons:           icons.Set(cfg.NerdFonts),
 		readOnly:        cfg.ReadOnly,
@@ -1271,6 +1283,9 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.multiFile {
 			m.toggleWhitespace()
 		}
+		return m, nil
+	case msg.String() == "#":
+		m.toggleLineNumbers()
 		return m, nil
 	case key.Matches(msg, keys.Split):
 		m.toggleSplit()
@@ -2611,7 +2626,10 @@ func (m *AppModel) recalculateLayout() {
 
 	// The comment pane takes
 	// commentPanelWidth columns; the content pane's borders take two.
-	contentWidth := m.width - m.commentPanelWidth() - 2
+	contentWidth := max(0, m.width-m.commentPanelWidth()-2)
+	if m.maxWrapWidth > 0 && m.maxWrapWidth < contentWidth-m.sourceGutterWidth()-1 {
+		contentWidth = m.maxWrapWidth + m.sourceGutterWidth() + 1
+	}
 
 	m.contentViewport.SetWidth(contentWidth)
 	m.contentViewport.SetHeight(mainHeight)
@@ -3188,7 +3206,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 		content = hideImagePlaceholders(content)
 	}
 	contentBox := lipgloss.NewStyle().
-		Width(m.contentViewport.Width()).
+		Width(max(0, m.contentPaneWidth()-2)).
 		Height(m.contentViewport.Height()).
 		Render(content)
 	contentPane := renderPane(m.renderTabBar(), contentBox, lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
@@ -3239,6 +3257,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	layout.copyTextButton, layout.hasCopyTextButton = buttonRect(footer, footerTop, m.copyTextButton())
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
+	layout.lineNumbersButton, layout.hasLineNumbersButton = buttonRect(footer, footerTop, m.lineNumbersButton())
 	if button := m.formListButton(); button != "" {
 		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
 	}
@@ -3561,6 +3580,10 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	}
 	if imageLayout.hasFormListButton && imageLayout.formListButton.contains(mouse) {
 		m.openFormList()
+		return m, nil
+	}
+	if imageLayout.hasLineNumbersButton && imageLayout.lineNumbersButton.contains(mouse) {
+		m.toggleLineNumbers()
 		return m, nil
 	}
 	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
@@ -4339,7 +4362,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	if mouse.X < left || (m.sidebarVisible() && mouse.X >= right) || mouse.Y < top || mouse.Y >= bottom {
 		return m, nil
 	}
-	if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && target.annotation && mouse.X >= left+gutterWidth {
+	if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && target.annotation && mouse.X >= left+m.sourceGutterWidth() {
 		annotations := m.annotationsAfterLine(target.line, target.side)
 		if target.annotationIndex < len(annotations) {
 			m.focused = contentPane
@@ -4510,7 +4533,7 @@ func (m AppModel) renderFooterHints() string {
 	if button := m.formListButton(); !m.readOnly && button != "" {
 		items = append([]string{button}, items...)
 	}
-	items = append([]string{m.footerHelpButton(), m.imagesButton()}, items...)
+	items = append([]string{m.footerHelpButton(), m.imagesButton(), m.lineNumbersButton()}, items...)
 	if !t.selecting {
 		items = append(items, m.outlineHint())
 	}
@@ -4640,6 +4663,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
 			{keys: "M-w", desc: "copy selected text or reference"},
+			{keys: "#", desc: "toggle line numbers (all files)"},
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
@@ -4670,6 +4694,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},
 		{keys: "V · O", desc: "reading view / open all"},
+		{keys: "#", desc: "toggle line numbers"},
 		{keys: "w · I/M-i", desc: "WS changes · image/math/Mermaid previews"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},

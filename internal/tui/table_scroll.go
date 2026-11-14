@@ -42,7 +42,7 @@ func (m *AppModel) horizontalBlockAtLine(line int) *horizontalBlockViewport {
 
 func (m *AppModel) horizontalBlockAtMouse(mouse tea.Mouse) *horizontalBlockViewport {
 	left, top, right, bottom := m.contentBounds()
-	if mouse.X < left+gutterWidth || mouse.X >= right || mouse.Y < top || mouse.Y >= bottom {
+	if mouse.X < left+m.sourceGutterWidth() || mouse.X >= right || mouse.Y < top || mouse.Y >= bottom {
 		return nil
 	}
 	target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset())
@@ -60,7 +60,7 @@ func (m *AppModel) handleHorizontalScrollClick(mouse tea.Mouse) bool {
 	left, _, _, _ := m.contentBounds()
 	x := mouse.X - left
 	direction := 0
-	if x == gutterWidth && (!table.compactEdges || table.window.offset > 0) {
+	if x == m.sourceGutterWidth() && (!table.compactEdges || table.window.offset > 0) {
 		direction = -1
 	} else if x == table.left+table.window.width && (!table.compactEdges || table.window.offset < table.window.maxOffset()) {
 		direction = 1

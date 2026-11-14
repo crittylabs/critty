@@ -250,3 +250,34 @@ func TestMermaidConfigurationIsGlobalOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestReadingSettingsPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name, project string
+		width         int
+		numbers       bool
+	}{
+		{"inherit", "", 80, true},
+		{"reset", "max_wrap_width = 0\nline_numbers = false", 0, false},
+		{"replace", "max_wrap_width = 60", 60, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			project := t.TempDir()
+			writeConfig(t, GlobalPath(), "max_wrap_width = 80\nline_numbers = true")
+			writeConfig(t, ProjectPath(project), tc.project)
+			cfg, err := Load(project)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.MaxWrapWidth != tc.width || cfg.LineNumbers == nil || *cfg.LineNumbers != tc.numbers {
+				t.Fatalf("config=%+v", cfg)
+			}
+		})
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	writeConfig(t, GlobalPath(), "max_wrap_width = -1")
+	if _, err := Load(""); err == nil {
+		t.Fatal("negative width accepted")
+	}
+}

@@ -130,14 +130,14 @@ func (m *AppModel) rebuildContent() {
 		width := lipgloss.Width("> "+markers) + 1
 		contentWidth = min(contentWidth, m.contentViewport.Width()-width)
 	}
-	boxWidth := contentWidth - gutterWidth
+	boxWidth := contentWidth - m.sourceGutterWidth()
 	if boxWidth < 20 {
 		boxWidth = 20
 	}
 
-	textWidth := contentWidth - gutterWidth - 1
-	if textWidth < 10 {
-		textWidth = 10
+	textWidth := max(10, contentWidth-m.sourceGutterWidth()-1)
+	if m.maxWrapWidth > 0 {
+		textWidth = min(textWidth, m.maxWrapWidth)
 	}
 	markers := renderGutterMarkers()
 
@@ -163,7 +163,7 @@ func (m *AppModel) rebuildContent() {
 			tb.colWidths[i] = max(2, min(width, tableColumnMaxWidth))
 			totalWidth += tb.colWidths[i] + 3
 		}
-		width, left := textWidth, gutterWidth
+		width, left := textWidth, m.sourceGutterWidth()
 		if totalWidth > width {
 			width -= 2
 			left++
@@ -182,6 +182,7 @@ func (m *AppModel) rebuildContent() {
 	var b strings.Builder
 	b.Grow(len(sourceLines) * 200) // pre-allocate to reduce allocations
 	layout := newRenderedContentLayout()
+	layout.gutter = m.sourceGutterWidth()
 	if t.outsideChanges && t.doc != nil {
 		layout.appendBlock(&b, ansi.Wrap("Saved snapshot: outside current changes.\n", max(1, contentWidth), ""), contentMouseTarget{})
 	} else if m.documentSnapshot != nil && t.path == m.filePath {
@@ -288,7 +289,7 @@ func (m *AppModel) rebuildContent() {
 				} else if isSidebarHighlight {
 					content = inlineBackground(sidebarHighlightBg, ansi.Strip(content))
 				}
-				layout.appendSourceBlock(&b, t.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target, t.markdownHanging(del.OldLineNum, true, wi, textWidth))
+				layout.appendSourceBlock(&b, m.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target, t.markdownHanging(del.OldLineNum, true, wi, textWidth))
 			}
 			if images := m.renderMarkdownImages(del.OldLineNum, true); images != "" {
 				layout.appendBlock(&b, images, target)
@@ -381,7 +382,7 @@ func (m *AppModel) rebuildContent() {
 				rows = inlineDiffDisplayLines(inlineChanges, false, textWidth, diffCommonTextBg, diffAddedTextBg, decorate)
 			}
 			for wi, styledLine := range rows {
-				layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+styledLine, lineTarget, t.markdownHanging(lineNum, false, wi, textWidth))
+				layout.appendSourceBlock(&b, m.sourceRowGutter(lineNum, false, wi, marker, numStr)+styledLine, lineTarget, t.markdownHanging(lineNum, false, wi, textWidth))
 			}
 		} else if tb, inTable := tableBlockMap[lineNum]; inTable {
 			var rows []string
@@ -411,10 +412,7 @@ func (m *AppModel) rebuildContent() {
 				wrappedLines = append(wrappedLines, row)
 			}
 			for wi, row := range wrappedLines {
-				prefix := fmt.Sprintf("%s%s ", marker, numStr)
-				if wi > 0 {
-					prefix = fmt.Sprintf(" %s ", continuationGutter)
-				}
+				prefix := m.sourceRowGutter(lineNum, false, wi, marker, numStr)
 				if columns == nil {
 					layout.addTextSpan(len(layout.rows), 0, 0, prefix+row, lineTarget)
 					span := &layout.textSpans[len(layout.textSpans)-1]
@@ -441,25 +439,25 @@ func (m *AppModel) rebuildContent() {
 					if wi == 0 {
 						start = checkboxX
 					}
-					end := contentWidth - gutterWidth
+					end := contentWidth - m.sourceGutterWidth()
 					if start < end {
 						layout.formControls = append(layout.formControls, formControl{line: lineNum,
-							rect: mouseRect{left: gutterWidth + start, right: gutterWidth + end, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+							rect: mouseRect{left: m.sourceGutterWidth() + start, right: m.sourceGutterWidth() + end, top: len(layout.rows), bottom: len(layout.rows) + 1}})
 					}
 					row += formBackground.Render(strings.Repeat(" ", max(0, textWidth-lipgloss.Width(row))))
 				}
 				if wi == 0 {
-					layout.appendBlock(&b, fmt.Sprintf("%s%s %s", marker, numStr, row), lineTarget)
+					layout.appendBlock(&b, m.sourceRowGutter(lineNum, false, 0, marker, numStr)+row, lineTarget)
 				} else {
-					layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
+					layout.appendBlock(&b, m.sourceRowGutter(lineNum, false, 1, marker, numStr)+row, lineTarget)
 				}
 			}
 			for _, row := range m.formTextRows(lineNum, textWidth) {
 				if item := m.formRows[t.path][lineNum].item; item != nil {
 					layout.formControls = append(layout.formControls, formControl{line: item.Line,
-						rect: mouseRect{left: gutterWidth, right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+						rect: mouseRect{left: m.sourceGutterWidth(), right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
 				}
-				layout.appendBlock(&b, fmt.Sprintf(" %s %s", continuationGutter, row), lineTarget)
+				layout.appendBlock(&b, m.sourceRowGutter(lineNum, false, 1, marker, numStr)+row, lineTarget)
 			}
 		} else {
 			// Get the display content: Markdown, linked text, or Chroma-highlighted
@@ -492,7 +490,7 @@ func (m *AppModel) rebuildContent() {
 				if decorate != nil {
 					plain = ""
 				}
-				layout.appendSourceRow(&b, marker+numStr+" "+displayLine, plain, lineTarget)
+				layout.appendSourceRow(&b, m.sourceRowGutter(lineNum, false, 0, marker, numStr)+displayLine, plain, lineTarget)
 			} else {
 				var rows []string
 				if isMarkdown {
@@ -501,7 +499,7 @@ func (m *AppModel) rebuildContent() {
 					rows = strings.Split(lipgloss.Wrap(displayLine, textWidth, ""), "\n")
 				}
 				for wi, wl := range rows {
-					layout.appendSourceBlock(&b, t.sourceRowGutter(lineNum, false, wi, marker, numStr)+wl, lineTarget, t.markdownHanging(lineNum, false, wi, textWidth))
+					layout.appendSourceBlock(&b, m.sourceRowGutter(lineNum, false, wi, marker, numStr)+wl, lineTarget, t.markdownHanging(lineNum, false, wi, textWidth))
 				}
 			}
 		}
@@ -583,17 +581,17 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 
 	var prefix string
 	if focused {
-		cursor := lipgloss.NewStyle().Width(2).Render(cursorMarker.Render(">"))
-		prefix = cursor + strings.Repeat(" ", gutterWidth-2)
+		cursor := lipgloss.NewStyle().Width(min(2, m.sourceGutterWidth())).Render(cursorMarker.Render(">"))
+		prefix = cursor + strings.Repeat(" ", max(0, m.sourceGutterWidth()-2))
 	} else {
-		prefix = strings.Repeat(" ", gutterWidth)
+		prefix = strings.Repeat(" ", m.sourceGutterWidth())
 	}
 
 	var b strings.Builder
 	for _, line := range strings.Split(box, "\n") {
 		b.WriteString(prefix + line + "\n")
 	}
-	button.translate(gutterWidth+2, 1)
+	button.translate(m.sourceGutterWidth()+2, 1)
 	return b.String(), button
 }
 

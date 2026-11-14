@@ -55,7 +55,7 @@ func (l *renderedContentLayout) appendSourceRow(b *strings.Builder, block, plain
 		l.appendSourceBlock(b, block, target)
 		return
 	}
-	l.textSpans = append(l.textSpans, contentTextSpan{row: len(l.rows), left: gutterWidth,
+	l.textSpans = append(l.textSpans, contentTextSpan{row: len(l.rows), left: l.gutter,
 		ref: lineRef{line: target.line, side: target.side}, text: plain})
 	l.appendBlock(b, block, target)
 }
@@ -65,9 +65,9 @@ func (l *renderedContentLayout) addTextSpan(row, left, column int, text string, 
 		return
 	}
 	l.textSpans = append(l.textSpans, contentTextSpan{
-		row: row, left: left + gutterWidth, column: column,
+		row: row, left: left + l.gutter, column: column,
 		ref:  lineRef{line: target.line, side: target.side},
-		text: ansi.Strip(ansi.Cut(text, gutterWidth, ansi.StringWidth(text))),
+		text: ansi.Strip(ansi.Cut(text, l.gutter, ansi.StringWidth(text))),
 	})
 }
 

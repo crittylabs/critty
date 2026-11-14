@@ -302,7 +302,7 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 }
 
 func (m AppModel) markdownImageSize(img *inlineImage) (int, int) {
-	return img.size(min(44, m.contentViewport.Width()-gutterWidth), min(19, max(5, m.contentViewport.Height())), m.images.cell)
+	return img.size(min(44, m.contentViewport.Width()-m.sourceGutterWidth()), min(19, max(5, m.contentViewport.Height())), m.images.cell)
 }
 
 func (m AppModel) markdownImageVisible(ref markdownImage) bool {
@@ -442,7 +442,7 @@ func (m *AppModel) renderMarkdownImages(line int, before bool) string {
 	if !m.images.enabled || m.images.hidden {
 		return ""
 	}
-	width := max(1, m.contentViewport.Width()-gutterWidth)
+	width := max(1, m.contentViewport.Width()-m.sourceGutterWidth())
 	var blocks []string
 	for _, ref := range m.tab().markdownImages {
 		if ref.line != line || ref.before != before {
@@ -465,7 +465,7 @@ func (m *AppModel) renderMarkdownImages(line int, before bool) string {
 	if len(rows) == 0 {
 		return ""
 	}
-	return lipgloss.NewStyle().PaddingLeft(gutterWidth).Render(strings.Join(rows, "\n"))
+	return lipgloss.NewStyle().PaddingLeft(m.sourceGutterWidth()).Render(strings.Join(rows, "\n"))
 }
 
 func (m *AppModel) toggleImages() tea.Cmd {

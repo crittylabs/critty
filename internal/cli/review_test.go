@@ -308,3 +308,26 @@ func TestOverallSubmissionSurvivesCustomPrompts(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapWidthOverrideAndLaunch(t *testing.T) {
+	previousWidth, previousChanged := maxWrapWidth, maxWrapWidthFlag.Changed
+	t.Cleanup(func() { maxWrapWidth, maxWrapWidthFlag.Changed = previousWidth, previousChanged })
+	cfg := &config.Config{MaxWrapWidth: 80}
+	maxWrapWidthFlag.Changed = false
+	if configuredWrapWidth(cfg) != 80 {
+		t.Fatal("configuration ignored")
+	}
+	for _, width := range []int{0, 60} {
+		maxWrapWidth, maxWrapWidthFlag.Changed = width, true
+		if configuredWrapWidth(cfg) != width {
+			t.Fatal("explicit CLI width ignored")
+		}
+		command, err := buildTUICommand(&reviewMode{sessionKey: "0123456789ab"}, "tmux")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(command, fmt.Sprintf(" --max-wrap-width %d", width)) {
+			t.Fatalf("launcher lost width: %s", command)
+		}
+	}
+}
