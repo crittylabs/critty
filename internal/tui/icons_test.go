@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,80 @@ import (
 	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
+
+func TestNerdFontHeaderControls(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		for _, width := range []int{45, 80, 120} {
+			t.Run(fmt.Sprintf("dark=%t/width=%d", dark, width), func(t *testing.T) {
+				initAdaptiveStyles(dark)
+				app := patchApp(t, whitespacePatch)
+				app.icons = icons.Nerd
+				app.width, app.patch = width, nil
+				app.project, app.branch = "sample", "feature/viewer"
+				app.reload.watch, app.images.enabled = true, true
+				app.recalculateLayout()
+				app.rebuildContent()
+				app.updateCommentSidebar()
+				if width == 120 {
+					bar := ansi.Strip(app.renderReviewBar())
+					for _, label := range []string{icons.Nerd.Label(icons.Project, "sample"), icons.Nerd.Label(icons.Branch, "feature/viewer")} {
+						if !strings.Contains(bar, label) {
+							t.Fatalf("header context missing: %q in %s", label, bar)
+						}
+					}
+				}
+				_, layout := app.renderReviewScreen()
+				for _, control := range []struct {
+					icon    string
+					button  string
+					rect    mouseRect
+					visible bool
+				}{
+					{icons.Nerd.Glyph(icons.Watch, ""), app.watchIndicator(), layout.watchIndicator, layout.hasWatchIndicator},
+					{"", app.splitButton(), layout.splitButton, layout.hasSplitButton},
+					{"", app.whitespaceButton(), layout.whitespaceButton, layout.hasWhitespaceButton},
+					{"", app.imagesButton(), layout.imagesButton, layout.hasImagesButton},
+				} {
+					if !control.visible || control.rect.left < 0 || control.rect.right > width || control.rect.bottom > app.height {
+						t.Fatalf("control %q unreachable: %+v", control.button, control.rect)
+					}
+					if control.icon != "" && !strings.Contains(control.button, control.icon) {
+						t.Fatalf("control %q icon missing", control.button)
+					}
+				}
+				app = clickMouse(app, layout.splitButton.left, layout.splitButton.top)
+				if !app.split {
+					t.Fatal("split button did not toggle split")
+				}
+				_, after := app.renderReviewScreen()
+				if after.splitButton != layout.splitButton {
+					t.Fatal("split state shifted header targets")
+				}
+				app = clickMouse(app, after.whitespaceButton.left, after.whitespaceButton.top)
+				if !app.ignoreWhitespace {
+					t.Fatal("whitespace button did not toggle filtering")
+				}
+				_, after = app.renderReviewScreen()
+				app = clickMouse(app, after.watchIndicator.left, after.watchIndicator.top)
+				if app.reload.watch {
+					t.Fatal("watch icon did not turn off watching")
+				}
+				_, after = app.renderReviewScreen()
+				app = clickMouse(app, after.imagesButton.left, after.imagesButton.top)
+				if !app.images.hidden {
+					t.Fatal("image button did not hide previews")
+				}
+				for _, line := range strings.Split(app.renderReviewBar(), "\n") {
+					if ansi.StringWidth(line) > width {
+						t.Fatal("header exceeds terminal width")
+					}
+				}
+			})
+		}
+	}
+}
 
 func TestOutlineSymbolKinds(t *testing.T) {
 	for _, tc := range []struct {

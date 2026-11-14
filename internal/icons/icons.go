@@ -52,6 +52,9 @@ const (
 	Constant
 	Variable
 	Heading
+	Project
+	Branch
+	Watch
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -67,6 +70,7 @@ var glyphs = [...]string{
 	Function: "\U000f0295", Method: "\uea8c", Class: "\ueb5b", Struct: "\uea91",
 	Interface: "\ueb61", Enum: "\uea95", Namespace: "\uea8b", Constant: "\ueb5d",
 	Variable: "\uea88", Heading: "\ueb1d",
+	Project: "\ueb30", Branch: "\uf418", Watch: "\uea70",
 }
 
 func (s Set) Glyph(kind Kind, fallback string) string {

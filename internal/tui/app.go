@@ -2951,7 +2951,7 @@ func (m AppModel) renderReviewBar() string {
 	subject += "."
 	text := renderBrand() + reviewBarStyle.Render(" ")
 	if m.project != "" {
-		text += reviewBarStyle.Bold(true).Render(headerLabel(m.project))
+		text += reviewBarStyle.Bold(true).Render(m.icons.Label(icons.Project, headerLabel(m.project)))
 		text += m.branchLabel(reviewBarStyle.Foreground(textSecondary))
 		if m.topic != "" && m.topic != m.branch {
 			text += reviewBarStyle.Render(" · " + headerLabel(m.topic))
@@ -3026,7 +3026,7 @@ func (m AppModel) branchLabel(style lipgloss.Style) string {
 	if m.branch == "" {
 		return ""
 	}
-	return style.Bold(false).Render(" (" + headerLabel(m.branch) + ")")
+	return style.Bold(false).Render(" (" + m.icons.Label(icons.Branch, headerLabel(m.branch)) + ")")
 }
 
 func headerLabel(value string) string {

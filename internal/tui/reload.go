@@ -12,6 +12,7 @@ import (
 
 	"github.com/crittylabs/critty/internal/document"
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -405,7 +406,7 @@ func (m AppModel) watchIndicator() string {
 	if !m.CanWatch() || !m.reload.watch {
 		return ""
 	}
-	return modalBtnFocusedKey.Render("W") + modalBtnFocusedLabel.Bold(true).Padding(0).Render("atch: on")
+	return m.iconBarButton(icons.Watch, modalBtnFocusedKey.Render("W")+modalBtnFocusedLabel.Bold(true).Padding(0).Render("atch: on"))
 }
 
 func (m AppModel) renderReloadStatus() string {

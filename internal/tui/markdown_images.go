@@ -12,11 +12,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	gitpkg "github.com/crittylabs/critty/internal/git"
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/parser"
 	"github.com/yuin/goldmark/v2/util"
 	nethtml "golang.org/x/net/html"
+
+	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
 type markdownImage struct {

@@ -7,6 +7,13 @@ import (
 	"github.com/crittylabs/critty/internal/icons"
 )
 
+func (m AppModel) iconBarButton(kind icons.Kind, button string) string {
+	if !m.icons {
+		return button
+	}
+	return modalBtnFocusedLabel.Padding(0).Render(m.icons.Glyph(kind, "")+" ") + button
+}
+
 func fileIcon(path string, binary bool) icons.Kind {
 	if path == overallCommentsPath {
 		return icons.Comment
