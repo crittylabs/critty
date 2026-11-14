@@ -1012,7 +1012,9 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case contentPane:
 		m.contentViewport, cmd = m.contentViewport.Update(msg)
 	case commentPane:
-		if m.sidebarView == filesView {
+		if m.singleFileView() {
+			m.outline.viewport, cmd = m.outline.viewport.Update(msg)
+		} else if m.sidebarView == filesView {
 			m.fileTree.viewport, cmd = m.fileTree.viewport.Update(msg)
 		} else {
 			m.commentViewport, cmd = m.commentViewport.Update(msg)
@@ -1275,6 +1277,9 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Tab):
 		if !t.selecting {
+			if m.singleFileView() && len(m.outline.rows) == 0 {
+				return m, nil
+			}
 			if m.viewMode {
 				m.viewMode = false
 				m.recalculateLayout()
@@ -2723,7 +2728,7 @@ func (m *AppModel) updateCommentSidebar() {
 	if t.sidebarCursor < 0 {
 		t.sidebarCursor = 0
 	}
-	if m.viewMode {
+	if m.viewMode || m.singleFileView() {
 		m.commentViewport.SetContent("")
 		return
 	}
@@ -3175,7 +3180,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	contentPane := renderPane(m.renderTabBar(), contentBox, lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
 
 	mainRow := contentPane
-	if !m.viewMode {
+	if m.sidebarVisible() {
 		mainRow = lipgloss.JoinHorizontal(lipgloss.Top, contentPane, m.renderSidebarPane())
 	}
 
@@ -4056,8 +4061,16 @@ func (m *AppModel) highlightedCommentLines() (int, int, string) {
 	return 0, 0, ""
 }
 
+func (m AppModel) singleFileView() bool {
+	return m.readOnly && len(m.tabs) == 1
+}
+
+func (m AppModel) sidebarVisible() bool {
+	return !m.viewMode && (!m.singleFileView() || len(m.outline.rows) > 0)
+}
+
 func (m AppModel) commentPanelWidth() int {
-	if m.viewMode {
+	if !m.sidebarVisible() {
 		return 0
 	}
 	minimum := 26 // room for the Comments and Files tabs
@@ -4107,6 +4120,12 @@ func (m AppModel) sidebarTabs() []string {
 		m.icons.Label(icons.FolderOpen, "Files"),
 		m.icons.Label(icons.Comment, fmt.Sprintf("Comments (%d)", unresolvedCommentCount(m.tab().state.Comments))),
 	}
+	if m.singleFileView() {
+		if len(m.outline.rows) == 0 {
+			return nil
+		}
+		labels = []string{m.icons.Label(icons.Outline, "Outline")}
+	}
 	tabs := make([]string, len(labels))
 	for i, label := range labels {
 		style := inactiveTabStyle
@@ -4120,7 +4139,7 @@ func (m AppModel) sidebarTabs() []string {
 
 // sidebarTabAt returns the sidebar view whose tab spans screen column x.
 func (m AppModel) sidebarTabAt(x int) (sidebarView, bool) {
-	if m.viewMode {
+	if !m.sidebarVisible() {
 		return 0, false
 	}
 	left := m.contentPaneWidth() + 2
@@ -4134,9 +4153,8 @@ func (m AppModel) sidebarTabAt(x int) (sidebarView, bool) {
 	return 0, false
 }
 
-// renderSidebarPane renders the sidebar as a pane with Comments and Files
-// tabs, matching the height of the content pane.  Focus brightens the
-// border color, as with inline comment boxes.
+// renderSidebarPane frames the available sidebar tabs and their current view.
+// Focus brightens the border color, as with inline comment boxes.
 func (m AppModel) renderSidebarPane() string {
 	width := m.commentPanelWidth()
 	border := lipgloss.RoundedBorder()
@@ -4173,8 +4191,8 @@ func fillTabRow(row string, width int, border lipgloss.Border, style lipgloss.St
 
 func (m *AppModel) commentBounds() (left, top, right, bottom int) {
 	_, top, left, bottom = m.contentBounds()
-	if m.viewMode {
-		return left, top, left + m.commentPanelWidth(), bottom
+	if !m.sidebarVisible() {
+		return left, top, left, bottom
 	}
 	left = m.contentPaneWidth() + 1
 	return left, top, m.width - 1, bottom
@@ -4282,7 +4300,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	left, top, right, bottom := m.commentBounds()
-	if !m.viewMode && mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
+	if m.sidebarVisible() && mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
 		if m.sidebarView == filesView {
 			m.scrollFilesSidebar(mouse.Y-top, direction*3)
 			return m, nil
@@ -4304,7 +4322,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	left, top, right, bottom = m.contentBounds()
-	if mouse.X < left || (!m.viewMode && mouse.X >= right) || mouse.Y < top || mouse.Y >= bottom {
+	if mouse.X < left || (m.sidebarVisible() && mouse.X >= right) || mouse.Y < top || mouse.Y >= bottom {
 		return m, nil
 	}
 	if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && target.annotation && mouse.X >= left+gutterWidth {
@@ -4419,7 +4437,12 @@ func (m AppModel) renderFooterHints() string {
 		if t.selecting {
 			items = []string{k("esc", "cancel"), k("v", "toggle select"), k("M-w", "copy reference")}
 		} else {
-			items = []string{k("s", "sidebar"), k("t", "files/comments"), k("o/M-o", "follow link"), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close")}
+			items = []string{k("o/M-o", "follow link"), k("v", "select lines"), k("M-w", "copy reference"), k("q", "close")}
+			if !m.singleFileView() {
+				items = append([]string{k("s", "sidebar"), k("t", "files/comments")}, items...)
+			} else if len(m.outline.rows) > 0 {
+				items = append([]string{k("s/t", "file/outline"), k("V", "hide/show outline")}, items...)
+			}
 		}
 	} else if t.selecting {
 		items = []string{
@@ -4591,28 +4614,37 @@ func renderHelpGroup(title string, items []helpItem, width int) string {
 
 func (m AppModel) renderHelp(innerWidth int) string {
 	if m.readOnly {
-		return renderHelpGroup("View (read-only)", []helpItem{
+		items := []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
 			{keys: "↑/↓,k/j", desc: "⇅ move"},
 			{keys: "PgUp/PgDn · M-v/C-v", desc: "⇅ scroll file (2-row overlap)"},
 			{keys: "Home/End,g/G,</> · M-</M->", desc: "⇅ file top/bottom"},
 			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
-			{keys: "V · O", desc: "reading view / open all comments"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "o/M-o · click", desc: "follow a link or open an image; local files stay in the viewer"},
 			{keys: "M-←/M-→ · M-b/M-f · Back/Forward", desc: "restore previous/next document and reading position (up to 64 visits)"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
 			{keys: "v · esc", desc: "select lines / cancel"},
 			{keys: "M-w", desc: "copy selected text or reference"},
-			{keys: "s/t", desc: "toggle sidebar / view"},
-			{keys: "M-G", desc: "focus outline"},
-			{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline"},
-			{keys: "enter/esc", desc: "outline: return to source"},
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "M-? · esc", desc: "help / close help"},
-		}, innerWidth) + renderHostHelp(reviewHost(), innerWidth)
+		}
+		if m.singleFileView() {
+			if len(m.outline.rows) > 0 {
+				items = append(items, helpItem{keys: "s/t · M-G", desc: "focus file/outline"},
+					helpItem{keys: "V", desc: "hide/show outline"},
+					helpItem{keys: "enter/esc", desc: "outline: return to source"})
+			}
+		} else {
+			items = append(items, helpItem{keys: "V · O", desc: "reading view / open all comments"},
+				helpItem{keys: "s/t", desc: "toggle sidebar / view"},
+				helpItem{keys: "M-G", desc: "focus outline"},
+				helpItem{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline"},
+				helpItem{keys: "enter/esc", desc: "outline: return to source"})
+		}
+		return renderHelpGroup("View (read-only)", items, innerWidth) + renderHostHelp(reviewHost(), innerWidth)
 	}
 	columnWidth := (innerWidth - 4) / 3
 	general := renderHelpGroup("General", []helpItem{

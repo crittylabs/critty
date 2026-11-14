@@ -92,6 +92,18 @@ func outlineHeadingText(n ast.Node, source []byte) string {
 // Short outlines give unused space back to the file tree.
 func (m *AppModel) layoutFilesSidebar() {
 	height := m.commentViewport.Height()
+	if m.singleFileView() {
+		if len(m.outline.rows) == 0 {
+			height = 0
+		}
+		m.fileTree.viewport.SetWidth(m.commentViewport.Width())
+		m.fileTree.viewport.SetHeight(0)
+		m.outline.viewport.SetWidth(m.commentViewport.Width())
+		m.outline.viewport.SetHeight(height)
+		m.outline.focused = height > 0
+		m.outline.dragging = false
+		return
+	}
 	size := 0
 	if len(m.outline.rows) > 0 && height >= 6 {
 		requested := height / 2
@@ -129,9 +141,19 @@ func (m *AppModel) syncOutline() {
 		}
 	}
 	changed := source != o.source
+	hadOutline := len(o.rows) > 0
 	previous := o.active
 	previousHeight := o.viewport.Height()
 	o.source, o.rows, o.active = source, rows, -1
+	if m.singleFileView() {
+		m.sidebarView = filesView
+		if len(rows) == 0 && m.focused == commentPane {
+			m.focused = contentPane
+		}
+		if hadOutline != (len(rows) > 0) && m.width > 0 {
+			m.recalculateLayout()
+		}
+	}
 	if source != nil {
 		line := m.tab().cursorLine
 		if m.tab().cursorSide == "old" {
@@ -202,6 +224,9 @@ func (m *AppModel) revealOutlineHeading() {
 }
 
 func (m AppModel) renderFilesSidebar() string {
+	if m.singleFileView() {
+		return m.outline.viewport.View()
+	}
 	view := m.fileTree.viewport.View()
 	if m.outline.viewport.Height() == 0 {
 		return view
@@ -235,6 +260,9 @@ func (m AppModel) outlineHint() string {
 		return footerKeyStyle.Render("M-G") + " " + footerDescStyle.Render("outline")
 	}
 	if m.sidebarView == filesView {
+		if m.singleFileView() {
+			return footerKeyStyle.Render("RET/ESC") + " " + footerDescStyle.Render("file")
+		}
 		return footerKeyStyle.Render("C-↑/↓") + " " + footerDescStyle.Render("⇅ tree/outline")
 	}
 	return ""
@@ -261,7 +289,7 @@ func (m *AppModel) focusOutline() {
 
 func (m *AppModel) handleFilesSidebarKey(msg tea.KeyPressMsg) bool {
 	o := &m.outline
-	if o.viewport.Height() > 0 {
+	if !m.singleFileView() && o.viewport.Height() > 0 {
 		switch msg.String() {
 		case "ctrl+down", "ctrl+up":
 			o.focused = msg.String() == "ctrl+down"
@@ -322,6 +350,11 @@ func (m *AppModel) handleFilesSidebarKey(msg tea.KeyPressMsg) bool {
 
 func (m *AppModel) handleFilesSidebarClick(row int) {
 	o := &m.outline
+	if m.singleFileView() {
+		m.focused, o.focused = commentPane, true
+		m.jumpOutline(row + o.viewport.YOffset())
+		return
+	}
 	treeHeight := m.fileTree.viewport.Height()
 	if o.viewport.Height() > 0 && row >= treeHeight {
 		m.focused, o.focused = commentPane, true
@@ -340,7 +373,7 @@ func (m *AppModel) handleFilesSidebarClick(row int) {
 
 func (m *AppModel) scrollFilesSidebar(row, delta int) {
 	vp := &m.fileTree.viewport
-	if m.outline.viewport.Height() > 0 && row > m.fileTree.viewport.Height() {
+	if m.singleFileView() || m.outline.viewport.Height() > 0 && row > m.fileTree.viewport.Height() {
 		vp = &m.outline.viewport
 	}
 	if delta < 0 {

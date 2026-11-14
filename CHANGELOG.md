@@ -14,6 +14,7 @@
 
 ### Changed
 
+- **Single-file viewing**: Read files at full width when no outline is available.  Files with headings or declarations show an Outline sidebar without Files or Comments tabs; hide it to use the full width.
 - **Markdown section dividers**: Thematic breaks extend across the available text width and use the same muted gray as frontmatter boundaries.  Resizing keeps the rule within its pane.  Rules select as a whole and copy as their original Markdown.
 - **Shell completion**: Complete subcommands and filenames together after `critty`, with subcommands listed first in shells that support ordered candidates.  Explicit paths keep native file completion.
 - **Document viewing by default**: `critty <file[:LINE]>` opens a read-only view in the current terminal without saving a review or migrating stored data.  Use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes, and `--session` still resumes a saved review.
@@ -22,7 +23,7 @@
 ### Fixed
 
 - **Project path display**: Resolve `.` and `..` before highlighting repository boundaries or abbreviating paths in headers, tabs, and the file tree.  A path such as `foo/../bar/notes.md` now identifies `bar` rather than highlighting the departed `foo` project.
-- **Viewer controls**: Read-only views show the same image-preview status and clickable toggle as reviews, including unavailable terminals.  Sidebar, file-switching, and change-navigation hints are also available; line selection shows cancel and copy actions.
+- **Viewer controls**: Read-only views show the same image-preview status and clickable toggle as reviews, including unavailable terminals.  Sidebar, file-switching, and change-navigation hints appear when applicable; line selection shows cancel and copy actions.
 - **Markdown colors on dark terminals**: Inline code shows its shaded background immediately after opening a document in a dark terminal.
 
 ## 1.11.2

@@ -522,6 +522,15 @@ func (m *AppModel) handleFileTreeClick(row int) {
 // toggleSidebarView switches the sidebar between the file tree and the
 // comments and focuses it.
 func (m *AppModel) toggleSidebarView() {
+	if m.singleFileView() {
+		if m.focused == commentPane {
+			m.focused = contentPane
+			m.rebuildContent()
+		} else {
+			m.focusOutline()
+		}
+		return
+	}
 	if m.viewMode {
 		m.viewMode = false
 		m.recalculateLayout()

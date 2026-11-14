@@ -1169,7 +1169,7 @@ func TestReadOnlyViewer(t *testing.T) {
 	if !strings.Contains(plain, "View the document.") || strings.Contains(plain, "read-only") || strings.Contains(plain, "Review the") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
 		t.Fatalf("missing read-only UI: %s", plain)
 	}
-	for _, hint := range []string{"Images:", "s sidebar", "t files/comments"} {
+	for _, hint := range []string{"Images:", "s/t file/outline"} {
 		if !strings.Contains(ansi.Strip(app.renderFooter()), hint) {
 			t.Fatalf("missing view footer control: %s", hint)
 		}

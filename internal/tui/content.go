@@ -68,8 +68,8 @@ func (m *AppModel) rebuildContent() {
 	}
 	t := m.tab()
 	t.ensureHighlightCache()
-	m.prepareRenderedDisplay()
 	m.syncOutline()
+	m.prepareRenderedDisplay()
 	t.unread = false
 	if m.alternateDiff(t) {
 

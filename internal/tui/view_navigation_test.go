@@ -7,8 +7,112 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/crittylabs/critty/internal/document"
 )
+
+func TestSingleFileViewSidebar(t *testing.T) {
+	for _, tc := range []struct {
+		name, content string
+		outline, nerd bool
+	}{
+		{"plain.txt", "Example text.\n", false, false},
+		{"plain.md", "Example text.\n", false, true},
+		{"outlined.md", "# Root\n\n## Child\n", true, false},
+		{"nested.md", "# Reading notes\n\n## Navigation\n\n## Details\n", true, true},
+		{"outlined.go", "package example\n\nfunc Run() {}\n", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), tc.name)
+			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			app := NewApp(path, AppConfig{ReadOnly: true, NerdFonts: tc.nerd})
+			app, _ = updateApp(app, docRenderedMsg{})
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 25})
+			if app.sidebarVisible() != tc.outline || app.fileTree.viewport.Height() != 0 {
+				t.Fatalf("sidebar=%t tree height=%d", app.sidebarVisible(), app.fileTree.viewport.Height())
+			}
+			tabs := app.sidebarTabs()
+			if tc.outline {
+				if len(tabs) != 1 || !strings.HasSuffix(strings.TrimSpace(ansi.Strip(tabs[0])), "Outline") || app.outline.viewport.Height() != app.commentViewport.Height() {
+					t.Fatalf("outline does not fill its only sidebar tab: %v", tabs)
+				}
+			} else {
+				if len(tabs) != 0 || app.contentViewport.Width() != app.width-2 {
+					t.Fatal("view without an outline is not full width")
+				}
+				for _, key := range []rune{'s', 't'} {
+					app = pressKey(app, key)
+					if app.focused != contentPane || app.sidebarVisible() {
+						t.Fatal("sidebar shortcut focused an unavailable sidebar")
+					}
+				}
+			}
+			if help := ansi.Strip(app.renderHelp(80)); strings.Contains(help, "files/comments") || strings.Contains(help, "tree/outline") || strings.Contains(help, "open all comments") {
+				t.Fatal("single-file Help advertises unavailable comment or tree controls")
+			}
+			if screen := ansi.Strip(app.View().Content); strings.Contains(screen, "Comments (") || strings.Contains(screen, "files/comments") {
+				t.Fatal("single-file view exposes comment controls")
+			}
+			rows := strings.Split(app.View().Content, "\n")
+			_, top, _, bottom := app.contentBounds()
+			for y := top; y < bottom; y++ {
+				if ansi.StringWidth(rows[y]) != app.width || ansi.Strip(ansi.Cut(rows[y], app.width-1, app.width)) != "│" {
+					t.Fatalf("row %d does not end with a border at column %d: %q", y, app.width, rows[y])
+				}
+			}
+		})
+	}
+}
+
+func TestSingleFileViewOutlineInteraction(t *testing.T) {
+	app := newViewNavigationApp(t, "# Root\n\n## Child\n\n## Sibling\n")
+	left, top, _, _ := app.commentBounds()
+	app = clickMouse(app, left+3, top+1)
+	if app.tab().cursorLine != 3 || app.focused != commentPane || !app.outline.focused {
+		t.Fatal("outline row click did not select the corresponding source line")
+	}
+	app = pressKey(app, tea.KeyEsc)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'G', Mod: tea.ModAlt})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModCtrl})
+	app = pressKey(app, 'j')
+	if app.tab().cursorLine != 5 || !app.outline.focused {
+		t.Fatal("outline keys focused the hidden tree or lost navigation")
+	}
+	app = pressKey(app, 'V')
+	if app.sidebarVisible() || app.contentViewport.Width() != app.width-2 {
+		t.Fatal("reading view did not hide the outline")
+	}
+	app = pressKey(app, 's')
+	if !app.sidebarVisible() || !app.outline.focused || app.focused != commentPane {
+		t.Fatal("sidebar shortcut did not restore the outline")
+	}
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 45, Height: 12})
+	app = pressKey(app, tea.KeyEsc)
+	app = clickMouse(app, app.contentPaneWidth()+3, app.headerHeight())
+	if app.focused != commentPane || !app.outline.focused || app.fileTree.viewport.Height() != 0 {
+		t.Fatal("resized Outline tab did not focus its content")
+	}
+}
+
+func TestSingleFileViewOutlineAvailability(t *testing.T) {
+	app := newViewNavigationApp(t, "# Root\n\n## Child\n")
+	plain := filepath.Join(filepath.Dir(app.tab().path), "plain.md")
+	if err := os.WriteFile(plain, []byte("Example text.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app.focusOutline()
+	followViewTestLink(t, &app, "plain.md")
+	if app.sidebarVisible() || app.focused != contentPane || app.contentViewport.Width() != app.width-2 {
+		t.Fatal("navigation to a document without headings retained the outline pane or focus")
+	}
+	app.stepViewHistory(false)
+	if !app.sidebarVisible() || len(app.sidebarTabs()) != 1 || app.outline.viewport.Height() != app.commentViewport.Height() {
+		t.Fatal("Back did not restore the document's outline")
+	}
+}
 
 func newViewNavigationApp(t *testing.T, content string) AppModel {
 	t.Helper()
