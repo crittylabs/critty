@@ -476,7 +476,8 @@ func (m *AppModel) rebuildDiffContent() {
 	}
 	m.mapMathRanges(&layout)
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
+	content := m.shadeMarkdownCodeBlocks(b.String(), &m.contentLayout, width)
+	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(content, &m.contentLayout, groups)))
 }
 
 func updateDiffRange(ranges map[int]renderedRange, line, row int) {

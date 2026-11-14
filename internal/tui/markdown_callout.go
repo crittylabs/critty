@@ -69,15 +69,7 @@ func calloutType(name string) calloutKind {
 }
 
 func calloutTitleBackground(kind calloutKind) color.Color {
-	red, green, blue, _ := calloutColor(kind).RGBA()
-	backgroundRed, backgroundGreen, backgroundBlue, _ := terminalBackground.RGBA()
-	const tint = 12
-	return color.RGBA{
-		R: uint8((backgroundRed*(100-tint) + red*tint) / 100 >> 8),
-		G: uint8((backgroundGreen*(100-tint) + green*tint) / 100 >> 8),
-		B: uint8((backgroundBlue*(100-tint) + blue*tint) / 100 >> 8),
-		A: 255,
-	}
+	return tintedBackground(calloutColor(kind), 12)
 }
 
 func calloutIcon(kind calloutKind, symbols icons.Set) string {

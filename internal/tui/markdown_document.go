@@ -74,6 +74,7 @@ type markdownLine struct {
 	thematicBreak bool
 	ruleStart     int
 	literal       bool
+	codeBlock     bool
 	previewTokens []markdownToken
 	previewHidden bool
 	previewMap    []previewDisplaySpan
@@ -132,6 +133,7 @@ type markdownSource struct {
 	suggestionLexer chroma.Lexer
 	syntax          *syntax.Rules
 	symbols         icons.Set
+	hasCodeBlocks   bool
 }
 
 func parseMarkdownSource(lines []string, known map[int]bool, suggestion ...chroma.Lexer) *markdownSource {
@@ -224,8 +226,14 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 				if fence := m.addCodeFence(block, data, m.offsets[start]); fence != nil {
 					info.start, info.end = info.start+m.offsets[start], info.end+m.offsets[start]
 					m.styleCodeFence(*fence, info)
+					m.markCodeRows(fence.start, fence.end)
 				}
 				m.highlightCodeBlock(block, data, m.offsets[start], info.lexer)
+			} else if block.CodeBlockKind == ast.CodeBlockKindIndented && !incomplete {
+				segments := block.Value.Segments()
+				if len(segments) > 0 {
+					m.markCodeRows(m.offsets[start]+segments[0].Start, m.offsets[start]+segments[len(segments)-1].Stop)
+				}
 			}
 			return
 		case *ast.HTMLBlock:

@@ -120,11 +120,23 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int, 
 			}
 			content = style.Render(renderSource.lines[i].render(nil, style, style, links))
 		}
+		prefixWidth := 0
 		if !prefixed && prefix != "" {
 			content = style.Bold(true).Render(prefix) + content
+			prefixWidth = ansi.StringWidth(prefix)
 		}
 		prefixed = true
-		lines = append(lines, strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")...)
+		rows := strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")
+		if renderSource != nil && renderSource.lines[i].codeBlock && renderSource.lines[i].previewTokens == nil {
+			for row := range rows {
+				left := 0
+				if row == 0 {
+					left = prefixWidth
+				}
+				rows[row] = shadeCodeRow(rows[row], left, width)
+			}
+		}
+		lines = append(lines, rows...)
 		if !showImages {
 			continue
 		}

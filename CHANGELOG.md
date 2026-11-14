@@ -11,7 +11,7 @@
 - **Markdown in comment threads**: Read bold, italic, inline code, headings, and block quotes in the comment sidebar, inline threads, and reply context, including formatting that spans source lines.  Regular and emphasized text retain each author's color; links and code keep their dedicated colors.
 - **Keyboard labels in Markdown**: Read `<kbd>` labels as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested key combinations keep a single pair of brackets per key, and copying retains the Markdown source without the display brackets.
 - **External link markers**: Identify HTTP(S) links by a clickable `↗` after their label in documents and comments.  Copying keeps the Markdown source without the display marker.
-- **Syntax highlighting in Markdown code blocks**: Read fenced code in documents, comments, and the comment editor with colors for light and dark terminals.  Recognized language names use the accent color; fence markers and attributes stay muted.  Language names can also use the first class in `{#id .language key="value"}` attributes.  `suggestion` blocks in comments use the target file's language.  Multiline strings and comments keep their context; blocks without a recognized language remain plain text.
+- **Markdown code blocks**: Distinguish fenced and indented code in documents and comments with a faint background across blank lines, wrapped rows, and the available text width.  Selection, search, and diff colors retain priority, and copying excludes decorative padding.  Fenced code also has syntax highlighting in documents, comments, and the comment editor for light and dark terminals.  Recognized language names use the accent color; fence markers and attributes stay muted.  Language names can use the first class in `{#id .language key="value"}` attributes.  `suggestion` blocks use the target file's language.  Multiline strings and comments keep their context; unrecognized languages remain plain text.
 - **Document browsing in view mode**: Follow local file and heading links without adding tabs, reusing existing tabs when available.  Back and Forward restore documents and reading positions, with up to 64 visits held in memory.  Web links open in the browser, and files Critty cannot display offer external opening.  Review editing remains disabled, and navigation saves no review or history files.
 
 ### Changed
@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- **Copying across blank Markdown lines**: Dragging a selection across blank lines retains one continuous source range instead of inserting extra closing code fences between fragments.
 - **Dimmed sidebar selections**: The current file and outline heading keep a uniform row background behind dialogs, including the blank space after their labels, in light and dark terminals.
 - **Project path display**: Resolve `.` and `..` before highlighting repository boundaries or abbreviating paths in headers, tabs, and the file tree.  A path such as `foo/../bar/notes.md` now identifies `bar` rather than highlighting the departed `foo` project.
 - **Viewer controls**: Read-only views show the same image-preview status and clickable toggle as reviews, including unavailable terminals.  Sidebar, file-switching, and change-navigation hints appear when applicable; line selection shows cancel and copy actions.

@@ -621,6 +621,17 @@ func fgToAnsi(c color.Color) string {
 	return colorToAnsi(c, 30)
 }
 
+func tintedBackground(foreground color.Color, tint uint32) color.Color {
+	red, green, blue, _ := foreground.RGBA()
+	backgroundRed, backgroundGreen, backgroundBlue, _ := terminalBackground.RGBA()
+	return color.RGBA{
+		R: uint8((backgroundRed*(100-tint) + red*tint) / 100 >> 8),
+		G: uint8((backgroundGreen*(100-tint) + green*tint) / 100 >> 8),
+		B: uint8((backgroundBlue*(100-tint) + blue*tint) / 100 >> 8),
+		A: 255,
+	}
+}
+
 // colorToAnsi returns the SGR sequence for c, with base 30 for the
 // foreground or 40 for the background.
 func colorToAnsi(c color.Color, base int) string {

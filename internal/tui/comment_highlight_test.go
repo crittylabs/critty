@@ -29,7 +29,11 @@ func TestCommentCodeHighlighting(t *testing.T) {
 				t.Fatal("code in comments has no syntax tokens with images hidden")
 			}
 			view := app.renderCommentContent("Reviewer", body, "", 80)
-			if !strings.Contains(ansi.Strip(view), code) {
+			plainRows := strings.Split(ansi.Strip(view), "\n")
+			for i := range plainRows {
+				plainRows[i] = strings.TrimRight(plainRows[i], " ")
+			}
+			if !strings.Contains(strings.Join(plainRows, "\n"), code) {
 				t.Fatalf("code changed during comment rendering: %q", view)
 			}
 			want := parsed.lines[1].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)

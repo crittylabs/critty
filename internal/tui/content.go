@@ -530,7 +530,8 @@ func (m *AppModel) rebuildContent() {
 
 	m.mapMathRanges(&layout)
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
+	content := m.shadeMarkdownCodeBlocks(b.String(), &m.contentLayout, contentWidth)
+	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(content, &m.contentLayout, groups)))
 }
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.

@@ -236,7 +236,7 @@ func (m *AppModel) selectedText() string {
 				source = m.tab().markdown.before
 			}
 			first.ref.line = max(1, sort.Search(len(source.offsets), func(i int) bool { return source.offsets[i] > start }))
-			last.ref.line = max(1, sort.Search(len(source.offsets), func(i int) bool { return source.offsets[i] >= end }))
+			last.ref.line = max(first.ref.line, sort.Search(len(source.offsets), func(i int) bool { return source.offsets[i] >= end }))
 		}
 		if len(ranges) > 0 {
 			previous := &ranges[len(ranges)-1]
