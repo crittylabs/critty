@@ -52,6 +52,10 @@ func TestTextconvReviewSources(t *testing.T) {
 			if err != nil || string(content) != tc.want+"\nsame\n" {
 				t.Fatalf("content=%q, err=%v", content, err)
 			}
+			contents, err := s.TextContents(files)
+			if err != nil || string(contents[path]) != string(content) {
+				t.Fatalf("batch content=%q, err=%v", contents[path], err)
+			}
 			diff, err := s.Diff(path, "")
 			if err != nil || diff == nil || !diff.ChangedLines[1] || diff.DeletedAfter[0][0].Content != tc.old {
 				t.Fatalf("diff=%+v, err=%v", diff, err)

@@ -42,6 +42,37 @@ func TestInitialLoadSharesContentWithRoundSnapshot(t *testing.T) {
 	}
 }
 
+func TestInitialGitLoadKeepsAttachmentsAndStagedContent(t *testing.T) {
+	dir := newGitRepo(t)
+	if err := os.WriteFile("note.md", []byte("Staged content\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	runGitIn(t, dir, "add", ".")
+	if err := os.WriteFile("note.md", []byte("Working content\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	source := gitpkg.ReviewSource{Scope: "staged"}
+	files, err := source.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := review.AttachedDocument{ID: "notice", Name: "notice.md", Content: "Attachment\n"}
+	app := NewCodeReviewApp(files, "HEAD", AppConfig{Source: &source, Documents: []review.AttachedDocument{d}})
+	app, _ = updateApp(app, app.loadDocuments()())
+	if app.err != nil {
+		t.Fatal(app.err)
+	}
+	for _, tab := range app.tabs {
+		want := "Staged content\n"
+		if tab.attachment != nil {
+			want = d.Content
+		}
+		if tab.doc == nil || tab.doc.Content != want {
+			t.Fatalf("%s: content=%v, want %q", tab.path, tab.doc, want)
+		}
+	}
+}
+
 func TestResumedDocumentSnapshotReloadsFromWorkspace(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

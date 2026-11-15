@@ -577,6 +577,7 @@ func (m AppModel) Init() tea.Cmd {
 func (m AppModel) loadDocuments() tea.Cmd {
 	return func() tea.Msg {
 		documents := make(map[string]*document.Document, len(m.tabs))
+		var files []gitpkg.FileChange
 		for _, tab := range m.tabs {
 			if tab.loadErr != nil {
 				return errMsg{tab.loadErr}
@@ -584,11 +585,24 @@ func (m AppModel) loadDocuments() tea.Cmd {
 			if tab.isBinary || tab.isDeleted || tab.outsideChanges {
 				continue
 			}
+			if m.source != nil && tab.attachment == nil && tab.path != overallCommentsPath {
+				files = append(files, gitpkg.FileChange{Path: tab.path, Textconv: tab.textconv})
+				continue
+			}
 			doc, err := m.loadDocument(tab.path)
 			if err != nil {
 				return errMsg{err}
 			}
 			documents[tab.path] = doc
+		}
+		if len(files) > 0 {
+			contents, err := m.source.TextContents(files)
+			if err != nil {
+				return errMsg{err}
+			}
+			for path, content := range contents {
+				documents[path] = document.FromContent(path, content)
+			}
 		}
 		return documentsLoadedMsg{documents: documents}
 	}
