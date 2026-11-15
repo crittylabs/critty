@@ -122,7 +122,7 @@ func (m *AppModel) isContentGutter(x int) bool {
 	if x == 0 {
 		return true
 	}
-	if m.alternateDiff(m.tab()) {
+	if m.alternateDiff(m.tab()) || m.splitPatchDocument(m.tab()) {
 		for _, row := range m.contentLayout.columns {
 			if row.split > 0 {
 				return x == row.split+3
@@ -138,7 +138,7 @@ func (m *AppModel) alternateDiff(t *FileTab) bool {
 }
 
 func (m AppModel) splitButton() string {
-	if !m.multiFile {
+	if !m.multiFile && (len(m.tabs) == 0 || m.documentPatch(m.tab()) == nil) {
 		return ""
 	}
 	state := "off"
@@ -212,7 +212,7 @@ func (m *AppModel) restoreDiffAttention(attention diffAttention) {
 }
 
 func (m *AppModel) toggleSplit() {
-	if !m.multiFile || len(m.tabs) == 0 {
+	if len(m.tabs) == 0 || !m.multiFile && m.documentPatch(m.tab()) == nil {
 		return
 	}
 	attention := m.captureDiffAttention()

@@ -1293,6 +1293,9 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Split):
 		m.toggleSplit()
 		return m, nil
+	case (msg.String() == "left" || msg.String() == "right") && m.focused == contentPane && m.splitPatchDocument(t):
+		m.movePatchDocumentSide(msg.String() == "left")
+		return m, nil
 	case (msg.String() == "left" || msg.String() == "right") && m.focused == contentPane && m.alternateDiff(t):
 		m.moveDiffSide(msg.String() == "left")
 		return m, nil

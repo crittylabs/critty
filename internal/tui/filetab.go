@@ -26,6 +26,7 @@ type fileReview struct {
 
 // FileTab holds per-file state for a single tab in the code review TUI.
 type FileTab struct {
+	patchDocument         *patchDocumentCache
 	preview               imagePreview
 	markdownImages        []markdownImage
 	markdownImagesPending bool

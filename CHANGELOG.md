@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Split patch documents**: Read standalone diff/patch files and review attachments side by side with `S` or the Split button.  Unified remains the default; narrow panes fall back to it.  Patch headers and source line coordinates stay intact for comments and copying.  Git changes to a patch file retain their existing outer diff without a nested split.
 - **Markdown callouts**: Read GitHub alerts and Obsidian callouts with colored left bars, matching tinted titles, and type icons in documents and comments.  Icons use Nerd Font glyphs when enabled and portable symbols otherwise.  Custom titles retain inline formatting, nested callouts retain their own colors, and unknown types use the note style.  Shared types, including `important` and `caution`, use GitHub colors.  Obsidian `+` / `-` markers are recognized, with bodies always expanded.  Copying retains the original Markdown.
 - **Custom syntax associations**: Map code-fence language names and filename patterns to supported languages in global or project settings.  Associations control highlighting, supported outlines, and Markdown rendering; project rules take precedence.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#syntax-associations).
 - **Emacs-style file navigation**: Use `C-v` / `M-v` or Page Down / Up to scroll the file pane with two rows of overlap, retaining the cursor position while it remains visible.  `M-<` / `M->` jump to the start / end.  `C-u` / `C-d` and Shift+Up / Down retain half-page movement.  See Help for all navigation keys.
@@ -26,6 +27,7 @@
 
 ### Fixed
 
+- **Patch syntax colors**: Added and deleted lines retain distinct colors on light backgrounds.  Hunk headers and patch metadata use distinct colors in both light and dark schemes.
 - **Copying across blank Markdown lines**: Dragging a selection across blank lines retains one continuous source range instead of inserting extra closing code fences between fragments.
 - **Dimmed sidebar selections**: The current file and outline heading keep a uniform row background behind dialogs, including the blank space after their labels, in light and dark terminals.
 - **Project path display**: Resolve `.` and `..` before highlighting repository boundaries or abbreviating paths in headers, tabs, and the file tree.  A path such as `foo/../bar/notes.md` now identifies `bar` rather than highlighting the departed `foo` project.

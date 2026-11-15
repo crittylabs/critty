@@ -107,3 +107,20 @@ func TestLexerErrorsUsePlainTextWithoutBackground(t *testing.T) {
 		}
 	}
 }
+
+func TestPatchSyntaxColors(t *testing.T) {
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	const source = "--- a.txt\n+++ a.txt\n@@ -1,2 +1,2 @@\n context\n-old\n+new\n"
+	for _, dark := range []bool{false, true} {
+		initAdaptiveStyles(dark)
+		lines := newCodeHighlighter(codeLexer("sample.patch", source))(source)
+		_, context := renderedCells(lines[3])
+		for _, n := range []int{2, 4, 5} {
+			_, cells := renderedCells(lines[n])
+			if len(cells) == 0 || sameColor(cells[0].Fg, context[0].Fg) {
+				t.Errorf("dark=%v: patch line %q has no distinct syntax color", dark, ansi.Strip(lines[n]))
+			}
+		}
+	}
+}

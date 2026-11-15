@@ -983,6 +983,31 @@ def scenarios() -> None:
             "--- a/standalone.go\n+++ b/standalone.go\n"
             "@@ -10,3 +20,3 @@\n context\n-old call\n+new call\n tail\n"
         )
+        attached_patch = Round(
+            "attached-patch", ["--null", "--attachment", str(patch)]
+        )
+        tmux("resize-pane", "-t", attached_patch.pane, "-x", "120")
+        attached_patch.wait_screen("Split: off", "attached patch defaults to unified")
+        attached_patch.keys("S")
+        attached_patch.wait_screen("Split: on", "S enables attached patch splitting")
+        wait_until(
+            lambda: any(
+                "-old call" in row and "+new call" in row
+                for row in attached_patch.screen().splitlines()
+            ),
+            "attached patch deletion and addition share a display row",
+        )
+        attached_patch.keys("g", "j", "j", "j", "j", "j", "Enter")
+        attached_patch.text("Keep the patch document's own source anchors.")
+        attached_patch.keys("C-s")
+        anchored = wait_until(attached_patch.comments, "patch comment saved")
+        assert len(anchored) == 1 and anchored[0]["start_line"] == 6, anchored
+        assert not anchored[0].get("side") and anchored[0]["anchor"] == "-old call"
+        attached_patch.click(r"Split: on")
+        attached_patch.wait_screen("Split: off", "mouse restores attached patch unified")
+        assert attached_patch.comments() == anchored
+        attached_patch.finish(False)
+        report("attached patch splitting retains raw patch comment coordinates")
         formats = Round("diff-formats", [f"--diff={patch}"])
         tmux("resize-pane", "-t", formats.pane, "-x", "100")
         pane_width = int(

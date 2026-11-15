@@ -74,6 +74,18 @@ func (m *AppModel) visualLines(t *FileTab) []lineRef {
 	if t.doc == nil {
 		return nil
 	}
+	if m.splitPatchDocument(t) {
+		var lines []lineRef
+		for _, row := range m.documentPatch(t).rows {
+			if row.left > 0 {
+				lines = append(lines, lineRef{line: row.left})
+			}
+			if row.right > 0 && row.right != row.left {
+				lines = append(lines, lineRef{line: row.right})
+			}
+		}
+		return lines
+	}
 	if m.alternateDiff(t) {
 		return m.diffVisualLines(t)
 	}

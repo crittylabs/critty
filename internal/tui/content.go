@@ -71,6 +71,10 @@ func (m *AppModel) rebuildContent() {
 	m.syncOutline()
 	m.prepareRenderedDisplay()
 	t.unread = false
+	if m.splitPatchDocument(t) {
+		m.rebuildPatchDocument(m.documentPatch(t))
+		return
+	}
 	if m.alternateDiff(t) {
 
 		m.rebuildDiffContent()

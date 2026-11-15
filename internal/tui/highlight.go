@@ -10,6 +10,24 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 )
 
+var patchLightStyle = chroma.MustNewStyle("critty-diff-light", chroma.StyleEntries{
+	chroma.Text:              "#272822",
+	chroma.GenericDeleted:    "#B42318",
+	chroma.GenericInserted:   "#1A7F37",
+	chroma.GenericHeading:    "#8250DF",
+	chroma.GenericSubheading: "#0969DA",
+	chroma.GenericStrong:     "bold",
+})
+
+var patchDarkStyle = chroma.MustNewStyle("critty-diff-dark", chroma.StyleEntries{
+	chroma.Text:              "#F8F8F2",
+	chroma.GenericDeleted:    "#F92672",
+	chroma.GenericInserted:   "#A6E22E",
+	chroma.GenericHeading:    "#AE81FF",
+	chroma.GenericSubheading: "#66D9EF",
+	chroma.GenericStrong:     "bold",
+})
+
 func isCodeLexer(lexer chroma.Lexer) bool {
 	if lexer == nil {
 		return false
@@ -31,6 +49,12 @@ func newCodeHighlighter(lexer chroma.Lexer, observers ...func(chroma.Token)) fun
 	lexer = chroma.Coalesce(lexer)
 
 	style := codeHighlightStyle()
+	if strings.EqualFold(lexer.Config().Name, "diff") {
+		style = patchLightStyle
+		if terminalIsDark {
+			style = patchDarkStyle
+		}
+	}
 	formatter := formatters.Get("terminal256")
 
 	// Chroma's default options turn a lone CR into a newline, which would
