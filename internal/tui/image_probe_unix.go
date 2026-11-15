@@ -32,7 +32,7 @@ func CheckTerminalImages() (result ImageCapability, err error) {
 		return ImageCapability{Reason: "current TTY is a dumb terminal"}, nil
 	}
 	if !imageProbeAllowed() {
-		return ImageCapability{Reason: "current tmux window is not owned by one attached client with this pane selected"}, nil
+		return ImageCapability{Reason: "tmux image probing requires enabled passthrough and one receiving client with this pane selected"}, nil
 	}
 	_, height, e := term.GetSize(fd)
 	if e != nil || height < imageProbeRow {

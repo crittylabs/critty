@@ -115,7 +115,7 @@ def verify(binary: Path, tmux_binary: Path) -> None:
             assert (result["status"] == "ok") == supported, (name, result)
             if not supported:
                 assert result["message"] == (
-                    "skipped: current tmux window is not owned by one attached client "
+                    "skipped: tmux image probing requires enabled passthrough and one receiving client "
                     "with this pane selected"
                 ), (name, result)
             assert queries == [
@@ -143,6 +143,9 @@ def verify(binary: Path, tmux_binary: Path) -> None:
             tmux("set-option", "-g", "allow-passthrough", "on")
             attach("source")
             check("single client", True)
+            tmux("set-option", "-p", "-t", source, "allow-passthrough", "off")
+            check("pane disables inherited passthrough", False)
+            tmux("set-option", "-p", "-u", "-t", source, "allow-passthrough")
             background = tmux(
                 "split-window",
                 "-d",
@@ -169,12 +172,18 @@ def verify(binary: Path, tmux_binary: Path) -> None:
             attach("other")
             check("unrelated session", True)
             window = tmux("display-message", "-p", "-t", source, "#{window_id}")
-            tmux("link-window", "-s", window, "-t", "other:")
-            check("linked window", False)
+            tmux("link-window", "-d", "-s", window, "-t", "other:")
+            check("hidden linked window with passthrough on", True)
             tmux("set-option", "-g", "allow-passthrough", "all")
             check("hidden linked window with passthrough all", False)
+            tmux("set-option", "-p", "-t", source, "allow-passthrough", "on")
+            check("pane overrides inherited passthrough all", True)
+            tmux("set-option", "-p", "-u", "-t", source, "allow-passthrough")
             tmux("select-window", "-t", f"other:{window}")
-            check("shared pane", False)
+            check("shared pane with passthrough all", False)
+            tmux("set-option", "-g", "allow-passthrough", "on")
+            check("shared pane with passthrough on", False)
+            tmux("set-option", "-g", "allow-passthrough", "all")
 
             # Bypass Critty's guard once to verify why a hidden linked window
             # must count: passthrough=all sends replies into the other pane.
