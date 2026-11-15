@@ -173,6 +173,9 @@ func TestTextconvOptIn(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if _, err := s.Diffs(files); err != nil {
+				t.Fatal(err)
+			}
 			if _, err := os.Stat("forbidden"); !os.IsNotExist(err) {
 				t.Fatal("unselected textconv was executed")
 			}
@@ -183,6 +186,9 @@ func TestTextconvOptIn(t *testing.T) {
 	s := ReviewSource{Scope: "all", Base: "HEAD", TextconvDrivers: []string{"records"}}
 	if _, err := s.Diff("image.bin", "image.png"); err == nil {
 		t.Fatal("accepted rename with different converter selection")
+	}
+	if _, err := s.Diffs([]FileChange{{Path: "image.bin", OldPath: "image.png"}}); err == nil {
+		t.Fatal("batch accepted rename with different converter selection")
 	}
 	if _, err := os.Stat("forbidden"); !os.IsNotExist(err) {
 		t.Fatal("rename executed an unselected converter")

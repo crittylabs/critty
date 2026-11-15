@@ -431,6 +431,11 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 	ta := newModalTextarea()
 
 	tabs := make([]FileTab, 0, len(files))
+	var diffs map[string]*gitpkg.DiffInfo
+	var loadErr error
+	if cfg.Patch == nil && cfg.Source != nil {
+		diffs, loadErr = cfg.Source.Diffs(files)
+	}
 	for _, f := range files {
 		var diff *gitpkg.DiffInfo
 		var diffErr error
@@ -440,7 +445,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 			}
 		} else if !f.IsBinary() {
 			if cfg.Source != nil {
-				diff, diffErr = cfg.Source.Diff(f.Path, f.OldPath)
+				diff, diffErr = diffs[f.Path], loadErr
 			} else {
 				diff, _ = codeDiff(f.Path, f.OldPath, ref, cfg.Staged)
 			}

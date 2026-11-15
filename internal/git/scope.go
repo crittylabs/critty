@@ -191,6 +191,51 @@ func (s ReviewSource) Files() ([]FileChange, error) {
 	return files, nil
 }
 
+// Diffs loads the requested text diffs together.  Renames and text conversions
+// retain their per-file checks and path pairing.
+func (s ReviewSource) Diffs(changes []FileChange) (map[string]*DiffInfo, error) {
+	diffs := make(map[string]*DiffInfo, len(changes))
+	paths := make(map[string]bool, len(changes))
+	for _, change := range changes {
+		if change.IsBinary() || change.Status == StatusUntracked {
+			continue
+		}
+		if change.OldPath != "" || len(s.TextconvDrivers) > 0 {
+			diff, err := s.Diff(change.Path, change.OldPath)
+			if err != nil {
+				return nil, err
+			}
+			diffs[change.Path] = diff
+			continue
+		}
+		paths[change.Path] = true
+	}
+	if len(paths) == 0 {
+		return diffs, nil
+	}
+	// Renamed pairs were handled above.  Other additions and deletions must
+	// remain separate, as they were in per-file diffs.
+	args := append(s.diffArgs(), "--no-renames", "--")
+	out, err := gitCommand(args...)
+	if err != nil {
+		return nil, err
+	}
+	files, _, err := gitdiff.Parse(strings.NewReader(out))
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		path := file.NewName
+		if file.IsDelete {
+			path = file.OldName
+		}
+		if paths[path] {
+			diffs[path] = diffInfo([]*gitdiff.File{file})
+		}
+	}
+	return diffs, nil
+}
+
 // Diff returns the diff of path.  oldPath is the file's previous path when it
 // was renamed, else "".
 func (s ReviewSource) Diff(path, oldPath string) (*DiffInfo, error) {

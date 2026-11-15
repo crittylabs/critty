@@ -5,7 +5,7 @@
 ### Fixed
 
 - Large reviews stay responsive while the mouse moves.  Drawing hidden file tabs no longer delays keyboard actions such as opening the submit dialog with `q`.
-- Reviews open faster by reading each document once during startup.  The displayed content and saved review snapshot use that same read.
+- Large reviews open faster by loading ordinary text diffs together and reading each document once during startup.  The displayed content and saved review snapshot use that same read.  Renames and reviews with textconv settings keep individual diff loading.
 
 ## 2.0.0
 

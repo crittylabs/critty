@@ -7,6 +7,54 @@ import (
 	"testing"
 )
 
+func TestBatchDiffsKeepFileBoundaries(t *testing.T) {
+	dir := newRepo(t)
+	for _, path := range []string{"changed.txt", "deleted.txt", "old.txt", "mode.txt", "tab\tquote\"line\n.txt", "binary.bin"} {
+		writeFile(t, dir, path, []byte("one\ntwo\nthree\n"))
+	}
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-qm", "base")
+	writeFile(t, dir, "changed.txt", []byte("one\nchanged\nthree\n"))
+	writeFile(t, dir, "tab\tquote\"line\n.txt", []byte("different\n"))
+	writeFile(t, dir, "added.txt", []byte("added\n"))
+	writeFile(t, dir, "empty.txt", nil)
+	writeFile(t, dir, "binary.bin", []byte("\x00binary"))
+	if err := os.Chmod("mode.txt", 0755); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, dir, "rm", "deleted.txt")
+	runGit(t, dir, "mv", "old.txt", "new.txt")
+	writeFile(t, dir, "new.txt", []byte("one\ntwo\nthree\nfour\n"))
+	runGit(t, dir, "add", ".")
+	source := ReviewSource{Scope: "staged"}
+	files, err := source.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	diffs, err := source.Diffs(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if file.IsBinary() {
+			if diffs[file.Path] != nil {
+				t.Fatalf("binary file has a text diff: %s", file.Path)
+			}
+			continue
+		}
+		want, err := source.Diff(file.Path, file.OldPath)
+		if err != nil || !reflect.DeepEqual(diffs[file.Path], want) {
+			t.Fatalf("%q: batch diff=%+v err=%v, want %+v", file.Path, diffs[file.Path], err, want)
+		}
+	}
+	for _, requested := range [][]FileChange{nil, {{Path: "changed.txt"}}} {
+		subset, err := source.Diffs(requested)
+		if err != nil || len(subset) != len(requested) {
+			t.Fatalf("unrequested diffs: %v, err=%v", subset, err)
+		}
+	}
+}
+
 func TestResolveCommit(t *testing.T) {
 	dir := newRepo(t)
 	writeFile(t, dir, "file.txt", []byte("root\n"))
@@ -66,6 +114,10 @@ func TestResolveCommit(t *testing.T) {
 			if err != nil || diff == nil || !diff.ChangedLines[1] {
 				t.Fatalf("diff=%v err=%v", diff, err)
 			}
+			diffs, err := s.Diffs(files)
+			if err != nil || !reflect.DeepEqual(diffs[tc.path], diff) {
+				t.Fatalf("batch diff=%v err=%v, want %v", diffs[tc.path], err, diff)
+			}
 			snapshot, patch, err := s.Snapshot()
 			if err != nil || !reflect.DeepEqual(snapshot, s) || !strings.Contains(patch, "+"+strings.TrimSpace(tc.after)) {
 				t.Fatalf("snapshot=%+v patch=%q err=%v", snapshot, patch, err)
@@ -111,6 +163,10 @@ func TestReviewSources(t *testing.T) {
 			diff, err := s.Diff("file 日本語.txt", "")
 			if err != nil || diff == nil || !diff.ChangedLines[1] {
 				t.Fatalf("diff=%v err=%v", diff, err)
+			}
+			diffs, err := s.Diffs(files)
+			if err != nil || !reflect.DeepEqual(diffs["file 日本語.txt"], diff) {
+				t.Fatalf("batch diff=%v err=%v, want %v", diffs, err, diff)
 			}
 			if tc.scope == "unstaged" && diff.DeletedAfter[0][0].Content != "staged" {
 				t.Fatal("unstaged base is not the index")
