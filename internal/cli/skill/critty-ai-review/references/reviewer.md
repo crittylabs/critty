@@ -10,7 +10,7 @@ Inspect surrounding code, dependencies, and history needed to assess the request
 
 ### Return findings and completion
 
-Read replies and the revised target for each of your earlier findings.  Resolve your own finding when the response or fix is valid, or when the finding is no longer applicable.  Reply with the evidence or reason and set `--resolve`, or use the restricted `resolve_finding` tool.  Keep unresolved findings open when evidence is insufficient or the issue remains.  This skill authorizes resolution of your own findings under the CLI reference's user-authorization rule; it grants no authority over human or other reviewers' threads.
+Read replies and the revised target for each of your earlier findings.  Following `/critty`'s Resolve settled threads section, resolve your own finding when the response or fix is valid, or when the finding is no longer applicable: reply with the evidence or reason and set `--resolve`, or use the restricted `resolve_finding` tool.  Your posting scope remains your own findings; return other settled thread IDs and agreement evidence to the requester for resolution.
 
 Before resolving, read the latest full thread and other threads about the same issue.  If another reviewer, including the human, appears to have an unresolved or unanswered concern there, or you cannot tell whether it was addressed, leave the thread open.  State that your own concern is satisfied and why, using a reply without `--resolve` or the restricted `reply_finding` tool.  Your satisfaction does not settle another reviewer's concern.  Unrelated open findings elsewhere in the review do not prevent resolving your own thread.
 

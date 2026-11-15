@@ -23,7 +23,7 @@ Create scratch space with `critty tmp create` and use its returned `directory` f
 - Use the exact session ID returned at startup or completion.  Scope stays fixed within a session; matching paths or scope arguments do not identify a session.
 - Exit 0 means a submission, not necessarily approval.  Read `verdict`, `approved`, all threads and replies, and attachment snapshots.  Only `verdict: approve` with `approved: true` approves the reviewed content.  A failed export or nonzero exit grants no approval.
 - Verify the summary's session, round, and reviewed input against this invocation.  Keep complete finish output; summaries omit attachment bodies, form answers, and individual consents.  Read [result contracts](references/results.md) before interpreting forms or recovering a result.
-- Comments use source coordinates from the reviewed version, which may differ from disk.  Read the complete thread before replying, identify your agent with `--author`, and leave resolution to the human unless explicitly authorized.
+- Comments use source coordinates from the reviewed version, which may differ from disk.  Read the complete thread before replying, identify your agent with `--author`, and follow `/critty`'s Resolve settled threads section once agreement is recorded.
 - Use literal shell arguments.  For three or more replies, or any body with awkward quoting, use the [bulk JSON interface](references/comments.md#bulk-comments).
 - Saved reviews are retained after approval.  Stop preserves state; removal deletes it.  Follow `/critty-history` for task completion and retention.
 

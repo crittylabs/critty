@@ -85,7 +85,7 @@ Rules:
 - Use a single-quoted argument for a short body without apostrophes.  For bodies containing apostrophes, multiple lines, or complex quoting, use a JSON file even for one comment.  Double quotes let the shell interpret backticks and `$`.
 - Line numbers are 1-indexed source coordinates, not positions in the diff text.  Staged reviews use index contents, committed comparisons use the right endpoint, and supplied diffs use the saved snapshot.  Files on disk may differ or be absent.  Use comment anchors when content changes between rounds.
 - Bodies are Markdown; code fences and inline code render in the TUI.
-- Do not pass `--resolve` unless the user explicitly asks for it.  The same applies to the `resolve` field in bulk JSON.
+- Pass `--resolve` under `/critty`'s Resolve settled threads section or at the user's request.  The same applies to the `resolve` field in bulk JSON.
 
 ## Bulk comments
 
@@ -118,7 +118,7 @@ Entry fields:
 | `author` | string | Optional per-entry override for `--author`. |
 | `scope` | string | `"review"` or `"file"`; inferred when omitted. |
 | `reply_to` | string | Comment ID to reply to (`c_…` or `r_…`). |
-| `resolve` | bool | Only when the user asked to resolve. |
+| `resolve` | bool | Resolve under the rule above. |
 
 Scope is inferred as follows: `reply_to` makes a reply; no path and no line makes a review-level comment; a path without a line makes a file-level comment; a path with a line makes a line comment.
 

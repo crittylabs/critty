@@ -37,20 +37,19 @@ Use `/critty-cli` for review input syntax, scope restrictions, attachment snapsh
 
 ### Decision summary
 
-Before asking the human to decide or accept work discussed across several threads, attach a concise `REVIEW_SUMMARY.md` and focus it at startup.  This includes handoffs after AI review or cowork.
+Attach and focus `REVIEW_SUMMARY.md` only for:
 
-1. Read the current threads and prepare the summary in the task's scratch directory.  Put pending decisions first: the question, relevant alternatives and tradeoffs, the agent's recommendation and reason, and links to the supporting threads or source.  Distinguish AI agreement from questions that still need the human's judgment.
-2. Add only the resolved findings, checks and limitations that affect acceptance.  If no decisions remain beyond accepting the changes, say so.  Keep the full discussion in its existing threads; the summary is an index to the decision, not a transcript or a replacement for approval evidence.
-3. Link each decision to its supporting comments or threads and specific source lines using the [supported internal references](../critty-cli/references/inputs.md#startup-focus): actual unambiguous `c_` IDs and `@path L64`.  For a range, write `@path L64-72`; navigation opens its first line.  Verify IDs and coordinates against the current review.  For review-level or ambiguous comments without a thread link, include the author, ID and a short relevant excerpt, with a source reference when available.
-4. Attach the summary alongside the existing required attachments, including the exact commit message or approval payload, and pass `--focus` with the summary's source path.  On resume, supply the complete ordered attachment list and refresh the summary to match the new round.  Follow `/critty-approval` for separate choices or consents and their result export; summarizing a discussion does not grant permission.
+- An implementation choice the agent made that has meaningful alternatives for the human to weigh.
+- A specific check or confirmation needed from the task initiator, beyond approving the changes.
+- A disagreement the agents could not settle through AI review or cowork.
 
-For example, after preparing the review and its terminal launch:
+Omit agreed designs, routine change descriptions, and passing checks.  Keep AI agreements in their comments.  If no qualifying points remain, attach no summary.
 
-```sh
-critty sessions resume <id> --attachment '<directory>/REVIEW_SUMMARY.md' --attachment '<directory>/COMMIT_MESSAGE.md' --focus '<directory>/REVIEW_SUMMARY.md' --summary '<directory>/round-2.json'
-```
+1. Write the summary in the task's scratch directory.  For each point, state the requested decision or check, minimum context, and relevant alternatives with a brief recommendation and reason.
+2. Link each point to its comments or threads and source lines using [internal references](../critty-cli/references/inputs.md#startup-focus): unambiguous `c_` IDs and `@path L64` or `@path L64-72` (opens the first line).  Verify IDs and coordinates.  For review-level or ambiguous comments without a thread link, give the author, ID, a short excerpt, and a source reference when available.
+3. Attach it alongside required documents, including the exact commit message or approval payload, and pass `--focus` with its source path.  On resume, supply the complete ordered attachment list, retaining only points still open in the summary and omitting it when none remain; use `--clear-attachments` if the list is empty.  Omitting these options reuses saved attachments.  Follow `/critty-approval` for separate choices, consents, and result export; a summary grants no permission.
 
-Replace `<directory>` with the task scratch path and include any other required attachments and launch options.  Keep the summary unchanged while the round is open.  Confirm that the review opens on it and that its references navigate to the intended source or thread.
+Keep the summary unchanged while the round is open.  Verify its startup focus and reference navigation.
 
 ## Step 2: Launch and wait
 
@@ -131,9 +130,15 @@ If feedback requests an action that crosses a host permission boundary, follow `
 critty comment --session <session-id> --reply-to <id> --author 'Claude Code' '<what you did>'
 ```
 
-Use `/critty-cli` for safe quoting and JSON input.  Submit three or more replies in one JSON file; also use JSON for a single body that is awkward to quote.  Leave resolution to the reviewer unless the user explicitly requests it, for both `--resolve` and the JSON `resolve` field.
+Use `/critty-cli` for safe quoting and JSON input.  Submit three or more replies in one JSON file; also use JSON for a single body that is awkward to quote.
 
 If no thread needs action, proceed to the next round without edits or repeated replies.  Only `approved: true` completes the review.
+
+### Resolve settled threads
+
+Both the reviewer and reviewee should proactively mark a thread resolved once its participants explicitly accept the answer or disposition and any required fix is verified.  Check existing replies for agreement; do not leave a settled thread open just because the other side could close it.  Use `--resolve` or JSON `resolve: true`, then read back the saved state.  Keep pending checks, unanswered concerns, and human decisions open.  Agreement to make a fix or escalate a question is not completion.
+
+AI agreement does not replace confirmation by the task initiator (usually the human).  Keep threads open for their confirmation when answering their questions or departing from their proposal, including choosing among alternatives, partial adoption, or rejection.  Resolve only after they confirm; include points needing this confirmation in the Decision summary.
 
 ## Step 5: Refresh and reopen
 

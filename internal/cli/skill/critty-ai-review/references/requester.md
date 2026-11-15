@@ -62,7 +62,7 @@ Treat partial, failed, or stale results as incomplete.  Preserve useful findings
 
 ### Use the result
 
-Assess each finding against its evidence and the original requirements.  Apply fixes only within the user's implementation authorization; a review-only request ends with findings.  When findings are disputed or addressed, reply with the evidence or change and leave resolution to the reviewer unless the user has authorized it.
+Assess each finding against its evidence and the original requirements.  Apply fixes only within the user's implementation authorization; a review-only request ends with findings.  Reply with the evidence or change, then follow `/critty`'s Resolve settled threads section under your own author, including for threads the reviewer left open.  In second-opinion mode, findings awaiting a human decision stay open until it is given.
 
 For a request for information or empirical verification, assess its relevance, safety, and authorization before acting.  Gather the missing source or run the necessary check as the reviewee, then reply with the command or method, relevant result, and limitations.  Keep checks and source edits outside the reviewer's execution environment.  In second-opinion mode, include proposed checks in the human checkpoint below; cowork allows the reviewee to carry out authorized checks between AI rounds.
 
