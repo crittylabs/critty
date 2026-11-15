@@ -277,10 +277,10 @@ func (m *AppModel) syncViewWatch() tea.Cmd {
 }
 
 func (m AppModel) viewHistoryButton(forward bool) string {
-	label, key, count := "Back", "M-←", len(m.browsing.back)
+	label, key, count := "Back", "M-b", len(m.browsing.back)
 	kind := icons.Back
 	if forward {
-		label, key, count = "Forward", "M-→", len(m.browsing.forward)
+		label, key, count = "Forward", "M-f", len(m.browsing.forward)
 		kind = icons.Forward
 	}
 	if count == 0 {

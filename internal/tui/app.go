@@ -282,36 +282,32 @@ func (r *commentHeaderRegion) translate(x, y int) {
 }
 
 type renderedScreenLayout struct {
-	watchIndicator         mouseRect
-	hasWatchIndicator      bool
-	copyTextButton         mouseRect
-	hasCopyTextButton      bool
-	whitespaceButton       mouseRect
-	hasWhitespaceButton    bool
-	splitButton            mouseRect
-	hasSplitButton         bool
-	finishButton           mouseRect
-	hasFinishButton        bool
-	backButton             mouseRect
-	hasBackButton          bool
-	forwardButton          mouseRect
-	hasForwardButton       bool
-	footerHelp             mouseRect
-	hasFooterHelp          bool
-	formListButton         mouseRect
-	hasFormListButton      bool
-	imagesButton           mouseRect
-	hasImagesButton        bool
-	lineNumbersButton      mouseRect
-	hasLineNumbersButton   bool
-	copyContentButton      mouseRect
-	hasCopyContentButton   bool
-	copyReferenceButton    mouseRect
-	hasCopyReferenceButton bool
-	modalRegions           []modalMouseRegion
-	isearchCursor          *tea.Cursor
-	isearchRegions         []isearchMouseRegion
-	progressRegions        []progressRegion
+	watchIndicator       mouseRect
+	hasWatchIndicator    bool
+	copyTextButton       mouseRect
+	hasCopyTextButton    bool
+	whitespaceButton     mouseRect
+	hasWhitespaceButton  bool
+	splitButton          mouseRect
+	hasSplitButton       bool
+	finishButton         mouseRect
+	hasFinishButton      bool
+	backButton           mouseRect
+	hasBackButton        bool
+	forwardButton        mouseRect
+	hasForwardButton     bool
+	footerHelp           mouseRect
+	hasFooterHelp        bool
+	formListButton       mouseRect
+	hasFormListButton    bool
+	imagesButton         mouseRect
+	hasImagesButton      bool
+	lineNumbersButton    mouseRect
+	hasLineNumbersButton bool
+	modalRegions         []modalMouseRegion
+	isearchCursor        *tea.Cursor
+	isearchRegions       []isearchMouseRegion
+	progressRegions      []progressRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -3253,8 +3249,6 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	layout.footerHelp, layout.hasFooterHelp = buttonRect(footer, footerTop, m.footerHelpButton())
 	layout.imagesButton, layout.hasImagesButton = buttonRect(footer, footerTop, m.imagesButton())
 	layout.lineNumbersButton, layout.hasLineNumbersButton = buttonRect(footer, footerTop, m.lineNumbersButton())
-	layout.copyContentButton, layout.hasCopyContentButton = buttonRect(footer, footerTop, m.copyContentButton())
-	layout.copyReferenceButton, layout.hasCopyReferenceButton = buttonRect(footer, footerTop, m.copyReferenceButton())
 	if button := m.formListButton(); button != "" {
 		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
 	}
@@ -3578,12 +3572,6 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if imageLayout.hasFormListButton && imageLayout.formListButton.contains(mouse) {
 		m.openFormList()
 		return m, nil
-	}
-	if imageLayout.hasCopyContentButton && imageLayout.copyContentButton.contains(mouse) {
-		return m, m.copyFocusedContent()
-	}
-	if imageLayout.hasCopyReferenceButton && imageLayout.copyReferenceButton.contains(mouse) {
-		return m, m.copyReference()
 	}
 	if imageLayout.hasLineNumbersButton && imageLayout.lineNumbersButton.contains(mouse) {
 		m.toggleLineNumbers()
@@ -4510,7 +4498,6 @@ func (m AppModel) renderFooterHints() string {
 	if button := m.formListButton(); !m.readOnly && button != "" {
 		controls = append(controls, button)
 	}
-	controls = append(controls, m.copyContentButton(), m.copyReferenceButton())
 	items = append(controls, items...)
 	if !t.selecting {
 		items = append(items, m.outlineHint())

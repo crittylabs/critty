@@ -5,7 +5,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/crittylabs/critty/internal/icons"
 	"github.com/crittylabs/critty/internal/review"
 )
 
@@ -74,30 +73,4 @@ func copyThreadText(comment review.Comment) string {
 		appendMessage(reply.Author, reply.Body)
 	}
 	return text.String()
-}
-
-func (m AppModel) copyContentButton() string {
-	if len(m.tabs) == 0 {
-		return ""
-	}
-	label := "Copy line"
-	if id := m.selectedCommentID(); id != "" {
-		comment, _ := m.driftedComment(id)
-		label = "Copy comment"
-		if len(comment.Replies) > 0 {
-			label = "Copy thread"
-		}
-	} else if m.focused != contentPane || m.tab().doc == nil || m.tab().isBinary {
-		return ""
-	} else if m.tab().selecting {
-		label = "Copy lines"
-	}
-	return m.renderModalButton(m.icons.Label(icons.Copy, label), "M-w", false)
-}
-
-func (m AppModel) copyReferenceButton() string {
-	if len(m.tabs) == 0 || m.selectedCommentID() == "" && (m.focused != contentPane || m.tab().path == "") {
-		return ""
-	}
-	return m.renderModalButton("Copy reference", "@", false)
 }

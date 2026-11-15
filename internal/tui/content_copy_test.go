@@ -118,17 +118,6 @@ func TestCopyFocusedComments(t *testing.T) {
 				assertCopiedText(t, app, cmd, want)
 				app, cmd = pressKeyCmd(app, '@')
 				assertCopiedText(t, app, cmd, comment.ID)
-				app.notice.text = ""
-				_, layout := app.renderReviewScreen()
-				if !layout.hasCopyContentButton || !layout.hasCopyReferenceButton {
-					t.Fatal("copy buttons unavailable")
-				}
-				app, cmd = clickMouseCmd(app, layout.copyContentButton.left, layout.copyContentButton.top)
-				assertCopiedText(t, app, cmd, want)
-				app.notice.text = ""
-				_, layout = app.renderReviewScreen()
-				app, cmd = clickMouseCmd(app, layout.copyReferenceButton.left, layout.copyReferenceButton.top)
-				assertCopiedText(t, app, cmd, comment.ID)
 			})
 		}
 	}
