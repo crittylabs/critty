@@ -188,12 +188,3 @@ func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, b
 		line.tokens = append(line.tokens, markdownToken{start: last, end: len(line.source), text: line.source[last:]})
 	}
 }
-
-func (line *markdownLine) hasSyntax() bool {
-	for _, token := range line.tokens {
-		if token.syntax != 0 {
-			return true
-		}
-	}
-	return false
-}

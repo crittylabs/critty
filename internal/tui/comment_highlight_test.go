@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestCommentCodeHighlighting(t *testing.T) {
 			}
 			body := "```" + language + "\n" + code + "\n```"
 			parsed := app.commentRenderedDisplay(body, 80, false)
-			if !parsed.lines[1].hasSyntax() {
+			if !slices.ContainsFunc(parsed.lines[1].tokens, func(token markdownToken) bool { return token.syntax != 0 }) {
 				t.Fatal("code in comments has no syntax tokens with images hidden")
 			}
 			view := app.renderCommentContent("Reviewer", body, "", 80)

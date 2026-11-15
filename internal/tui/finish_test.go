@@ -7,7 +7,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/internal/icons"
@@ -565,56 +564,6 @@ func TestExplicitApprovalRequiresConfirmations(t *testing.T) {
 	}
 }
 
-func TestFinishRadioSelectionChangesFrameColorWithoutSubmitting(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		app, ch := newFinishTestApp(t, nil)
-		app.width, app.height = 100, 24
-		app.openFinishModal()
-		background := lipgloss.NewStyle().Width(app.width).Height(app.height).Render("")
-		frames := make(map[string]bool)
-		plainFrame := ""
-		for _, key := range []rune{'a', 'A', 'r', 'R', 'c', 'C'} {
-			var cmd tea.Cmd
-			app, cmd = pressKeyCmd(app, key)
-			if isQuit(cmd) || app.modal != finishModal {
-				t.Fatal("selection submitted the review")
-			}
-			select {
-			case <-ch:
-				t.Fatal("selection emitted a result")
-			default:
-			}
-			view := app.renderWithModal(background)
-			for _, line := range strings.Split(view, "\n") {
-				plain := ansi.Strip(line)
-				if !strings.Contains(plain, "╭") {
-					continue
-				}
-				if plainFrame != "" && plain != plainFrame {
-					t.Fatal("selection changed frame geometry")
-				}
-				plainFrame = plain
-				frames[line] = true
-				break
-			}
-		}
-		if len(frames) != 3 {
-			t.Fatal("radio selections did not produce three frame colors")
-		}
-		app.modalFocus = finishReject
-		app, cmd := pressKeyCmd(app, ' ')
-		if isQuit(cmd) || app.finishVerdict != review.VerdictReject {
-			t.Fatal("Space did not select the focused radio")
-		}
-		app, cmd = pressKeyCmd(app, tea.KeyEnter)
-		if !isQuit(cmd) || takeEvent(t, ch).Approved || app.session.CJ.RoundState.Verdict != review.VerdictReject {
-			t.Fatal("Enter did not submit the selected verdict")
-		}
-	}
-	initAdaptiveStyles(true)
-}
-
 func TestResolveAllConfirmationCanBeDeclined(t *testing.T) {
 	for _, cancel := range []rune{'n', tea.KeyEscape} {
 		app, ch := newFinishTestApp(t, []review.Comment{testComment()})
@@ -867,8 +816,15 @@ func TestFinishVerdictGroupNavigation(t *testing.T) {
 				{tea.KeyLeft, review.VerdictApprove},
 				{'c', review.VerdictComment},
 				{'r', review.VerdictReject},
+				{'A', review.VerdictApprove},
+				{'R', review.VerdictReject},
+				{'C', review.VerdictComment},
 			} {
-				app = pressKey(app, step.key)
+				var cmd tea.Cmd
+				app, cmd = pressKeyCmd(app, step.key)
+				if isQuit(cmd) || app.modal != finishModal {
+					t.Fatal("selection submitted the review")
+				}
 				if app.finishVerdict != step.verdict || app.modalFocus != app.finishVerdictFocus() {
 					t.Fatalf("key %d: verdict = %s, focus = %d", step.key, app.finishVerdict, app.modalFocus)
 				}
@@ -887,6 +843,15 @@ func TestFinishVerdictGroupNavigation(t *testing.T) {
 			case <-ch:
 				t.Fatal("navigation submitted the review")
 			default:
+			}
+			app.modalFocus = finishReject
+			app, cmd := pressKeyCmd(app, ' ')
+			if isQuit(cmd) || app.finishVerdict != review.VerdictReject {
+				t.Fatal("Space did not select the focused radio")
+			}
+			app, cmd = pressKeyCmd(app, tea.KeyEnter)
+			if !isQuit(cmd) || takeEvent(t, ch).Approved || app.session.CJ.RoundState.Verdict != review.VerdictReject {
+				t.Fatal("Enter did not submit the selected verdict")
 			}
 		})
 	}

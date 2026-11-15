@@ -107,7 +107,12 @@ exit 127
 	t.Setenv("TEST_LOG", filepath.Join(dir, "args"))
 	t.Setenv("TEST_ENV", filepath.Join(dir, "env"))
 	for _, entry := range []string{"wrapper", "critty", "foreign-first", "foreign-last"} {
-		for _, args := range [][]string{{"resume", "--last"}, {"--help"}, {"exec", "--", "--unknown", "a prompt"}} {
+		argsList := [][]string{{"resume", "--last"}, {"--help"}, {"exec", "--", "--unknown", "a prompt"}}
+		if strings.HasPrefix(entry, "foreign-") {
+			// Both entry parsers are covered above; exercise shell forwarding with the richest arguments.
+			argsList = argsList[2:]
+		}
+		for _, args := range argsList {
 			t.Run(entry+strings.Join(args, " "), func(t *testing.T) {
 				path := filepath.Dir(wrapper) + ":" + filepath.Dir(real)
 				exe := wrapper
@@ -125,9 +130,9 @@ exit 127
 				t.Setenv("PATH", path)
 				cmd := exec.Command(exe, input...)
 				cmd.Dir = dir
-				err := cmd.Run()
+				out, err := cmd.CombinedOutput()
 				if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 23 {
-					t.Fatalf("exit: %v", err)
+					t.Fatalf("exit: %v\n%s", err, out)
 				}
 				b, err := os.ReadFile(os.Getenv("TEST_LOG"))
 				if err != nil {
@@ -147,7 +152,7 @@ exit 127
 				registration := filepath.Join(dir, "state", "critty", "terminals", fmt.Sprintf("launcher-%d.json", cmd.Process.Pid))
 				b, err = os.ReadFile(registration)
 				if err != nil {
-					t.Fatal(err)
+					t.Fatalf("registration: %v\n%s", err, out)
 				}
 				var saved struct {
 					PID    int                           `json:"pid"`

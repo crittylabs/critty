@@ -202,32 +202,23 @@ func TestViewNavigationExistingTabsAndAnchors(t *testing.T) {
 	if app.tab().cursorLine != 3 {
 		t.Fatal("same-document heading did not navigate")
 	}
-	app.stepViewHistory(false)
+	// Ghostty's default Option+Left/Right sends ESC b/f rather than Alt arrows.
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
 	if app.tab().cursorLine != 40 || app.contentViewport.YOffset() != 30 {
 		t.Fatal("Back did not restore position before an anchor jump")
 	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
+	if app.tab().cursorLine != 3 {
+		t.Fatal("Forward did not restore the heading position")
+	}
+	app.stepViewHistory(false)
 	app.stepViewHistory(false)
 	if app.activeTab != 0 || len(app.tabs) != 2 {
 		t.Fatal("Back did not reuse the original tab")
 	}
-	app.stepViewHistory(true)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
 	if app.activeTab != 1 || len(app.tabs) != 2 {
 		t.Fatal("Forward did not reuse the destination tab")
-	}
-}
-
-func TestViewNavigationGhosttyArrowBindings(t *testing.T) {
-	app := newViewNavigationApp(t, "# Start\n\n## Details\n")
-	followViewTestLink(t, &app, "#details")
-	// Ghostty's default macOS Option+Left/Right bindings send ESC b/f,
-	// decoded as Alt+b/f rather than modified arrow keys.
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
-	if app.tab().cursorLine != 1 {
-		t.Fatal("Ghostty Option+Left (ESC b) did not go Back")
-	}
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
-	if app.tab().cursorLine != 3 {
-		t.Fatal("Ghostty Option+Right (ESC f) did not go Forward")
 	}
 }
 

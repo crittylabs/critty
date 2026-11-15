@@ -57,6 +57,7 @@ func TestNewRoundFocusesFreshReplies(t *testing.T) {
 		{name: "window arrives after documents", lateWindow: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			app := patchApp(t, "diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1,2 +1,2 @@\n first\n-old\n+new\n"+
 				"diff --git a/b.go b/b.go\n--- a/b.go\n+++ b/b.go\n@@ -1,2 +1,2 @@\n first\n-old\n+new\n")
 			app.author = "Reviewer"

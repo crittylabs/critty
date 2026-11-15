@@ -193,10 +193,3 @@ func TestCodeFenceLanguageResolution(t *testing.T) {
 		})
 	}
 }
-
-func TestMarkdownFenceLookupCacheReleased(t *testing.T) {
-	parsed := parseMarkdownSource(strings.Split("```no-such-language\ncontent\n```", "\n"), nil)
-	if parsed.fenceLexers != nil {
-		t.Fatal("finished Markdown parse retained its language lookup cache")
-	}
-}

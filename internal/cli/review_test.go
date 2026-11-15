@@ -181,34 +181,47 @@ func newPayloadSession(t *testing.T) *review.Session {
 }
 
 func TestBuildFinishPayloadUnresolved(t *testing.T) {
-	sess := newPayloadSession(t)
-	sess.SetFileComments("a.go", "", []review.Comment{
-		{ID: "c_1", StartLine: 3, EndLine: 3, Body: "fix this"},
-		{ID: "c_2", StartLine: 9, EndLine: 9, Body: "done already", Resolved: true},
-	})
-	cfg := &config.Config{}
-
-	payload := buildFinishPayload(cfg, sess, &reviewMode{ref: "HEAD", sessionKey: "0123456789ab"}, false)
-
-	if payload.Approved {
-		t.Error("expected unapproved payload")
-	}
-	if len(payload.Comments) != 2 {
-		t.Errorf("expected all comments, got %+v", payload.Comments)
-	}
-	if want := "critty sessions resume " + sess.Key; payload.NextCommand != want {
-		t.Errorf("NextCommand = %q, want %q", payload.NextCommand, want)
-	}
-	for _, want := range []string{
-		"The review finished with 1 unresolved comment.",
-		`"id": "c_1"`,
-		`"id": "c_2"`,
-		"critty comment --session " + sess.Key + " --reply-to <comment-id>",
-		payload.NextCommand,
-	} {
-		if !strings.Contains(payload.Prompt, want) {
-			t.Errorf("prompt missing %q:\n%s", want, payload.Prompt)
-		}
+	for _, kind := range []string{"code", "plan"} {
+		t.Run(kind, func(t *testing.T) {
+			sess := newPayloadSession(t)
+			mode := &reviewMode{ref: "HEAD", sessionKey: "0123456789ab"}
+			wantNext := "critty sessions resume " + sess.Key
+			file := "a.go"
+			comments := []review.Comment{
+				{ID: "c_1", StartLine: 3, EndLine: 3, Body: "fix this"},
+				{ID: "c_2", StartLine: 9, EndLine: 9, Body: "done already", Resolved: true},
+			}
+			if kind == "plan" {
+				sess.Meta.CWD = filepath.Join(t.TempDir(), "source worktree")
+				sess.CJ.CliArgs = []string{"plan", "--name", "my-plan", "docs/plan.md"}
+				mode = &reviewMode{docPath: "current.md", planSlug: "my-plan", planFile: "docs/plan.md"}
+				wantNext = "critty plan --session " + sess.Key + " " + shellEscape(filepath.Join(sess.Meta.CWD, "docs/plan.md"))
+				file = "current.md"
+				comments = []review.Comment{{ID: "c_1", StartLine: 1, EndLine: 1, Body: "clarify"}}
+			}
+			sess.SetFileComments(file, "", comments)
+			payload := buildFinishPayload(&config.Config{}, sess, mode, false)
+			if payload.Approved || len(payload.Comments) != len(comments) {
+				t.Errorf("unexpected unapproved payload: %+v", payload)
+			}
+			if payload.NextCommand != wantNext {
+				t.Errorf("NextCommand = %q, want %q", payload.NextCommand, wantNext)
+			}
+			for _, want := range []string{
+				"The review finished with 1 unresolved comment.",
+				"critty comment --session " + sess.Key + " --reply-to <comment-id>",
+				payload.NextCommand,
+			} {
+				if !strings.Contains(payload.Prompt, want) {
+					t.Errorf("prompt missing %q:\n%s", want, payload.Prompt)
+				}
+			}
+			for _, comment := range comments {
+				if want := `"id": "` + comment.ID + `"`; !strings.Contains(payload.Prompt, want) {
+					t.Errorf("prompt missing %q:\n%s", want, payload.Prompt)
+				}
+			}
+		})
 	}
 }
 
@@ -250,31 +263,6 @@ func TestBuildFinishPayloadApproved(t *testing.T) {
 	for _, want := range []string{"Final instruction", "Final reply", `"resolved": true`} {
 		if !strings.Contains(payload.Prompt, want) {
 			t.Errorf("approval output lost %q after cleanup: %s", want, payload.Prompt)
-		}
-	}
-}
-
-func TestBuildFinishPayloadPlanMode(t *testing.T) {
-	sess := newPayloadSession(t)
-	sess.Meta.CWD = filepath.Join(t.TempDir(), "source worktree")
-	sess.CJ.CliArgs = []string{"plan", "--name", "my-plan", "docs/plan.md"}
-	sess.SetFileComments("current.md", "", []review.Comment{
-		{ID: "c_1", StartLine: 1, EndLine: 1, Body: "clarify"},
-	})
-	cfg := &config.Config{}
-	mode := &reviewMode{docPath: "current.md", planSlug: "my-plan", planFile: "docs/plan.md"}
-
-	payload := buildFinishPayload(cfg, sess, mode, false)
-
-	if want := "critty plan --session " + sess.Key + " " + shellEscape(filepath.Join(sess.Meta.CWD, "docs/plan.md")); payload.NextCommand != want {
-		t.Errorf("NextCommand = %q, want %q", payload.NextCommand, want)
-	}
-	for _, want := range []string{
-		"critty comment --session " + sess.Key + " --reply-to <comment-id>",
-		payload.NextCommand,
-	} {
-		if !strings.Contains(payload.Prompt, want) {
-			t.Errorf("prompt missing %q:\n%s", want, payload.Prompt)
 		}
 	}
 }

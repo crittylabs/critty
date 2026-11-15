@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -84,18 +85,20 @@ func TestReloadDocumentAndAttachments(t *testing.T) {
 }
 
 func TestReloadReleasesRetiredPreviewPixels(t *testing.T) {
-	app := setupPrivateAppWithDoc(t, "Before $x$ after.")
-	app.width, app.height = 100, 30
-	app.tab().markdownImages = markdownMathRefs("Before $x$ after.")
-	app.tab().markdownImages[0].image = &inlineImage{id: 42, width: 48, height: 48, columns: 2, rows: 1, ready: true}
-	if err := os.WriteFile(app.filePath, []byte("Changed $y$."), 0600); err != nil {
-		t.Fatal(err)
-	}
-	msg := app.requestReload(true)().(reloadMsg)
-	output := strings.Join(rawMessages(app.finishReload(msg)), "")
-	if !strings.Contains(output, "a=d,d=I,q=2,i=42") {
-		t.Fatal("reload leaked retired terminal pixels")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		app := setupPrivateAppWithDoc(t, "Before $x$ after.")
+		app.width, app.height = 100, 30
+		app.tab().markdownImages = markdownMathRefs("Before $x$ after.")
+		app.tab().markdownImages[0].image = &inlineImage{id: 42, width: 48, height: 48, columns: 2, rows: 1, ready: true}
+		if err := os.WriteFile(app.filePath, []byte("Changed $y$."), 0600); err != nil {
+			t.Fatal(err)
+		}
+		msg := app.requestReload(true)().(reloadMsg)
+		output := strings.Join(rawMessages(app.finishReload(msg)), "")
+		if !strings.Contains(output, "a=d,d=I,q=2,i=42") {
+			t.Fatal("reload leaked retired terminal pixels")
+		}
+	})
 }
 
 func TestReloadPreservesPerFileViewport(t *testing.T) {

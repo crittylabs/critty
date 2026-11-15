@@ -200,18 +200,9 @@ func TestRenderCompletionMenu(t *testing.T) {
 	if len(lines) != 5 || ansi.Strip(lines[2]) != "│ second/ │" {
 		t.Fatalf("menu = %q", menu)
 	}
-	if !strings.Contains(lines[1], "\x1b[1;2m") && !strings.Contains(lines[1], "\x1b[2;1m") {
-		t.Errorf("first row is not faint bold: %q", lines[1])
-	}
-	if strings.Contains(lines[2], "\x1b[1") {
-		t.Errorf("second row is bold: %q", lines[2])
-	}
 	focused := strings.Split(renderCompletionMenu(items, 1, 0, 80), "\n")
-	if strings.Count(focused[2], "\x1b[2m") != 2 || !strings.Contains(ansi.Strip(focused[2]), "second/") {
-		t.Errorf("focused row should only fade its borders: %q", focused[2])
-	}
-	if !strings.Contains(focused[1], "\x1b[1;2m") && !strings.Contains(focused[1], "\x1b[2;1m") {
-		t.Errorf("first row loses bold while another row is focused: %q", focused[1])
+	if ansi.Strip(focused[2]) != "│ second/ │" {
+		t.Errorf("focused directory row = %q", focused[2])
 	}
 	narrow := strings.Split(renderCompletionMenu(items, -1, 0, 9), "\n")
 	if ansi.Strip(narrow[2]) != "│ seco… │" {

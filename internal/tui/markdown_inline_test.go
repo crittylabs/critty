@@ -25,6 +25,7 @@ func TestInlineMarkdownParser(t *testing.T) {
 		{"**bold `literal ** stars` end**", "bold  literal ** stars  end", ""},
 		{"``a ` b``", " a ` b ", ""},
 		{"[**label**](https://example.org/a_(b))", "label ↗", "https://example.org/a_(b)"},
+		{"- **[label](https://example.org)-compatible workflow**: commands", "- label ↗-compatible workflow: commands", "https://example.org"},
 		{"[label][ref]\n\n[ref]: https://example.org/ref", "label ↗", "https://example.org/ref"},
 		{"[label][ref]", "[label][ref]", ""},
 		{"https://example.org/plain.", "https://example.org/plain ↗.", "https://example.org/plain"},
