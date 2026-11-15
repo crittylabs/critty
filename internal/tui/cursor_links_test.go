@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/crittylabs/critty/internal/document"
 	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/internal/syntax"
 )
 
 func TestMarkdownLinkRefs(t *testing.T) {
@@ -224,39 +225,102 @@ func TestOpenLinksRespectsRemoteAndSchemes(t *testing.T) {
 }
 
 func TestOpenNonImageMarkdownTarget(t *testing.T) {
-	opened := stubOpener(t, false)
-	t.Setenv("EDITOR", "vi")
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "clip.mp4"), []byte("video"), 0o600); err != nil {
+	for _, markup := range []string{"[Video](./clip%20one.mp4)\n", "![](./clip%20one.mp4)\n"} {
+		t.Run(markup, func(t *testing.T) {
+			opened := stubOpener(t, false)
+			dir := t.TempDir()
+			path := filepath.Join(dir, "clip one.mp4")
+			if err := os.WriteFile(path, []byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			app, _ := formTestAppWithContent(t, markup)
+			app.tab().attachment.Source = filepath.Join(dir, "media.md")
+			app.width, app.height = 100, 35
+			app.recalculateLayout()
+			app.rebuildContent()
+			check := func(cmd tea.Cmd, count int) {
+				t.Helper()
+				if status := openStatus(cmd); status != "Opened ./clip%20one.mp4" || len(*opened) != count || !strings.HasSuffix((*opened)[count-1], " "+path) {
+					t.Fatalf("video link should open externally: status=%q opened=%v", status, *opened)
+				}
+			}
+			check(app.openReferenceAtCursor(), 1)
+			cells, _ := linkCells(app.contentViewport.GetContent(), "./clip%20one.mp4")
+			if len(cells) == 0 {
+				t.Fatal("video target has no clickable cells")
+			}
+			left, top, _, _ := app.contentBounds()
+			point := cells[len(cells)-1]
+			app = pressMouse(app, left+point.X, top+point.Y)
+			app, cmd := updateApp(app, tea.MouseReleaseMsg{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft})
+			check(cmd, 2)
+			app.session.Meta.CWD = dir
+			app.openLineComment()
+			app.modalTextarea.SetValue(markup)
+			app.modalTextarea.MoveToEnd()
+			check(app.openReferenceAtCursor(), 3)
+			remoteSession = func() bool { return true }
+			cmd, _ = app.followLink("./clip%20one.mp4")
+			if status := openStatus(cmd); !strings.HasPrefix(status, "Not opened:") || len(*opened) != 3 {
+				t.Fatalf("remote media link: %q opened=%v", status, *opened)
+			}
+		})
+	}
+}
+
+func TestUnreviewedLinkUsesSyntaxAndContent(t *testing.T) {
+	rules, err := syntax.Compile(syntax.Config{Files: []syntax.FileType{
+		{Pattern: "*.demo", Language: "go"},
+		{Pattern: "plain.go", Language: "text"},
+		{Pattern: "plain.md", Language: "text"},
+	}})
+	if err != nil {
 		t.Fatal(err)
 	}
-	app, _ := formTestAppWithContent(t, "![](./clip.mp4)\n")
-	app.tab().attachment.Source = filepath.Join(dir, "media.md")
-	app.width, app.height = 100, 35
-	app.recalculateLayout()
-	app.rebuildContent()
-	if cmd := app.openReferenceAtCursor(); cmd == nil || app.modal != noModal {
-		t.Fatalf("keyboard open: modal=%v cmd=%v", app.modal, cmd)
-	} else if ready := cmd().(sourceEditorReadyMsg); ready.err != nil || ready.cmd.Args[len(ready.cmd.Args)-1] != filepath.Join(dir, "clip.mp4") {
-		t.Fatalf("editor command: %+v", ready)
-	}
-	cells, _ := linkCells(app.contentViewport.GetContent(), "./clip.mp4")
-	if len(cells) == 0 {
-		t.Fatal("video target has no clickable cells")
-	}
-	left, top, _, _ := app.contentBounds()
-	point := cells[len(cells)-1]
-	app = pressMouse(app, left+point.X, top+point.Y)
-	app, cmd := updateApp(app, tea.MouseReleaseMsg{X: left + point.X, Y: top + point.Y, Button: tea.MouseLeft})
-	if cmd == nil || app.modal != noModal || len(*opened) != 0 {
-		t.Fatalf("mouse open: modal=%v opened=%v", app.modal, *opened)
-	}
-	app.session.Meta.CWD = dir
-	app.openLineComment()
-	app.modalTextarea.SetValue("![](./clip.mp4)")
-	app.modalTextarea.MoveToEnd()
-	if status := openStatus(app.openReferenceAtCursor()); status != "Opened ./clip.mp4" || len(*opened) != 1 {
-		t.Fatalf("editor open: %q opened=%v", status, *opened)
+	for _, tc := range []struct {
+		name, content string
+		editor        bool
+	}{
+		{"source.go", "package example\n", true},
+		{"Gemfile", "source 'https://example.org'\n", true},
+		{"tool", "#!/usr/bin/env python3\n", true},
+		{"custom.demo", "package example\n", true},
+		{"guide.md", "# Guide\n", true},
+		{"guide.markdown", "# Guide\n", true},
+		{"plain.md", "# Guide\n", true},
+		{"plain.go", "package example\n", true},
+		{"notes.txt", "Example notes.\n", true},
+		{"LICENSE", "Permission is granted to use this example.\n", true},
+		{"Examplefile", "Example configuration.\n", true},
+		{"unknown", "Example notes.\n", true},
+		{"unicode", "αβγ\n", true},
+		{"empty", "", true},
+		{"binary", "\x00\x01\x02", false},
+		{"binary.txt", "\x00\x01\x02", false},
+		{"report.pdf", "%PDF-1.7\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := stubOpener(t, false)
+			t.Setenv("EDITOR", "vi")
+			app := setupAppWithDoc(t, "Source\n")
+			app.syntax = rules
+			path := filepath.Join(filepath.Dir(app.tab().path), tc.name)
+			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd, ok := app.followLink(path)
+			if !ok || cmd == nil {
+				t.Fatal("local link did not produce an action")
+			}
+			if tc.editor {
+				ready, ok := cmd().(sourceEditorReadyMsg)
+				if !ok || ready.err != nil || ready.cmd.Args[len(ready.cmd.Args)-1] != path || len(*opened) != 0 {
+					t.Fatalf("source link did not open in the editor: %+v opened=%v", ready, *opened)
+				}
+			} else if status := openStatus(cmd); status != "Opened "+path || len(*opened) != 1 {
+				t.Fatalf("non-source link did not open externally: %q opened=%v", status, *opened)
+			}
+		})
 	}
 }
 
@@ -267,30 +331,39 @@ func TestFollowLocalMarkdownLinks(t *testing.T) {
 		disk       bool
 		attachment bool
 		outside    bool
+		media      bool
 	}{
 		{name: "review snapshot", tab: true},
 		{name: "existing file", tab: true, disk: true},
 		{name: "attachment source", tab: true, attachment: true},
 		{name: "retained tab", tab: true, outside: true},
+		{name: "media snapshot", tab: true, media: true},
 		{name: "editor fallback", disk: true},
 		{name: "missing file"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			opened := stubOpener(t, false)
 			t.Setenv("EDITOR", "vi")
-			app := setupAppWithDoc(t, "[Guide](../guide%20file.md)\n")
+			name, destination := "guide file.md", "guide%20file.md"
+			if tc.media {
+				name, destination = "clip.mp4", "clip.mp4"
+			}
+			app := setupAppWithDoc(t, "[Guide](../"+destination+")\n")
 			dir := filepath.Dir(app.tab().path)
 			app.session.Meta.CWD = dir
 			// Resolve relative to the reviewed file, not the process directory.
 			app.tab().path = "docs/start.md"
-			path := filepath.Join(dir, "guide file.md")
+			path := filepath.Join(dir, name)
 			if tc.disk {
 				if err := os.WriteFile(path, []byte("# Guide\n"), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
 			if tc.tab {
-				target := FileTab{path: "guide file.md", doc: document.FromContent(path, []byte("# Guide\n")), state: &fileReview{}, outsideChanges: tc.outside}
+				target := FileTab{path: name, doc: document.FromContent(path, []byte("# Guide\n")), state: &fileReview{}, outsideChanges: tc.outside}
+				if tc.media {
+					target.isBinary, target.doc = true, nil
+				}
 				if tc.attachment {
 					attachment := review.AttachedDocument{Source: path}
 					target.path, target.attachment = "saved.md", &attachment

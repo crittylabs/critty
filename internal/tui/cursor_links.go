@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -238,22 +241,46 @@ func (m *AppModel) followLink(destination string) (tea.Cmd, bool) {
 	if m.readOnly {
 		return m.followViewLink(destination)
 	}
-	if !m.readOnly {
-		if path, ok := m.localLinkPath(destination, false); ok {
-			location := sourceLocation{path: path}
-			if m.focusSource(location) {
-				return nil, true
-			}
-			if !regularFile(path) {
-				m.locationError = "File does not exist on disk."
-				return nil, true
-			}
-			m.locationError = ""
-			return m.openSourceEditor(location), true
+	if path, ok := m.localLinkPath(destination, false); ok {
+		if m.focusSource(sourceLocation{path: path}) {
+			return nil, true
 		}
+		if !regularFile(path) {
+			m.locationError = "File does not exist on disk."
+			return nil, true
+		}
+		m.locationError = ""
+		return m.openUnreviewedLink(destination, path), true
 	}
 	cmd := m.openLink(destination, false)
 	return cmd, cmd != nil
+}
+
+func (m *AppModel) openUnreviewedLink(destination, path string) tea.Cmd {
+	editor := m.openSourceEditor(sourceLocation{path: path})
+	external := m.openLink(destination, false)
+	tab := FileTab{path: path, syntax: m.syntax}
+	return func() tea.Msg {
+		file, err := os.Open(path)
+		if err != nil {
+			return externalOpenMsg{"Cannot open " + destination + ": " + err.Error()}
+		}
+		defer func() { _ = file.Close() }()
+		data, err := io.ReadAll(io.LimitReader(file, maxShebangLineBytes+1))
+		if err != nil {
+			return externalOpenMsg{"Cannot read " + destination + ": " + err.Error()}
+		}
+		cmd := external
+		if lexer := tab.codeLexer(string(data)); markdownPath(path) ||
+			lexer != nil && lexer.Config().Name != "plaintext" ||
+			strings.HasPrefix(http.DetectContentType(data), "text/") {
+			cmd = editor
+		}
+		if cmd == nil {
+			return nil
+		}
+		return cmd()
+	}
 }
 
 func (m AppModel) openLink(destination string, editor bool) tea.Cmd {

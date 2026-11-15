@@ -37,7 +37,7 @@
   - **Keyboard navigation**
     - **Emacs- and vi-style navigation**: Use either style for line and page movement, line selection, and horizontal scrolling in tables and block formulas.  Jump to file boundaries or either horizontal edge.  `C-v` / `M-v` and Page Down / Up scroll with two rows of overlap, keeping the cursor position while visible; half-page movement remains available.  See Help for all navigation keys.
   - **File navigation**
-    - In reviews, local Markdown links jump to an existing file tab or open the file in the editor when it has no tab.  Relative links resolve from the document's source directory.  Back and Forward also restore positions after following file or thread references, including links from summary attachments, without undoing review edits.  The header buttons show `M-b` / `M-f` when history is available.  See Help for all bindings.
+    - In reviews, local Markdown links jump to an existing tab first.  Otherwise, Markdown, files recognized by the configured syntax rules, and files detected as text open in the editor; other files, including videos and PDFs, use the OS default application.  Relative links resolve from the document's source directory.  Back and Forward also restore positions after following file or thread references, including links from summary attachments, without undoing review edits.  The header buttons show `M-b` / `M-f` when history is available.  See Help for all bindings.
 
 ### Changed
 

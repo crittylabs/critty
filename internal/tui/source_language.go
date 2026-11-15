@@ -9,6 +9,8 @@ import (
 	"github.com/mattn/go-shellwords"
 )
 
+const maxShebangLineBytes = 4096
+
 // Prefer known filenames, then use a bounded shebang for unrecognized or plain
 // text files.  Never analyse the whole document just to guess its language.
 func codeLexer(filename, source string) chroma.Lexer {
@@ -68,8 +70,8 @@ func shebangCommand(source string) string {
 	if !strings.HasPrefix(source, "#!") {
 		return ""
 	}
-	line, _, _ := strings.Cut(source[:min(len(source), 4097)], "\n")
-	if len(line) > 4096 {
+	line, _, _ := strings.Cut(source[:min(len(source), maxShebangLineBytes+1)], "\n")
+	if len(line) > maxShebangLineBytes {
 		return ""
 	}
 	parser := shellwords.NewParser()
