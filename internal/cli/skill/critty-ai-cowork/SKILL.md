@@ -25,10 +25,10 @@ Continue without asking the human to approve each AI response.  Complete the loo
 
 Preserve substantiated disagreements for a human decision instead of editing merely to obtain AI agreement.  Identify them as unresolved; a completed AI assessment alone does not establish agreement or resolution.
 
-Ask for a human decision when progress requires one: a material scope change, repeated disagreement without new evidence, or a recurring failure that prevents verification.  Honor explicit round, time, and cost limits; reaching one ends the loop with a report of remaining work, not a claim of completion.
+Ask for a human decision when progress requires one: a material scope change, repeated disagreement without new evidence, or a recurring failure that prevents verification.  Use the Decision summary procedure in `/critty` when the decision spans several threads.  Honor explicit round, time, and cost limits; reaching one ends the loop with a report of remaining work, not a claim of completion.
 
 ## Final human review
 
-Present the completed changes, checks, AI findings and their disposition, and remaining limitations through the caller's human review workflow.  Human feedback can start another in-scope implementation and AI review round, followed by renewed human review of changed content.
+Present the completed changes, checks, AI findings and their disposition, and remaining limitations through the caller's human review workflow.  For a Critty handoff across several threads, prepare and focus the summary described in `/critty`'s Decision summary section.  Human feedback can start another in-scope implementation and AI review round, followed by renewed human review of changed content.
 
 This skill does not activate autonomous approval or waive required human gates for commits, release, or other actions.  AI completion remains separate from human acceptance.

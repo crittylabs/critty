@@ -35,6 +35,23 @@ Start reviews with `critty review`; resume with `critty sessions resume <id>`.  
 
 Use `/critty-cli` for review input syntax, scope restrictions, attachment snapshots, focus and labels, or image support.  Use `/critty-approval` to prepare approval documents, publication drafts, and form decisions.  Retain the selected scope and input paths or diff producer for later rounds.
 
+### Decision summary
+
+Before asking the human to decide or accept work discussed across several threads, attach a concise `REVIEW_SUMMARY.md` and focus it at startup.  This includes handoffs after AI review or cowork.
+
+1. Read the current threads and prepare the summary in the task's scratch directory.  Put pending decisions first: the question, relevant alternatives and tradeoffs, the agent's recommendation and reason, and links to the supporting threads or source.  Distinguish AI agreement from questions that still need the human's judgment.
+2. Add only the resolved findings, checks and limitations that affect acceptance.  If no decisions remain beyond accepting the changes, say so.  Keep the full discussion in its existing threads; the summary is an index to the decision, not a transcript or a replacement for approval evidence.
+3. Link each decision to its supporting comments or threads and specific source lines using the [supported internal references](../critty-cli/references/inputs.md#startup-focus): actual unambiguous `c_` IDs and `@path L64`.  For a range, write `@path L64-72`; navigation opens its first line.  Verify IDs and coordinates against the current review.  For review-level or ambiguous comments without a thread link, include the author, ID and a short relevant excerpt, with a source reference when available.
+4. Attach the summary alongside the existing required attachments, including the exact commit message or approval payload, and pass `--focus` with the summary's source path.  On resume, supply the complete ordered attachment list and refresh the summary to match the new round.  Follow `/critty-approval` for separate choices or consents and their result export; summarizing a discussion does not grant permission.
+
+For example, after preparing the review and its terminal launch:
+
+```sh
+critty sessions resume <id> --attachment '<directory>/REVIEW_SUMMARY.md' --attachment '<directory>/COMMIT_MESSAGE.md' --focus '<directory>/REVIEW_SUMMARY.md' --summary '<directory>/round-2.json'
+```
+
+Replace `<directory>` with the task scratch path and include any other required attachments and launch options.  Keep the summary unchanged while the round is open.  Confirm that the review opens on it and that its references navigate to the intended source or thread.
+
 ## Step 2: Launch and wait
 
 Choose a background task or resumable handle that preserves the process and its output across tool yields and turn boundaries.  Check the current tool's timeout semantics for the selected execution mode: a timeout may kill the command, move it to the background, or only end a wait.  Set any process lifetime limit to the maximum the tool allows, independently of the agent's wait deadline.  Preserve complete stdout, stderr, and the exit status in task-owned files, or in a recoverable tool result whose output is not truncated.  Retain the working directory, session ID, execution handle, and output location.
