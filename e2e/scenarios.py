@@ -264,7 +264,10 @@ def child(path: str) -> None:
             stderr=err,
             check=False,
         )
-    (ROOT / f"{name}.exit.json").write_text(json.dumps({"code": result.returncode}))
+    exit_path = ROOT / f"{name}.exit.json"
+    pending = exit_path.with_suffix(".tmp")
+    pending.write_text(json.dumps({"code": result.returncode}))
+    pending.replace(exit_path)
 
 
 def report(message: str) -> None:

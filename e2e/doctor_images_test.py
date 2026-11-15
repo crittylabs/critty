@@ -38,8 +38,12 @@ class DoctorImagesTest(unittest.TestCase):
         cls.tmux_bin.mkdir()
         fake_tmux = cls.tmux_bin / "tmux"
         fake_tmux.write_text(
-            '#!/bin/sh\n[ "$3" = list-clients ] || exit 1\n'
-            'printf "%s\\n" "$CRITTY_TEST_CLIENT_PANE"\n'
+            '#!/bin/sh\ncase "$1" in\n'
+            '  -S) [ "$3" = show-options ] || exit 1\n'
+            '      printf "on\\n@1\\n%s @1 @1\\n" "$CRITTY_TEST_CLIENT_PANE" ;;\n'
+            '  show-options) printf "on\\n" ;;\n'
+            "  *) exit 1 ;;\n"
+            "esac\n"
         )
         fake_tmux.chmod(0o700)
         cls.env = {
