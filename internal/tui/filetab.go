@@ -220,6 +220,7 @@ func (ft *FileTab) highlightSource() {
 		observers = append(observers, mask.observe)
 	}
 	ft.chromaLines = newCodeHighlighter(ft.lexer, observers...)(ft.doc.Content)
+	ft.highlightPatchDocument()
 	ft.plainLines = make([]string, len(ft.chromaLines))
 	ft.displayWidths = make([]int, len(ft.chromaLines))
 	for i, line := range ft.chromaLines {

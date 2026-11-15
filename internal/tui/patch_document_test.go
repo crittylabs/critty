@@ -228,15 +228,15 @@ func TestPatchDocumentRows(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			lines := strings.Split(tc.source, "\n")
-			rows := patchDocumentRows(lines, tc.source)
-			if (len(rows) > 0) != tc.valid {
-				t.Fatalf("valid=%v, rows=%+v", tc.valid, rows)
+			patch := parsePatchDocument(lines, tc.source)
+			if (patch != nil) != tc.valid {
+				t.Fatalf("valid=%v, patch=%+v", tc.valid, patch)
 			}
 			if !tc.valid {
 				return
 			}
 			seen := map[int]bool{}
-			for _, row := range rows {
+			for _, row := range patch.rows {
 				for _, n := range []int{row.left, row.right} {
 					if n > 0 {
 						seen[n] = true

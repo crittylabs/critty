@@ -479,6 +479,9 @@ func (m *AppModel) rebuildContent() {
 			if !measured {
 				width = ansi.StringWidth(displayLine)
 			}
+			if !isSelected && !isSidebarHighlight {
+				displayLine = t.patchDisplayLine(lineNum, displayLine)
+			}
 			displayLine = highlight(displayLine)
 			if isSelected {
 				displayLine = inlineBackground(selectedLineBg, displayLine)

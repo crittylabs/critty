@@ -19,21 +19,43 @@ type patchDocumentCache struct {
 	doc     *document.Document
 	content string
 	rows    []patchDocumentRow
+	hunks   []patchDocumentHunk
+	before  map[int]string
+	kinds   map[int]gitdiff.LineOp
+}
+
+type patchDocumentHunk struct {
+	oldName, newName string
+	lines            []patchDocumentSourceLine
+}
+
+type patchDocumentSourceLine struct {
+	line int
+	op   gitdiff.LineOp
 }
 
 // Split projections always refer to the patch document's own source lines.
 // A Git change to a patch file keeps the existing outer diff renderer.
 func (m *AppModel) documentPatch(t *FileTab) *patchDocumentCache {
+	if m.multiFile && t.attachment == nil && !t.viewDocument {
+		return nil
+	}
+	return t.documentPatch()
+}
+
+func (t *FileTab) documentPatch() *patchDocumentCache {
 	if t.doc == nil || t.doc.Known != nil || t.diff != nil || t.isBinary ||
-		m.multiFile && t.attachment == nil && !t.viewDocument ||
 		t.lexer == nil || !strings.EqualFold(t.lexer.Config().Name, "diff") {
 		return nil
 	}
 	if t.patchDocument == nil || t.patchDocument.doc != t.doc || t.patchDocument.content != t.doc.Content {
-		t.patchDocument = &patchDocumentCache{doc: t.doc, content: t.doc.Content}
+		t.patchDocument = &patchDocumentCache{}
 		if len(t.doc.Content) <= 64<<20 {
-			t.patchDocument.rows = patchDocumentRows(t.doc.Lines, t.doc.Content)
+			if parsed := parsePatchDocument(t.doc.Lines, t.doc.Content); parsed != nil {
+				t.patchDocument = parsed
+			}
 		}
+		t.patchDocument.doc, t.patchDocument.content = t.doc, t.doc.Content
 	}
 	if len(t.patchDocument.rows) == 0 {
 		return nil
@@ -47,14 +69,20 @@ func (m *AppModel) splitPatchDocument(t *FileTab) bool {
 
 // The parser validates the grammar. Match each validated fragment back to its
 // literal source, refusing ambiguous extra headers rather than guessing anchors.
-func patchDocumentRows(lines []string, source string) []patchDocumentRow {
+func parsePatchDocument(lines []string, source string) *patchDocumentCache {
 	files, _, err := gitdiff.Parse(strings.NewReader(source))
 	if err != nil {
 		return nil
 	}
-	var fragments []*gitdiff.TextFragment
+	type fragment struct {
+		file *gitdiff.File
+		text *gitdiff.TextFragment
+	}
+	var fragments []fragment
 	for _, file := range files {
-		fragments = append(fragments, file.TextFragments...)
+		for _, text := range file.TextFragments {
+			fragments = append(fragments, fragment{file, text})
+		}
 	}
 	var headers []int
 	for i, line := range lines {
@@ -66,9 +94,11 @@ func patchDocumentRows(lines []string, source string) []patchDocumentRow {
 		return nil
 	}
 	kinds := make(map[int]gitdiff.LineOp)
+	var hunks []patchDocumentHunk
 	for i, fragment := range fragments {
 		index := headers[i] + 1
-		for _, line := range fragment.Lines {
+		hunk := patchDocumentHunk{oldName: fragment.file.OldName, newName: fragment.file.NewName}
+		for _, line := range fragment.text.Lines {
 			if index >= len(lines) {
 				return nil
 			}
@@ -77,11 +107,13 @@ func patchDocumentRows(lines []string, source string) []patchDocumentRow {
 				return nil
 			}
 			kinds[index+1] = line.Op
+			hunk.lines = append(hunk.lines, patchDocumentSourceLine{index + 1, line.Op})
 			index++
 			if index < len(lines) && strings.HasPrefix(lines[index], "\\ ") {
 				index++
 			}
 		}
+		hunks = append(hunks, hunk)
 	}
 	var rows []patchDocumentRow
 	for n := 1; n <= len(lines); {
@@ -121,7 +153,7 @@ func patchDocumentRows(lines []string, source string) []patchDocumentRow {
 			rows = append(rows, pair)
 		}
 	}
-	return rows
+	return &patchDocumentCache{rows: rows, hunks: hunks, kinds: kinds}
 }
 
 func (m *AppModel) rebuildPatchDocument(patch *patchDocumentCache) {
@@ -135,11 +167,14 @@ func (m *AppModel) rebuildPatchDocument(patch *patchDocumentCache) {
 		width = min(width, m.contentViewport.Width()-lipgloss.Width(fmt.Sprintf("> ☑︎ 💬 %d", len(ids)))-1)
 	}
 	gutter := m.diffGutter(t)
-	cell := func(n, width int) ([]diffCellRow, contentMouseTarget) {
+	cell := func(n, width int, before bool) ([]diffCellRow, contentMouseTarget) {
 		if n == 0 {
 			return nil, contentMouseTarget{}
 		}
-		line := &diffLine{ref: lineRef{line: n}, text: t.doc.LineAt(n), styled: documentDisplayLine(t, n-1, t.doc.LineAt(n))}
+		line := &diffLine{ref: lineRef{line: n}, text: t.doc.LineAt(n), styled: t.patchDisplayLine(n, documentDisplayLine(t, n-1, t.doc.LineAt(n)))}
+		if styled, ok := patch.before[n]; before && ok {
+			line.styled = t.patchDisplayLine(n, styled)
+		}
 		return m.diffCell(line, width, false, gutter)
 	}
 	annotations := func(n int) {
@@ -158,7 +193,7 @@ func (m *AppModel) rebuildPatchDocument(patch *patchDocumentCache) {
 	annotations(0)
 	for _, row := range patch.rows {
 		if row.full {
-			cells, target := cell(row.left, width)
+			cells, target := cell(row.left, width, false)
 			for _, c := range cells {
 				layout.addCellSpan(len(layout.rows), 0, 0, c, target)
 				layout.appendBlock(&b, c.text, target)
@@ -166,8 +201,8 @@ func (m *AppModel) rebuildPatchDocument(patch *patchDocumentCache) {
 		} else {
 			leftWidth := max(1, (width-3)/2)
 			rightWidth := max(1, width-3-leftWidth)
-			left, lt := cell(row.left, leftWidth)
-			right, rt := cell(row.right, rightWidth)
+			left, lt := cell(row.left, leftWidth, true)
+			right, rt := cell(row.right, rightWidth, false)
 			for i := 0; i < max(len(left), len(right)); i++ {
 				var l, r diffCellRow
 				if i < len(left) {
