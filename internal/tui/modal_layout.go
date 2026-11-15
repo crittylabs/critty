@@ -73,17 +73,20 @@ func layoutModalActions(specs []modalButtonSpec, width, top int) (string, []moda
 	if len(specs) == 0 {
 		return "", nil
 	}
-	ordered := append(slices.Clone(specs[1:]), specs[0])
+	ordered := slices.Concat(specs[1:], specs[:1])
 	content, regions := layoutModalButtonRow(ordered, width, top)
 	rows := strings.Split(content, "\n")
-	for i := range regions {
-		row := regions[i].rect.top - top
-		offset := max(0, width-lipgloss.Width(rows[row]))
-		regions[i].rect.left += offset
-		regions[i].rect.right += offset
-	}
-	for i := range rows {
-		rows[i] = strings.Repeat(" ", max(0, width-lipgloss.Width(rows[i]))) + rows[i]
+	nextRegion := 0
+	for i, row := range rows {
+		offset := max(0, width-lipgloss.Width(row))
+		// Regions follow row order; reuse this row's offset for every target.
+		for nextRegion < len(regions) && regions[nextRegion].rect.top == top+i {
+			region := &regions[nextRegion]
+			region.rect.left += offset
+			region.rect.right += offset
+			nextRegion++
+		}
+		rows[i] = strings.Repeat(" ", offset) + row
 	}
 	return strings.Join(rows, "\n"), regions
 }

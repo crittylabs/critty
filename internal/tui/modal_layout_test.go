@@ -14,7 +14,7 @@ import (
 
 func TestModalActionsWrapWholeButtons(t *testing.T) {
 	t.Parallel()
-	for _, width := range []int{24, 44} {
+	for _, width := range []int{24, 44, 120} {
 		t.Run(fmt.Sprintf("width=%d", width), func(t *testing.T) {
 			m := AppModel{}
 			specs := []modalButtonSpec{
