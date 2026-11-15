@@ -1865,6 +1865,9 @@ if __name__ == "__main__":
             from tmux_launchers import verify
 
             verify(binary, Path(args.tmux).resolve())
+            from tmux_image_probe import verify as verify_image_probe
+
+            verify_image_probe(binary, Path(args.tmux).resolve())
         finally:
             if args.keep:
                 print(f"Fixtures and logs: {root}")
