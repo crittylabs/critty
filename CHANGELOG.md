@@ -4,35 +4,61 @@
 
 ### Added
 
-- **Patch document viewing**: Read standalone diff/patch files and review attachments with source-language highlighting, red/green change backgrounds, and optional side-by-side layout through `S` or Split.  Markdown shares the document viewer's heading and inline text styles while retaining its raw syntax.  Filename associations apply; unknown languages retain patch colors.  Unified remains the default, with narrow panes falling back to it.  Highlighting starts fresh per hunk, so fragments beginning inside multiline strings or comments can lack their original context.  Patch headers, source coordinates, comments, and copied text stay intact.  Git changes to a patch file retain their existing outer diff without a nested split.
-- **Markdown callouts**: Read GitHub alerts and Obsidian callouts with colored left bars, matching tinted titles, and type icons in documents and comments.  Icons use Nerd Font glyphs when enabled and portable symbols otherwise.  Custom titles retain inline formatting, nested callouts retain their own colors, and unknown types use the note style.  Shared types, including `important` and `caution`, use GitHub colors.  Obsidian `+` / `-` markers are recognized, with bodies always expanded.  Copying retains the original Markdown.
-- **Custom syntax associations**: Map code-fence language names and filename patterns to supported languages in global or project settings.  Associations control highlighting, supported outlines, and Markdown rendering; project rules take precedence.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#syntax-associations).
-- **Emacs-style file navigation**: Use `C-v` / `M-v` or Page Down / Up to scroll the file pane with two rows of overlap, retaining the cursor position while it remains visible.  `M-<` / `M->` jump to the start / end.  `C-u` / `C-d` and Shift+Up / Down retain half-page movement.  See Help for all navigation keys.
-- **Nerd Font icons**: Identify file types, Git changes, comment and form states, and document structure with icons while keeping names, unread markers, and line counts.  File type icons use nvim-web-devicons' light or dark colors independently of filenames.  Icon labels start immediately after a two-cell icon field, accommodating wider glyphs without an extra separator.  The close symbol occupies one cell.  File and sidebar tabs use single-cell pointed Powerline ends that dim with their backgrounds behind dialogs.  Markdown files and outline headings share the same icon.  Project and branch context and selected viewer controls keep their labels and key hints beside matching icons.  Dialog title bars use a matching close icon.  Outline icons replace redundant declaration keywords while keeping names and Go receivers.  Select `auto`, `on`, or `off` with `nerd_fonts`, and inspect the result and reason with `critty doctor`.  Automatic detection estimates support from terminal signals and installed font names; `off` keeps the portable symbols and labels.
-- **Markdown in comment threads**: Read bold, italic, inline code, headings, and block quotes in the comment sidebar, inline threads, and reply context, including formatting that spans source lines.  Regular and emphasized text retain each author's color; links and code keep their dedicated colors.
-- **Keyboard labels in Markdown**: Read `<kbd>` labels as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested key combinations keep a single pair of brackets per key, and copying retains the Markdown source without the display brackets.
-- **External link markers**: Identify HTTP(S) links by a clickable `↗` after their label in documents and comments.  Copying keeps the Markdown source without the display marker.
-- **Markdown code blocks**: Distinguish fenced and indented code in documents and comments with a faint background across blank lines, wrapped rows, and the available text width.  Selection, search, and diff colors retain priority, and copying excludes decorative padding.  Fenced code also has syntax highlighting in documents, comments, and the comment editor for light and dark terminals.  Recognized language names use the accent color; fence markers and attributes stay muted.  Language names can use the first class in `{#id .language key="value"}` attributes.  `suggestion` blocks use the target file's language.  Multiline strings and comments keep their context; unrecognized languages remain plain text.
-- **Document browsing in view mode**: Follow local file and heading links without adding tabs, reusing existing tabs when available.  Back and Forward restore documents and reading positions, with up to 64 visits held in memory.  Web links open in the browser, and files Critty cannot display offer external opening.  Review editing remains disabled, and navigation saves no review or history files.
+- **Syntax highlighting and Markdown rendering**
+  - **Markdown**
+    - **Fenced code uses language highlighting** in documents, comments, and the comment editor.  `suggestion` blocks use the target file's language.  Multiline strings and comments keep their context; unknown languages remain plain text.  Recognized language names use the accent color, while fence markers and attributes stay muted.  The first class in `{#id .language key="value"}` can specify the language.
+    - **Markdown highlighting throughout reviews**: Comment sidebars, inline threads, and reply context support bold, italic, inline code, headings, block quotes, and formatting across source lines.  Regular and emphasized text retain each author's color; links and code keep their own colors.
+    - **GitHub alerts and Obsidian callouts**: Read callouts with colored left bars, tinted titles, and type icons in documents and comments.  Icons use Nerd Font glyphs when enabled.  Custom titles retain inline formatting, nested callouts keep their own colors, and unknown types use the note style.  Shared types, including `important` and `caution`, use GitHub colors.  Obsidian `+` / `-` markers are recognized; bodies remain expanded.
+    - **Distinguishable external links**: HTTP(S) links have a clickable `↗` marker after their labels.  Copying retains the Markdown without the display marker.
+    - `<kbd>` labels appear as `⟦X⟧` or `⟦Enter⟧` in documents and comments.  Nested combinations keep one pair of brackets per key.  Copying retains the original Markdown without the display brackets.
+    - **Wrapped list items align with their text**; nested quotes repeat their vertical bars.  Callouts keep their colors across wrapped rows.  Decorative indentation and bars stay out of copied text, including in split diffs.
+    - Fenced and indented code blocks have faint backgrounds across blank lines, wrapped rows, and the available text width.  Selection, search, and diff colors take priority; copying excludes decorative padding.
+  - **Diff and patch files**
+    - **Source-language highlighting and side-by-side view**: Read standalone diff/patch files and review attachments with syntax colors and red/green change backgrounds.  Toggle the layout with `S` or Split.  Unified remains the default; narrow panes fall back to it.  Git changes to a patch file keep their existing outer diff without a nested split.
+    - **Consistent Markdown highlighting**: Markdown in diffs uses the same heading and inline text styles as the document viewer while keeping the source syntax visible.
+  - **Custom syntax associations**
+    - Map code-fence language names and filename patterns to supported languages in global or project settings.  Associations control highlighting, supported outlines, and Markdown rendering; project rules take precedence.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#syntax-associations).
+
+- **View mode and reading layout**
+  - **Use Critty as a full-featured terminal viewer for Markdown, source code, and images.**  `critty <file[:LINE]>` opens a read-only view in the current terminal without saving a review or migrating stored data.  Use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes, and `--session` still resumes a saved review.
+  - Follow local file and heading links within the viewer, reusing existing tabs when available.  Back and Forward restore documents and reading positions, with up to 64 visits in memory.  Web links open in the browser; unsupported files offer external opening.  Browsing saves no review or history files.
+  - Toggle line numbers in view or review mode with `#` or Lines, keeping a one-column marker gutter.  View mode hides numbers by default; reviews retain them.  Set `line_numbers` to override the default.
+  - Set `max_wrap_width` or pass `--max-wrap-width` to cap text wrapping without shrinking the pane or changing source coordinates.  By default, text uses the available width; `0` means no limit.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#reading-layout).
+  - Single-file views omit the file tree and Comments sidebar.  They show only Outline when document structure is available and use the full width otherwise.
+
+- **Nerd Font support**
+  - **Icons throughout the UI**: Identify file types, Git changes, comment and form states, and document structure with icons while keeping names, unread markers, and counts.  Select `auto`, `on`, or `off` with `nerd_fonts`; `critty doctor` reports the result and reason.  Automatic detection uses terminal signals and installed font names; `off` keeps portable symbols and labels.
+  - File icons use nvim-web-devicons' light or dark colors independently of filenames.  Markdown files and outline headings share an icon.  Outline icons replace redundant declaration keywords while retaining names and Go receivers.
+  - Decorate file and sidebar tabs with pointed Powerline ends.
+
+- **Navigation improvements**
+  - **Copying and references**
+    - Use `M-w` to copy selected text, the current line or selected source range, a comment body, or a complete thread with author names.  Source text and Markdown are independent of wrapping and display options.  Press `@` to copy a file/line reference or comment ID.  Footer buttons provide the same actions; both operations use the kill ring and system clipboard.  Input fields keep their existing copy behavior.
+  - **Keyboard navigation**
+    - **Emacs- and vi-style navigation**: Use `C-v` / `M-v` or Page Down / Up to scroll the file pane with two rows of overlap, keeping the cursor position while visible.  `M-<` / `M->` jump to the start / end.  `C-u` / `C-d` and Shift+Up / Down retain half-page movement.  See Help for all navigation keys.
+  - **File navigation**
+    - In reviews, local Markdown links jump to an existing file tab or open the file in the editor when it has no tab.  Relative links resolve from the document's source directory.
 
 ### Changed
 
-- **Copy content and references separately**: Use `M-w` to copy selected text, the current source line or selected line range, a comment body, or a complete thread with author names.  Source text and Markdown are retained independently of wrapping and display options.  Press `@` to copy a file/line reference or comment ID.  Footer buttons provide the same actions, and references now reach both the kill ring and system clipboard.  Input fields retain their existing copy behavior.
-- **Markdown wrapping**: Wrapped list items align with their text, and quotes repeat their nested vertical bars in documents and comments.  Callouts retain their colors across wrapped rows.  Decorative indentation and repeated bars stay out of copied Markdown, including in split diffs.
-- **Reading layout**: Read files without line numbers by default in `view`; reviews retain them.  Toggle numbers in either mode with `#` or the footer control, keeping a one-column marker gutter when hidden.  Text uses the available width by default; set `max_wrap_width` or pass `--max-wrap-width` to cap wrapping without shrinking the pane frame or changing source coordinates.  Single-file views show only an Outline sidebar when structure is available, and use the full width otherwise.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#reading-layout).
-- **Markdown section dividers**: Thematic breaks extend across the available text width and use the same muted gray as frontmatter boundaries.  Resizing keeps the rule within its pane.  Rules select as a whole and copy as their original Markdown.
-- **Shell completion**: Complete subcommands and filenames together after `critty`, with subcommands listed first in shells that support ordered candidates.  Explicit paths keep native file completion.
-- **Document viewing by default**: `critty <file[:LINE]>` opens a read-only view in the current terminal without saving a review or migrating stored data.  Use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes, and `--session` still resumes a saved review.
-- **Local Markdown links in reviews**: Follow a file link to its existing review tab, or open the file directly in your editor when it has no tab, instead of using the system's default application.  Relative links resolve from the document's source directory.
+- **Viewer defaults**
+  - `critty <file[:LINE]>` now opens a read-only view.  Use `critty review <file>` to collect feedback; bare `critty` still reviews Git changes.
+  - View mode hides line numbers by default and shows only an Outline sidebar when structure is available.  Reviews retain line numbers.  Use `#` or `line_numbers` to change their visibility.
+- **Copying**
+  - `M-w` now copies source text or comment content.  Use `@` for file/line references and comment IDs.  Both reach the kill ring and system clipboard; input fields keep their existing copy behavior.
 
 ### Fixed
 
-- **Patch syntax colors**: Added and deleted lines retain distinct colors on light backgrounds.  Hunk headers and patch metadata use distinct colors in both light and dark schemes.
-- **Copying across blank Markdown lines**: Dragging a selection across blank lines retains one continuous source range instead of inserting extra closing code fences between fragments.
-- **Dimmed sidebar selections**: The current file and outline heading keep a uniform row background behind dialogs, including the blank space after their labels, in light and dark terminals.
-- **Project path display**: Resolve `.` and `..` before highlighting repository boundaries or abbreviating paths in headers, tabs, and the file tree.  A path such as `foo/../bar/notes.md` now identifies `bar` rather than highlighting the departed `foo` project.
-- **Viewer controls**: Read-only views show the same image-preview status and clickable toggle as reviews, including unavailable terminals.  Sidebar, file-switching, and change-navigation hints appear when applicable; line selection shows cancel and copy actions.
-- **Markdown colors on dark terminals**: Inline code shows its shaded background immediately after opening a document in a dark terminal.
+- **Markdown and diff rendering**
+  - Copying across blank Markdown lines no longer adds extra closing code fences.
+  - Inline code has its shaded background immediately after opening a document in a dark terminal.
+  - Diff/patch additions and deletions remain distinguishable on light backgrounds, with distinct hunk and metadata colors in both schemes.
+  - Thematic breaks extend across the available text width in the muted gray used for frontmatter boundaries.  They resize with the pane, select as a whole, and copy as their original Markdown.
+- **Viewer UI and paths**
+  - Dimmed file-tree and outline selections keep a uniform row background, including the blank space after labels.
+  - Paths resolve `.` and `..` before repository highlighting and abbreviation, so `foo/../bar/notes.md` identifies `bar`.
+  - Read-only views show image-preview status and its toggle even when previews are unavailable.  Navigation hints appear only when applicable.
+  - Shell completion offers subcommands before filenames where ordered candidates are supported.  Explicit paths keep native file completion.
 
 ## 1.11.2
 
