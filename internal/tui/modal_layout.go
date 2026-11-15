@@ -7,6 +7,33 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+type modalMouseAction struct {
+	resolve         bool
+	openImage       bool
+	toggleImages    bool
+	dialog          bool // the whole dialog frame
+	close           bool
+	lineInput       bool
+	pick            bool
+	pickIndex       int
+	focus           int
+	deleteIndex     int
+	textarea        bool
+	scrollable      bool
+	scrollOffset    int
+	scrollMaxOffset int
+}
+
+type modalMouseRegion struct {
+	rect   mouseRect
+	action modalMouseAction
+}
+
+type modalButtonSpec struct {
+	rendered string
+	action   modalMouseAction
+}
+
 func layoutModalButtonRow(specs []modalButtonSpec, width, top int) (string, []modalMouseRegion) {
 	var row strings.Builder
 	regions := make([]modalMouseRegion, 0, len(specs))

@@ -1,13 +1,12 @@
 package tui
 
 import (
-	"bytes"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
-	"github.com/alecthomas/chroma/v2/formatters"
-	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+
+	"github.com/crittylabs/critty/internal/syntax"
 )
 
 var patchLightStyle = chroma.MustNewStyle("critty-diff-light", chroma.StyleEntries{
@@ -39,68 +38,16 @@ func isCodeLexer(lexer chroma.Lexer) bool {
 	return true
 }
 
-// newCodeHighlighter reuses the selected lexer.  Each call independently
-// tokenises content and returns lines with ANSI styling.  Observers receive
-// every token of the pass, so other consumers need no second pass.
+// newCodeHighlighter captures the current terminal palette for this pass factory.
 func newCodeHighlighter(lexer chroma.Lexer, observers ...func(chroma.Token)) func(string) []string {
-	if lexer == nil {
-		lexer = lexers.Fallback
-	}
-	lexer = chroma.Coalesce(lexer)
-
 	style := codeHighlightStyle()
-	if strings.EqualFold(lexer.Config().Name, "diff") {
+	if lexer != nil && strings.EqualFold(lexer.Config().Name, "diff") {
 		style = patchLightStyle
 		if terminalIsDark {
 			style = patchDarkStyle
 		}
 	}
-	formatter := formatters.Get("terminal256")
-
-	// Chroma's default options turn a lone CR into a newline, which would
-	// shift every later line against the document's line numbers.
-	options := &chroma.TokeniseOptions{State: "root", EnsureLF: false}
-
-	return func(content string) []string {
-		raw := strings.Split(content, "\n")
-		iterator, err := lexer.Tokenise(options, content)
-		if err != nil {
-			return raw
-		}
-
-		// Lexer failures can flag valid constructs, such as TOML multiline
-		// strings.  Render them as text rather than syntax diagnostics.
-		readable := func() chroma.Token {
-			token := iterator()
-			for _, observe := range observers {
-				observe(token)
-			}
-			if token.Type == chroma.Error {
-				token.Type = chroma.Text
-			}
-			return token
-		}
-		var buf bytes.Buffer
-		if err := formatter.Format(&buf, style, readable); err != nil {
-			return raw
-		}
-
-		// Split the ANSI output by newlines
-		lines := strings.Split(buf.String(), "\n")
-
-		// Chroma sometimes adds a trailing empty line from the final newline
-		if len(lines) > 0 && lines[len(lines)-1] == "" {
-			lines = lines[:len(lines)-1]
-		}
-
-		// A lexer that merges or splits lines would misplace the rest of the
-		// file, so prefer unstyled lines that stay aligned.
-		if len(lines) != len(trimTrailingEmpty(raw)) {
-			return raw
-		}
-
-		return lines
-	}
+	return syntax.NewHighlighter(lexer, style, observers...)
 }
 
 func codeHighlightStyle() *chroma.Style {
@@ -109,11 +56,4 @@ func codeHighlightStyle() *chroma.Style {
 		return styles.Get("monokailight")
 	}
 	return styles.Get("monokai")
-}
-
-func trimTrailingEmpty(lines []string) []string {
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		return lines[:len(lines)-1]
-	}
-	return lines
 }

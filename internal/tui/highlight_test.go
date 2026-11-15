@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
@@ -13,30 +12,9 @@ import (
 	gitpkg "github.com/crittylabs/critty/internal/git"
 )
 
-func TestCodeHighlighterKeepsInputsIndependent(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		path   string
-		inputs []string
-	}{
-		{"test.mm", []string{"@implementation Service\n", "- (void)run { /* https://example.test */ }\n"}},
-		{"test.go", []string{"package main\n/* unfinished comment", "var name = `日本語`", "", "// comment\n"}},
-		{"test.py", []string{"value = \"\"\"unfinished string", "print('日本語')\n", "\t# comment"}},
-		{"Makefile", []string{"all:\n\techo hello\n", "\techo goodbye"}},
-		{"test.unknown-extension", []string{"plain text\n", "\t日本語", ""}},
-	} {
-		t.Run(tt.path, func(t *testing.T) {
-			if tt.path == "test.mm" && !isCodeLexer(codeLexer(tt.path, "")) {
-				t.Fatal("source file was classified as text")
-			}
-			highlight := newCodeHighlighter(codeLexer(tt.path, ""))
-			for _, input := range tt.inputs {
-				want := newCodeHighlighter(codeLexer(tt.path, ""))(input)
-				if got := highlight(input); !reflect.DeepEqual(got, want) {
-					t.Fatalf("ANSI output for %q depends on previous input:\ngot  %q\nwant %q", input, got, want)
-				}
-			}
-		})
+func TestObjectiveCIsCode(t *testing.T) {
+	if !isCodeLexer(codeLexer("test.mm", "")) {
+		t.Fatal("source file was classified as text")
 	}
 }
 

@@ -1,4 +1,4 @@
-// Package syntax resolves user-defined language aliases and filename rules.
+// Package syntax resolves language rules and highlights source text.
 package syntax
 
 import (
