@@ -7,8 +7,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/icons"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 func TestMarkdownCallouts(t *testing.T) {

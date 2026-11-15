@@ -6,7 +6,7 @@ builds:
     main: ./cmd/critty/
     binary: critty
     ldflags:
-      - -s -w -X github.com/crittylabs/critty/internal/cli.version=v{{.Version}}
+      - -s -w -X github.com/crittylabs/critty/v2/internal/cli.version=v{{.Version}}
     goos:
       - darwin
       - linux

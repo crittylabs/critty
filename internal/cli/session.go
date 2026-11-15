@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func loadReviewSession(key string) (*review.Session, *reviewMode, error) {

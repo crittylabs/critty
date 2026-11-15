@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 // Run keeps Codex arguments, environment, working directory and exit status unchanged.

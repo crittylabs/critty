@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func TestSourceFocusPreservesMarkdownFormatting(t *testing.T) {

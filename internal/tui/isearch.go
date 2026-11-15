@@ -16,7 +16,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/dlclark/regexp2/v2"
 
-	"github.com/crittylabs/critty/internal/searchhistory"
+	"github.com/crittylabs/critty/v2/internal/searchhistory"
 )
 
 // isearchMatchTimeout bounds one match attempt.  Backtracking lets queries

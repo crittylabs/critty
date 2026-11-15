@@ -11,9 +11,9 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/crittylabs/critty/internal/document"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/document"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func TestFileTreeAbsolutePathsUseProjectHierarchy(t *testing.T) {

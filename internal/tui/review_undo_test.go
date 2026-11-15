@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func commentByID(t *testing.T, app AppModel, tab int, id string) *review.Comment {

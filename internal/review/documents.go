@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/crittylabs/critty/internal/imageinfo"
+	"github.com/crittylabs/critty/v2/internal/imageinfo"
 )
 
 // AttachedDocument keeps the source identity separate from its comment path.

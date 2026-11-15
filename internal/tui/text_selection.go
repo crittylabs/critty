@@ -9,7 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 // Text spans exclude gutters, annotations, images and split-diff padding.

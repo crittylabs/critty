@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 type workspaceContext struct{ place terminalbinding.Target }

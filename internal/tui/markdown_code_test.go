@@ -9,8 +9,8 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/charmbracelet/x/ansi"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/syntax"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/syntax"
 )
 
 func TestMarkdownCodeBlocks(t *testing.T) {

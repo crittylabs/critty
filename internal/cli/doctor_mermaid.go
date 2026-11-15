@@ -3,8 +3,8 @@ package cli
 import (
 	"os"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/mermaidrender"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/mermaidrender"
 )
 
 var findMermaid = mermaidrender.Find

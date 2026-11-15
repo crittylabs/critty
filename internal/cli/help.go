@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/tui"
 )
 
 // helpWidth bounds the styled help so long descriptions stay readable on

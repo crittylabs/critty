@@ -19,8 +19,8 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/imageinfo"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/imageinfo"
 	_ "golang.org/x/image/webp"
 )
 

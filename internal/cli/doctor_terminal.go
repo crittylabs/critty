@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 	"github.com/tklauser/ps"
 )
 
@@ -93,7 +93,7 @@ func (r *doctorReport) checkCodexWrapper() {
 		return
 	}
 	bi, err := buildinfo.ReadFile(bin)
-	if err == nil && bi.Path == "github.com/crittylabs/critty/cmd/codex" {
+	if err == nil && bi.Path == "github.com/crittylabs/critty/v2/cmd/codex" {
 		r.add("terminal/codex-wrapper", "ok", "PATH selects the Critty Codex wrapper at "+bin, "A marker test verifies the current session; PATH selection applies to future launches.")
 		return
 	}

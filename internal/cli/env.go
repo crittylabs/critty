@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/tui"
 	"github.com/spf13/cobra"
 )
 

@@ -10,9 +10,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/crittylabs/critty/internal/form"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/form"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func reloadApp(t *testing.T, app *AppModel) {

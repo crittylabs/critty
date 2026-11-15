@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/crittylabs/critty/internal/history"
+	"github.com/crittylabs/critty/v2/internal/history"
 )
 
 func warnHistory(w io.Writer, cwd string, policy history.Policy) {

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/git"
 )
 
 // The types in this file mirror the review.json ("CritJSON") format of

@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 func TestCopyNoticeExpires(t *testing.T) {

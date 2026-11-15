@@ -6,7 +6,7 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/styles"
 
-	"github.com/crittylabs/critty/internal/syntax"
+	"github.com/crittylabs/critty/v2/internal/syntax"
 )
 
 var patchLightStyle = chroma.MustNewStyle("critty-diff-light", chroma.StyleEntries{

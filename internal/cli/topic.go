@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/searchhistory"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/searchhistory"
 )
 
 var reviewTopic string

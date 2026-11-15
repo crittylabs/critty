@@ -9,8 +9,8 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 type goOutlineCache struct {

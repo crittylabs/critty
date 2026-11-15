@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 const rexSource = "block:00000000-0000-0000-0000-000000000001"

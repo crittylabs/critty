@@ -8,7 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/crittylabs/critty/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/ipc"
 )
 
 type lifecycleModel struct{ ready chan struct{} }

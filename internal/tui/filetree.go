@@ -11,7 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 // sidebarView selects what the sidebar pane shows, in tab order.  The file

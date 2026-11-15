@@ -10,11 +10,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/config"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/nerdfont"
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/config"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/nerdfont"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/tui"
 )
 
 var reviewDemo bool

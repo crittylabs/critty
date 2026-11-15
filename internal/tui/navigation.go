@@ -3,7 +3,7 @@ package tui
 import (
 	"sort"
 
-	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/v2/internal/form"
 )
 
 // selectionRange returns the ordered start/end of the current selection.

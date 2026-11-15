@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/crittylabs/critty/internal/cli"
+	"github.com/crittylabs/critty/v2/internal/cli"
 )
 
 func main() {

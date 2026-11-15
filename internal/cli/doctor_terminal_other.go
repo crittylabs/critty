@@ -2,7 +2,7 @@
 
 package cli
 
-import "github.com/crittylabs/critty/internal/terminalbinding"
+import "github.com/crittylabs/critty/v2/internal/terminalbinding"
 
 func probeCurrentTerminalMarker(terminalbinding.Origin) (markerProbeResult, error) {
 	return markerProbeResult{Reason: "local marker probing is unavailable on this platform"}, nil

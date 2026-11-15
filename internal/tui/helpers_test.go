@@ -12,8 +12,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 // setupSession points XDG state at a temp dir and opens a doc session there.

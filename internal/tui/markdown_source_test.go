@@ -9,7 +9,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/v2/internal/document"
 )
 
 func TestPatchMarkdownSharesDocumentStyles(t *testing.T) {

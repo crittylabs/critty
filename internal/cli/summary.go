@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 type summaryAttachment struct {

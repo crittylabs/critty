@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/mathrender"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/mathrender"
 )
 
 var findMathRaTeX = mathrender.FindRaTeX

@@ -1,4 +1,4 @@
-module github.com/crittylabs/critty
+module github.com/crittylabs/critty/v2
 
 go 1.27.2
 

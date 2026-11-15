@@ -17,8 +17,8 @@ import (
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/parser"
 
-	"github.com/crittylabs/critty/internal/form"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/form"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func testStore(t *testing.T) *Store {

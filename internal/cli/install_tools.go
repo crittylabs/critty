@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/mathrender"
+	"github.com/crittylabs/critty/v2/internal/mathrender"
 )
 
 type toolInstall struct {

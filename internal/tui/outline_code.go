@@ -7,8 +7,8 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 type codeOutlineCache struct {

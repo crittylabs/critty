@@ -6,8 +6,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/crittylabs/critty/internal/icons"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 // commentLocation is a display location only; saved coordinates and scope stay intact.

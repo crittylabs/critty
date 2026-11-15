@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/crittylabs/critty/internal/clipboard"
+	"github.com/crittylabs/critty/v2/internal/clipboard"
 )
 
 type clipboardImageMsg struct {

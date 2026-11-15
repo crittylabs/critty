@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/v2/internal/config"
 )
 
 func TestDoctorMermaid(t *testing.T) {

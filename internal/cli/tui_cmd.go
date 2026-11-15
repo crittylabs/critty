@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/v2/internal/config"
 	"github.com/spf13/cobra"
 )
 

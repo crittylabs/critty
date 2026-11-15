@@ -10,8 +10,8 @@ import (
 	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/syntax"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/syntax"
 )
 
 func TestSyntaxAssociations(t *testing.T) {

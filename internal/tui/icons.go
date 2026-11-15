@@ -6,7 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 func (m AppModel) iconBarButton(kind icons.Kind, button string) string {

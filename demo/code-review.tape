@@ -79,7 +79,7 @@ Sleep 3s
 Enter
 
 # The next round opens with Claude's reply focused in the thread.
-Wait+Screen@600s /↳ /
+Wait+Screen@600s /1 reply/
 Sleep 3s
 
 # Read the fixed code below the thread, then return to the thread.

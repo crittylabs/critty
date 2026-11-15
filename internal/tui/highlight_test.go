@@ -8,8 +8,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/crittylabs/critty/internal/document"
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/document"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 func TestObjectiveCIsCode(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"runtime"
 
 	tea "charm.land/bubbletea/v2"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 type externalOpenMsg struct{ status string }

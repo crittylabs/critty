@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 // SessionEntry records where a review session's data lives, so commands run

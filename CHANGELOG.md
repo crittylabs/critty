@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2.0.0
+
+### Upgrading from v1
+
+- **Go installation uses a new module path**: Run `go install github.com/crittylabs/critty/v2/cmd/critty@latest`.  Release archives and mise keep their existing names.  Existing settings and saved reviews remain supported.
+- **File arguments open the viewer**: Use `critty review <file>` when you want to collect feedback.  Bare `critty` still reviews Git changes.
+- **Copy references with `@`**: `M-w` now copies source text or comment content; use `@` for file/line references and comment IDs.  Input fields keep their existing copy behavior.
 
 ### Added
 
@@ -42,11 +48,6 @@
 ### Changed
 
 - **Agent handoffs**: When review discussions span several threads, bundled skills direct agents to attach and focus a decision summary with internal links to the relevant comments and source lines, including after AI review or cowork.
-- **Viewer defaults**
-  - `critty <file[:LINE]>` now opens a read-only view.  Use `critty review <file>` to collect feedback; bare `critty` still reviews Git changes.
-  - View mode hides line numbers by default and shows only an Outline sidebar when structure is available.  Reviews retain line numbers.  Use `#` or `line_numbers` to change their visibility.
-- **Copying**
-  - `M-w` now copies source text or comment content.  Use `@` for file/line references and comment IDs.  Both reach the kill ring and system clipboard; input fields keep their existing copy behavior.
 
 ### Fixed
 

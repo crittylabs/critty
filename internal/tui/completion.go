@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sahilm/fuzzy"
 
-	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/v2/internal/form"
 )
 
 const completionMenuRows = 10

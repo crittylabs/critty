@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 const outlineIdentifier = `[\pL_$][\pL\pM\pN_$]*`

@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/tui"
 	"github.com/tklauser/ps"
 	"golang.org/x/sys/unix"
 )

@@ -3,7 +3,7 @@ package tui
 import (
 	"sort"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 // Keep the status width stable so toggling it does not move neighboring controls.

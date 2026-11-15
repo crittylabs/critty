@@ -9,7 +9,7 @@ argument-hint: "[file]"
 
 Run the interactive review loop when the user selects Critty or `/critty-approval` delegates to it.  Critty stores reviews locally and opens a TUI; it does not publish changes or execute approved operations.  The caller's policy determines what approval authorizes afterward.
 
-The `critty` binary must be on PATH.  If missing and mise is available, use `mise use github:crittylabs/critty` for the project, or `mise use -g github:crittylabs/critty` for a requested user-wide installation.  Follow the caller's tool-management scope.  Otherwise, use `go install github.com/crittylabs/critty/cmd/critty@latest` and ensure Go's binary directory is on PATH.
+The `critty` binary must be on PATH.  If missing and mise is available, use `mise use github:crittylabs/critty` for the project, or `mise use -g github:crittylabs/critty` for a requested user-wide installation.  Follow the caller's tool-management scope.  Otherwise, use `go install github.com/crittylabs/critty/v2/cmd/critty@latest` and ensure Go's binary directory is on PATH.
 
 Before the first review of a work task, use [critty-history](../critty-history/SKILL.md) for task registration or continuation.  Reuse any supplied task ID, pass `--task <id>` for each new review, and retain it across rounds and agent handoffs.  Return to that skill when the whole task is complete to apply its retention policy; individual approval does not trigger another cleanup question.
 

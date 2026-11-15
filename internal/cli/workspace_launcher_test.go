@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 func testWorkspaceContext(host string) workspaceContext {

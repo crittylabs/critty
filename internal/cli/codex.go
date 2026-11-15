@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/crittylabs/critty/internal/codexwrapper"
+	"github.com/crittylabs/critty/v2/internal/codexwrapper"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +39,7 @@ func codexWrapperHint(self, path string) string {
 	wrapper := filepath.Join(filepath.Dir(self), "codex")
 	// A critty-only Go install may sit beside the original Codex instead.
 	bi, err := buildinfo.ReadFile(wrapper)
-	if err != nil || bi.Path != "github.com/crittylabs/critty/cmd/codex" {
+	if err != nil || bi.Path != "github.com/crittylabs/critty/v2/cmd/codex" {
 		return ""
 	}
 	info, err := os.Stat(wrapper)

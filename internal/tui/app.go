@@ -21,17 +21,17 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/form"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/icons"
-	"github.com/crittylabs/critty/internal/imageinfo"
-	"github.com/crittylabs/critty/internal/mathrender"
-	"github.com/crittylabs/critty/internal/mermaidrender"
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/searchhistory"
-	"github.com/crittylabs/critty/internal/svgrender"
-	"github.com/crittylabs/critty/internal/syntax"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/form"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/imageinfo"
+	"github.com/crittylabs/critty/v2/internal/mathrender"
+	"github.com/crittylabs/critty/v2/internal/mermaidrender"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/searchhistory"
+	"github.com/crittylabs/critty/v2/internal/svgrender"
+	"github.com/crittylabs/critty/v2/internal/syntax"
 )
 
 type pane int

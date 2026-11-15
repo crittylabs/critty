@@ -14,8 +14,8 @@ import (
 	"github.com/yuin/goldmark/v2/text"
 	"github.com/yuin/goldmark/v2/util"
 
-	"github.com/crittylabs/critty/internal/icons"
-	"github.com/crittylabs/critty/internal/syntax"
+	"github.com/crittylabs/critty/v2/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/syntax"
 )
 
 var (

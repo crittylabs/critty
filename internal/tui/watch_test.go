@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 func waitWatch(t *testing.T, w *sourceWatcher, mutate func()) watchChangedMsg {

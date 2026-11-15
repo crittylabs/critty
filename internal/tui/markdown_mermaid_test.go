@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
-	"github.com/crittylabs/critty/internal/mermaidrender"
+	"github.com/crittylabs/critty/v2/internal/mermaidrender"
 )
 
 func enableMermaid(t *testing.T, app *AppModel) {

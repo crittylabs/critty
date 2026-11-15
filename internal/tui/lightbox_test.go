@@ -11,7 +11,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 // linkCells returns the screen positions of cells whose hyperlink contains

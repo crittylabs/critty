@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 // Entry is one recorded query.  Mode is "regexp", "literal", or "word".

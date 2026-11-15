@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 // Request is a client-to-TUI message.

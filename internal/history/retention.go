@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 type Maintenance struct {

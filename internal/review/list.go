@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/git"
 )
 
 // ListedComment is a comment flattened for CLI output, matching crit's

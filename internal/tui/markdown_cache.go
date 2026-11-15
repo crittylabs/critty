@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"github.com/crittylabs/critty/internal/document"
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/document"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 type markdownCache struct {

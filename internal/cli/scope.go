@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/git"
 )
 
 func validateScopeFlags(cmd *cobra.Command, _ []string) error {

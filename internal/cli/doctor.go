@@ -18,8 +18,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/tui"
 )
 
 var checkTerminalImages = tui.CheckTerminalImages

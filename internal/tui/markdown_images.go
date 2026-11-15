@@ -15,7 +15,7 @@ import (
 	"github.com/yuin/goldmark/v2/ast"
 	nethtml "golang.org/x/net/html"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 type markdownImage struct {

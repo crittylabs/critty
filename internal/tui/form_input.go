@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/v2/internal/form"
 )
 
 func (m *AppModel) pathInputType() form.InputType {

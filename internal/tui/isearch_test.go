@@ -11,8 +11,8 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/searchhistory"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/searchhistory"
 )
 
 const isearchDoc = "alpha\nbeta\nalphabet\ngamma\nalpha\n"

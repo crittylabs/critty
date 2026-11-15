@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/crittylabs/critty/internal/rendercache"
+	"github.com/crittylabs/critty/v2/internal/rendercache"
 
 	"golang.org/x/image/draw"
 )

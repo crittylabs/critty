@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func TestReviewProjectLinkedWorktree(t *testing.T) {

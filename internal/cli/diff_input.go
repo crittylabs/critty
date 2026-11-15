@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/git"
 )
 
 func addDiffFlag(cmd *cobra.Command) {

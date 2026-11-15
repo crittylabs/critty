@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 // herdrAppContext is a terminal running in herdr-core.  The Herdr desktop app

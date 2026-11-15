@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/imageinfo"
+	"github.com/crittylabs/critty/v2/internal/imageinfo"
 )
 
 type svgRenderer interface {

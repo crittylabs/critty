@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/git"
 )
 
 // NewSession allocates independent storage even for identical review arguments.

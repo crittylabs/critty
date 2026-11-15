@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 func TestDesktopLauncherOrder(t *testing.T) {

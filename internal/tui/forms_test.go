@@ -12,10 +12,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/form"
-	"github.com/crittylabs/critty/internal/icons"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/form"
+	"github.com/crittylabs/critty/v2/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func TestFormNavigationTargets(t *testing.T) {

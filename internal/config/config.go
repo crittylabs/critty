@@ -14,9 +14,9 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/crittylabs/critty/internal/history"
-	"github.com/crittylabs/critty/internal/syntax"
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/history"
+	"github.com/crittylabs/critty/v2/internal/syntax"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 // Config is the resolved (merged) configuration.

@@ -3,7 +3,7 @@ package tui
 import (
 	"slices"
 
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 // reviewEditKind names a review action that can be undone.

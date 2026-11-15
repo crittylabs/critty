@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"reflect"
 
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/workspace"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/workspace"
 	"github.com/spf13/cobra"
 )
 

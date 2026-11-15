@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/form"
-	"github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/v2/internal/form"
+	"github.com/crittylabs/critty/v2/internal/git"
 )
 
 type ReviewInput struct {

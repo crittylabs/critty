@@ -10,10 +10,10 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/crittylabs/critty/internal/form"
-	gitpkg "github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/icons"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/form"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 type formControl struct {

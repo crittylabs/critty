@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/v2/internal/form"
 )
 
 func TestFormDraftsAndInvalidation(t *testing.T) {

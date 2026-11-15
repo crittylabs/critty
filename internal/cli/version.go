@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/tui"
 )
 
 // version is set at release build time via -ldflags "-X ...internal/cli.version=...".

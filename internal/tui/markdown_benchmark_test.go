@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	gitpkg "github.com/crittylabs/critty/internal/git"
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 // BenchmarkMarkdownRebuild includes the complete viewport rebuild, including

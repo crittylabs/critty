@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"golang.org/x/term"
 
-	"github.com/crittylabs/critty/internal/tui"
+	"github.com/crittylabs/critty/v2/internal/tui"
 )
 
 // outputStyle describes how decorated text should be written to a writer.

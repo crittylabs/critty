@@ -20,10 +20,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/crittylabs/critty/internal/rendercache"
+	"github.com/crittylabs/critty/v2/internal/rendercache"
 
-	"github.com/crittylabs/critty/internal/imageinfo"
-	"github.com/crittylabs/critty/internal/renderfont"
+	"github.com/crittylabs/critty/v2/internal/imageinfo"
+	"github.com/crittylabs/critty/v2/internal/renderfont"
 )
 
 const maxBytes = 5 << 20

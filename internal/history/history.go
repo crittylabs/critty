@@ -16,9 +16,9 @@ import (
 
 	"github.com/gofrs/flock"
 
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 // Policy applies at explicit task boundaries, never at individual review exits.

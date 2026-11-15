@@ -11,9 +11,9 @@ import (
 
 	"github.com/gofrs/flock"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func setup(t *testing.T) (string, string, string) {

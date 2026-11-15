@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/form"
-	"github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/history"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/form"
+	"github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/history"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func TestResumeProjectWorkspaces(t *testing.T) {

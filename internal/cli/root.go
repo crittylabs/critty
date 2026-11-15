@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/migration"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/migration"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 var rootSession string

@@ -9,9 +9,9 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/crittylabs/critty/internal/document"
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/syntax"
+	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/syntax"
 )
 
 func TestMarkdownLinkRefs(t *testing.T) {

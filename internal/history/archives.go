@@ -9,8 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 type ArchiveInfo struct {

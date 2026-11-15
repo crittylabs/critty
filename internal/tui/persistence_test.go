@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func TestCommentEditPreservesConcurrentCLIReply(t *testing.T) {

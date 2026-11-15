@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/crittylabs/critty/internal/document"
+import "github.com/crittylabs/critty/v2/internal/document"
 
 const overallCommentsPath = "\x00review"
 

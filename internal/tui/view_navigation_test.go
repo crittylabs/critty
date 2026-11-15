@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/document"
+	"github.com/crittylabs/critty/v2/internal/document"
 )
 
 func TestSingleFileViewSidebar(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 	"github.com/spf13/cobra"
 )
 

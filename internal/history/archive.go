@@ -22,10 +22,10 @@ import (
 	"github.com/yuin/goldmark/v2/parser"
 	nethtml "golang.org/x/net/html"
 
-	"github.com/crittylabs/critty/internal/form"
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/review"
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/form"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/review"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 var ErrBusy = errors.New("review is active or busy")

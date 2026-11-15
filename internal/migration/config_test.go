@@ -10,7 +10,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/crittylabs/critty/internal/config"
+	"github.com/crittylabs/critty/v2/internal/config"
 )
 
 func writeText(t *testing.T, path, content string) {

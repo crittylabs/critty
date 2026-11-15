@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/git"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/review"
 	"github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
 )

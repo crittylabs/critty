@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/crittylabs/critty/internal/xdg"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 	"github.com/gofrs/flock"
 )
 

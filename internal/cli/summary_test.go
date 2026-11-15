@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/config"
-	"github.com/crittylabs/critty/internal/ipc"
-	"github.com/crittylabs/critty/internal/review"
+	"github.com/crittylabs/critty/v2/internal/config"
+	"github.com/crittylabs/critty/v2/internal/ipc"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
 
 func captureFinish(t *testing.T, payload *ipc.FinishPayload, sess *review.Session, launch *launchSummary) (string, string, error) {

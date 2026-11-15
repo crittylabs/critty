@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/crittylabs/critty/internal/form"
+	"github.com/crittylabs/critty/v2/internal/form"
 )
 
 func TestMemoryReviewLifecycle(t *testing.T) {

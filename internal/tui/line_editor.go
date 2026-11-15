@@ -11,7 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/crittylabs/critty/internal/clipboard"
+	"github.com/crittylabs/critty/v2/internal/clipboard"
 )
 
 // lineEditor is the single-line text input shared by the search query

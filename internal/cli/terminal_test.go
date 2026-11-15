@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crittylabs/critty/internal/terminalbinding"
+	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
 
 func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
