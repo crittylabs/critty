@@ -659,9 +659,9 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 	cells := make([]diffCellRow, len(rows))
 	for i, text := range rows {
 		if selected {
-			text = inlineBackground(selectedLineBg, ansi.Strip(text))
+			text = sourceLineHighlight(selectedLineBg, text)
 		} else if highlighted {
-			text = inlineBackground(sidebarHighlightBg, ansi.Strip(text))
+			text = sourceLineHighlight(sidebarHighlightBg, text)
 		}
 		cells[i] = diffCellRow{text: m.sourceRowGutter(sourceLine, oldSide, i, marker, num) + text}
 		if t.isMarkdown {

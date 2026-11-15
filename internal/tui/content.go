@@ -289,9 +289,9 @@ func (m *AppModel) rebuildContent() {
 			}
 			for wi, content := range rows {
 				if isSelected {
-					content = inlineBackground(selectedLineBg, ansi.Strip(content))
+					content = sourceLineHighlight(selectedLineBg, content)
 				} else if isSidebarHighlight {
-					content = inlineBackground(sidebarHighlightBg, ansi.Strip(content))
+					content = sourceLineHighlight(sidebarHighlightBg, content)
 				}
 				layout.appendSourceBlock(&b, m.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target, t.markdownHanging(del.OldLineNum, true, wi, textWidth))
 			}
@@ -805,6 +805,15 @@ func inlineBackground(style lipgloss.Style, content string) string {
 // inlineColors applies style's background, and its foreground when
 // foreground is true, across content, restoring them after inner resets.
 func inlineColors(style lipgloss.Style, content string, foreground bool) string {
+	return inlineColorsWithOverride(style, content, foreground, false)
+}
+
+// sourceLineHighlight replaces diff colors while preserving text attributes and links.
+func sourceLineHighlight(style lipgloss.Style, content string) string {
+	return inlineColorsWithOverride(style, content, true, true)
+}
+
+func inlineColorsWithOverride(style lipgloss.Style, content string, foreground, override bool) string {
 	bgAnsi := bgToAnsi(style.GetBackground())
 	fgAnsi := ""
 	if foreground {
@@ -824,6 +833,10 @@ func inlineColors(style lipgloss.Style, content string, foreground bool) string 
 		}
 		if len(params) == 0 {
 			reapplyBg, reapplyFg = true, true
+		}
+		if override {
+			reapplyBg, reapplyFg = true, true
+			return
 		}
 		params.ForEach(0, func(_ int, param int, _ bool) {
 			switch {

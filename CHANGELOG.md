@@ -50,6 +50,7 @@
 ### Fixed
 
 - **Markdown and diff rendering**
+  - Focusing a comment or selecting source lines keeps Markdown emphasis and links visible in split diffs and deleted lines.
   - Copying across blank Markdown lines no longer adds extra closing code fences.
   - Inline code has its shaded background immediately after opening a document in a dark terminal.
   - Diff/patch additions and deletions remain distinguishable on light backgrounds, with distinct hunk and metadata colors in both schemes.
