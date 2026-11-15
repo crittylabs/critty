@@ -108,3 +108,25 @@ func BenchmarkMarkdownMathFences(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkMarkdownReferences tracks position lookup as references accumulate.
+func BenchmarkMarkdownReferences(b *testing.B) {
+	for _, tc := range []struct {
+		name, line string
+		refs       func(string) []markdownImageRef
+	}{
+		{"links", "[label](https://example.org)\n\n", markdownLinkRefs},
+		{"images", "![image](image.png)\n\n", markdownImageRefs},
+	} {
+		for _, count := range []int{100, 2000} {
+			b.Run(tc.name+"/"+strconv.Itoa(count), func(b *testing.B) {
+				source := strings.Repeat(tc.line, count)
+				b.ReportAllocs()
+				b.SetBytes(int64(len(source)))
+				for b.Loop() {
+					tc.refs(source)
+				}
+			})
+		}
+	}
+}

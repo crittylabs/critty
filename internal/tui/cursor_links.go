@@ -17,17 +17,18 @@ import (
 func markdownLinkRefs(source string) []markdownImageRef {
 	data := []byte(source)
 	root := parser.New(parser.WithExtensions(extension.LinkifyParser)).Parse(data)
+	lines := sourceLineCursor{text: source}
 	var refs []markdownImageRef
 	add := func(start, end int, destination string) {
 		if start < 0 || end < start || end > len(source) {
 			return
 		}
-		lineStart := strings.LastIndexByte(source[:start], '\n') + 1
+		line, column := lines.position(start)
 		if next := strings.IndexByte(source[start:end], '\n'); next >= 0 {
 			end = start + next
 		}
-		refs = append(refs, markdownImageRef{line: strings.Count(source[:start], "\n") + 1,
-			destination: destination, start: start - lineStart, end: end - lineStart})
+		refs = append(refs, markdownImageRef{line: line,
+			destination: destination, start: column, end: column + end - start})
 	}
 	readHTML := func(start, end int) {
 		z := nethtml.NewTokenizer(strings.NewReader(source[start:end]))

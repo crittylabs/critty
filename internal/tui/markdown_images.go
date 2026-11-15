@@ -58,18 +58,19 @@ type markdownImageRef struct {
 func markdownImageRefs(source string) []markdownImageRef {
 	data := []byte(source)
 	root := markdownReferenceParser.Parse(data)
+	lines := sourceLineCursor{text: source}
 	var refs []markdownImageRef
 	add := func(offset, end int, destination string) {
 		if offset < 0 || offset > len(source) {
 			return
 		}
-		lineStart := strings.LastIndex(source[:offset], "\n") + 1
+		line, column := lines.position(offset)
 		lineEnd := len(source)
 		if i := strings.IndexByte(source[offset:], '\n'); i >= 0 {
 			lineEnd = offset + i
 		}
 		end = max(offset, min(end, lineEnd))
-		refs = append(refs, markdownImageRef{strings.Count(source[:offset], "\n") + 1, destination, offset - lineStart, end - lineStart})
+		refs = append(refs, markdownImageRef{line, destination, column, column + end - offset})
 	}
 	// Inline image syntax carries no end position; the reference closes at
 	// the parenthesis after the destination on the same line.
