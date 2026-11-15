@@ -37,10 +37,11 @@
   - **Keyboard navigation**
     - **Emacs- and vi-style navigation**: Use either style for line and page movement, line selection, and horizontal scrolling in tables and block formulas.  Jump to file boundaries or either horizontal edge.  `C-v` / `M-v` and Page Down / Up scroll with two rows of overlap, keeping the cursor position while visible; half-page movement remains available.  See Help for all navigation keys.
   - **File navigation**
-    - In reviews, local Markdown links jump to an existing file tab or open the file in the editor when it has no tab.  Relative links resolve from the document's source directory.
+    - In reviews, local Markdown links jump to an existing file tab or open the file in the editor when it has no tab.  Relative links resolve from the document's source directory.  Back and Forward also restore positions after following file or thread references, including links from summary attachments, without undoing review edits.  Use the buttons or `M-b` / `M-f`; see Help for all bindings.
 
 ### Changed
 
+- **Agent handoffs**: When review discussions span several threads, bundled skills direct agents to attach and focus a decision summary with internal links to the relevant comments and source lines, including after AI review or cowork.
 - **Viewer defaults**
   - `critty <file[:LINE]>` now opens a read-only view.  Use `critty review <file>` to collect feedback; bare `critty` still reviews Git changes.
   - View mode hides line numbers by default and shows only an Outline sidebar when structure is available.  Reviews retain line numbers.  Use `#` or `line_numbers` to change their visibility.

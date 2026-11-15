@@ -66,6 +66,7 @@ func (m *AppModel) navigateCommentReference(uri string) bool {
 	if !ok {
 		return false
 	}
+	origin := m.currentViewVisit()
 	if m.viewMode {
 		m.viewMode = false
 		m.recalculateLayout()
@@ -75,6 +76,8 @@ func (m *AppModel) navigateCommentReference(uri string) bool {
 	for _, target := range m.commentTargets(i) {
 		if target.id == id {
 			m.selectComment(i, target)
+			m.browsing.back = appendViewVisit(m.browsing.back, origin)
+			m.browsing.forward = nil
 			return true
 		}
 	}

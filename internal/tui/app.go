@@ -1165,13 +1165,11 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // handleReviewKey handles a key outside dialogs and search mode.
 func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.tab()
-	if m.readOnly {
-		switch msg.String() {
-		case "alt+left", "alt+b":
-			return m, m.stepViewHistory(false)
-		case "alt+right", "alt+f":
-			return m, m.stepViewHistory(true)
-		}
+	switch msg.String() {
+	case "alt+left", "alt+b":
+		return m, m.stepViewHistory(false)
+	case "alt+right", "alt+f":
+		return m, m.stepViewHistory(true)
 	}
 	switch {
 	case isUndoKey(msg.String()):
@@ -3521,7 +3519,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if m.modal != noModal {
 		return m, nil
 	}
-	if m.readOnly {
+	if len(m.browsing.back) > 0 || len(m.browsing.forward) > 0 {
 		_, layout := m.renderReviewScreen()
 		if layout.hasBackButton && layout.backButton.contains(mouse) {
 			return m, m.stepViewHistory(false)
@@ -4687,6 +4685,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, columnWidth)
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
+		{keys: "M-←/M-→ · M-b/M-f · Back/Forward", desc: "restore previous/next reference position (up to 64 visits)"},
 		{keys: "↑/↓,k/j · C-p/C-n", desc: "next/previous line"},
 		{keys: "←/→,h/l · C-b/C-f", desc: "scroll table/formula"},
 		{keys: "C-a/^ · C-e/$", desc: "table/formula left/right edge"},

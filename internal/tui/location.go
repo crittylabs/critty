@@ -135,6 +135,8 @@ func (m *AppModel) focusSource(location sourceLocation) bool {
 		if location.line > 0 && (t.doc == nil || !t.doc.HasLine(location.line)) {
 			continue
 		}
+		m.browsing.back = appendViewVisit(m.browsing.back, m.currentViewVisit())
+		m.browsing.forward = nil
 		changed := m.activateTab(i)
 		m.locationError = ""
 		m.focused = contentPane

@@ -80,6 +80,86 @@ func TestAttachmentReferences(t *testing.T) {
 	}
 }
 
+func TestReviewReferenceHistory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.WriteFile("target.md", []byte("one\ntwo\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, reference := range []string{"@target.md L2", "c_abcdef"} {
+		t.Run(reference, func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, strings.Repeat("Context\n", 30)+reference+"\n"+strings.Repeat("Context\n", 40))
+			app.tabs[1].doc = document.FromContent("target.md", []byte("one\ntwo\n"))
+			app.tabs[1].state.Comments = []review.Comment{{ID: "c_abcdef", StartLine: 2, EndLine: 2, Body: "Check this."}}
+			attachment := app.activeTab
+			app.tab().cursorLine = 31
+			app.contentViewport.SetYOffset(20)
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+			if app.activeTab != 1 || app.tab().cursorLine != 2 {
+				t.Fatal("reference did not reach its target")
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
+			if app.activeTab != attachment || app.tab().cursorLine != 31 || app.contentViewport.YOffset() != 20 {
+				t.Fatalf("Back lost the summary position: tab=%d line=%d offset=%d", app.activeTab, app.tab().cursorLine, app.contentViewport.YOffset())
+			}
+			// Navigation must retain current review data, including a moved thread.
+			app.tabs[1].doc = document.FromContent("target.md", []byte("changed\none\ntwo\n"))
+			app.tabs[1].state = &fileReview{Comments: []review.Comment{{ID: "c_abcdef", StartLine: 3, EndLine: 3, Body: "Updated.", Resolved: true}}}
+			_, layout := app.renderReviewScreen()
+			if !layout.hasForwardButton {
+				t.Fatal("Forward button missing")
+			}
+			app = clickMouse(app, layout.forwardButton.left, layout.forwardButton.top)
+			if app.activeTab != 1 || app.tab().doc.Lines[0] != "changed" || !app.tab().state.Comments[0].Resolved {
+				t.Fatal("Forward restored stale review data")
+			}
+			if reference == "c_abcdef" && (app.selectedCommentID() != "c_abcdef" || app.tab().cursorLine != 3) {
+				t.Fatal("Forward did not restore the moved thread")
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt})
+			if app.activeTab != attachment {
+				t.Fatal("Alt+Left did not return to the summary")
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
+			if app.activeTab != 1 {
+				t.Fatal("Alt+f did not return to the target")
+			}
+			_, layout = app.renderReviewScreen()
+			if !layout.hasBackButton {
+				t.Fatal("Back button missing")
+			}
+			app = clickMouse(app, layout.backButton.left, layout.backButton.top)
+			if app.activeTab != attachment {
+				t.Fatal("Back click did not return to the summary")
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
+			if len(app.browsing.forward) != 0 {
+				t.Fatal("a new reference did not clear Forward history")
+			}
+		})
+	}
+}
+
+func TestReviewReferenceHistorySameTabAndRemovedTarget(t *testing.T) {
+	app, _ := formTestAppWithContent(t, "Summary\nDetails\n")
+	path := app.tab().path
+	app.focusSource(sourceLocation{path: path, line: 2})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
+	if app.tab().cursorLine != 1 {
+		t.Fatal("Back did not restore the position before a same-tab jump")
+	}
+	if app.focusSource(sourceLocation{path: path, line: 99}) || len(app.browsing.forward) != 1 {
+		t.Fatal("failed navigation changed history")
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
+	app.focusSource(sourceLocation{path: "target.md", line: 1})
+	app.tabs = app.tabs[1:]
+	app.activeTab = 0
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
+	if app.tab().path != "target.md" || len(app.browsing.back) != 0 {
+		t.Fatal("Back restored a removed review tab")
+	}
+}
+
 func TestAttachmentReferenceOutsideReview(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if err := os.WriteFile("other.go", []byte("one\ntwo\n"), 0o600); err != nil {

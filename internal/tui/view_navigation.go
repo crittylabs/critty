@@ -19,7 +19,8 @@ import (
 const viewHistoryLimit = 64
 
 type viewVisit struct {
-	tab FileTab
+	tab       FileTab
+	commentID string
 }
 
 type viewNavigation struct {
@@ -42,6 +43,15 @@ func (m *AppModel) currentViewVisit() viewVisit {
 	m.saveTabViewport()
 	tab := *m.tab()
 	tab.horizontalOffsets = maps.Clone(tab.horizontalOffsets)
+	if !m.readOnly {
+		// Review history retains positions, not snapshots of editable data.
+		return viewVisit{tab: FileTab{
+			path: tab.path, cursorLine: tab.cursorLine, cursorSide: tab.cursorSide,
+			cursorOnForm:  tab.cursorOnForm,
+			contentOffset: tab.contentOffset, commentOffset: tab.commentOffset,
+			horizontalOffsets: tab.horizontalOffsets,
+		}, commentID: m.selectedCommentID()}
+	}
 	tab.preview.before.image, tab.preview.after.image = nil, nil
 	tab.preview.before.attempted, tab.preview.after.attempted = false, false
 	tab.markdownImages = slices.Clone(tab.markdownImages)
@@ -177,20 +187,48 @@ func (m *AppModel) stepViewHistory(forward bool) tea.Cmd {
 	if forward {
 		from, to = to, from
 	}
-	if !m.readOnly || len(*from) == 0 {
+	if len(*from) == 0 {
 		return nil
 	}
 	visit := (*from)[len(*from)-1]
 	(*from)[len(*from)-1] = viewVisit{}
 	*from = (*from)[:len(*from)-1]
-	*to = appendViewVisit(*to, m.currentViewVisit())
-	m.browsing.request++
-	index := m.activeTab
+	index := -1
 	for i := range m.tabs {
 		if m.tabs[i].path == visit.tab.path {
 			index = i
 			break
 		}
+	}
+	if !m.readOnly {
+		if index < 0 {
+			return m.stepViewHistory(forward)
+		}
+		*to = appendViewVisit(*to, m.currentViewVisit())
+		m.activateTab(index)
+		tab := m.tab()
+		tab.cursorLine, tab.cursorSide = visit.tab.cursorLine, visit.tab.cursorSide
+		tab.cursorOnAnnotation, tab.cursorOnForm = false, visit.tab.cursorOnForm
+		tab.contentOffset, tab.commentOffset = visit.tab.contentOffset, visit.tab.commentOffset
+		tab.horizontalOffsets = visit.tab.horizontalOffsets
+		if tab.doc != nil && tab.cursorSide == "" {
+			tab.cursorLine = min(max(1, tab.cursorLine), max(1, tab.doc.LineCount()))
+		}
+		m.refreshViewDocument(false)
+		if visit.commentID != "" {
+			for _, target := range m.commentTargets(index) {
+				if target.id == visit.commentID {
+					m.selectComment(index, target)
+					break
+				}
+			}
+		}
+		return nil
+	}
+	*to = appendViewVisit(*to, m.currentViewVisit())
+	m.browsing.request++
+	if index < 0 {
+		index = m.activeTab
 	}
 	old := m.tabs[index]
 	m.activateTab(index)
@@ -239,9 +277,6 @@ func (m *AppModel) syncViewWatch() tea.Cmd {
 }
 
 func (m AppModel) viewHistoryButton(forward bool) string {
-	if !m.readOnly {
-		return ""
-	}
 	label, key, count := "Back", "M-←", len(m.browsing.back)
 	kind := icons.Back
 	if forward {
