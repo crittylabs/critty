@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -27,6 +28,130 @@ func TestMarkdownLinkRefs(t *testing.T) {
 		if ref.destination != want[i] || ref.end <= ref.start {
 			t.Fatalf("reference %d: %+v", i, ref)
 		}
+	}
+}
+
+func TestMarkdownLinkParsesAreIndependent(t *testing.T) {
+	for _, tc := range []struct{ source, destination string }{
+		{"[one][ref]\n\n[ref]: https://example.org/one", "https://example.org/one"},
+		{"[two][ref]\n\n[ref]: https://example.org/two", "https://example.org/two"},
+		{"[missing][ref] ![image](image.png)", ""},
+	} {
+		t.Run(tc.source, func(t *testing.T) {
+			t.Parallel()
+			for range 2 {
+				refs := markdownLinkRefs(tc.source)
+				if tc.destination == "" {
+					if len(refs) != 0 {
+						t.Fatalf("unexpected references: %+v", refs)
+					}
+				} else if len(refs) != 1 || refs[0].destination != tc.destination {
+					t.Fatalf("references=%+v, want %s", refs, tc.destination)
+				}
+			}
+		})
+	}
+}
+
+func TestReferenceDistance(t *testing.T) {
+	const source = "αe\u0301\n\n界 end\n"
+	for _, tc := range []struct {
+		name         string
+		line, column int
+		ref          markdownImageRef
+		want         int
+	}{
+		{"before", 1, 0, markdownImageRef{line: 3, start: 0, end: 3}, 5},
+		{"at start", 3, 0, markdownImageRef{line: 3, start: 0, end: 3}, 0},
+		{"at end", 3, 1, markdownImageRef{line: 3, start: 0, end: 3}, 0},
+		{"after", 3, 2, markdownImageRef{line: 3, start: 0, end: 3}, 1},
+		{"combining", 1, 2, markdownImageRef{line: 1, start: 0, end: 5}, 0},
+		{"trailing line", 4, 0, markdownImageRef{line: 3, start: 0, end: 3}, 5},
+		{"clipped end", 4, 0, markdownImageRef{line: 3, start: 0, end: 99}, 1},
+		{"empty line", 2, 0, markdownImageRef{line: 2}, 0},
+		{"cursor before source", 0, 0, markdownImageRef{line: 3, end: 3}, 5},
+		{"cursor past source", 9, 2, markdownImageRef{line: 3, end: 3}, 8},
+		{"missing line", 1, 0, markdownImageRef{}, int(^uint(0) >> 1)},
+		{"past last line", 1, 0, markdownImageRef{line: 5}, int(^uint(0) >> 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			distance := referenceDistance(source, tc.line, tc.column)
+			for range 2 {
+				if got := distance(tc.ref); got != tc.want {
+					t.Fatalf("distance=%d, want %d", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkReferenceDistance(b *testing.B) {
+	for _, count := range []int{100, 1000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			source := strings.Repeat("α [link](https://example.org) ![pic](image.png)\n", count)
+			refs := append(markdownLinkRefs(source), markdownImageRefs(source)...)
+			b.ReportAllocs()
+			b.SetBytes(int64(len(source)))
+			for b.Loop() {
+				distance := referenceDistance(source, 2, 3)
+				for _, ref := range refs {
+					distance(ref)
+				}
+			}
+		})
+	}
+}
+
+func TestEditorReferencePriorityAndSiblings(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "clip.mp4"), []byte("video"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, marked, image, link string
+		imageOnly                 bool
+		siblings                  int
+	}{
+		{"wrapped image", "[![|one](a.png)](https://example.org)", "a.png", "", false, 1},
+		{"equal images", "![a](a.png) | ![b](b.png)", "a.png", "", false, 2},
+		{"second image", "![a](a.png) ![|b](b.png)", "b.png", "", false, 2},
+		{"equal links", "[a](https://example.org/a) | [b](https://example.org/b)", "", "https://example.org/a", false, 0},
+		{"non-image tie", "![](clip.mp4) | [b](https://example.org/b)", "", "https://example.org/b", false, 0},
+		{"images only", "![a](a.png) [|b](https://example.org)", "a.png", "", true, 1},
+		{"no references", "plain |text", "", "", false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opened := stubOpener(t, false)
+			app := setupAppWithDoc(t, "source\n")
+			app.session.Meta.CWD = dir
+			app.images.enabled = true
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
+			app.openLineComment()
+			before, after, _ := strings.Cut(tc.marked, "|")
+			app.modalTextarea.SetValue(before + after)
+			app.modalTextarea.MoveToBegin()
+			app.modalTextarea.SetCursorColumn(utf8.RuneCountInString(before))
+			var cmd tea.Cmd
+			if tc.imageOnly {
+				cmd = app.openImageAtCursor()
+			} else {
+				cmd = app.openReferenceAtCursor()
+			}
+			switch {
+			case tc.image != "":
+				if app.modal != lightboxModal || filepath.Base(app.lightbox.target.path) != tc.image || len(app.lightbox.siblings) != tc.siblings || len(*opened) != 0 {
+					t.Fatalf("image selection: modal=%v target=%+v siblings=%v opened=%v", app.modal, app.lightbox.target, app.lightbox.siblings, *opened)
+				}
+			case tc.link != "":
+				if got := openStatus(cmd); got != "Opened "+tc.link {
+					t.Fatalf("link selection: %s", got)
+				}
+			default:
+				if cmd != nil || app.modal != commentModal {
+					t.Fatal("no reference must leave the editor open")
+				}
+			}
+		})
 	}
 }
 

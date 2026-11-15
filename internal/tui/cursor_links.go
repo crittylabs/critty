@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/yuin/goldmark/v2/ast"
@@ -12,11 +13,13 @@ import (
 	nethtml "golang.org/x/net/html"
 )
 
+var markdownLinkParser = parser.New(parser.WithExtensions(extension.LinkifyParser))
+
 // markdownLinkRefs uses the Markdown and HTML parsers to exclude code and
-// resolve links and image references as well as plain web URLs.
+// resolve links and plain web URLs.  Images are collected separately.
 func markdownLinkRefs(source string) []markdownImageRef {
 	data := []byte(source)
-	root := parser.New(parser.WithExtensions(extension.LinkifyParser)).Parse(data)
+	root := markdownLinkParser.Parse(data)
 	lines := sourceLineCursor{text: source}
 	var refs []markdownImageRef
 	add := func(start, end int, destination string) {
@@ -94,33 +97,12 @@ func markdownLinkRefs(source string) []markdownImageRef {
 	if err != nil {
 		return nil
 	}
-	return append(refs, markdownImageRefs(source)...)
+	return refs
 }
 
 func (m *AppModel) openReferenceAtCursor() tea.Cmd {
 	if m.isTextModal() && m.modalFocus == 0 {
-		value := m.modalTextarea.Value()
-		line, column := m.modalTextarea.Line()+1, m.modalTextarea.Column()
-		best := int(^uint(0) >> 1)
-		var link *markdownImageRef
-		// Images win ties, including an image wrapped in a Markdown link.
-		for _, ref := range markdownImageRefs(value) {
-			if _, ok := m.commentImageTarget(ref.destination); ok {
-				best = min(best, referenceDistance(value, line, column, ref))
-			}
-		}
-		for _, ref := range markdownLinkRefs(value) {
-			if _, ok := m.linkArgument(ref.destination, true); !ok {
-				continue
-			}
-			if distance := referenceDistance(value, line, column, ref); distance < best {
-				best, link = distance, &ref
-			}
-		}
-		if link != nil {
-			return m.openLink(link.destination, true)
-		}
-		return m.openImageAtCursor()
+		return m.openCommentReference(true)
 	}
 	t := m.tab()
 	if t.isBinary || t.cursorOnAnnotation || t.cursorLine == 0 || t.cursorSide == "old" || t.doc == nil {
@@ -155,6 +137,68 @@ func (m *AppModel) openReferenceAtCursor() tea.Cmd {
 		}
 	}
 	return nil
+}
+
+func (m *AppModel) openCommentReference(includeLinks bool) tea.Cmd {
+	value := m.modalTextarea.Value()
+	images := markdownImageRefs(value)
+	distance := referenceDistance(value, m.modalTextarea.Line()+1, m.modalTextarea.Column())
+	best, image := int(^uint(0)>>1), -1
+	// Images win ties, including an image wrapped in a Markdown link.
+	for i, ref := range images {
+		if _, ok := m.commentImageTarget(ref.destination); ok {
+			if d := distance(ref); d < best {
+				best, image = d, i
+			}
+		}
+	}
+	if includeLinks {
+		var link *markdownImageRef
+		for _, ref := range append(markdownLinkRefs(value), images...) {
+			if _, ok := m.linkArgument(ref.destination, true); !ok {
+				continue
+			}
+			if d := distance(ref); d < best {
+				best, link = d, &ref
+			}
+		}
+		if link != nil {
+			return m.openLink(link.destination, true)
+		}
+	}
+	if image < 0 {
+		return nil
+	}
+	target, _ := m.commentImageTarget(images[image].destination)
+	var siblings []imageTarget
+	for _, ref := range images {
+		if ref.line == images[image].line {
+			if sibling, ok := m.commentImageTarget(ref.destination); ok {
+				siblings = append(siblings, sibling)
+			}
+		}
+	}
+	return m.openImageWithSiblings(target, siblings)
+}
+
+// referenceDistance prepares rune distances from one cursor to reference
+// spans.  Wide and combining text use rune positions, not screen columns.
+func referenceDistance(value string, line, column int) func(markdownImageRef) int {
+	lines := strings.Split(value, "\n")
+	starts := make([]int, len(lines)+1)
+	for i, text := range lines {
+		starts[i+1] = starts[i] + utf8.RuneCountInString(text) + 1
+	}
+	cursor := starts[min(max(0, line-1), len(lines))] + column
+	return func(ref markdownImageRef) int {
+		if ref.line < 1 || ref.line > len(lines) {
+			return int(^uint(0) >> 1)
+		}
+		text := lines[ref.line-1]
+		start := starts[ref.line-1] + utf8.RuneCountInString(text[:min(ref.start, len(text))])
+		end := starts[ref.line-1] + utf8.RuneCountInString(text[:min(ref.end, len(text))])
+		return max(start-cursor, cursor-end, 0)
+	}
 }
 
 func (m AppModel) linkArgument(destination string, editor bool) (string, bool) {

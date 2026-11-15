@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -242,31 +241,7 @@ func (m *AppModel) openImageLink(uri string) (tea.Cmd, bool) {
 // referenced on the cursor line.
 func (m *AppModel) openImageAtCursor() tea.Cmd {
 	if m.isTextModal() && m.modalFocus == 0 {
-		value := m.modalTextarea.Value()
-		line, column := m.modalTextarea.Line()+1, m.modalTextarea.Column()
-		refs := markdownImageRefs(value)
-		best, distance := -1, int(^uint(0)>>1)
-		for i, ref := range refs {
-			if _, ok := m.commentImageTarget(ref.destination); !ok {
-				continue
-			}
-			if d := referenceDistance(value, line, column, ref); d < distance {
-				best, distance = i, d
-			}
-		}
-		if best < 0 {
-			return nil
-		}
-		target, _ := m.commentImageTarget(refs[best].destination)
-		var siblings []imageTarget
-		for _, ref := range refs {
-			if ref.line == refs[best].line {
-				if sibling, ok := m.commentImageTarget(ref.destination); ok {
-					siblings = append(siblings, sibling)
-				}
-			}
-		}
-		return m.openImageWithSiblings(target, siblings)
+		return m.openCommentReference(false)
 	}
 	t := m.tab()
 	if (t.isBinary || m.svgFilePreview()) && imagePath(t.path) {
@@ -286,27 +261,6 @@ func (m *AppModel) openImageAtCursor() tea.Cmd {
 		}
 	}
 	return nil
-}
-
-// referenceDistance measures rune distance to a reference's span, rather
-// than screen columns, so wide and combining text keep the same anchors.
-func referenceDistance(value string, line, column int, ref markdownImageRef) int {
-	lines := strings.Split(value, "\n")
-	position := func(row, col int) int {
-		n := col
-		for _, text := range lines[:min(max(0, row-1), len(lines))] {
-			n += utf8.RuneCountInString(text) + 1
-		}
-		return n
-	}
-	if ref.line < 1 || ref.line > len(lines) {
-		return int(^uint(0) >> 1)
-	}
-	text := lines[ref.line-1]
-	start := position(ref.line, utf8.RuneCountInString(text[:min(ref.start, len(text))]))
-	end := position(ref.line, utf8.RuneCountInString(text[:min(ref.end, len(text))]))
-	cursor := position(line, column)
-	return max(start-cursor, cursor-end, 0)
 }
 
 var kittyDiacritics = func() map[rune]bool {
