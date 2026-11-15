@@ -1019,12 +1019,12 @@ func TestFillTabRowFitsSingleLine(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			row := lipgloss.JoinHorizontal(lipgloss.Top, inactiveTabStyle.Render("one"), tc.last.Render("two"))
-			for _, width := range []int{12, lipgloss.Width(row), lipgloss.Width(row) + 3} {
+			for _, width := range []int{0, 1, 2, 3, 12, lipgloss.Width(row), lipgloss.Width(row) + 3} {
 				filled := fillTabRow(row, width, border, style)
 				if lipgloss.Height(filled) != 1 || lipgloss.Width(filled) != width {
 					t.Fatalf("tab row does not fit %dx1: %q", width, filled)
 				}
-				if plain := ansi.Strip(filled); !strings.HasPrefix(plain, "╭") || !strings.HasSuffix(plain, "╮") {
+				if plain := ansi.Strip(filled); width >= 2 && (!strings.HasPrefix(plain, "╭") || !strings.HasSuffix(plain, "╮")) {
 					t.Fatalf("tab row has no rounded corners: %q", filled)
 				}
 			}

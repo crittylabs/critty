@@ -40,17 +40,19 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 	if len(labels) == 0 || capacity == 0 {
 		return nil
 	}
-	prefix := make([]int, len(labels)+1)
 	shares := min(len(labels), 4)
 	maximum := max(1, (capacity-shares+1)/shares)
-	for i := range labels {
+	widthAt := func(i int) int {
+		if labels[i].rendered != "" {
+			return labels[i].width
+		}
 		limit := maximum
 		if i == m.activeTab {
 			limit = max(limit, min(capacity, m.minimumTabWidth(labels, i)))
 		}
 		labels[i].rendered = m.renderTabWithin(labels, i, limit, false)
 		labels[i].width = lipgloss.Width(labels[i].rendered)
-		prefix[i+1] = prefix[i] + labels[i].width
+		return labels[i].width
 	}
 	overflowWidth := func(count int, backwards bool) int {
 		if count == 0 {
@@ -58,8 +60,7 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		}
 		return lipgloss.Width(m.renderTabOverflowIndicator(m.tabOverflowText(count, backwards)))
 	}
-	rangeWidth := func(start, end int) int {
-		width := prefix[end] - prefix[start] + end - start - 1
+	rangeWidth := func(start, end, width int) int {
 		if start > 0 {
 			width += overflowWidth(start, true) + 1
 		}
@@ -68,16 +69,25 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		}
 		return width
 	}
+	// Stop measuring once even the tabs alone exceed the pane.  Large reviews
+	// cannot fit their inter-tab gaps, so only the active window needs rendering.
 	start, end := 0, len(labels)
-	if rangeWidth(start, end) > capacity {
+	coreWidth := len(labels) - 1
+	for i := 0; i < len(labels) && coreWidth <= capacity; i++ {
+		coreWidth += widthAt(i)
+	}
+	if coreWidth > capacity {
 		start, end = m.activeTab, m.activeTab+1
+		coreWidth = widthAt(m.activeTab)
 		for {
 			expanded := false
-			if start > 0 && rangeWidth(start-1, end) <= capacity {
+			if start > 0 && rangeWidth(start-1, end, coreWidth+widthAt(start-1)+1) <= capacity {
+				coreWidth += widthAt(start-1) + 1
 				start--
 				expanded = true
 			}
-			if end < len(labels) && rangeWidth(start, end+1) <= capacity {
+			if end < len(labels) && rangeWidth(start, end+1, coreWidth+widthAt(end)+1) <= capacity {
+				coreWidth += widthAt(end) + 1
 				end++
 				expanded = true
 			}
@@ -105,7 +115,6 @@ func (m *AppModel) tabBarItems() []tabBarItem {
 		appendItem(m.renderTabWidth(labels, m.activeTab, capacity), m.activeTab, false)
 		return items
 	}
-	coreWidth := prefix[end] - prefix[start] + end - start - 1
 	minimumActive := min(labels[m.activeTab].width, m.minimumTabWidth(labels, m.activeTab))
 	budget := max(overflows, capacity-coreWidth+labels[m.activeTab].width-minimumActive-overflows)
 	leftWidth, rightWidth = fitTabOverflowWidths(leftWidth, rightWidth, budget)

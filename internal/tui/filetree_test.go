@@ -38,7 +38,7 @@ func TestFileTreeAbsolutePathsUseProjectHierarchy(t *testing.T) {
 			app.fileTree = newFileTree()
 			app.orderTabsByTree()
 			app.syncFileTree()
-			if label := ansi.Strip(app.tabLabels()[0].text); label != "i/a/z.go" {
+			if label := strings.TrimSpace(ansi.Strip(app.renderTabWidth(app.tabLabels(), 0, 0))); label != "i/a/z.go" {
 				t.Fatalf("single-root tab includes redundant ancestors: %q", label)
 			}
 			var names []string

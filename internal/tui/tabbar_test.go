@@ -231,6 +231,42 @@ func TestTabWidthSharesFitWithoutUnnecessaryOverflow(t *testing.T) {
 	}
 }
 
+func BenchmarkTabBarItems(b *testing.B) {
+	for _, count := range []int{1, 300} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			app := newFileTreeTestApp()
+			app.tabs = make([]FileTab, count)
+			for i := range app.tabs {
+				app.tabs[i].path = fmt.Sprintf("internal/component/file%d.go", i)
+			}
+			app.width, app.activeTab = 140, count/2
+			b.ReportAllocs()
+			for b.Loop() {
+				app.tabBarItems()
+			}
+		})
+	}
+}
+
+func TestShortTabsFitWithoutOverflowControls(t *testing.T) {
+	t.Parallel()
+	app := newFileTreeTestApp()
+	app.tabs = make([]FileTab, 12)
+	for i := range app.tabs {
+		app.tabs[i].path = string(rune('a' + i))
+	}
+	app.viewMode, app.width, app.activeTab = true, 52, 6
+	items := app.tabBarItems()
+	if len(items) != len(app.tabs) {
+		t.Fatalf("only %d of %d tabs fit", len(items), len(app.tabs))
+	}
+	for i, item := range items {
+		if item.overflow || item.target != i {
+			t.Fatalf("tab %d replaced by overflow: %+v", i, item)
+		}
+	}
+}
+
 func TestExpandedTabReservesUnreadCountsAndComments(t *testing.T) {
 	t.Parallel()
 	app := newFileTreeTestApp()

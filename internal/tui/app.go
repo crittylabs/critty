@@ -3307,7 +3307,6 @@ func (m *AppModel) tabLabels() []tabLabel {
 			label = t.attachment.Name
 		} else if t.path != overallCommentsPath {
 			path = label
-			label = m.paths.renderTab(label, m.tabStyle(i), i == m.activeTab, roots, 0)
 		}
 		if i == m.activeTab && (t.attachment != nil || t.path == overallCommentsPath) {
 			label = ansi.NewStyle().Bold().String() + label + ansi.NewStyle().Normal().Underline(false).String()
@@ -3345,16 +3344,20 @@ func (m *AppModel) renderTabWidth(labels []tabLabel, i, width int) string {
 func (m *AppModel) renderTabWithin(labels []tabLabel, i, width int, fill bool) string {
 	style := m.tabStyle(i)
 	label := labels[i].text
-	if width > 0 && labels[i].path != "" {
-		padding := style.GetHorizontalFrameSize()
-		if width < 3 {
-			padding = 0
+	if labels[i].path != "" {
+		budget := 0
+		if width > 0 {
+			padding := style.GetHorizontalFrameSize()
+			if width < 3 {
+				padding = 0
+			}
+			budget = width - padding - ansi.StringWidth(labels[i].suffix)
+			if m.tabs[i].unread {
+				budget -= ansi.StringWidth(m.tabs[i].unreadMarker())
+			}
+			budget = max(1, budget)
 		}
-		budget := width - padding - ansi.StringWidth(labels[i].suffix)
-		if m.tabs[i].unread {
-			budget -= ansi.StringWidth(m.tabs[i].unreadMarker())
-		}
-		label = m.paths.renderTab(labels[i].path, style, i == m.activeTab, labels[i].roots, max(1, budget)) + labels[i].suffix
+		label = m.paths.renderTab(labels[i].path, style, i == m.activeTab, labels[i].roots, budget) + labels[i].suffix
 	}
 	if m.tabs[i].unread {
 		label = m.tabs[i].unreadMarker() + lipgloss.NewStyle().Foreground(style.GetForeground()).Render(label)
@@ -4231,7 +4234,7 @@ func (m *AppModel) headerHeight() int {
 }
 
 func (m *AppModel) tabBarHeight() int {
-	return lipgloss.Height(m.renderTabBar())
+	return 1
 }
 
 func (m *AppModel) contentBounds() (left, top, right, bottom int) {

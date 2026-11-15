@@ -101,7 +101,7 @@ func TestTabLabelsKeepOnlyNecessaryRootPrefixes(t *testing.T) {
 	}
 	assertLabel := func(index int, want string) {
 		t.Helper()
-		if got := ansi.Strip(app.tabLabels()[index].text); got != want {
+		if got := strings.TrimSpace(ansi.Strip(app.renderTabWidth(app.tabLabels(), index, 0))); got != want {
 			t.Fatalf("tab %d = %q, want %q", index, got, want)
 		}
 	}
