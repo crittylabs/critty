@@ -94,3 +94,17 @@ func BenchmarkMarkdownFenceLanguages(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkMarkdownMathFences includes recursive parsing of code contents.
+func BenchmarkMarkdownMathFences(b *testing.B) {
+	for _, count := range []int{1, 40} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			source := strings.Repeat("> ```markdown\n> Before $x + y$ after.\n> ```\n\n", count)
+			b.SetBytes(int64(len(source)))
+			b.ReportAllocs()
+			for b.Loop() {
+				markdownMathRefs(source)
+			}
+		})
+	}
+}

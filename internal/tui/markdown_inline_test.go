@@ -25,10 +25,13 @@ func TestInlineMarkdownParser(t *testing.T) {
 		{"**bold `literal ** stars` end**", "bold  literal ** stars  end", ""},
 		{"``a ` b``", " a ` b ", ""},
 		{"[**label**](https://example.org/a_(b))", "label ↗", "https://example.org/a_(b)"},
+		{"[label][ref]\n\n[ref]: https://example.org/ref", "label ↗", "https://example.org/ref"},
+		{"[label][ref]", "[label][ref]", ""},
 		{"https://example.org/plain.", "https://example.org/plain ↗.", "https://example.org/plain"},
 		{"`https://example.org/code`", " https://example.org/code ", ""},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
+			t.Parallel()
 			got := highlightInline(tc.source)
 			if text := ansi.Strip(got); text != tc.text {
 				t.Fatalf("text = %q, want %q; raw=%q", text, tc.text, got)

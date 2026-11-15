@@ -10,6 +10,8 @@ import (
 	"github.com/yuin/goldmark/v2/util"
 )
 
+var inlineHighlightParser = parser.New(parser.WithExtensions(extension.LinkifyParser), parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50)))
+
 func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) string {
 	return highlightInlineReferences(line, linkStyle, codeStyle, nil)
 }
@@ -25,7 +27,7 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 	content := strings.TrimRight(line, " \t")
 	suffix := line[len(content):]
 	source := []byte(prefix + content)
-	root := parser.New(parser.WithExtensions(extension.LinkifyParser), parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50))).Parse(source)
+	root := inlineHighlightParser.Parse(source)
 	groupKeyboardNodes(root, source)
 	var render func(ast.Node, lipgloss.Style) string
 	linkDepth := 0

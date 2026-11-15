@@ -9,7 +9,11 @@ import (
 	"github.com/yuin/goldmark/v2/util"
 )
 
-var mathKind = ast.NewNodeKind("Math")
+var (
+	mathKind = ast.NewNodeKind("Math")
+	// Image discovery uses the same parser to keep math contents literal.
+	markdownReferenceParser = parser.New(parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50)))
+)
 
 type mathNode struct {
 	ast.BaseInline
@@ -101,7 +105,7 @@ func markdownMathSpans(data []byte, depth int) []mathSpan {
 	if depth >= 16 {
 		return nil
 	}
-	root := parser.New(parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50))).Parse(data)
+	root := markdownReferenceParser.Parse(data)
 	var spans []mathSpan
 	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {

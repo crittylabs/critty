@@ -397,3 +397,31 @@ func TestMarkdownPreviewsRetainedAcrossTabSwitch(t *testing.T) {
 		})
 	}
 }
+
+func TestMarkdownReferenceParsesAreIndependent(t *testing.T) {
+	for _, tc := range []struct {
+		name, source     string
+		images, formulas []string
+	}{
+		{"first definition", "![one][pic]\n\n[pic]: first.png\n\n> ```\n> $a$\n> ```", []string{"first.png"}, []string{"a"}},
+		{"other definition", "![two][pic]\n\n[pic]: second.png\n\n$b$", []string{"second.png"}, []string{"b"}},
+		{"undefined", "![missing][pic] and `$literal$`", nil, nil},
+		{"math hides images", "$$![hidden](hidden.png)$$", nil, []string{"![hidden](hidden.png)"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for range 2 {
+				var images, formulas []string
+				for _, ref := range markdownImageRefs(tc.source) {
+					images = append(images, ref.destination)
+				}
+				for _, ref := range markdownMathRefs(tc.source) {
+					formulas = append(formulas, ref.renderBody)
+				}
+				if !reflect.DeepEqual(images, tc.images) || !reflect.DeepEqual(formulas, tc.formulas) {
+					t.Fatalf("images=%v, math=%v; want images=%v, math=%v", images, formulas, tc.images, tc.formulas)
+				}
+			}
+		})
+	}
+}

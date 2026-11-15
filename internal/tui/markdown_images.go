@@ -13,8 +13,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
-	"github.com/yuin/goldmark/v2/parser"
-	"github.com/yuin/goldmark/v2/util"
 	nethtml "golang.org/x/net/html"
 
 	gitpkg "github.com/crittylabs/critty/internal/git"
@@ -59,7 +57,7 @@ type markdownImageRef struct {
 
 func markdownImageRefs(source string) []markdownImageRef {
 	data := []byte(source)
-	root := parser.New(parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50))).Parse(data)
+	root := markdownReferenceParser.Parse(data)
 	var refs []markdownImageRef
 	add := func(offset, end int, destination string) {
 		if offset < 0 || offset > len(source) {
