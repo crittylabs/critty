@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.0.1
+
 ### Fixed
 
 - Large reviews stay responsive while the mouse moves.  Drawing hidden file tabs no longer delays keyboard actions such as opening the submit dialog with `q`.

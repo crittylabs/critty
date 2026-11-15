@@ -138,6 +138,8 @@ Recently viewed image, math, and Mermaid previews stay cached when switching fil
 
 Image previews need a terminal with Kitty graphics protocol support and Unicode image placeholders, such as Kitty, Ghostty, iTerm2, or the Herdr desktop app.  Through tmux or Herdr TUI, enable image passthrough; for tmux, run `tmux set -g allow-passthrough on`.
 
+With `allow-passthrough on`, keep the Critty pane selected in the only client displaying that window; other clients can view different windows.  With `all`, other clients must not share that window, even when it is hidden.  Nested tmux image previews are not supported.
+
 After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr TUI checks read local configuration; running server and remote client settings may differ.
 
 PNG, JPEG, GIF, and WebP are supported directly.  SVG previews use `rsvg-convert`, `merman-cli`, or `resvg` found on PATH, with no extra setting.  SVG files retain their XML source alongside the preview; Markdown images and comment editors support SVG too.  See [SVG preview details](docs/configuration.md#svg-previews).  Large or unsupported images and changed images in supplied diffs remain text placeholders; remote image URLs are not fetched.
