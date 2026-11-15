@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -59,6 +60,21 @@ func BenchmarkMarkdownRebuild(b *testing.B) {
 					app.rebuildContent()
 				}
 			})
+		})
+	}
+}
+
+// BenchmarkMarkdownFences tracks parsing cost as the number of fences grows.
+func BenchmarkMarkdownFences(b *testing.B) {
+	for _, count := range []int{10, 100, 1000} {
+		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			source := strings.Repeat("Section.\n\n```\nplain content\n```\n\n", count)
+			lines := strings.Split(source, "\n")
+			b.SetBytes(int64(len(source)))
+			b.ReportAllocs()
+			for b.Loop() {
+				parseMarkdownSource(lines, nil)
+			}
 		})
 	}
 }

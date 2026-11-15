@@ -325,8 +325,7 @@ type markdownFence struct {
 	closing                             string
 }
 
-func (m *markdownSource) addCodeFence(block *ast.CodeBlock, data []byte, base int) *markdownFence {
-	source := string(data)
+func (m *markdownSource) addCodeFence(block *ast.CodeBlock, source string, base int) *markdownFence {
 	start := block.Pos()
 	if start < 0 || start >= len(source) {
 		return nil

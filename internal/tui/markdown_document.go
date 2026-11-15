@@ -148,16 +148,13 @@ func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.R
 }
 
 func (m *markdownSource) parseRun(start, end int, incomplete bool) {
-	var source strings.Builder
+	base := m.offsets[start]
+	source := m.source[base : m.offsets[end-1]+len(m.lines[end-1].source)]
 	offsets := make([]int, end-start)
-	for i := start; i < end; i++ {
-		offsets[i-start] = source.Len()
-		source.WriteString(m.lines[i].source)
-		if i+1 < end {
-			source.WriteByte('\n')
-		}
+	for i := range offsets {
+		offsets[i] = m.offsets[start+i] - base
 	}
-	data := []byte(source.String())
+	data := []byte(source)
 	context := parser.NewContext()
 	root := markdownBlockParser.Parse(data, parser.WithContext(context))
 	edits := make([][]markdownEdit, len(offsets))
@@ -197,16 +194,16 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 		case *ast.CodeBlock:
 			if block := n.(*ast.CodeBlock); block.CodeBlockKind == ast.CodeBlockKindFenced && (!incomplete || start == 0 || lineAt(block.Pos()) > 0) {
 				info := m.codeFenceInfo(block, data)
-				if fence := m.addCodeFence(block, data, m.offsets[start]); fence != nil {
-					info.start, info.end = info.start+m.offsets[start], info.end+m.offsets[start]
+				if fence := m.addCodeFence(block, source, base); fence != nil {
+					info.start, info.end = info.start+base, info.end+base
 					m.styleCodeFence(*fence, info)
 					m.markCodeRows(fence.start, fence.end)
 				}
-				m.highlightCodeBlock(block, data, m.offsets[start], info.lexer)
+				m.highlightCodeBlock(block, data, base, info.lexer)
 			} else if block.CodeBlockKind == ast.CodeBlockKindIndented && !incomplete {
 				segments := block.Value.Segments()
 				if len(segments) > 0 {
-					m.markCodeRows(m.offsets[start]+segments[0].Start, m.offsets[start]+segments[len(segments)-1].Stop)
+					m.markCodeRows(base+segments[0].Start, base+segments[len(segments)-1].Stop)
 				}
 			}
 			return
