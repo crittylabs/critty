@@ -36,6 +36,11 @@ type keyMap struct {
 	Cancel           key.Binding
 	Confirm          key.Binding
 	VisualMode       key.Binding
+	Copy             key.Binding
+	HorizontalLeft   key.Binding
+	HorizontalRight  key.Binding
+	HorizontalStart  key.Binding
+	HorizontalEnd    key.Binding
 	PrevTab          key.Binding
 	NextTab          key.Binding
 	NextChange       key.Binding
@@ -61,8 +66,8 @@ type keyMap struct {
 var keys = keyMap{
 	Quit:             key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	Tab:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "toggle sidebar")),
-	Up:               key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
-	Down:             key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
+	Up:               key.NewBinding(key.WithKeys("up", "k", "ctrl+p"), key.WithHelp("k/C-p", "up")),
+	Down:             key.NewBinding(key.WithKeys("down", "j", "ctrl+n"), key.WithHelp("j/C-n", "down")),
 	HalfPageUp:       key.NewBinding(key.WithKeys("ctrl+u", "shift+up"), key.WithHelp("S-up", "half page up")),
 	HalfPageDown:     key.NewBinding(key.WithKeys("ctrl+d", "shift+down"), key.WithHelp("S-down", "half page down")),
 	PageUp:           key.NewBinding(key.WithKeys("alt+v", "pgup"), key.WithHelp("M-v/PgUp", "page up")),
@@ -75,7 +80,12 @@ var keys = keyMap{
 	PrevComment:      key.NewBinding(key.WithKeys("["), key.WithHelp("[", "prev thread/form item")),
 	Cancel:           key.NewBinding(key.WithKeys("esc"), key.WithHelp("ESC", "cancel")),
 	Confirm:          key.NewBinding(key.WithKeys("enter"), key.WithHelp("RET", "confirm")),
-	VisualMode:       key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "select lines")),
+	VisualMode:       key.NewBinding(key.WithKeys("v", "ctrl+space", "ctrl+@", "ctrl+shift+@", "ctrl+shift+2"), key.WithHelp("v/C-SPC/C-@", "select lines")),
+	Copy:             key.NewBinding(key.WithKeys("alt+w", "Y"), key.WithHelp("M-w/Y", "copy content")),
+	HorizontalLeft:   key.NewBinding(key.WithKeys("left", "h", "ctrl+b"), key.WithHelp("h/C-b", "scroll left")),
+	HorizontalRight:  key.NewBinding(key.WithKeys("right", "l", "ctrl+f"), key.WithHelp("l/C-f", "scroll right")),
+	HorizontalStart:  key.NewBinding(key.WithKeys("ctrl+a", "^"), key.WithHelp("C-a/^", "scroll to left edge")),
+	HorizontalEnd:    key.NewBinding(key.WithKeys("ctrl+e", "$"), key.WithHelp("C-e/$", "scroll to right edge")),
 	PrevTab:          key.NewBinding(key.WithKeys("shift+tab", "alt+{", "alt+shift+[", "alt+shift+{"), key.WithHelp("S-TAB/M-{", "prev tab")),
 	NextTab:          key.NewBinding(key.WithKeys("tab", "alt+}", "alt+shift+]", "alt+shift+}"), key.WithHelp("TAB/M-}", "next tab")),
 	NextChange:       key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next hunk/item")),

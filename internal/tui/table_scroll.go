@@ -1,9 +1,34 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func (m *AppModel) handleHorizontalScrollKey(msg tea.KeyPressMsg) bool {
+	if m.focused != contentPane || m.tab().cursorSide != "" {
+		return false
+	}
+	table := m.horizontalBlockAtLine(m.tab().cursorLine)
+	if table == nil {
+		return false
+	}
+	delta := max(1, table.window.width/2)
+	switch {
+	case key.Matches(msg, keys.HorizontalLeft):
+		delta = -delta
+	case key.Matches(msg, keys.HorizontalRight):
+	case key.Matches(msg, keys.HorizontalStart):
+		delta = -table.window.offset
+	case key.Matches(msg, keys.HorizontalEnd):
+		delta = table.window.maxOffset() - table.window.offset
+	default:
+		return false
+	}
+	m.scrollHorizontalBlock(*table, delta)
+	return true
+}
 
 type horizontalBlockViewport struct {
 	startLine, endLine int

@@ -110,7 +110,11 @@ func TestCopyFocusedComments(t *testing.T) {
 				app.updateCommentSidebar()
 				app.rebuildContent()
 				var cmd tea.Cmd
-				app, cmd = updateApp(app, tea.KeyPressMsg{Code: 'w', Mod: tea.ModAlt})
+				copyKey := tea.KeyPressMsg{Code: 'w', Mod: tea.ModAlt}
+				if inline {
+					copyKey = tea.KeyPressMsg{Code: 'Y'}
+				}
+				app, cmd = updateApp(app, copyKey)
 				assertCopiedText(t, app, cmd, want)
 				app, cmd = pressKeyCmd(app, '@')
 				assertCopiedText(t, app, cmd, comment.ID)

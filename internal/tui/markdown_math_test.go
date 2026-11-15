@@ -502,11 +502,16 @@ func TestBlockMathHorizontalControlsAndCopy(t *testing.T) {
 	if app.horizontalBlockAtLine(2).window.offset == 0 {
 		t.Fatal("horizontal wheel did not scroll the block formula")
 	}
-	app.scrollHorizontalBlock(*app.horizontalBlockAtLine(2), width)
+	app = ctrlKey(app, 'e')
 	block = app.horizontalBlockAtLine(2)
 	if block.window.offset != block.window.maxOffset() {
 		t.Fatal("block formula did not reach its right edge")
 	}
+	app = pressKey(app, '^')
+	if app.horizontalBlockAtLine(2).window.offset != 0 {
+		t.Fatal("caret did not return the block formula to its left edge")
+	}
+	app = pressKey(app, '$')
 	rows = strings.Split(app.contentViewport.GetContent(), "\n")
 	rowBody = ansi.Strip(ansi.Cut(rows[app.contentLayout.lineRanges[3].start], gutterWidth, app.contentViewport.Width()))
 	if strings.HasSuffix(rowBody, " ") || strings.HasSuffix(rowBody, "▶") {

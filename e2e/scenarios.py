@@ -733,8 +733,8 @@ def scenarios() -> None:
         except AssertionError:
             print(copying.screen(), flush=True)
             raise
-        copying.keys("M-w")
-        copying.wait_screen("Copied text", "partial link copied")
+        copying.keys("Y")
+        copying.wait_screen("Copied text", "Y copies a partial link")
         copying.keys("Enter")
         copying.wait_screen("Add Comment (line 2)", "comment editor for partial link")
         copying.keys("C-y", "C-s")
@@ -769,9 +769,24 @@ def scenarios() -> None:
             ),
             "file and line reference pasted from the kill ring",
         )
+        copying.click("Before")
+        copying.keys("C-Space", "C-n", "C-p", "C-n", "Y")
+        copying.wait_screen("Copied text", "NUL selects lines and Y copies the source range")
+        copying.keys("Enter")
+        copying.wait_screen("Add Comment (lines 1-2)", "Emacs selection retains source anchors")
+        copying.keys("C-y", "C-s")
+        wait_until(
+            lambda: any(
+                c["body"] == (WORK / "copy-text.md").read_text().rstrip("\n")
+                and c["start_line"] == 1
+                and c["end_line"] == 2
+                for c in copying.comments()
+            ),
+            "selected source range pasted without Markdown display changes",
+        )
         copying.finish(False)
         report(
-            "M-w copies source selections and current lines; @ copies references; editors retain copy and yank"
+            "M-w/Y copy source text; C-SPC and C-p/C-n select lines; @ copies references; editors retain copy and yank"
         )
         paragraph_source = "**日本語 é first\nsecond**\n\n`code\ncontinued`\n"
         (WORK / "paragraph.md").write_text(paragraph_source)
@@ -910,6 +925,23 @@ def scenarios() -> None:
         table.keys("l")
         table.wait_screen("◀", "l scrolls the table right")
         return_to_first_column("h")
+        table.keys("C-f")
+        table.wait_screen("◀", "C-f scrolls horizontally")
+        table.keys("C-a")
+        table.wait_screen("StartColumn", "C-a returns to the left edge")
+        table.keys("C-e")
+        wait_until(
+            lambda: "◀" in (screen := table.screen()) and "▶" not in screen,
+            "C-e reaches the right edge",
+        )
+        table.keys("^")
+        table.wait_screen("StartColumn", "caret returns to the left edge")
+        table.keys("$")
+        wait_until(
+            lambda: "◀" in (screen := table.screen()) and "▶" not in screen,
+            "dollar reaches the right edge",
+        )
+        return_to_first_column("C-b")
         table.click("▶")
         table.wait_screen("◀", "right edge button scrolls the table")
         table.keys("Enter")

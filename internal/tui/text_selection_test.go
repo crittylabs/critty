@@ -16,9 +16,10 @@ func TestDragTextAndCopy(t *testing.T) {
 		name, content, want string
 		start, end          int
 		reverse             bool
+		copyKey             rune
 	}{
 		{name: "inline code", content: "before `word` after", start: 8, end: 12, want: "`word`"},
-		{name: "reverse", content: "before `word` after", start: 8, end: 12, want: "`word`", reverse: true},
+		{name: "reverse vi copy", content: "before `word` after", start: 8, end: 12, want: "`word`", reverse: true, copyKey: 'Y'},
 		{name: "partial link", content: "before [long label](https://example.org/a_(b)) after", start: 7, end: 11, want: "[long](https://example.org/a_(b))"},
 		{name: "unicode", content: "`日本語 é 👩‍💻`", start: 1, end: 12, want: "`日本語 é 👩‍💻`"},
 		{name: "inside wide character", content: "`日本語`", start: 2, end: 5, want: "`日本`"},
@@ -44,9 +45,13 @@ func TestDragTextAndCopy(t *testing.T) {
 				t.Fatalf("selected = %q, want %q", got, tt.want)
 			}
 			before := ansi.Strip(app.contentViewport.GetContent())
-			app, cmd := updateApp(app, tea.KeyPressMsg{Code: 'w', Mod: tea.ModAlt})
+			copyKey := tea.KeyPressMsg{Code: 'w', Mod: tea.ModAlt}
+			if tt.copyKey != 0 {
+				copyKey = tea.KeyPressMsg{Code: tt.copyKey}
+			}
+			app, cmd := updateApp(app, copyKey)
 			if cmd == nil || !reflect.DeepEqual(cmd(), tea.SetClipboard(tt.want)()) {
-				t.Fatal("M-w did not emit the selected text through OSC 52")
+				t.Fatal("copy did not emit the selected text through OSC 52")
 			}
 			if app.killRing.current() != tt.want || app.textSelection.active {
 				t.Fatalf("kill ring = %q, selection = %+v", app.killRing.current(), app.textSelection)

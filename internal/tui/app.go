@@ -1146,7 +1146,7 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.textSelection.active && msg.String() != "alt+w" && !key.Matches(msg, keys.Cancel) {
+	if m.textSelection.active && !key.Matches(msg, keys.Copy, keys.Cancel) {
 		m.clearTextSelection()
 	}
 	if m.isearch.active {
@@ -1213,7 +1213,7 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "@" {
 		return m, m.copyReference()
 	}
-	if msg.String() == "alt+w" {
+	if key.Matches(msg, keys.Copy) {
 		return m, m.copyFocusedContent()
 	}
 	if (msg.String() == "o" || msg.String() == "alt+o") && !t.selecting {
@@ -1232,16 +1232,8 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.handleCommentKey(msg) {
 		return m, nil
 	}
-	if m.focused == contentPane && t.cursorSide == "" &&
-		(msg.String() == "left" || msg.String() == "right" || msg.String() == "h" || msg.String() == "l") {
-		if table := m.horizontalBlockAtLine(t.cursorLine); table != nil {
-			direction := 1
-			if msg.String() == "left" || msg.String() == "h" {
-				direction = -1
-			}
-			m.scrollHorizontalBlock(*table, direction*max(1, table.window.width/2))
-			return m, nil
-		}
+	if m.handleHorizontalScrollKey(msg) {
+		return m, nil
 	}
 
 	if msg.String() == "ctrl+pgup" || msg.String() == "ctrl+pgdown" {
@@ -4669,16 +4661,17 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	if m.readOnly {
 		items := []helpItem{
 			{keys: "q/C-c", desc: "close without saving"},
-			{keys: "↑/↓,k/j", desc: "next/previous line"},
+			{keys: "↑/↓,k/j · C-p/C-n", desc: "next/previous line"},
 			{keys: "PgUp/PgDn · M-v/C-v", desc: "next/previous page (2-row overlap)"},
 			{keys: "Home/End,g/G,</> · M-</M->", desc: "file top/bottom"},
-			{keys: "left/right,h/l · horizontal wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
+			{keys: "C-a/^ · C-e/$", desc: "table/formula left/right edge"},
+			{keys: "←/→,h/l,C-b/f · wheel · ◀/▶", desc: "scroll a table or block formula horizontally; long table cells wrap at 40 columns"},
 			{keys: "tab/shift+tab · 1-9", desc: "switch file"},
 			{keys: "o/M-o · click", desc: "follow a link or open an image; local files stay in the viewer"},
 			{keys: "M-←/M-→ · M-b/M-f · Back/Forward", desc: "restore previous/next document and reading position (up to 64 visits)"},
 			{keys: "/ ? · C-s/C-r", desc: "search forward / backward"},
-			{keys: "v · esc", desc: "select lines / cancel"},
-			{keys: "M-w", desc: "copy selected text, current line, or selected lines"},
+			{keys: "v/C-SPC/C-@ · esc", desc: "toggle line selection / cancel"},
+			{keys: "M-w/Y", desc: "copy selected text, current line, or selected lines"},
 			{keys: "@", desc: "copy file/line reference"},
 			{keys: "#", desc: "toggle line numbers (all files)"},
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
@@ -4707,7 +4700,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
 		{keys: "M-↑/↓", desc: "⇅ move ranked item"},
-		{keys: "v/space", desc: "select/form"},
+		{keys: "v/C-SPC/C-@ · space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},
 		{keys: "V · O", desc: "reading view / open all"},
@@ -4722,8 +4715,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	}, columnWidth)
 
 	navigation := renderHelpGroup("Navigation", []helpItem{
-		{keys: "↑/↓,k/j", desc: "next/previous line"},
-		{keys: "←/→,h/l", desc: "scroll table"},
+		{keys: "↑/↓,k/j · C-p/C-n", desc: "next/previous line"},
+		{keys: "←/→,h/l · C-b/C-f", desc: "scroll table/formula"},
+		{keys: "C-a/^ · C-e/$", desc: "table/formula left/right edge"},
 		{keys: "PgUp/PgDn · M-v/C-v", desc: "next/previous page (2-row overlap)"},
 		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page"},
 		{keys: "Home/End,g/G,</> · M-</M->", desc: "top/bottom"},
@@ -4737,7 +4731,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	codeReview := renderHelpGroup("Code review / search", []helpItem{
 		{keys: "/ ?", desc: "search text"},
 		{keys: "M-e/g", desc: "editor/line"},
-		{keys: "M-w", desc: "copy selected text, lines, or thread"},
+		{keys: "M-w/Y", desc: "copy selected text, lines, or thread"},
 		{keys: "@", desc: "copy file/line reference or comment ID"},
 		{keys: "M-p", desc: "open file"},
 		{keys: "S · ←/→", desc: "split diff · diff side"},
@@ -4749,15 +4743,16 @@ func (m AppModel) renderHelp(innerWidth int) string {
 	contexts := renderHelpGroup("Selection and dialogs", []helpItem{
 		{keys: "enter (comment)", desc: "unfold a folded thread; otherwise open its comment window"},
 		{keys: "←/→,h/l (comment)", desc: "fold/unfold first; otherwise scroll the table or switch diff sides with arrow keys"},
-		{keys: "drag text · M-w · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
-		{keys: "←/→,h/l · horizontal wheel · ◀/▶", desc: "scroll the cursor's table or block formula with keys, or the block under the pointer with the wheel or edge buttons; long table cells wrap at 40 columns"},
+		{keys: "drag text · M-w/Y · esc", desc: "select text · copy to kill ring and system clipboard · cancel"},
+		{keys: "←/→,h/l,C-b/f · wheel · ◀/▶", desc: "scroll the cursor's table or block formula with keys, or the block under the pointer with the wheel or edge buttons; long table cells wrap at 40 columns"},
 		{keys: "V", desc: "toggle reading view: hide sidebar and reduce all comments to bubble markers; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "reset individual folds and toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
 		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},
 		{keys: "↑/↓,k/j · ←/→,h/l · enter/esc", desc: "outline: ⇅ jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
-		{keys: "↑/↓,k/j · enter/v/esc · C-PgUp/PgDn", desc: "⇅ extend · comment/toggle/cancel selection · ⇅ scroll thread"},
+		{keys: "↑/↓,k/j,C-p/n (selection)", desc: "extend line selection; enter comments, v/C-SPC/C-@ toggles, esc cancels"},
+		{keys: "C-PgUp/PgDn", desc: "scroll the focused thread"},
 		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
 		{keys: "M-i (editors)", desc: "show/hide image, math, and Mermaid previews without changing source"},
 		{keys: "drag,S-arrows · M-w · C-v · C-z (editors)", desc: "select text · copy it · paste clipboard text · undo the last deletion, overwrite, or paste; esc cancels the selection"},

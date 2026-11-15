@@ -15,7 +15,7 @@ func TestHelpScrollControlsOnlyOnOverflow(t *testing.T) {
 	}{
 		{"view/fits", true, 120, 38, false},
 		{"view/overflow", true, 40, 12, true},
-		{"review/fits", false, 120, 80, false},
+		{"review/fits", false, 120, 100, false},
 		{"review/overflow", false, 80, 24, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestHelpScrollControlsOnlyOnOverflow(t *testing.T) {
 				t.Fatalf("End offset=%d, scrollable=%t", app.helpOffset, tc.scrollable)
 			}
 			if tc.scrollable {
-				app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 80})
+				app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 100})
 				for _, region := range app.modalMouseRegions() {
 					if region.action.scrollable {
 						t.Fatal("scroll controls remain after resizing to fit all shortcuts")

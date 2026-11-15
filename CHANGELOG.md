@@ -33,9 +33,9 @@
 
 - **Navigation improvements**
   - **Copying and references**
-    - Use `M-w` to copy selected text, the current line or selected source range, a comment body, or a complete thread with author names.  Source text and Markdown are independent of wrapping and display options.  Press `@` to copy a file/line reference or comment ID.  Footer buttons provide the same actions; both operations use the kill ring and system clipboard.  Input fields keep their existing copy behavior.
+    - Use `M-w` or `Y` to copy selected text, the current line or selected source range, a comment body, or a complete thread with author names.  Source text and Markdown are independent of wrapping and display options.  Press `@` to copy a file/line reference or comment ID.  Footer buttons provide the same actions; both operations use the kill ring and system clipboard.  Input fields keep their existing copy behavior.
   - **Keyboard navigation**
-    - **Emacs- and vi-style navigation**: Use `C-v` / `M-v` or Page Down / Up to scroll the file pane with two rows of overlap, keeping the cursor position while visible.  `M-<` / `M->` jump to the start / end.  `C-u` / `C-d` and Shift+Up / Down retain half-page movement.  See Help for all navigation keys.
+    - **Emacs- and vi-style navigation**: Use either style for line and page movement, line selection, and horizontal scrolling in tables and block formulas.  Jump to file boundaries or either horizontal edge.  `C-v` / `M-v` and Page Down / Up scroll with two rows of overlap, keeping the cursor position while visible; half-page movement remains available.  See Help for all navigation keys.
   - **File navigation**
     - In reviews, local Markdown links jump to an existing file tab or open the file in the editor when it has no tab.  Relative links resolve from the document's source directory.
 
