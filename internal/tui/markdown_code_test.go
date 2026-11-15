@@ -6,9 +6,11 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/internal/git"
+	"github.com/crittylabs/critty/internal/syntax"
 )
 
 func TestMarkdownCodeBlocks(t *testing.T) {
@@ -151,5 +153,50 @@ func TestMarkdownCodeBlockPatchGaps(t *testing.T) {
 				t.Fatalf("patch boundary invented a code context: %+v", token)
 			}
 		}
+	}
+}
+
+func TestCodeFenceLanguageResolution(t *testing.T) {
+	rules, err := syntax.Compile(syntax.Config{Aliases: map[string]string{
+		"go": "text", "custom": "python", "suggestion": "ruby",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name                                                    string
+		rules                                                   *syntax.Rules
+		suggestion                                              chroma.Lexer
+		wantGo, wantCustom, wantSuggestion, wantUpperSuggestion string
+	}{
+		{name: "built-in", wantGo: "Go"},
+		{name: "inherited", suggestion: lexers.Get("python"), wantGo: "Go", wantSuggestion: "Python"},
+		{name: "overrides", rules: rules, suggestion: lexers.Get("python"), wantGo: "plaintext", wantCustom: "Python", wantSuggestion: "Ruby", wantUpperSuggestion: "Ruby"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := markdownSource{syntax: tc.rules, suggestionLexer: tc.suggestion}
+			for range 2 {
+				for _, lookup := range []struct{ name, want string }{
+					{"go", tc.wantGo}, {"GO", tc.wantGo}, {"h", "C"}, {"H", "C++"},
+					{"custom", tc.wantCustom}, {"no-such-language", ""}, {"", ""},
+					{"suggestion", tc.wantSuggestion}, {"SUGGESTION", tc.wantUpperSuggestion},
+				} {
+					got := ""
+					if lexer := source.codeFenceLexer(lookup.name); lexer != nil {
+						got = lexer.Config().Name
+					}
+					if got != lookup.want {
+						t.Errorf("language %q = %q, want %q", lookup.name, got, lookup.want)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestMarkdownFenceLookupCacheReleased(t *testing.T) {
+	parsed := parseMarkdownSource(strings.Split("```no-such-language\ncontent\n```", "\n"), nil)
+	if parsed.fenceLexers != nil {
+		t.Fatal("finished Markdown parse retained its language lookup cache")
 	}
 }

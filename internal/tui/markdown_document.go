@@ -103,6 +103,7 @@ type markdownSource struct {
 	headingText     []string
 	headingAnchors  map[string]int
 	suggestionLexer chroma.Lexer
+	fenceLexers     map[string]chroma.Lexer
 	syntax          *syntax.Rules
 	symbols         icons.Set
 	hasCodeBlocks   bool
@@ -136,6 +137,7 @@ func parseMarkdownWithSyntax(lines []string, known map[int]bool, rules *syntax.R
 		result.parseRun(start, end, known != nil)
 		start = end
 	}
+	result.fenceLexers = nil
 	result.prepareWrapping()
 	ids := parser.NewIDs(parser.WithIDGenerator(markdownHeadingIDs{}))
 	result.headingAnchors = make(map[string]int, len(result.headings))

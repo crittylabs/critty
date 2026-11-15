@@ -78,3 +78,19 @@ func BenchmarkMarkdownFences(b *testing.B) {
 		})
 	}
 }
+
+// BenchmarkMarkdownFenceLanguages includes names that need filename matching
+// and unknown names, whose failed lookups must not be repeated for every fence.
+func BenchmarkMarkdownFenceLanguages(b *testing.B) {
+	for _, language := range []string{"go", "h", "no-such-language", "suggestion"} {
+		b.Run(language, func(b *testing.B) {
+			source := strings.Repeat("```"+language+"\nvalue = 42\n```\n\n", 100)
+			lines := strings.Split(source, "\n")
+			b.SetBytes(int64(len(source)))
+			b.ReportAllocs()
+			for b.Loop() {
+				parseMarkdownSource(lines, nil)
+			}
+		})
+	}
+}

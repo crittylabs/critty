@@ -47,14 +47,28 @@ func (m *markdownSource) codeFenceInfo(block *ast.CodeBlock, data []byte) codeFe
 		language, _ = block.Language(data)
 		end = len(language)
 	}
-	lexer := m.syntax.Lexer(language)
-	if language == "suggestion" && !m.syntax.HasAlias(language) {
-		lexer = m.suggestionLexer
-	}
+	lexer := m.codeFenceLexer(language)
 	if start < end {
 		start, end = index.Start+start, index.Start+end
 	}
 	return codeFenceInfo{lexer: lexer, start: start, end: end}
+}
+
+// Cache hits and misses for this parse; names without a direct Chroma match
+// trigger a full filename-pattern scan.  Keep exact keys for case-sensitive matches.
+func (m *markdownSource) codeFenceLexer(language string) chroma.Lexer {
+	if language == "suggestion" && !m.syntax.HasAlias(language) {
+		return m.suggestionLexer
+	}
+	if lexer, ok := m.fenceLexers[language]; ok {
+		return lexer
+	}
+	lexer := m.syntax.Lexer(language)
+	if m.fenceLexers == nil {
+		m.fenceLexers = make(map[string]chroma.Lexer)
+	}
+	m.fenceLexers[language] = lexer
+	return lexer
 }
 
 // Goldmark merges multiple classes into a string without source positions.
