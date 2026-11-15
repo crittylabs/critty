@@ -29,7 +29,7 @@ func TestSingleFileViewSidebar(t *testing.T) {
 				t.Fatal(err)
 			}
 			app := NewApp(path, AppConfig{ReadOnly: true, NerdFonts: tc.nerd})
-			app, _ = updateApp(app, docRenderedMsg{})
+			app, _ = updateApp(app, app.loadDocuments()())
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 25})
 			if app.sidebarVisible() != tc.outline || app.fileTree.viewport.Height() != 0 {
 				t.Fatalf("sidebar=%t tree height=%d", app.sidebarVisible(), app.fileTree.viewport.Height())
@@ -121,7 +121,7 @@ func newViewNavigationApp(t *testing.T, content string) AppModel {
 		t.Fatal(err)
 	}
 	app := NewApp(path, AppConfig{ReadOnly: true})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 25})
 	return app
 }

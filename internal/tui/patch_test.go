@@ -32,7 +32,7 @@ func patchApp(t *testing.T, raw string) AppModel {
 	}
 	m := NewCodeReviewApp(p.Changes(), "", AppConfig{Session: sess, Patch: p})
 	m.width, m.height = 120, 40
-	updated, _ := m.Update(docRenderedMsg{})
+	updated, _ := m.Update(m.loadDocuments()())
 	return updated.(AppModel)
 }
 

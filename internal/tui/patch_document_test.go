@@ -34,7 +34,7 @@ func patchDocumentApp(t *testing.T, attachment bool) AppModel {
 	} else {
 		m = NewApp(path, AppConfig{ReadOnly: true})
 	}
-	m, _ = updateApp(m, docRenderedMsg{})
+	m, _ = updateApp(m, m.loadDocuments()())
 	m, _ = updateApp(m, tea.WindowSizeMsg{Width: 160, Height: 45})
 	m.focused = contentPane
 	return m

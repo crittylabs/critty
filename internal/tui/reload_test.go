@@ -113,7 +113,7 @@ func TestReloadPreservesPerFileViewport(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.addDocuments(docs)
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 24})
 	positions := []struct {
 		path         string
@@ -329,7 +329,7 @@ func TestReloadGitFilesAndConcurrentComments(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(files, "HEAD", AppConfig{Session: sess, Source: &source})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app.width, app.height = 100, 30
 	for i := range app.tabs {
 		if app.tabs[i].path == "gone.txt" {
@@ -381,7 +381,7 @@ func TestReloadFormDraftsAndConsent(t *testing.T) {
 	}
 	app.addDocuments(docs)
 	app.orderTabsByTree()
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	if app.err != nil {
 		t.Fatal(app.err)
 	}
@@ -417,7 +417,7 @@ func TestReloadBranchWithoutContentChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewApp("notes.md", AppConfig{Project: "sample"})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app.width, app.height = 100, 30
 	reloadApp(t, &app)
 	before := app.branch

@@ -31,7 +31,7 @@ func TestStartupFocus(t *testing.T) {
 					app, _ = updateApp(app, window)
 				}
 				app.previousReplyIDs = []string{}
-				app, _ = updateApp(app, docRenderedMsg{})
+				app, _ = updateApp(app, app.loadDocuments()())
 				app.tabs[0].state.Comments = []review.Comment{{ID: "thread", StartLine: 2, EndLine: 2, Replies: []review.Reply{{ID: "new", Author: "Agent"}}}}
 				if lateWindow {
 					app, _ = updateApp(app, window)

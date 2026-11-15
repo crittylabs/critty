@@ -398,7 +398,7 @@ func TestLightboxCyclesImageRevisions(t *testing.T) {
 	} {
 		t.Run(tc.status.String(), func(t *testing.T) {
 			app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "image.png", Status: tc.status, Binary: true}}, "HEAD", AppConfig{})
-			app, _ = updateApp(app, docRenderedMsg{})
+			app, _ = updateApp(app, app.loadDocuments()())
 			app.images.enabled = true
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
 			app.tab().preview.before.image = &inlineImage{id: 101, width: 160, height: 80, columns: 20, rows: 5, ready: true}
@@ -484,7 +484,7 @@ func TestLightboxLoadsRenamedBeforeImage(t *testing.T) {
 	}
 	source := &gitpkg.ReviewSource{Scope: "all", Base: "HEAD"}
 	app := NewCodeReviewApp([]gitpkg.FileChange{{Path: "new.png", OldPath: "old.png", Status: gitpkg.StatusRenamed, Binary: true}}, "HEAD", AppConfig{Source: source})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app.images.enabled = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'o', Mod: tea.ModAlt})
@@ -512,7 +512,7 @@ func TestStandaloneImageLightbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewApp(path, AppConfig{})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app.images.enabled = true
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 40})
 	app.tab().preview.after.image = &inlineImage{id: 101, width: 160, height: 80, columns: 20, rows: 5, ready: true}
@@ -542,7 +542,7 @@ func TestLightboxZoomReversesAtLimits(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app := NewApp("image.png", AppConfig{})
-			app, _ = updateApp(app, docRenderedMsg{})
+			app, _ = updateApp(app, app.loadDocuments()())
 			app.images.enabled = true
 			app.images.cell = cellSize{width: 13, height: 27}
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 35})

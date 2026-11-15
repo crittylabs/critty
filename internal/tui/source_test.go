@@ -41,7 +41,7 @@ func TestRangeReviewUsesCommittedContentAcrossRounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(files, source.Base, AppConfig{Session: sess, Source: &source})
-	updated, _ := app.Update(docRenderedMsg{})
+	updated, _ := app.Update(app.loadDocuments()())
 	app = updated.(AppModel)
 	app.width, app.height = 100, 30
 	app.recalculateLayout()

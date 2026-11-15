@@ -83,7 +83,7 @@ func TestReloadNoticeOnlyForVisibleChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(files, "HEAD", AppConfig{Source: &source})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app.width, app.height = 80, 30
 	if app.tab().path != "a.txt" {
 		t.Fatal("wrong initial tab")
@@ -141,7 +141,7 @@ func TestBinaryReloadNotice(t *testing.T) {
 				t.Fatal(err)
 			}
 			app := NewCodeReviewApp(files, "HEAD", AppConfig{Source: &source})
-			app, _ = updateApp(app, docRenderedMsg{})
+			app, _ = updateApp(app, app.loadDocuments()())
 			app.width, app.height = 80, 30
 			reloadApp(t, &app)
 			if app.notice.text != "" {

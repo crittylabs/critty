@@ -15,6 +15,33 @@ import (
 	"github.com/crittylabs/critty/v2/internal/review"
 )
 
+func TestInitialLoadSharesContentWithRoundSnapshot(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "note.md")
+	if err := os.WriteFile(path, []byte("Loaded content\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	session, err := review.OpenDocSession(t.TempDir(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(path, AppConfig{Session: session})
+	loaded := app.loadDocuments()()
+	if err := os.WriteFile(path, []byte("Changed after loading\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	app, _ = updateApp(app, loaded)
+	if app.err != nil {
+		t.Fatal(app.err)
+	}
+	if got := app.tab().doc.Content; got != "Loaded content\n" {
+		t.Fatalf("displayed content = %q, want the loaded content", got)
+	}
+	if got := session.CJ.RoundState.Files[path].Content; got != app.tab().doc.Content {
+		t.Fatalf("round snapshot = %q, differs from displayed content", got)
+	}
+}
+
 func TestResumedDocumentSnapshotReloadsFromWorkspace(t *testing.T) {
 	t.Chdir(t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

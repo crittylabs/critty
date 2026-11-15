@@ -571,6 +571,7 @@ func (m AppModel) Init() tea.Cmd {
 
 func (m AppModel) loadDocuments() tea.Cmd {
 	return func() tea.Msg {
+		documents := make(map[string]*document.Document, len(m.tabs))
 		for _, tab := range m.tabs {
 			if tab.loadErr != nil {
 				return errMsg{tab.loadErr}
@@ -578,11 +579,13 @@ func (m AppModel) loadDocuments() tea.Cmd {
 			if tab.isBinary || tab.isDeleted || tab.outsideChanges {
 				continue
 			}
-			if _, err := m.loadDocument(tab.path); err != nil {
+			doc, err := m.loadDocument(tab.path)
+			if err != nil {
 				return errMsg{err}
 			}
+			documents[tab.path] = doc
 		}
-		return docRenderedMsg{}
+		return documentsLoadedMsg{documents: documents}
 	}
 }
 
@@ -885,26 +888,28 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case docRenderedMsg:
-		if err := m.restoreRound(); err != nil {
-			m.err = err
-			return m, nil
-		}
-		// Load documents and existing review comments for each tab.  Syntax
-		// highlighting dominates startup for large files, so source tabs are
-		// highlighted concurrently; Markdown parsing stays on this goroutine.
+	case documentsLoadedMsg:
 		for i := range m.tabs {
 			t := &m.tabs[i]
-			t.state = &fileReview{Comments: m.sessionComments(t.path)}
 			if t.isBinary || t.outsideChanges {
 				continue
 			}
 			if t.isDeleted {
 				t.doc = &document.Document{Path: t.path}
 			} else {
-				doc, _ := m.loadDocument(t.path)
-				t.doc = doc
+				t.doc = msg.documents[t.path]
 			}
+		}
+		if err := m.restoreRound(); err != nil {
+			m.err = err
+			return m, nil
+		}
+		// Load existing review comments for each tab.  Syntax
+		// highlighting dominates startup for large files, so source tabs are
+		// highlighted concurrently; Markdown parsing stays on this goroutine.
+		for i := range m.tabs {
+			t := &m.tabs[i]
+			t.state = &fileReview{Comments: m.sessionComments(t.path)}
 		}
 		var wg sync.WaitGroup
 		for i := range m.tabs {

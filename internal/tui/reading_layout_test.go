@@ -33,7 +33,7 @@ func TestReadingLayout(t *testing.T) {
 				t.Fatal(err)
 			}
 			app := NewApp(path, AppConfig{ReadOnly: tc.readOnly, LineNumbers: tc.numbers, MaxWrapWidth: tc.cap})
-			app, _ = updateApp(app, docRenderedMsg{})
+			app, _ = updateApp(app, app.loadDocuments()())
 			app.viewMode = true
 			app, _ = updateApp(app, tea.WindowSizeMsg{Width: tc.terminal, Height: 30})
 			if app.sourceGutterWidth() != tc.wantGutter || app.contentViewport.Width() != tc.wantViewport {

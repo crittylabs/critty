@@ -61,7 +61,7 @@ func newDocApp(t *testing.T, content string, session func(string) *review.Sessio
 	app := NewApp(testFile, AppConfig{Session: session(testFile), Author: "Tester"})
 	app.tabs = []FileTab{{path: testFile}}
 	app.activeTab = 0
-	updated, _ := app.Update(docRenderedMsg{})
+	updated, _ := app.Update(app.loadDocuments()())
 	a := updated.(AppModel)
 	a.contentViewport.SetHeight(5)
 	a.sidebarView = commentsView // most tests exercise the comment sidebar

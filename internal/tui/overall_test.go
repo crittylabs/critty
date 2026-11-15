@@ -66,7 +66,7 @@ func TestOverallCommentsRemainAvailableWithoutSourceChanges(t *testing.T) {
 	app.session.CJ.ReviewComments = []review.Comment{{ID: "r_only", Scope: "review", Body: "Only remaining concern", Author: "Reviewer", CreatedAt: review.Now()}}
 	app.persist()
 	fresh := NewCodeReviewApp(nil, "HEAD", AppConfig{Session: app.session, Author: app.author})
-	fresh, _ = updateApp(fresh, docRenderedMsg{})
+	fresh, _ = updateApp(fresh, fresh.loadDocuments()())
 	fresh, _ = updateApp(fresh, tea.WindowSizeMsg{Width: 80, Height: 24})
 	if fresh.err != nil {
 		t.Fatal(fresh.err)

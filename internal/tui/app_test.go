@@ -475,7 +475,7 @@ func TestHelpModalScrollsToBottom(t *testing.T) {
 	}
 }
 
-func TestDocRenderedMsg_LoadsExistingComments(t *testing.T) {
+func TestDocumentsLoadedRestoresExistingComments(t *testing.T) {
 	testFile := filepath.Join(t.TempDir(), "test.go")
 	if err := os.WriteFile(testFile, []byte("package main\n\nfunc main() {}\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -490,7 +490,7 @@ func TestDocRenderedMsg_LoadsExistingComments(t *testing.T) {
 
 	app := NewApp(testFile, AppConfig{Session: sess, Author: "Tester"})
 	app.tabs = []FileTab{{path: testFile}}
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 
 	if state := app.tabs[0].state; state == nil || len(state.Comments) != 1 || state.Comments[0].ID != comment.ID || state.Comments[0].Body != comment.Body {
 		t.Fatalf("state = %+v, want the saved comment", state)
@@ -621,8 +621,8 @@ func TestRoundStart_ReloadsCommentsAndAdvancesRound(t *testing.T) {
 	}
 	app.persist()
 	// Load the document so the next round has previous content to carry
-	// comments forward from; docRenderedMsg reloads state from the session.
-	updated0, _ := app.Update(docRenderedMsg{})
+	// comments forward from; document loading restores state from the session.
+	updated0, _ := app.Update(app.loadDocuments()())
 	app = updated0.(AppModel)
 
 	// Simulate the agent replying via the CLI while the TUI waits.
@@ -722,7 +722,7 @@ func TestStagedRoundUsesIndexDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(files, "HEAD", AppConfig{Session: sess, Staged: true})
-	updated, _ := app.Update(docRenderedMsg{})
+	updated, _ := app.Update(app.loadDocuments()())
 	app = updated.(AppModel)
 	if got := app.tab().doc.Content; got != "package staged\n" {
 		t.Fatalf("initial document = %q, want indexed content", got)
@@ -762,7 +762,7 @@ func TestRevertedAdditionShowsSnapshotAndKeepsComments(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(files, "HEAD", AppConfig{Session: sess, Author: "Tester"})
-	updated, _ := app.Update(docRenderedMsg{})
+	updated, _ := app.Update(app.loadDocuments()())
 	app = updated.(AppModel)
 	app.width, app.height = 100, 30
 	app.recalculateLayout()
@@ -1168,7 +1168,7 @@ func TestReadOnlyViewer(t *testing.T) {
 	}
 	dataRoot := filepath.Join(root, "state")
 	app := NewApp(path, AppConfig{ReadOnly: true, Session: &review.Session{Dir: dataRoot}})
-	editorMessage(&app, docRenderedMsg{})
+	editorMessage(&app, app.loadDocuments()())
 	editorMessage(&app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	if app.session != nil || app.err != nil {
 		t.Fatalf("read-only initialization: %v, %v", app.session, app.err)

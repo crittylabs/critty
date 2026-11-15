@@ -38,7 +38,7 @@ func TestTextconvReviewRoundTrip(t *testing.T) {
 		}
 		docs := []review.AttachedDocument{{ID: "check", Source: "/check.md", Content: "- [ ] Check <!-- form: id=check -->\n"}}
 		app := NewCodeReviewApp(files, "HEAD", AppConfig{Session: sess, Source: &source, Documents: docs})
-		updated, _ := app.Update(docRenderedMsg{})
+		updated, _ := app.Update(app.loadDocuments()())
 		app = updated.(AppModel)
 		if app.err != nil {
 			t.Fatal(app.err)
@@ -104,7 +104,7 @@ func TestSuppliedDiffDoesNotInferTextconv(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(patch.Changes(), "", AppConfig{Patch: patch, ReadOnly: true})
-	updated, _ := app.Update(docRenderedMsg{})
+	updated, _ := app.Update(app.loadDocuments()())
 	app = updated.(AppModel)
 	if app.err != nil || app.tab().doc.Content != "converted" || app.tab().textconv.Command != "" {
 		t.Fatalf("supplied diff used local conversion: %+v, %v", app.tab(), app.err)

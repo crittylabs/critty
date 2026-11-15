@@ -30,7 +30,7 @@ func TestReloadUnreadTabs(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewCodeReviewApp(files, "HEAD", AppConfig{Source: &source})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app.width, app.height = 100, 30
 	check := func(want map[string]bool) {
 		t.Helper()

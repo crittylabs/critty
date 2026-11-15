@@ -120,7 +120,7 @@ func TestNewRoundFocusesFreshReplies(t *testing.T) {
 			}
 			next := NewCodeReviewApp(app.patch.Changes(), "", AppConfig{Session: loaded, Patch: app.patch, Author: app.author})
 			next.width, next.height = 120, 40
-			updated, _ = next.Update(docRenderedMsg{})
+			updated, _ = next.Update(next.loadDocuments()())
 			next = updated.(AppModel)
 			if next.activeTab != 0 || next.tab().cursorOnAnnotation {
 				t.Fatal("unfinished round repeated the jump")
@@ -186,7 +186,7 @@ func restartRound(t *testing.T, old AppModel) AppModel {
 		next = NewCodeReviewApp(files, ref, cfg)
 	}
 	next.width, next.height = old.width, old.height
-	updated, _ := next.Update(docRenderedMsg{})
+	updated, _ := next.Update(next.loadDocuments()())
 	next = updated.(AppModel)
 	if next.err != nil {
 		t.Fatal(next.err)

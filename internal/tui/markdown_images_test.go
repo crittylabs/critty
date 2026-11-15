@@ -216,7 +216,7 @@ func TestMarkdownImagesInAttachmentsWithoutGit(t *testing.T) {
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			doc := review.AttachedDocument{ID: "a_plan", Source: filepath.Join(docs, "plan.md"), Name: "plan.md", Content: "# Plan\n![shot](assets/shot.png)\n"}
 			app := NewCodeReviewApp(patch.Changes(), "", AppConfig{Patch: patch, Documents: []review.AttachedDocument{doc}})
-			updated, discovery := app.Update(docRenderedMsg{})
+			updated, discovery := app.Update(app.loadDocuments()())
 			app = updated.(AppModel)
 			app.images.enabled = true
 			app.contentViewport.SetWidth(80)

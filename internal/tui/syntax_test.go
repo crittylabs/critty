@@ -77,7 +77,7 @@ func TestSyntaxViewNavigationAndReload(t *testing.T) {
 		}
 	}
 	app := NewApp(start, AppConfig{ReadOnly: true, Syntax: rules})
-	app, _ = updateApp(app, docRenderedMsg{})
+	app, _ = updateApp(app, app.loadDocuments()())
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 25})
 	if !app.tab().isMarkdown || !app.sidebarVisible() {
 		t.Fatal("configured Markdown did not expose its outline")
