@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/yuin/goldmark/v2/ast"
@@ -118,25 +117,15 @@ func markdownMathSpans(data []byte, depth int) []mathSpan {
 			if language, _ := node.Language(data); language == "mermaid" {
 				return ast.WalkSkipChildren, nil
 			}
-			type projection struct{ local, start int }
-			var body strings.Builder
-			var positions []projection
-			for _, segment := range node.Value.Segments() {
-				positions = append(positions, projection{body.Len(), segment.Start})
-				body.Write(data[segment.Start:segment.Stop])
-			}
-			if body.Len() == 0 {
+			projection := projectMarkdownSegments(data, node.Value.Segments())
+			if projection.text == "" {
 				return ast.WalkSkipChildren, nil
 			}
-			project := func(offset int) int {
-				i := max(0, sort.Search(len(positions), func(i int) bool { return positions[i].local > offset })-1)
-				return positions[i].start + offset - positions[i].local
-			}
-			for _, span := range markdownMathSpans([]byte(body.String()), depth+1) {
+			for _, span := range markdownMathSpans([]byte(projection.text), depth+1) {
 				if len(spans) >= 64 {
 					break
 				}
-				span.start, span.end = project(span.start), project(span.end)
+				span.start, span.end = projection.sourceOffset(span.start), projection.sourceOffset(span.end)
 				spans = append(spans, span)
 			}
 			return ast.WalkSkipChildren, nil

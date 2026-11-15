@@ -132,14 +132,8 @@ func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, b
 	if lexer == nil {
 		return
 	}
-	segments := block.Value.Segments()
-	var body strings.Builder
-	starts := make([]int, len(segments))
-	for i, segment := range segments {
-		starts[i] = body.Len()
-		body.Write(data[segment.Start:segment.Stop])
-	}
-	source := body.String()
+	projection := projectMarkdownSegments(data, block.Value.Segments())
+	source := projection.text
 	iterator, err := lexer.Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, source)
 	if err != nil {
 		return
@@ -154,10 +148,9 @@ func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, b
 		}
 		end := pos + len(token.Value)
 		for pos < end {
-			i := sort.Search(len(starts), func(i int) bool { return starts[i] > pos }) - 1
-			segment := segments[i]
-			stop := min(end, starts[i]+segment.Stop-segment.Start)
-			offset := base + segment.Start + pos - starts[i]
+			span := projection.spanAt(pos)
+			stop := min(end, span.end)
+			offset := base + span.source + pos - span.local
 			row := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > offset }) - 1
 			column := offset - m.offsets[row]
 			length := min(stop-pos, len(m.lines[row].source)-column)

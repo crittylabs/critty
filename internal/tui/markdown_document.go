@@ -279,20 +279,13 @@ func paragraphParser() parser.Parser {
 }
 
 func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offsets []int, base int, edits [][]markdownEdit, lineAt func(int) int) {
-	type projection struct{ local, source, length int }
-	var body strings.Builder
-	var projections []projection
-	for _, seg := range segments {
-		projections = append(projections, projection{body.Len(), seg.Start, seg.Stop - seg.Start})
-		body.Write(data[seg.Start:seg.Stop])
-	}
-	input := []byte(body.String())
+	projection := projectMarkdownSegments(data, segments)
+	input := []byte(projection.text)
 	output := make(map[int][]markdownToken)
 	emit := func(from, to int, value string, style markdownStyle, uri string) {
 		for from < to {
-			pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > from })-1)
-			p := projections[pi]
-			stop := min(to, p.local+p.length)
+			p := projection.spanAt(from)
+			stop := min(to, p.end)
 			if stop <= from {
 				break
 			}
@@ -320,9 +313,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	ranges := make(map[ast.Node]markdownMarkup)
 	var render func(ast.Node, markdownStyle, string)
 	decorate := func(offset int, value string, style markdownStyle, uri string, kind markdownDecoration) {
-		pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > offset })-1)
-		p := projections[pi]
-		global := p.source + offset - p.local
+		global := projection.sourceOffset(offset)
 		row := lineAt(global)
 		column := global - offsets[row]
 		output[row] = append(output[row], markdownToken{start: column, end: column, text: value, style: style, uri: uri, decoration: kind})
@@ -429,9 +420,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	groupKeyboardNodes(root, input)
 	collectMarkdownMarkup(root, input, ranges)
 	project := func(offset int) int {
-		pi := max(0, sort.Search(len(projections), func(i int) bool { return projections[i].local > offset })-1)
-		p := projections[pi]
-		return m.offsets[base] + p.source + offset - p.local
+		return m.offsets[base] + projection.sourceOffset(offset)
 	}
 	for _, r := range ranges {
 		r.start, r.contentStart, r.contentEnd, r.end = project(r.start), project(r.contentStart), project(r.contentEnd), project(r.end)
