@@ -45,7 +45,12 @@ func (t *FileTab) highlightPatchSide(patch *patchDocumentCache, hunk patchDocume
 	}
 	// Each hunk starts a fresh lexer pass; missing context must not leak state
 	// into another hunk, file, or the opposite side of a replacement.
-	highlighted := newCodeHighlighter(lexer)(source)
+	var highlighted []string
+	if strings.EqualFold(lexer.Config().Name, "markdown") {
+		highlighted = t.highlightMarkdownSource(lines)
+	} else {
+		highlighted = newCodeHighlighter(lexer)(source)
+	}
 	if len(highlighted) != len(refs) {
 		return
 	}

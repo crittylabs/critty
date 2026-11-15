@@ -708,20 +708,35 @@ func highlightMarkdownBlock(line string) string {
 	return highlightMarkdownWith(line, func(s string) string { return s })
 }
 
+func markdownHeadingStyle(level int) lipgloss.Style {
+	switch level {
+	case 1:
+		return mdH1Style
+	case 2:
+		return mdH2Style
+	case 3:
+		return mdH3Style
+	case 4:
+		return mdH4Style
+	default:
+		return lipgloss.NewStyle()
+	}
+}
+
 func highlightMarkdownWith(line string, inline func(string) string) string {
 	trimmed := strings.TrimSpace(line)
 
 	if strings.HasPrefix(trimmed, "#### ") {
-		return mdH4Style.Render(inline(line))
+		return markdownHeadingStyle(4).Render(inline(line))
 	}
 	if strings.HasPrefix(trimmed, "### ") {
-		return mdH3Style.Render(inline(line))
+		return markdownHeadingStyle(3).Render(inline(line))
 	}
 	if strings.HasPrefix(trimmed, "## ") {
-		return mdH2Style.Render(inline(line))
+		return markdownHeadingStyle(2).Render(inline(line))
 	}
 	if strings.HasPrefix(trimmed, "# ") {
-		return mdH1Style.Render(inline(line))
+		return markdownHeadingStyle(1).Render(inline(line))
 	}
 
 	if reTableSep.MatchString(line) {

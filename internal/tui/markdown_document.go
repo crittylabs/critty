@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"image/color"
 	"slices"
 	"sort"
 	"strings"
@@ -484,6 +485,57 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	}
 }
 
+func markdownTokenStyle(token markdownToken, quoted bool, foreground color.Color) lipgloss.Style {
+	style := lipgloss.NewStyle()
+	if quoted && token.style&markdownQuoteBar == 0 {
+		style = style.Italic(true)
+	}
+	if token.style&markdownQuoteBar != 0 {
+		style = mdBlockquoteBar.Inherit(style)
+	}
+	if token.style&markdownCalloutTitle != 0 {
+		style = style.Background(calloutTitleBackground(token.callout)).Bold(true)
+	}
+	if token.syntax != 0 {
+		entry := codeHighlightStyle().Get(token.syntax)
+		if entry.Colour.IsSet() {
+			style = style.Foreground(lipgloss.Color(entry.Colour.String()))
+		}
+		style = style.Bold(entry.Bold == chroma.Yes).Italic(entry.Italic == chroma.Yes).Underline(entry.Underline == chroma.Yes)
+	}
+	if token.style&markdownDelimiter != 0 {
+		style = mdHrStyle.Inherit(style)
+	}
+	if token.style&markdownFenceLanguage != 0 {
+		style = mdFenceLanguageStyle.Inherit(style)
+	}
+	if token.style&markdownFenceAttribute != 0 {
+		style = mdFenceAttributeStyle.Inherit(style)
+	}
+	if token.style&markdownBold != 0 {
+		style = mdBoldStyle.Inherit(style)
+	}
+	if token.style&markdownItalic != 0 {
+		style = mdItalicStyle.Inherit(style)
+	}
+	if token.callout != 0 {
+		style = style.Foreground(calloutColor(token.callout))
+	}
+	if token.style&markdownLink != 0 {
+		style = mdLinkStyle.Inherit(style)
+	}
+	if token.style&markdownCode != 0 {
+		style = mdCodeStyle.Inherit(style)
+	}
+	if token.style&markdownKeyboard != 0 {
+		style = keyboardStyle().Inherit(style)
+	}
+	if foreground != nil && token.callout == 0 && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter|markdownFenceLanguage|markdownFenceAttribute) == 0 {
+		style = style.Foreground(foreground)
+	}
+	return style
+}
+
 func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) string {
 	if line.thematicBreak {
 		prefix := highlightMarkdownBlock(line.source[:line.ruleStart])
@@ -522,53 +574,7 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 			b.WriteString(token.text)
 			continue
 		}
-		style := lipgloss.NewStyle()
-		if line.quoted && !line.calloutBody && !line.codeBlock && token.style&markdownQuoteBar == 0 {
-			style = style.Italic(true)
-		}
-		if token.style&markdownQuoteBar != 0 {
-			style = mdBlockquoteBar.Inherit(style)
-		}
-		if token.style&markdownCalloutTitle != 0 {
-			style = style.Background(calloutTitleBackground(token.callout)).Bold(true)
-		}
-		if token.syntax != 0 {
-			entry := codeHighlightStyle().Get(token.syntax)
-			if entry.Colour.IsSet() {
-				style = style.Foreground(lipgloss.Color(entry.Colour.String()))
-			}
-			style = style.Bold(entry.Bold == chroma.Yes).Italic(entry.Italic == chroma.Yes).Underline(entry.Underline == chroma.Yes)
-		}
-		if token.style&markdownDelimiter != 0 {
-			style = mdHrStyle.Inherit(style)
-		}
-		if token.style&markdownFenceLanguage != 0 {
-			style = mdFenceLanguageStyle.Inherit(style)
-		}
-		if token.style&markdownFenceAttribute != 0 {
-			style = mdFenceAttributeStyle.Inherit(style)
-		}
-		if token.style&markdownBold != 0 {
-			style = mdBoldStyle.Inherit(style)
-		}
-		if token.style&markdownItalic != 0 {
-			style = mdItalicStyle.Inherit(style)
-		}
-		if token.callout != 0 {
-			style = style.Foreground(calloutColor(token.callout))
-		}
-		if token.style&markdownLink != 0 {
-			style = mdLinkStyle.Inherit(style)
-		}
-		if token.style&markdownCode != 0 {
-			style = mdCodeStyle.Inherit(style)
-		}
-		if token.style&markdownKeyboard != 0 {
-			style = keyboardStyle().Inherit(style)
-		}
-		if foreground != nil && token.callout == 0 && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter|markdownFenceLanguage|markdownFenceAttribute) == 0 {
-			style = style.Foreground(foreground)
-		}
+		style := markdownTokenStyle(token, line.quoted && !line.calloutBody && !line.codeBlock, foreground)
 		uri := token.uri
 		write := func(value string, background lipgloss.Style) {
 			tokenStyle := style
