@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -113,6 +114,35 @@ func TestSVGDimensionsAndValidation(t *testing.T) {
 	source := `<svg><image href="data:image/png;base64,` + base64.StdEncoding.EncodeToString(encoded.Bytes()) + `"/></svg>`
 	if _, _, err := dimensions([]byte(source)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEmbeddedSVGValidation(t *testing.T) {
+	embed := func(source string) string {
+		return `<svg><image href="data:image/svg+xml;base64,` + base64.StdEncoding.EncodeToString([]byte(source)) + `"/></svg>`
+	}
+	deep := `<svg/>`
+	for range 9 {
+		deep = embed(deep)
+	}
+	for _, tc := range []struct {
+		name, source string
+		valid        bool
+	}{
+		{"base64", embed(`<svg><rect width="10" height="10"/></svg>`), true},
+		{"percent encoded", `<svg><image href="data:image/svg+xml,` + url.PathEscape(`<svg/>`) + `"/></svg>`, true},
+		{"external resource", embed(`<svg><image href="file:///missing.png"/></svg>`), false},
+		{"nested external resource", embed(embed(`<svg><image href="https://example.org/image.png"/></svg>`)), false},
+		{"DTD", embed(`<!DOCTYPE svg SYSTEM "file:///missing"><svg/>`), false},
+		{"invalid XML", embed(`<svg>`), false},
+		{"too deeply embedded", deep, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := dimensions([]byte(tc.source))
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%t: %v", tc.valid, err)
+			}
+		})
 	}
 }
 

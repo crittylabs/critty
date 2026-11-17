@@ -383,17 +383,22 @@ func alignDiffRows(before, after []*diffLine, pairs map[int]int) []diffRow {
 	return rows
 }
 
+func (m AppModel) diffContentWidth() int {
+	width := m.contentViewport.Width()
+	for _, ids := range m.commentMarkerGroups() {
+		width = min(width, m.contentViewport.Width()-lipgloss.Width(fmt.Sprintf("> ☑︎ 💬 %d", len(ids)))-1)
+	}
+	return width
+}
+
 func (m *AppModel) rebuildDiffContent() {
 	t := m.tab()
 	layout := newRenderedContentLayout()
 	layout.gutter = m.sourceGutterWidth()
 	var b strings.Builder
 	m.appendSVGPreview(&b, &layout)
-	width := m.contentViewport.Width()
+	width := m.diffContentWidth()
 	groups := m.commentMarkerGroups()
-	for _, ids := range groups {
-		width = min(width, m.contentViewport.Width()-lipgloss.Width(fmt.Sprintf("> ☑︎ 💬 %d", len(ids)))-1)
-	}
 	appendAnnotations := func(ref lineRef) {
 		for idx, ann := range m.annotationsAfterLine(ref.line, ref.side) {
 			focused := m.focused == contentPane && t.cursorOnAnnotation && t.cursorLine == ref.line && t.cursorSide == ref.side && t.cursorAnnoIdx == idx

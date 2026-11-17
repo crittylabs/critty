@@ -173,7 +173,7 @@ func (m *AppModel) recheckImagesOnActivity(previousTab int, msg tea.Msg) tea.Cmd
 	if t.outsideChanges {
 		return nil
 	}
-	if (t.isBinary || m.svgFilePreview()) && imagePath(t.path) && (m.patch == nil || t.attachment != nil) {
+	if m.fileImagePreview() {
 		return m.images.restartProbe()
 	}
 	if t.isMarkdown && t.doc != nil && (m.patch == nil || t.attachment != nil) {
@@ -325,6 +325,11 @@ func imagePath(path string) bool {
 	return imageinfo.SupportedPath(path) || imageinfo.SVGPath(path)
 }
 
+func (m AppModel) fileImagePreview() bool {
+	t := m.tab()
+	return m.svgFilePreview() || t.isBinary && imagePath(t.path) && (m.patch == nil || t.attachment != nil)
+}
+
 func decodePreview(data []byte) (image.Image, error) {
 	if len(data) > maxPreviewBytes {
 		return nil, fmt.Errorf("image exceeds 5 MiB")
@@ -373,7 +378,7 @@ func (m *AppModel) prepareVisibleImage() tea.Cmd {
 		}
 		return m.prepareMarkdownImages()
 	}
-	if (!t.isBinary && !m.svgFilePreview()) || !imagePath(t.path) || t.outsideChanges || m.patch != nil && t.attachment == nil {
+	if !m.fileImagePreview() || t.outsideChanges {
 		return nil
 	}
 	if !m.images.enabled || m.images.hidden {
@@ -486,6 +491,9 @@ func (m AppModel) imageContent(path string, before bool) ([]byte, error) {
 		}
 		return doc.ReadImage(base)
 	}
+	if m.patch != nil && imageinfo.SVGPath(path) {
+		return m.svgPatchContent(path, before)
+	}
 	source := m.imageSource()
 	if filepath.IsAbs(path) {
 		source = gitpkg.ReviewSource{}
@@ -552,6 +560,9 @@ func (m AppModel) finishImageLoad(msg imageLoadedMsg) (tea.Model, tea.Cmd) {
 
 func (m AppModel) imagePreviewLayout() (width, height int, horizontal bool) {
 	width, height = m.contentViewport.Width(), m.contentViewport.Height()
+	if m.svgFilePreview() && m.alternateDiff(m.tab()) {
+		return (m.diffContentWidth() - 3) / 2, height - 1, true
+	}
 	if !m.tab().compareImages() {
 		return width, height, false
 	}
@@ -571,7 +582,8 @@ func (m AppModel) renderImagePreview() string {
 		return ""
 	}
 	link := func(before bool) string { return t.imageTarget(before).uri() }
-	if !t.compareImages() {
+	split := m.svgFilePreview() && m.alternateDiff(t)
+	if !t.compareImages() && !split {
 		side := t.preview.side(t.isDeleted)
 		if ready(*side) {
 			return side.image.linkedPlaceholder(link(t.isDeleted))
@@ -579,7 +591,10 @@ func (m AppModel) renderImagePreview() string {
 		return ""
 	}
 	width, _, horizontal := m.imagePreviewLayout()
-	column := func(label string, before bool) string {
+	column := func(label string, before bool, width int) string {
+		if !t.compareImages() && before != t.isDeleted {
+			return strings.Repeat(" ", width)
+		}
 		side := *t.preview.side(before)
 		content := "  Loading image…"
 		if side.failed {
@@ -590,7 +605,16 @@ func (m AppModel) renderImagePreview() string {
 		}
 		return lipgloss.NewStyle().Width(width).Render("  " + label + "\n" + content)
 	}
-	before, after := column("Before", true), column("After", false)
+	rightWidth := width
+	if split {
+		rightWidth = m.diffContentWidth() - 3 - width
+	}
+	before, after := column("Before", true, width), column("After", false, rightWidth)
+	if split {
+		rows := max(lipgloss.Height(before), lipgloss.Height(after))
+		separator := strings.TrimSuffix(strings.Repeat(" │ \n", rows), "\n")
+		return lipgloss.JoinHorizontal(lipgloss.Top, before, separator, after)
+	}
 	if horizontal {
 		return lipgloss.JoinHorizontal(lipgloss.Top, before, "  ", after)
 	}

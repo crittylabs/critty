@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"math"
+	"mime"
 	"net/url"
 	"os"
 	"os/exec"
@@ -116,6 +117,11 @@ func (r *Renderer) render(ctx context.Context, source []byte) ([]byte, error) {
 // Resource references stay within the document; converters never receive a
 // source filename that could establish a base directory for external files.
 func dimensions(source []byte) (int, int, error) {
+	budget := maxBytes
+	return dimensionsWithEmbedded(source, 0, &budget)
+}
+
+func dimensionsWithEmbedded(source []byte, embeddedDepth int, budget *int) (int, int, error) {
 	d := xml.NewDecoder(bytes.NewReader(source))
 	depth, roots := 0, 0
 	width, height := 0.0, 0.0
@@ -153,7 +159,7 @@ func dimensions(source []byte) (int, int, error) {
 			for _, a := range token.Attr {
 				if a.Name.Local == "href" && token.Name.Local != "a" {
 					v := strings.TrimSpace(a.Value)
-					if v != "" && !strings.HasPrefix(v, "#") && !embeddedRaster(v) {
+					if v != "" && !strings.HasPrefix(v, "#") && !embeddedImage(v, embeddedDepth, budget) {
 						return 0, 0, fmt.Errorf("external SVG resources are not supported")
 					}
 				}
@@ -204,7 +210,7 @@ func dimensions(source []byte) (int, int, error) {
 	return max(1, int(math.Ceil(width*scale))), max(1, int(math.Ceil(height*scale))), nil
 }
 
-func embeddedRaster(value string) bool {
+func embeddedImage(value string, depth int, budget *int) bool {
 	if !strings.HasPrefix(value, "data:") {
 		return false
 	}
@@ -222,8 +228,20 @@ func embeddedRaster(value string) bool {
 	} else {
 		data = []byte(decoded)
 	}
-	if err != nil || len(data) > maxBytes {
+	if err != nil || len(data) > *budget {
 		return false
+	}
+	*budget -= len(data)
+	mediaType, _, err := mime.ParseMediaType(strings.TrimSuffix(header, ";base64"))
+	if err != nil {
+		return false
+	}
+	if mediaType == "image/svg+xml" {
+		if depth >= 8 {
+			return false
+		}
+		_, _, err := dimensionsWithEmbedded(data, depth+1, budget)
+		return err == nil
 	}
 	info, err := imageinfo.Read(data)
 	return err == nil && info.Width > 0 && info.Height > 0 && info.Width <= imageinfo.MaxPixels/info.Height

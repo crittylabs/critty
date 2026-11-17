@@ -151,9 +151,11 @@ Homebrew.  See [preview tool installation](#install-preview-tools).
 
 Local SVG references work in Markdown, comments, the comment editor, and the image lightbox.  Opening an SVG file or attaching it for review also shows a preview above its XML source, retaining source text, line comments, and diff coordinates.  Attached SVGs remain text snapshots, so their source and preview survive source-file removal and review resumption.  `I` / `M-i` outside input and `M-i` in the editor toggle SVG with other images.  When conversion is unavailable or fails, the source or image reference remains visible.
 
+SVG diffs show Before and After previews above the source.  In Split View, the previews align with the corresponding source columns.  Supplied patches use their saved source snapshots, including for the image lightbox; patches without a complete source snapshot retain the XML diff without a preview.
+
 Previews are static and retain the SVG's own colors and transparency.  Converter font handling and supported SVG features may differ.  Inputs and output PNGs are limited to 5 MiB, the output fits within 2048 pixels per side, and each converter has a three-second deadline.  Results are cached in memory for the viewer.  Common absolute SVG dimensions and `viewBox` aspect ratios determine the preview size; documents without usable dimensions use a 300 by 150 pixel viewport.
 
-Converters receive validated SVG on stdin in a temporary directory.  External resource references, DTDs, XML stylesheet instructions, and XML base URLs are unsupported; use self-contained SVGs with internal references or embedded raster images.  Embedded raster metadata must fit the existing 16-megapixel limit.  Source viewing remains available for unsupported documents.
+Converters receive validated SVG on stdin in a temporary directory.  External resource references, DTDs, XML stylesheet instructions, and XML base URLs are unsupported; use self-contained SVGs with internal references or embedded images.  Embedded SVGs are validated recursively, with at most eight embedding levels and 5 MiB of decoded embedded data in total.  Embedded raster metadata must fit the existing 16-megapixel limit.  Source viewing remains available for unsupported documents.
 
 ## Math previews
 

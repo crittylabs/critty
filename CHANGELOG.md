@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- SVG changes in supplied patches show inline Before and After previews when complete source snapshots are available.  In Split View, SVG previews align with the source columns and their divider.  Incomplete patches keep the XML diff visible.
+- SVG previews support self-contained SVG icons embedded through data URLs, including coverage badges.  Embedded documents receive the same resource validation as the outer SVG.
+
 ## 2.0.1
 
 ### Fixed
