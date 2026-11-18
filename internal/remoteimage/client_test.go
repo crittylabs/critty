@@ -11,7 +11,7 @@ import (
 )
 
 func TestAllowedImageURL(t *testing.T) {
-	client := New([]string{"Images.Example.org", ".CDN.Example.org"})
+	client := New([]string{"Images.Example.org", ".CDN.Example.org", "ASSET-*.example.org", ".media-*.example.net", "*.files.example.com"})
 	for _, tc := range []struct {
 		url  string
 		want bool
@@ -30,6 +30,13 @@ func TestAllowedImageURL(t *testing.T) {
 		{"https://cdn.example.org/photo.png", false},
 		{"https://othercdn.example.org/photo.png", false},
 		{"https://media.cdn.example.org.other.example.org/photo.png", false},
+		{"https://asset-new.example.org/photo.png", true},
+		{"https://asset-new.sub.example.org/photo.png", false},
+		{"https://asset-new.example.org.other.example.org/photo.png", false},
+		{"https://x.media-new.example.net/photo.png", true},
+		{"https://media-new.example.net/photo.png", false},
+		{"https://one.files.example.com/photo.png", true},
+		{"https://two.one.files.example.com/photo.png", false},
 	} {
 		t.Run(tc.url, func(t *testing.T) {
 			if got := client.Allows(tc.url); got != tc.want {
@@ -78,12 +85,14 @@ func TestFetchRedirects(t *testing.T) {
 		wantHosts                 []string
 	}{
 		{"permitted", "https://media.cdn.example.org/badge", "", []string{"images.example.org", "media.cdn.example.org"}},
+		{"wildcard", "https://asset-1.example.org/badge", "", []string{"images.example.org", "asset-1.example.org"}},
+		{"wildcard cannot span labels", "https://asset-1.other.example.org/badge", "outside the image allowlist", []string{"images.example.org"}},
 		{"different host", "https://other.example.org/badge", "outside the image allowlist", []string{"images.example.org"}},
 		{"downgrade", "http://media.cdn.example.org/badge", "outside the image allowlist", []string{"images.example.org"}},
 		{"loop", "/start", "too many image redirects", []string{"images.example.org", "images.example.org", "images.example.org", "images.example.org"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := New([]string{"images.example.org", ".cdn.example.org"})
+			client := New([]string{"images.example.org", ".cdn.example.org", "asset-*.example.org"})
 			var hosts []string
 			client.http.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
 				if ref := req.Referer(); ref != "" {

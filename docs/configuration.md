@@ -49,7 +49,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `math_ratex` | Global-only RaTeX selection: `auto` (default), `off`, a command name, or an absolute executable path. |
 | `mermaid_merman`, `mermaid_mmdr` | Global-only Mermaid CLI selections with the same `auto`, `off`, command, or absolute path values. |
 | `mermaid_fonts` | Global-only array of up to eight absolute font-file paths for Merman; omission enables automatic font selection. |
-| `remote_image_hosts` | Global-only array of DNS hostnames and dot-prefixed subdomain suffixes allowed to serve remote image previews.  Defaults to `[]`. |
+| `remote_image_hosts` | Global-only allowlist of exact hostnames, subdomain suffixes, and wildcard patterns for remote image previews.  Defaults to `[]`. |
 
 Global settings are applied first, followed by project settings.  Settings merge as follows:
 
@@ -155,9 +155,17 @@ remote_image_hosts = ["img.shields.io", ".cdn.example.org"]
 Use ASCII DNS names.  Matching ignores case.  An exact hostname applies to
 that host alone.  A leading dot allows subdomains at any depth.  For example,
 `.cdn.example.org` covers `media.cdn.example.org`.  Add `cdn.example.org`
-separately to allow the base domain itself.  Each redirect must match the
-allowlist.  Critty fetches images over HTTPS on port 443, connects to public IP
-addresses, and allows up to three redirects.
+separately to allow the base domain itself.
+
+Use `*` to match zero or more characters within one DNS label.  For example,
+`github-production-user-asset-*.s3.amazonaws.com` matches a GitHub attachment
+bucket such as `github-production-user-asset-6210df.s3.amazonaws.com`.  A
+wildcard does not span dots.  You can combine a leading dot with a wildcard
+pattern.  For GitHub attachment URLs, allow `github.com` as well as the
+matching redirect host.
+
+Each redirect must match the allowlist.  Critty fetches images over HTTPS on
+port 443, connects to public IP addresses, and allows up to three redirects.
 Requests time out after five seconds and accept up to 5 MiB per image.  SVG
 responses use the same validation and renderer as local SVGs.
 

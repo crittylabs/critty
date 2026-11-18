@@ -28,17 +28,19 @@ var hostname = regexp.MustCompile(`^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-
 func ValidateHosts(hosts []string) error {
 	for _, entry := range hosts {
 		host := strings.TrimPrefix(entry, ".")
-		if len(host) > 253 || !strings.Contains(entry, ".") || !hostname.MatchString(host) || net.ParseIP(host) != nil {
-			return fmt.Errorf("remote_image_hosts requires DNS hostnames or dot-prefixed suffixes, got %q", entry)
+		sample := strings.ReplaceAll(host, "*", "a")
+		if len(host) > 253 || !strings.Contains(entry, ".") || !hostname.MatchString(sample) || net.ParseIP(host) != nil {
+			return fmt.Errorf("remote_image_hosts requires a DNS hostname, wildcard pattern, or dot-prefixed suffix, got %q", entry)
 		}
 	}
 	return nil
 }
 
 type Client struct {
-	hosts map[string]bool
-	http  http.Client
-	slots chan struct{}
+	hosts    map[string]bool
+	patterns []*regexp.Regexp
+	http     http.Client
+	slots    chan struct{}
 }
 
 // New creates a fetcher for validated hosts. A nil client denies every URL.
@@ -47,8 +49,18 @@ func New(hosts []string) *Client {
 		return nil
 	}
 	c := &Client{hosts: make(map[string]bool, len(hosts)), slots: make(chan struct{}, 4)}
-	for _, host := range hosts {
-		c.hosts[strings.ToLower(host)] = true
+	for _, entry := range hosts {
+		entry = strings.ToLower(entry)
+		if !strings.Contains(entry, "*") {
+			c.hosts[entry] = true
+			continue
+		}
+		host, suffix := strings.CutPrefix(entry, ".")
+		pattern := strings.ReplaceAll(regexp.QuoteMeta(host), `\*`, `[a-z0-9-]*`)
+		if suffix {
+			pattern = `(?:[a-z0-9-]+\.)+` + pattern
+		}
+		c.patterns = append(c.patterns, regexp.MustCompile("^"+pattern+"$"))
 	}
 	c.http = http.Client{
 		Transport: &http.Transport{
@@ -85,6 +97,11 @@ func (c *Client) allows(u *url.URL) bool {
 	}
 	for i := range len(host) {
 		if host[i] == '.' && c.hosts[host[i:]] {
+			return true
+		}
+	}
+	for _, pattern := range c.patterns {
+		if pattern.MatchString(host) {
 			return true
 		}
 	}

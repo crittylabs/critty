@@ -102,12 +102,12 @@ func TestRemoteImageHostsAreGlobalOnly(t *testing.T) {
 	if err != nil || len(cfg.RemoteImageHosts) != 0 {
 		t.Fatalf("repository enabled image fetches: config=%+v, err=%v", cfg, err)
 	}
-	writeConfig(t, GlobalPath(), `remote_image_hosts = ["images.example.org", ".cdn.example.org"]`)
+	writeConfig(t, GlobalPath(), `remote_image_hosts = ["images.example.org", ".cdn.example.org", "asset-*.example.org"]`)
 	cfg, err = Load(project)
-	if err != nil || !slices.Equal(cfg.RemoteImageHosts, []string{"images.example.org", ".cdn.example.org"}) {
+	if err != nil || !slices.Equal(cfg.RemoteImageHosts, []string{"images.example.org", ".cdn.example.org", "asset-*.example.org"}) {
 		t.Fatalf("global allowlist was not preserved: config=%+v, err=%v", cfg, err)
 	}
-	writeConfig(t, GlobalPath(), `remote_image_hosts = ["*.example.org"]`)
+	writeConfig(t, GlobalPath(), `remote_image_hosts = ["asset-?.example.org"]`)
 	if _, err := Load(project); err == nil || !strings.Contains(err.Error(), "remote_image_hosts") {
 		t.Fatalf("invalid allowlist error = %v", err)
 	}
