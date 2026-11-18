@@ -173,24 +173,29 @@ func TestFileSelectInputUsesKillRing(t *testing.T) {
 	}
 }
 
-func TestLineEditorPastesClipboardTextWithCtrlV(t *testing.T) {
-	app := setupAppWithDoc(t, "one")
-	app.width, app.height = 80, 24
-	app.recalculateLayout()
-	app.openFileSelect()
-	app = typeSearch(app, "ab")
-	app = ctrlKey(app, 'a')
-	app, cmd := updateApp(app, tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
-	if cmd == nil || app.fileSelect.input.Value() != "ab" {
-		t.Fatalf("C-v: cmd %v value %q", cmd != nil, app.fileSelect.input.Value())
-	}
-	app, _ = updateApp(app, lineEditorPasteMsg{id: app.clipboardID, text: "x\ty\n"})
-	if app.fileSelect.input.Value() != "x y ab" || app.fileSelect.query != "x y ab" {
-		t.Fatalf("paste gave %q (query %q)", app.fileSelect.input.Value(), app.fileSelect.query)
-	}
-	app, _ = updateApp(app, lineEditorPasteMsg{id: app.clipboardID - 1, text: "stale"})
-	if app.fileSelect.input.Value() != "x y ab" {
-		t.Fatalf("a stale clipboard result changed the value to %q", app.fileSelect.input.Value())
+func TestLineEditorPastesClipboardText(t *testing.T) {
+	for _, mod := range []tea.KeyMod{tea.ModCtrl, tea.ModAlt} {
+		msg := tea.KeyPressMsg{Code: 'v', Mod: mod}
+		t.Run(msg.String(), func(t *testing.T) {
+			app := setupAppWithDoc(t, "one")
+			app.width, app.height = 80, 24
+			app.recalculateLayout()
+			app.openFileSelect()
+			app = typeSearch(app, "ab")
+			app = ctrlKey(app, 'a')
+			app, cmd := updateApp(app, msg)
+			if cmd == nil || app.fileSelect.input.Value() != "ab" {
+				t.Fatalf("paste command present = %t, value = %q", cmd != nil, app.fileSelect.input.Value())
+			}
+			app, _ = updateApp(app, lineEditorPasteMsg{id: app.clipboardID, text: "x\ty\n"})
+			if app.fileSelect.input.Value() != "x y ab" || app.fileSelect.query != "x y ab" {
+				t.Fatalf("paste gave %q (query %q)", app.fileSelect.input.Value(), app.fileSelect.query)
+			}
+			app, _ = updateApp(app, lineEditorPasteMsg{id: app.clipboardID - 1, text: "stale"})
+			if app.fileSelect.input.Value() != "x y ab" {
+				t.Fatalf("a stale clipboard result changed the value to %q", app.fileSelect.input.Value())
+			}
+		})
 	}
 }
 

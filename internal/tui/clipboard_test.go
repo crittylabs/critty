@@ -24,9 +24,9 @@ func TestClipboardImageInTextModals(t *testing.T) {
 		m := newKillRingApp("after")
 		m.modal = modal
 		m.session = &review.Session{Dir: t.TempDir()}
-		editorControl(&m, 'v')
+		editorMeta(&m, 'v')
 		if !m.clipboardPending {
-			t.Fatal("C-v did not start image paste")
+			t.Fatal("M-v did not start image paste")
 		}
 		editorMessage(&m, clipboardImageMsg{id: m.clipboardID, data: data.Bytes()})
 		body := m.modalTextarea.Value()

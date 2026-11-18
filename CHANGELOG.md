@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Paste from the system clipboard with `M-v` anywhere `C-v` already pastes, including images in comment editors.
+
 ### Fixed
 
 - SVG changes in supplied patches show inline Before and After previews when complete source snapshots are available.  In Split View, SVG previews align with the source columns and their divider.  Incomplete patches keep the XML diff visible.

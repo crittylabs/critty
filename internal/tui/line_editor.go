@@ -72,7 +72,7 @@ func newLineEditor(value string, limit int) lineEditor {
 	input.SetVirtualCursor(false)
 	input.Prompt = ""
 	input.CharLimit = limit
-	input.KeyMap.Paste = key.NewBinding() // `C-v` reads the clipboard through editLineEditor
+	input.KeyMap.Paste = key.NewBinding() // editLineEditor handles clipboard shortcuts
 	input.SetValue(value)
 	input.CursorEnd()
 	return lineEditor{input: input}
@@ -211,22 +211,23 @@ func (e *lineEditor) edit(msg tea.KeyPressMsg, ring *killRing) tea.Cmd {
 	return cmd
 }
 
-// lineEditorPasteMsg carries clipboard text read for a `C-v` in an input.
+// lineEditorPasteMsg carries clipboard text read for an input.
 type lineEditorPasteMsg struct {
 	id   uint64
 	text string
 	err  error
 }
 
-// editLineEditor applies a key to an input.  `C-v` reads the system
+// editLineEditor applies a key to an input.  `C-v` and `M-v` read the system
 // clipboard as text, since these fields take no images.
 func (m *AppModel) editLineEditor(editor *lineEditor, msg tea.KeyPressMsg) tea.Cmd {
-	if isUndoKey(msg.String()) {
+	keyName := msg.String()
+	if isUndoKey(keyName) {
 		editor.undoEdit()
 		m.killRing.interrupt()
 		return nil
 	}
-	if msg.String() != "ctrl+v" {
+	if keyName != "ctrl+v" && keyName != "alt+v" {
 		return editor.edit(msg, &m.killRing)
 	}
 	m.clipboardID++

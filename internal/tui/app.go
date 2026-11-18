@@ -2478,7 +2478,7 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+s":
 		m.modalSubmit()
 		return m, nil
-	case "ctrl+v":
+	case "ctrl+v", "alt+v":
 		if m.modalFocus == 0 {
 			return m, m.pasteClipboardImage()
 		}
@@ -4661,6 +4661,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
+			{keys: "C-v/M-v (inputs)", desc: "paste clipboard text, including while editing a search query with M-e"},
 			{keys: "M-? · esc", desc: "help / close help"},
 		}
 		if m.singleFileView() {
@@ -4738,9 +4739,10 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,k/j,C-p/n (selection)", desc: "extend line selection; enter comments, v/C-SPC/C-@ toggles, esc cancels"},
 		{keys: "C-PgUp/PgDn", desc: "scroll the focused thread"},
-		{keys: "C-s/o/v · M-s · tab/S-tab · enter/esc", desc: "save/edit/paste · suggest · focus · activate/close"},
+		{keys: "C-s/o · M-s · tab/S-tab · enter/esc", desc: "save/edit · suggest · focus · activate/close"},
 		{keys: "M-i (editors)", desc: "show/hide image, math, and Mermaid previews without changing source"},
-		{keys: "drag,S-arrows · M-w · C-v · C-z (editors)", desc: "select text · copy it · paste clipboard text · undo the last deletion, overwrite, or paste; esc cancels the selection"},
+		{keys: "C-v/M-v (editors and inputs)", desc: "paste from the system clipboard; comment editors also accept images"},
+		{keys: "drag,S-arrows · M-w · C-z (editors)", desc: "select text · copy it · undo the last deletion, overwrite, or paste; esc cancels the selection"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},
@@ -4759,7 +4761,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "M-s i/c/w/r/m", desc: "toggle case / word / regexp / multi-file"},
 		{keys: "M-p / M-n", desc: "older / newer query from project search history"},
 		{keys: "M-e", desc: "edit the query (line editing, kill ring); enter/C-s/C-r resume, esc keeps the previous query; drag to select, M-w copies"},
-		{keys: "terminal paste", desc: "paste text into the query"},
+		{keys: "terminal paste · C-v/M-v (M-e)", desc: "paste text into the query; C-v/M-v read the clipboard while editing"},
 	}, innerWidth)
 	help := columns + "\n\n" + search + "\n\n" + contexts
 	return help + renderHostHelp(reviewHost(), innerWidth)
