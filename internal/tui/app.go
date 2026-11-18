@@ -28,6 +28,7 @@ import (
 	"github.com/crittylabs/critty/v2/internal/imageinfo"
 	"github.com/crittylabs/critty/v2/internal/mathrender"
 	"github.com/crittylabs/critty/v2/internal/mermaidrender"
+	"github.com/crittylabs/critty/v2/internal/remoteimage"
 	"github.com/crittylabs/critty/v2/internal/review"
 	"github.com/crittylabs/critty/v2/internal/searchhistory"
 	"github.com/crittylabs/critty/v2/internal/svgrender"
@@ -105,6 +106,7 @@ type AppConfig struct {
 	MathRaTeX                  string
 	MermaidMerman, MermaidMmdr string
 	MermaidFonts               []string
+	RemoteImageHosts           []string
 }
 
 // gutterWidth is the total width of the left gutter: line number (5) + marker (1) + space (1).
@@ -121,6 +123,7 @@ type AppModel struct {
 	browsing        viewNavigation
 	reload          reloadState
 	images          imageDisplay
+	remoteImages    *remoteimage.Client
 	math            *mathrender.Renderer
 	mermaid         *mermaidrender.Renderer
 	svg             svgRenderer
@@ -390,6 +393,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		searchRing:       loadSearchRing(cfg.SearchHistory),
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
+		remoteImages:     remoteimage.New(cfg.RemoteImageHosts),
 		math:             mathrender.New(cfg.MathRaTeX),
 		mermaid:          mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		svg:              svgrender.New(),
@@ -502,6 +506,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		searchRing:      loadSearchRing(cfg.SearchHistory),
 		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
+		remoteImages:    remoteimage.New(cfg.RemoteImageHosts),
 		math:            mathrender.New(cfg.MathRaTeX),
 		mermaid:         mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		svg:             svgrender.New(),
@@ -759,7 +764,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		for i := range m.tabs {
-			if m.tabs[i].path == msg.path {
+			if m.tabs[i].matchesImageLoad(msg.imageLoadedMsg) {
 				m.tabs[i].imageSide(msg.before, msg.markdown).image = &inlineImage{id: msg.id, width: msg.width, height: msg.height}
 			}
 		}

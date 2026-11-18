@@ -15,6 +15,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/crittylabs/critty/v2/internal/history"
+	"github.com/crittylabs/critty/v2/internal/remoteimage"
 	"github.com/crittylabs/critty/v2/internal/syntax"
 	"github.com/crittylabs/critty/v2/internal/xdg"
 )
@@ -30,6 +31,7 @@ type Config struct {
 	MermaidMmdr      string            `json:"mermaid_mmdr,omitempty"`
 	MermaidFonts     []string          `json:"mermaid_fonts,omitempty"`
 	MathRaTeX        string            `json:"math_ratex,omitempty"`
+	RemoteImageHosts []string          `json:"remote_image_hosts,omitempty"`
 	History          history.Policy    `json:"history"`
 	Output           string            `json:"output,omitempty"`
 	Author           string            `json:"author,omitempty"`
@@ -58,6 +60,7 @@ type fileConfig struct {
 	MermaidMmdr      string            `toml:"mermaid_mmdr"`
 	MermaidFonts     []string          `toml:"mermaid_fonts"`
 	MathRaTeX        string            `toml:"math_ratex"`
+	RemoteImageHosts []string          `toml:"remote_image_hosts"`
 	History          *history.Policy   `toml:"history"`
 	Output           string            `toml:"output"`
 	Author           string            `toml:"author"`
@@ -95,6 +98,11 @@ func Load(projectRoot string) (*Config, error) {
 	if global != nil {
 		cfg.MathRaTeX = global.MathRaTeX
 		cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts = global.MermaidMerman, global.MermaidMmdr, global.MermaidFonts
+		// Only the user can opt in to network requests triggered by review content.
+		cfg.RemoteImageHosts = global.RemoteImageHosts
+		if err := remoteimage.ValidateHosts(cfg.RemoteImageHosts); err != nil {
+			return nil, err
+		}
 	}
 	// Retention can delete saved data, so repositories cannot enable it.
 	if global != nil && global.History != nil {

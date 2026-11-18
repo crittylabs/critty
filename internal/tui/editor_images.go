@@ -22,7 +22,6 @@ const maxEditorImages = 16
 
 type editorImageRef struct {
 	line int
-	path string
 	key  commentImageKey
 }
 
@@ -108,12 +107,12 @@ func (m *AppModel) applyEditorImages(value string) {
 		if len(s.refs) >= maxEditorImages {
 			break
 		}
-		path, ok := m.commentImagePath(ref.destination)
-		if !ok {
+		target, ok := m.commentImageTarget(ref.destination)
+		if !ok || !m.canPreviewImage(target) {
 			continue
 		}
-		key := commentImageKey{path: path, width: s.width}
-		s.refs = append(s.refs, editorImageRef{line: ref.line, path: path, key: key})
+		key := commentImageKey{target: target, width: s.width}
+		s.refs = append(s.refs, editorImageRef{line: ref.line, key: key})
 		m.commentImageSide(key)
 	}
 	for _, ref := range m.renderedRefs(value) {
@@ -146,9 +145,9 @@ func (m AppModel) editorImageBlocks() map[int][]string {
 			}
 			byLine[ref.line] = append(byLine[ref.line], ansi.Truncate("  Image preview unavailable", s.width, ""))
 		} else if side.image != nil && side.image.ready {
-			uri := imageTarget{path: ref.path}.uri()
-			if ref.key.renderBody != "" {
-				uri = ""
+			var uri string
+			if ref.key.renderBody == "" {
+				uri = ref.key.target.uri()
 			}
 			byLine[ref.line] = append(byLine[ref.line], side.image.linkedPlaceholder(uri))
 		}

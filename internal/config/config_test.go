@@ -94,6 +94,25 @@ func TestMathExecutableIsGlobalOnly(t *testing.T) {
 	}
 }
 
+func TestRemoteImageHostsAreGlobalOnly(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	project := t.TempDir()
+	writeConfig(t, ProjectPath(project), `remote_image_hosts = ["project.example.org"]`)
+	cfg, err := Load(project)
+	if err != nil || len(cfg.RemoteImageHosts) != 0 {
+		t.Fatalf("repository enabled image fetches: config=%+v, err=%v", cfg, err)
+	}
+	writeConfig(t, GlobalPath(), `remote_image_hosts = ["images.example.org", ".cdn.example.org"]`)
+	cfg, err = Load(project)
+	if err != nil || !slices.Equal(cfg.RemoteImageHosts, []string{"images.example.org", ".cdn.example.org"}) {
+		t.Fatalf("global allowlist was not preserved: config=%+v, err=%v", cfg, err)
+	}
+	writeConfig(t, GlobalPath(), `remote_image_hosts = ["*.example.org"]`)
+	if _, err := Load(project); err == nil || !strings.Contains(err.Error(), "remote_image_hosts") {
+		t.Fatalf("invalid allowlist error = %v", err)
+	}
+}
+
 func writeConfig(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

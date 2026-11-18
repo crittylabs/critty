@@ -580,7 +580,7 @@ func TestFormTextAnswers(t *testing.T) {
 	}
 	app.toggleForm(1)
 	typeAnswer("See ![diagram](attachments/diagram.png)")
-	if path, _ := app.commentImagePath("attachments/diagram.png"); !slices.ContainsFunc(slices.Collect(maps.Keys(app.commentImages)), func(key commentImageKey) bool { return key.path == path }) {
+	if path, _ := app.commentImagePath("attachments/diagram.png"); !slices.ContainsFunc(slices.Collect(maps.Keys(app.commentImages)), func(key commentImageKey) bool { return key.target.path == path }) {
 		t.Fatal("answer image was not registered for preview")
 	}
 	app.toggleForm(1)

@@ -13,7 +13,11 @@ type svgRenderer interface {
 }
 
 func (m AppModel) encodeImage(data []byte, path string, msg imageLoadedMsg) imageLoadedMsg {
-	if msg.err == nil && imageinfo.SVGPath(path) {
+	return m.encodePreview(data, imageinfo.SVGPath(path), msg)
+}
+
+func (m AppModel) encodePreview(data []byte, svg bool, msg imageLoadedMsg) imageLoadedMsg {
+	if msg.err == nil && svg {
 		ctx := m.reload.context
 		if ctx == nil {
 			ctx = context.Background()

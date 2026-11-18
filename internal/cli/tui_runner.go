@@ -50,6 +50,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		MermaidMerman:    cfg.MermaidMerman,
 		MermaidMmdr:      cfg.MermaidMmdr,
 		MermaidFonts:     cfg.MermaidFonts,
+		RemoteImageHosts: cfg.RemoteImageHosts,
 		Branch:           branch,
 		Context:          ctx,
 		Watch:            reviewWatch,

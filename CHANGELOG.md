@@ -5,6 +5,7 @@
 ### Added
 
 - Paste from the system clipboard with `M-v` anywhere `C-v` already pastes, including images in comment editors.
+- Preview remote HTTPS images in Markdown and comments by listing exact hostnames or dot-prefixed subdomain suffixes in the global `remote_image_hosts` setting.  Each redirect must match the same allowlist.
 
 ### Fixed
 

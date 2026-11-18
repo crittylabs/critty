@@ -45,7 +45,7 @@ func TestSVGPreviewSurfaces(t *testing.T) {
 	if loaded.err != nil || loaded.width != 80 || loaded.info.Format != "SVG" {
 		t.Fatal(loaded.err, loaded.info)
 	}
-	key := commentImageKey{path: path, width: 60}
+	key := commentImageKey{target: imageTarget{path: path}, width: 60}
 	if msg := app.loadCommentImage(key)().(imageLoadedMsg); msg.err != nil || msg.width != 80 {
 		t.Fatal(msg.err)
 	}
@@ -54,7 +54,7 @@ func TestSVGPreviewSurfaces(t *testing.T) {
 	}
 	app.modal = commentModal
 	app.applyEditorImages("![Preview](" + path + ")")
-	if len(app.editorImages.refs) != 1 || app.editorImages.refs[0].key.path != path {
+	if len(app.editorImages.refs) != 1 || app.editorImages.refs[0].key.target.path != path {
 		t.Fatal(app.editorImages.refs)
 	}
 }

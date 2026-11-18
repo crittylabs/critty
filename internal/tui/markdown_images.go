@@ -22,7 +22,7 @@ type markdownImage struct {
 	line                                  int
 	before                                bool
 	path                                  string
-	url                                   string // web URL that is linked but not previewed
+	url                                   string
 	local                                 bool
 	renderKind                            renderedKind
 	renderBody                            string
@@ -37,10 +37,7 @@ type markdownImage struct {
 }
 
 func (ref markdownImage) target() imageTarget {
-	if ref.url != "" {
-		return imageTarget{url: ref.url, line: ref.line}
-	}
-	return imageTarget{path: ref.path, before: ref.before, line: ref.line}
+	return imageTarget{path: ref.path, url: ref.url, before: ref.before, line: ref.line}
 }
 
 type markdownImagesMsg struct {
@@ -165,9 +162,9 @@ func localImagePath(documentPath, destination string) (string, bool) {
 	return filepath.Clean(path), imagePath(path)
 }
 
-func (t *FileTab) hasLocalMarkdownImages() bool {
-	for _, ref := range t.markdownImages {
-		if ref.url == "" {
+func (m AppModel) hasMarkdownPreviews() bool {
+	for _, ref := range m.tab().markdownImages {
+		if m.canPreviewImage(ref.target()) {
 			return true
 		}
 	}
@@ -292,11 +289,16 @@ func (m AppModel) loadMarkdownImage(index int) tea.Cmd {
 			data, err := m.renderSource(ctx, ref.renderKind, ref.renderBody, ref.renderInline, dark)
 			return m.images.encode(data, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, rendered: true, renderDark: dark, renderKind: ref.renderKind, renderInline: ref.renderInline, err: err})
 		}
+		msg := imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, remoteURL: ref.url}
+		if ref.url != "" {
+			return m.loadRemotePreview(ref.url, msg)
+		}
 		if ref.local {
 			source = gitpkg.ReviewSource{}
 		}
 		data, err := source.PreviewContent(ref.path, ref.before && !ref.local, maxPreviewBytes)
-		return m.encodeImage(data, ref.path, imageLoadedMsg{path: path, markdown: index + 1, before: ref.before, err: err})
+		msg.err = err
+		return m.encodeImage(data, ref.path, msg)
 	}
 }
 
@@ -424,7 +426,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 			if ref.image != nil {
 				ref.columns, ref.rows = m.markdownPreviewSize(*ref, ref.image)
 			}
-			if ref.url == "" && !ref.attempted && loading < 2 {
+			if !ref.attempted && loading < 2 && m.canPreviewImage(ref.target()) {
 				ref.attempted = true
 				loading++
 				cmds = append(cmds, m.loadMarkdownImage(i))

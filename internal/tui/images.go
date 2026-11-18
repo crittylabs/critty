@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -111,6 +112,7 @@ type imageLoadedMsg struct {
 	rendered, renderDark, renderInline bool
 	renderKind                         renderedKind
 	path                               string
+	remoteURL                          string
 	comment                            *commentImageKey
 	markdown                           int
 	before                             bool
@@ -178,7 +180,7 @@ func (m *AppModel) recheckImagesOnActivity(previousTab int, msg tea.Msg) tea.Cmd
 	}
 	if t.isMarkdown && t.doc != nil && (m.patch == nil || t.attachment != nil) {
 		for _, ref := range markdownImageRefs(t.doc.Content) {
-			if _, ok := localImagePath(t.path, ref.destination); ok {
+			if _, ok := localImagePath(t.path, ref.destination); ok || m.remoteImages.Allows(ref.destination) {
 				return m.images.restartProbe()
 			}
 		}
@@ -371,7 +373,7 @@ func (m *AppModel) prepareVisibleImage() tea.Cmd {
 			return m.findMarkdownImages()
 		}
 		if !m.images.enabled {
-			if t.hasLocalMarkdownImages() {
+			if m.hasMarkdownPreviews() {
 				return m.requestImageProbe()
 			}
 			return nil
@@ -522,9 +524,47 @@ func (d imageDisplay) encode(data []byte, msg imageLoadedMsg) imageLoadedMsg {
 	return msg
 }
 
+func (m AppModel) loadRemotePreview(rawURL string, msg imageLoadedMsg) imageLoadedMsg {
+	ctx := m.reload.context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	data, svg, err := m.remoteImages.Fetch(ctx, rawURL)
+	msg.err = err
+	return m.encodePreview(data, svg, msg)
+}
+
+// matchesImageLoad keeps a completed network request from populating a
+// different reference after the file has been refreshed.
+func (t *FileTab) matchesImageLoad(msg imageLoadedMsg) bool {
+	if t.path != msg.path {
+		return false
+	}
+	if msg.remoteURL == "" {
+		return true
+	}
+	if msg.markdown <= 0 || msg.markdown > len(t.markdownImages) {
+		return false
+	}
+	ref := t.markdownImages[msg.markdown-1]
+	return ref.url == msg.remoteURL && ref.before == msg.before && ref.attempted
+}
+
 func (m AppModel) finishImageLoad(msg imageLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.rendered && msg.renderDark != terminalIsDark {
 		return m, nil
+	}
+	if msg.remoteURL != "" {
+		matched := false
+		for i := range m.tabs {
+			if m.tabs[i].matchesImageLoad(msg) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return m, nil
+		}
 	}
 	if msg.comment == nil && msg.markdown == 0 {
 		for i := range m.tabs {
@@ -544,7 +584,7 @@ func (m AppModel) finishImageLoad(msg imageLoadedMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		for i := range m.tabs {
-			if m.tabs[i].path == msg.path {
+			if m.tabs[i].matchesImageLoad(msg) {
 				m.tabs[i].imageSide(msg.before, msg.markdown).failed = true
 			}
 		}

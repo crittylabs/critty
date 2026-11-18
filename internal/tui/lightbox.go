@@ -40,6 +40,9 @@ type lightboxLoadedMsg struct {
 
 func (m AppModel) loadLightboxImage(target imageTarget) tea.Cmd {
 	return func() tea.Msg {
+		if target.url != "" {
+			return lightboxLoadedMsg{target, m.loadRemotePreview(target.url, imageLoadedMsg{})}
+		}
 		data, err := m.imageContent(target.path, target.before)
 		return lightboxLoadedMsg{target, m.encodeImage(data, target.path, imageLoadedMsg{err: err})}
 	}
@@ -86,22 +89,26 @@ func (m *AppModel) showLightboxImage(target imageTarget, img inlineImage) tea.Cm
 	img.placementAlias = lightboxPlacement(img.id)
 	img.columns, img.rows, img.ready = 0, 0, false
 	s.target, s.image, s.zoom = target, img, 100
+	m.locationError = ""
 	return m.prepareLightbox()
 }
 
 // cycleLightbox moves to the next or previous image in the group.
 func (m *AppModel) cycleLightbox(step int) tea.Cmd {
 	s := &m.lightbox
+	index := s.index
 	for range max(0, len(s.siblings)-1) {
-		s.index = (s.index + step + len(s.siblings)) % len(s.siblings)
-		target := s.siblings[s.index]
+		index = (index + step + len(s.siblings)) % len(s.siblings)
+		target := s.siblings[index]
+		if !m.canPreviewImage(target) {
+			continue
+		}
+		s.index = index
 		if img := m.loadedImage(target); img != nil {
 			return m.showLightboxImage(target, *img)
 		}
-		if target.url == "" {
-			m.showLightboxImage(target, inlineImage{})
-			return m.loadLightboxImage(target)
-		}
+		m.showLightboxImage(target, inlineImage{})
+		return m.loadLightboxImage(target)
 	}
 	return nil
 }
@@ -117,6 +124,7 @@ func (m *AppModel) closeLightbox() {
 	m.modal = m.lightbox.returnTo
 	m.modalFocus = m.lightbox.returnFocus
 	m.lightbox = lightboxState{}
+	m.locationError = ""
 	if m.isTextModal() && m.modalFocus == 0 {
 		m.modalTextarea.Focus()
 	}
@@ -265,7 +273,7 @@ func (m AppModel) lightboxContent() (string, int, []modalMouseRegion) {
 			m.lightboxPercent(), group)
 	}
 	if m.locationError != "" {
-		guide += "\n" + m.locationError
+		body = lipgloss.Wrap(m.locationError, innerWidth, "")
 	}
 	guide = lipgloss.Wrap(footerStyle.Render(guide), innerWidth, "")
 	content := title + "\n" + body + "\n\n" + guide

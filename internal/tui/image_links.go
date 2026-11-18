@@ -10,10 +10,8 @@ import (
 	"github.com/charmbracelet/x/ansi/kitty"
 )
 
-// imageTarget identifies an image shown in the review: a local file on one
-// side of the diff, or a web URL that is linked but never fetched.  line is
-// the document line of the reference, when it comes from one, so the other
-// images on that line can be found.
+// imageTarget identifies a local file or a web image.  A document reference
+// includes its line and diff side so the other images on that line can be found.
 type imageTarget struct {
 	path    string
 	before  bool
@@ -31,9 +29,9 @@ func (t imageTarget) uri() string {
 		q.Set("url", t.url)
 	} else {
 		q.Set("path", t.path)
-		if t.before {
-			q.Set("side", "old")
-		}
+	}
+	if t.before {
+		q.Set("side", "old")
 	}
 	if t.line > 0 {
 		q.Set("line", strconv.Itoa(t.line))
@@ -126,9 +124,6 @@ func (m *AppModel) imageSpans(line int, before bool) []linkSpan {
 
 // loadedImage returns a transmitted image for target, if any view holds one.
 func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
-	if target.url != "" {
-		return nil
-	}
 	loaded := func(side *previewSide) *inlineImage {
 		if side != nil && side.image != nil {
 			return side.image
@@ -137,7 +132,7 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 	}
 	if len(m.tabs) > 0 {
 		t := m.tab()
-		if t.path == target.path || target.before && t.oldPath == target.path {
+		if target.url == "" && (t.path == target.path || target.before && t.oldPath == target.path) {
 			if img := loaded(t.preview.side(target.before)); img != nil {
 				return img
 			}
@@ -147,7 +142,7 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 		for _, exact := range []bool{true, false} {
 			for i := range t.markdownImages {
 				ref := &t.markdownImages[i]
-				if ref.path != target.path || ref.before != target.before || exact && ref.line != target.line {
+				if ref.renderBody != "" || ref.path != target.path || ref.url != target.url || ref.before != target.before || exact && ref.line != target.line {
 					continue
 				}
 				if img := loaded(&ref.previewSide); img != nil {
@@ -160,7 +155,7 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 		return nil
 	}
 	for key, side := range m.commentImages {
-		if key.path == target.path {
+		if key.target.path == target.path && key.target.url == target.url && key.renderBody == "" {
 			if img := loaded(side); img != nil {
 				return img
 			}
@@ -169,8 +164,7 @@ func (m *AppModel) loadedImage(target imageTarget) *inlineImage {
 	return nil
 }
 
-// openImage enlarges a previewed image in the lightbox, or hands a web URL
-// or an image without a preview to the system opener.
+// openImage enlarges a previewable image in the lightbox or uses the system opener.
 func (m *AppModel) openImage(target imageTarget) tea.Cmd {
 	if len(m.tabs) > 0 && (m.tab().isBinary || m.svgFilePreview()) && target.line == 0 {
 		for _, candidate := range m.tab().imageTargets() {
@@ -204,7 +198,7 @@ func (t *FileTab) imageTargets() []imageTarget {
 }
 
 func (m *AppModel) openImageWithSiblings(target imageTarget, siblings []imageTarget) tea.Cmd {
-	if target.url == "" && m.images.enabled && !m.images.hidden {
+	if m.canPreviewImage(target) && m.images.enabled && !m.images.hidden {
 		if img := m.loadedImage(target); img != nil {
 			return m.openLightbox(target, *img, siblings)
 		}
@@ -212,6 +206,10 @@ func (m *AppModel) openImageWithSiblings(target imageTarget, siblings []imageTar
 		return m.loadLightboxImage(target)
 	}
 	return m.openImageExternally(target)
+}
+
+func (m AppModel) canPreviewImage(target imageTarget) bool {
+	return target.url == "" || m.remoteImages.Allows(target.url)
 }
 
 // lineImages returns the images referenced on the same document line as

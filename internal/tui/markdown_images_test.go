@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/remoteimage"
 	"github.com/crittylabs/critty/v2/internal/review"
 )
 
@@ -80,6 +81,49 @@ func TestMarkdownImagesLayoutAndComments(t *testing.T) {
 	app.rebuildContent()
 	if strings.ContainsRune(app.contentViewport.GetContent(), kitty.Placeholder) {
 		t.Fatal("off retained images")
+	}
+}
+
+func TestRemoteImagePreviewsRespectAllowlist(t *testing.T) {
+	const allowed = "https://images.example.org/badge"
+	const blocked = "https://other.example.org/badge"
+	body := "![image](" + allowed + ") ![other](" + blocked + ")"
+	app := setupAppWithDoc(t, body)
+	app.remoteImages = remoteimage.New([]string{"images.example.org"})
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
+	app.tab().markdownImages = app.findMarkdownImages()().(markdownImagesMsg).images
+	app.tab().markdownImagesPending = true
+	app.images.enabled = true
+	app.prepareVisibleImage()
+	refs := app.tab().markdownImages
+	if len(refs) != 2 || !refs[0].attempted || refs[1].attempted {
+		t.Fatalf("inline previews: %+v", refs)
+	}
+	stale := imageLoadedMsg{path: app.tab().path, markdown: 1, remoteURL: blocked, id: 17}
+	if _, cmd := app.finishImageLoad(stale); cmd != nil {
+		t.Fatal("a stale result reached the terminal")
+	}
+
+	target := refs[0].target()
+	siblings := app.lineImages(target)
+	if cmd := app.openImageWithSiblings(target, siblings); cmd == nil || app.modal != lightboxModal {
+		t.Fatal("allowed image did not open the lightbox")
+	}
+	if cmd := app.cycleLightbox(1); cmd != nil || app.lightbox.target != target || app.lightbox.index != 0 {
+		t.Fatal("unlisted image was selected in the lightbox")
+	}
+	app.closeLightbox()
+	if cmd := app.openImageWithSiblings(refs[1].target(), siblings); cmd == nil || app.modal != noModal {
+		t.Fatal("unlisted image did not retain its external link")
+	}
+
+	app.renderCommentContent("Reviewer", body, "", 60)
+	if _, ok := app.commentImages[commentImageKey{target: imageTarget{url: allowed}, width: 60}]; !ok || len(app.commentImages) != 1 {
+		t.Fatalf("comment registered the wrong previews: %+v", app.commentImages)
+	}
+	app.applyEditorImages(body)
+	if refs := app.editorImages.refs; len(refs) != 1 || refs[0].key.target.url != allowed {
+		t.Fatalf("editor registered the wrong previews: %+v", refs)
 	}
 }
 

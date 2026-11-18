@@ -16,7 +16,7 @@ import (
 )
 
 type commentImageKey struct {
-	path                 string
+	target               imageTarget
 	width                int
 	renderKind           renderedKind
 	renderBody           string
@@ -50,7 +50,7 @@ func (m AppModel) commentImageTarget(destination string) (imageTarget, bool) {
 	return imageTarget{path: path}, ok
 }
 
-// commentImageSide returns the preview state for a local comment image at
+// commentImageSide returns the preview state for a comment image at
 // a width, registering it for loading when first seen.
 func (m *AppModel) commentImageSide(key commentImageKey) *previewSide {
 	if m.commentImages == nil {
@@ -150,18 +150,18 @@ func (m *AppModel) renderCommentContent(author, body, prefix string, width int, 
 			if ref.line != i+1 {
 				continue
 			}
-			path, ok := m.commentImagePath(ref.destination)
-			if !ok {
+			target, ok := m.commentImageTarget(ref.destination)
+			if !ok || !m.canPreviewImage(target) {
 				continue
 			}
-			side := m.commentImageSide(commentImageKey{path: path, width: width})
+			side := m.commentImageSide(commentImageKey{target: target, width: width})
 			if side == nil {
 				continue
 			}
 			if side.failed {
 				blocks = append(blocks, ansi.Truncate("  Image preview unavailable", width, ""))
 			} else if side.image != nil && side.image.ready {
-				blocks = append(blocks, side.image.linkedPlaceholder(imageTarget{path: path}.uri()))
+				blocks = append(blocks, side.image.linkedPlaceholder(target.uri()))
 			}
 		}
 		for _, row := range packImageBlocks(blocks, width) {
@@ -181,8 +181,13 @@ func (m AppModel) loadCommentImage(key commentImageKey) tea.Cmd {
 			data, err := m.renderSource(ctx, key.renderKind, key.renderBody, key.inline, key.dark)
 			return m.images.encode(data, imageLoadedMsg{comment: &key, rendered: true, renderDark: key.dark, renderKind: key.renderKind, renderInline: key.inline && !key.editor, err: err})
 		}
-		data, err := (gitpkg.ReviewSource{}).PreviewContent(key.path, false, maxPreviewBytes)
-		return m.encodeImage(data, key.path, imageLoadedMsg{comment: &key, err: err})
+		msg := imageLoadedMsg{comment: &key}
+		if key.target.url != "" {
+			return m.loadRemotePreview(key.target.url, msg)
+		}
+		data, err := (gitpkg.ReviewSource{}).PreviewContent(key.target.path, false, maxPreviewBytes)
+		msg.err = err
+		return m.encodeImage(data, key.target.path, msg)
 	}
 }
 

@@ -41,10 +41,10 @@ func TestCommentEditorPreviewsImagesAfterTypingPause(t *testing.T) {
 	}
 	app, _ = updateApp(app, editorImagesMsg{seq: app.editorImages.seq})
 	want, _ := filepath.Abs("a.png")
-	if len(app.editorImages.refs) != 1 || app.editorImages.refs[0].line != 1 || app.editorImages.refs[0].path != want {
+	if len(app.editorImages.refs) != 1 || app.editorImages.refs[0].line != 1 || app.editorImages.refs[0].key.target.path != want {
 		t.Fatalf("refs=%+v", app.editorImages.refs)
 	}
-	key := commentImageKey{path: want, width: app.modalTextarea.Width()}
+	key := commentImageKey{target: imageTarget{path: want}, width: app.modalTextarea.Width()}
 	side := app.commentImages[key]
 	if side == nil {
 		t.Fatal("editor image not registered for loading")
