@@ -11,6 +11,7 @@
 ### Changed
 
 - Markdown headings use level-specific colors in both the document and its outline.  The colors adapt to light and dark backgrounds, and fourth-level headings use upright text.
+- External web links use the Octicons external link marker when Nerd Fonts are enabled.
 
 ### Fixed
 

@@ -976,5 +976,5 @@ func formatTableSep(colWidths []int) string {
 }
 
 func highlightInline(line string) string {
-	return highlightInlineWith(line, mdLinkStyle, mdCodeStyle)
+	return highlightInlineReferences(line, mdLinkStyle, mdCodeStyle, icons.Plain, nil)
 }

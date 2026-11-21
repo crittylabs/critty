@@ -89,6 +89,7 @@ const (
 	Report
 	Bolt
 	Stop
+	LinkExternal
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -112,6 +113,7 @@ var glyphs = [...]string{
 	Info: "\uea74", Flame: "\ueaf2", Question: "\ueb32", Error: "\uea87",
 	Bug: "\ueaaf", List: "\ueb17", Quote: "\ueb33", Clipboard: "\ueac0",
 	Report: "\uf50a", Bolt: "\U000f140b", Stop: "\uf46e",
+	LinkExternal: "\uf465",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.

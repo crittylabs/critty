@@ -8,15 +8,13 @@ import (
 	"github.com/yuin/goldmark/v2/extension"
 	"github.com/yuin/goldmark/v2/parser"
 	"github.com/yuin/goldmark/v2/util"
+
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 var inlineHighlightParser = parser.New(parser.WithExtensions(extension.LinkifyParser), parser.WithInlineParsers(util.Prioritized[parser.InlineParser](mathParser{}, 50)))
 
-func highlightInlineWith(line string, linkStyle, codeStyle lipgloss.Style) string {
-	return highlightInlineReferences(line, linkStyle, codeStyle, nil)
-}
-
-func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style, references func(string) string) string {
+func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style, symbols icons.Set, references func(string) string) string {
 	if strings.TrimSpace(line) == "" {
 		return line
 	}
@@ -84,10 +82,10 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 				label = linkStyle.Inherit(style).Render(n.Destination.Str(source))
 			}
 			uri := n.Destination.Str(source)
-			return linkedText(uri, label+linkStyle.Inherit(style).Render(externalLinkSuffix(uri)))
+			return linkedText(uri, label+linkStyle.Inherit(style).Render(externalLinkSuffix(uri, symbols)))
 		case *ast.AutoLink:
 			uri := n.Destination.Str(source)
-			return linkedText(uri, linkStyle.Inherit(style).Render(n.Label.Str(source)+externalLinkSuffix(uri)))
+			return linkedText(uri, linkStyle.Inherit(style).Render(n.Label.Str(source)+externalLinkSuffix(uri, symbols)))
 		case *ast.Image:
 			// Previewable images get lightbox links from the image renderer.
 			if !markdownHasLabel(n, source) {
@@ -102,9 +100,9 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 	return strings.TrimPrefix(render(root, lipgloss.NewStyle()), prefix) + suffix
 }
 
-func externalLinkSuffix(uri string) string {
+func externalLinkSuffix(uri string, symbols icons.Set) string {
 	if _, ok := webImageURL(uri); ok {
-		return " ↗"
+		return " " + symbols.Glyph(icons.LinkExternal, "↗")
 	}
 	return ""
 }

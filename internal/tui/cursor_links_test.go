@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/crittylabs/critty/v2/internal/document"
+	"github.com/crittylabs/critty/v2/internal/icons"
 	"github.com/crittylabs/critty/v2/internal/review"
 	"github.com/crittylabs/critty/v2/internal/syntax"
 )
@@ -428,15 +429,17 @@ func TestExternalLinkMarkClickAndSelection(t *testing.T) {
 	opened := stubOpener(t, false)
 	const uri = "https://example.org"
 	app := setupAppWithDoc(t, "[Site]("+uri+") after\n")
+	app.icons, app.tab().symbols = icons.Nerd, icons.Nerd
+	app.tab().markdown = nil
 	app.width, app.height = 100, 30
 	app.recalculateLayout()
 	app.rebuildContent()
 	cells, _ := linkCells(app.contentViewport.GetContent(), uri)
-	if len(cells) != len("Site ")+1 {
-		t.Fatalf("link cells=%d, want label, space, and marker", len(cells))
+	if len(cells) != len("Site ")+2 {
+		t.Fatalf("link cells=%d, want label, space, marker, and padding", len(cells))
 	}
 	left, top, _, _ := app.contentBounds()
-	mark := cells[len(cells)-1]
+	mark := cells[len(cells)-2]
 	x, y := left+mark.X, top+mark.Y
 	app = pressMouse(app, x, y)
 	app, cmd := updateApp(app, tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft})

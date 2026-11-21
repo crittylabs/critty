@@ -12,6 +12,7 @@ import (
 
 	"github.com/crittylabs/critty/v2/internal/document"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 func TestMarkdownParagraphSourceLines(t *testing.T) {
@@ -195,11 +196,18 @@ func TestMarkdownExternalLinkMarks(t *testing.T) {
 		{"`https://example.org`", " https://example.org "},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
-			parsed := parseMarkdownSource([]string{tc.source}, nil)
-			cached := parsed.lines[0].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
-			for name, got := range map[string]string{"document": cached, "inline": highlightInline(tc.source)} {
-				if plain := ansi.Strip(got); plain != tc.want {
-					t.Fatalf("%s = %q, want %q", name, plain, tc.want)
+			for _, mode := range []struct {
+				symbols icons.Set
+				mark    string
+			}{{icons.Plain, "↗"}, {icons.Nerd, "\uf465 "}} {
+				want := strings.ReplaceAll(tc.want, "↗", mode.mark)
+				parsed := parseMarkdownWithSyntax([]string{tc.source}, nil, nil, mode.symbols)
+				cached := parsed.lines[0].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+				inline := highlightInlineReferences(tc.source, mdLinkStyle, mdCodeStyle, mode.symbols, nil)
+				for name, got := range map[string]string{"document": cached, "inline": inline} {
+					if plain := ansi.Strip(got); plain != want {
+						t.Fatalf("%s = %q, want %q", name, plain, want)
+					}
 				}
 			}
 		})
@@ -207,12 +215,12 @@ func TestMarkdownExternalLinkMarks(t *testing.T) {
 }
 
 func TestExternalLinkMarksInComments(t *testing.T) {
-	app := NewApp("notes.md", AppConfig{})
+	app := NewApp("notes.md", AppConfig{NerdFonts: true})
 	const source = "[Site](https://example.org) and [Local](notes.md)"
-	if got := ansi.Strip(app.renderCommentContent("Reviewer", source, "", 80)); got != "Site ↗ and Local" {
+	if got := ansi.Strip(app.renderCommentContent("Reviewer", source, "", 80)); got != "Site \uf465  and Local" {
 		t.Fatalf("comment=%q", got)
 	}
-	if got := ansi.Strip(app.renderCommentContent("Reviewer", "[first\nsecond](https://example.org)", "", 80)); got != "first\nsecond ↗" {
+	if got := ansi.Strip(app.renderCommentContent("Reviewer", "[first\nsecond](https://example.org)", "", 80)); got != "first\nsecond \uf465 " {
 		t.Fatalf("multiline comment=%q", got)
 	}
 	app.modal = commentModal
@@ -220,7 +228,7 @@ func TestExternalLinkMarksInComments(t *testing.T) {
 	app.modalTextarea.SetWidth(80)
 	app.modalTextarea.SetHeight(3)
 	view, _ := app.editorView()
-	if got := ansi.Strip(view); !strings.Contains(got, source) || strings.Contains(got, "↗") {
+	if got := ansi.Strip(view); !strings.Contains(got, source) || strings.Contains(got, "\uf465") {
 		t.Fatalf("editor did not keep literal source: %q", got)
 	}
 }

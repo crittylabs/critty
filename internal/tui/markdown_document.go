@@ -382,7 +382,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 				i := node.Destination.Index()
 				if i.Start >= 0 && i.Stop <= len(input) {
 					emit(i.Start, i.Stop, uri, style, uri)
-					if suffix := externalLinkSuffix(uri); suffix != "" {
+					if suffix := externalLinkSuffix(uri, m.symbols); suffix != "" {
 						decorate(i.Stop, suffix, style, uri, closingDecoration)
 					}
 				}
@@ -391,7 +391,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 				render(child, style, uri)
 			}
-			if suffix := externalLinkSuffix(uri); suffix != "" {
+			if suffix := externalLinkSuffix(uri, m.symbols); suffix != "" {
 				if r, ok := ranges[node]; ok {
 					decorate(r.contentEnd, suffix, style, uri, closingDecoration)
 				}
@@ -401,7 +401,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			i := node.Label.Index()
 			uri = node.Destination.Str(input)
 			emit(i.Start, i.Stop, node.Label.Str(input), style|markdownLink, uri)
-			if suffix := externalLinkSuffix(uri); suffix != "" {
+			if suffix := externalLinkSuffix(uri, m.symbols); suffix != "" {
 				decorate(i.Stop, suffix, style|markdownLink, uri, closingDecoration)
 			}
 			return
