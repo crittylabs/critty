@@ -1211,8 +1211,11 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	if msg.String() == "space" || msg.String() == " " {
-		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
+	if (msg.String() == "space" || msg.String() == " ") && m.focused == contentPane {
+		if t.selecting && m.toggleFormSelection() {
+			return m, nil
+		}
+		if !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
 			return m, nil
 		}
 	}
@@ -4492,6 +4495,9 @@ func (m AppModel) renderFooterHints() string {
 			k("esc", "cancel"),
 			k("v", "toggle select"),
 		}
+		if t.selectAnchor != t.cursorLine && m.selectionSide() == "" && m.forms.Document(t.path) != nil {
+			items = append(items, k("space", "toggle selected form controls"))
+		}
 	} else {
 		enterAction := "comment"
 		if id := m.selectedCommentID(); id != "" {
@@ -4754,6 +4760,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "↑/↓,k/j · ←/→,h/l · enter/esc", desc: "outline: ⇅ jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},
 		{keys: "↑/↓,k/j,C-p/n (selection)", desc: "extend line selection; enter comments, v/C-SPC/C-@ toggles, esc cancels"},
+		{keys: "space (selected lines)", desc: "check form boxes and the first option per group in the range; press again to clear them"},
 		{keys: "C-PgUp/PgDn", desc: "scroll the focused thread"},
 		{keys: "C-s/o · M-s · tab/S-tab · enter/esc", desc: "save/edit · suggest · focus · activate/close"},
 		{keys: "M-i (editors)", desc: "show/hide image, math, and Mermaid previews without changing source"},

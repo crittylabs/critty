@@ -45,6 +45,8 @@ Path input uses the existing completion menu without requiring `@`.  Select a ca
 
 A select-all item has no answer of its own.  Each target's answer is a human answer, including `consent`; `via` names the select-all item when that operation set it.  Critty rejects a tag matching no other item, cycles, and select-alls covering two choices of one field.
 
+A reviewer can also toggle the checkboxes and choices whose controls start within a selected line range.  Each choice group contributes its topmost option in the range.  The operation clears the targets when they are all checked, including the topmost option of each group.  Standalone inputs, rankings, and tagged select-all controls are outside this operation.  Answers record human provenance without a `via` value.  Selected controls retain their associated inputs and the same path validation as tagged select-all.
+
 ## Text and images
 
 Text is Markdown, entered and shown like a comment body.  Pasted images are saved in the session and referenced by `attachments/` paths relative to the result's `image_base`.  These files are removed with the session.  When carrying answers into a durable document, such as an ADR or design document, copy each referenced image into that document's own asset directory and rewrite the links relative to the document.  Do this before cleaning up the session.

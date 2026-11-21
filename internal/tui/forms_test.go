@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -412,13 +413,85 @@ func TestFormApprovalGrantsHumanConsent(t *testing.T) {
 	}
 }
 
-func TestFormsDoNotToggleWhileSelecting(t *testing.T) {
+func TestFormSelectionNeedsMultipleLines(t *testing.T) {
 	t.Parallel()
 	app, _ := formTestApp(t)
-	app.tab().cursorLine, app.tab().selecting = 2, true
-	app.handleKeyPress(tea.KeyPressMsg{Code: ' '})
+	app.tab().cursorLine = 2
+	app = pressKey(app, 'v')
+	app = pressKey(app, ' ')
 	if len(app.missingForms()) != 1 {
-		t.Fatal("selection toggled form")
+		t.Fatal("single-line selection toggled a form control")
+	}
+}
+
+func TestToggleFormControlsInSelectedLines(t *testing.T) {
+	t.Parallel()
+	const source = `# Form
+- [x] Outside choice <!-- form: id=size value=outside -->
+- [x] Existing check <!-- form: id=existing -->
+- [ ] First choice in range <!-- form: id=size value=small -->
+- [ ] Second choice in range <!-- form: id=size value=large -->
+- [ ] Mode <!-- form: id=mode value=auto -->
+- [ ] Consent <!-- form: id=allow consent -->
+- [ ] Tagged select-all <!-- form: id=all select-all=outside -->
+- [ ] Text input <!-- form: id=note text -->
+- [ ] Outside checkbox <!-- form: id=outside tags=outside -->
+`
+	app, _ := formTestAppWithContent(t, source)
+	app.tab().cursorLine = 9
+	app = pressKey(app, 'v')
+	for range 6 {
+		app = pressKey(app, 'k')
+	}
+	if start, end := app.selectionRange(); start != 3 || end != 9 {
+		t.Fatalf("selected lines %d-%d, want 3-9", start, end)
+	}
+	for _, tc := range []struct {
+		name       string
+		checked    bool
+		size, mode string
+	}{
+		{"select", true, "small", "auto"},
+		{"clear", false, "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app = pressKey(app, ' ')
+			if app.modal != noModal || !app.tab().selecting || app.err != nil {
+				t.Fatalf("range toggle changed selection mode or failed: modal = %v, err = %v", app.modal, app.err)
+			}
+			saved, err := app.session.LoadForms()
+			if err != nil {
+				t.Fatal(err)
+			}
+			answers := saved.Documents[0].Answers
+			for id, want := range map[string]any{"existing": tc.checked, "size": tc.size, "mode": tc.mode, "allow": tc.checked} {
+				if answer := answers[id]; answer.Value != want || !answer.Human || answer.Via != "" {
+					t.Errorf("%s = %+v, want human answer %v", id, answer, want)
+				}
+			}
+			for _, id := range []string{"all", "note", "outside"} {
+				if answer := answers[id]; answer.Human {
+					t.Errorf("%s changed outside the range targets: %+v", id, answer)
+				}
+			}
+		})
+	}
+	if app.tab().doc.Content != source {
+		t.Fatal("range toggle changed the source")
+	}
+}
+
+func TestFormSelectionLeavesAnswersUntouchedWhenPathIsInvalid(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, "- [ ] Check <!-- form: id=check -->\n- [ ] File <!-- form: id=file checkbox type=file existing default='missing.md' -->\n")
+	app.session.Meta.CWD = t.TempDir()
+	d := app.forms.Document(app.tab().path)
+	before := maps.Clone(d.Answers)
+	app = pressKey(app, 'v')
+	app = pressKey(app, 'j')
+	app = pressKey(app, ' ')
+	if app.modal != formTextModal || app.editingFormLine != 2 || !reflect.DeepEqual(d.Answers, before) {
+		t.Fatalf("invalid path: modal = %v, line = %d, answers = %+v", app.modal, app.editingFormLine, d.Answers)
 	}
 }
 

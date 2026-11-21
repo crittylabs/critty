@@ -7,6 +7,7 @@
 - Paste from the system clipboard with `M-v` anywhere `C-v` already pastes, including images in comment editors.
 - Preview remote HTTPS images in Markdown and comments using the global `remote_image_hosts` allowlist.  It supports exact hostnames, dot-prefixed subdomain suffixes, and `*` wildcards within DNS labels.  Each redirect must match the same allowlist.
 - Use the horizontal mouse wheel over a truncated row in the Files sidebar to read its full name without opening the file or moving the selection.
+- Press Space while selecting multiple lines to check form boxes and the topmost option of each choice group in the range.  Press Space again to clear them.
 
 ### Changed
 

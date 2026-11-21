@@ -249,7 +249,7 @@ func (m *AppModel) toggleForm(line int) bool {
 	if d == nil {
 		return false
 	}
-	for _, item := range d.Items {
+	for i, item := range d.Items {
 		if line < item.Line || line > item.EndLine {
 			continue
 		}
@@ -263,54 +263,90 @@ func (m *AppModel) toggleForm(line int) bool {
 			m.openFormText(item)
 			return true
 		}
-		previous := maps.Clone(d.Answers)
+		answers := maps.Clone(d.Answers)
 		answer := form.Answer{Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+		targets := []int{i}
 		if item.SelectAll != nil {
 			answer.Via = item.ID
-			form.ApplyBulk(d.Items, m.formTargets[d.Path()][item.ID], d.Answers, answer)
+			targets = m.formTargets[d.Path()][item.ID]
+			form.ApplyBulk(d.Items, targets, answers, answer)
 		} else {
-			selected := item.Choice || !form.Selected(item, d.Answers[item.ID])
-			d.Answers[item.ID] = form.SelectAnswer(d.Items, item, d.Answers[item.ID], selected, answer)
+			selected := item.Choice || !form.Selected(item, answers[item.ID])
+			answers[item.ID] = form.SelectAnswer(d.Items, item, answers[item.ID], selected, answer)
 		}
-		var targets []form.Item
-		if item.SelectAll != nil {
-			for _, i := range m.formTargets[d.Path()][item.ID] {
-				targets = append(targets, d.Items[i])
-			}
-		} else {
-			targets = []form.Item{item}
-		}
-		for _, target := range targets {
-			proposed := d.Answers[target.ID]
-			if target.Type == "" || !form.Selected(target, proposed) {
-				continue
-			}
-			if err := m.validateFormPath(target, proposed.Text); err != nil {
-				d.Answers = previous
-				m.openFormText(target)
-				m.pendingFormAnswer = &proposed
-				m.modalTextarea.SetValue(proposed.Text)
-				m.modalInitial = proposed.Text
-				m.resizePathInput()
-				m.refreshPathInfo()
-				m.clipboardStatus = err.Error()
-				m.rebuildContent()
-				return true
-			}
-		}
-		if err := m.session.SaveForms(*m.forms); err != nil {
-			d.Answers = previous
-			m.err = err
-		} else {
-			m.err = nil
-			if item.Text && form.Selected(item, d.Answers[item.ID]) {
-				m.openFormText(item)
-			}
+		if m.saveFormSelections(d, targets, answers) && item.Text && form.Selected(item, answers[item.ID]) {
+			m.openFormText(item)
 		}
 		m.rebuildContent()
 		return true
 	}
 	return false
+}
+
+func (m *AppModel) toggleFormSelection() bool {
+	if m.readOnly || m.selectionSide() != "" {
+		return false
+	}
+	d := m.forms.Document(m.tab().path)
+	if d == nil {
+		return false
+	}
+	start, end := m.selectionRange()
+	if start == end {
+		return false
+	}
+	var targets []int
+	groups := make(map[string]bool)
+	for i, item := range d.Items {
+		if item.Line < start || item.Line > end || item.Rank || form.IsTextField(item) || item.SelectAll != nil {
+			continue
+		}
+		if item.Choice {
+			if groups[item.ID] {
+				continue
+			}
+			groups[item.ID] = true
+		}
+		targets = append(targets, i)
+	}
+	if len(targets) == 0 {
+		return false
+	}
+	answers := maps.Clone(d.Answers)
+	answer := form.Answer{Human: true, Author: m.author, Revision: m.forms.Revision, Round: m.session.CJ.ReviewRound}
+	form.ApplyBulk(d.Items, targets, answers, answer)
+	m.saveFormSelections(d, targets, answers)
+	m.rebuildContent()
+	return true
+}
+
+func (m *AppModel) saveFormSelections(d *review.FormDocument, targets []int, answers map[string]form.Answer) bool {
+	for _, i := range targets {
+		target := d.Items[i]
+		proposed := answers[target.ID]
+		if target.Type == "" || !form.Selected(target, proposed) {
+			continue
+		}
+		if err := m.validateFormPath(target, proposed.Text); err != nil {
+			m.openFormText(target)
+			m.pendingFormAnswer = &proposed
+			m.modalTextarea.SetValue(proposed.Text)
+			m.modalInitial = proposed.Text
+			m.resizePathInput()
+			m.refreshPathInfo()
+			m.clipboardStatus = err.Error()
+			return false
+		}
+	}
+	previous := d.Answers
+	d.Answers = answers
+	if err := m.session.SaveForms(*m.forms); err != nil {
+		d.Answers = previous
+		m.err = err
+		return false
+	}
+	m.err = nil
+	return true
 }
 
 // openFormText edits standalone input or input on a selected control.
