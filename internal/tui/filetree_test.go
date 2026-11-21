@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -285,7 +286,7 @@ func TestFileTreeHighlightAcrossScrolling(t *testing.T) {
 					case "scrolled":
 						app = pressKey(app, tea.KeyRight)
 					case "end":
-						app.scrollTreeRow(app.maxTreeScroll())
+						app.scrollTreeRow(app.fileTree.cursor, len(app.tab().path))
 					case "directory":
 						app.setTreeCursor(app.fileTree.cursor - 1)
 					}
@@ -402,8 +403,9 @@ func TestFileTreeScrollsTruncatedCursorRow(t *testing.T) {
 		t.Fatalf("scrolled row = %q, want its end visible", row())
 	}
 	cursor := app.fileTree.cursor
+	offset := app.fileTree.hscroll
 	app = pressKey(app, 'h')
-	if app.fileTree.cursor != cursor || app.fileTree.hscroll >= app.maxTreeScroll() {
+	if app.fileTree.cursor != cursor || app.fileTree.hscroll >= offset {
 		t.Fatalf("h while scrolled moved the cursor to %d (scroll %d)", app.fileTree.cursor, app.fileTree.hscroll)
 	}
 	for app.fileTree.hscroll > 0 {
@@ -420,6 +422,44 @@ func TestFileTreeScrollsTruncatedCursorRow(t *testing.T) {
 	app = pressKey(app, 'l') // unfolds it rather than scrolling
 	if app.fileTree.collapsed["b"] || app.fileTree.hscroll != 0 {
 		t.Fatalf("l on a folded directory: folded = %t, scroll = %d", app.fileTree.collapsed["b"], app.fileTree.hscroll)
+	}
+}
+
+func TestFileTreeHorizontalWheelScrollsRowUnderPointer(t *testing.T) {
+	t.Parallel()
+	app := newFileTreeTestApp()
+	long := "b/" + strings.Repeat("directory-name-", 4) + "end.go"
+	app.tabs = append(app.tabs, FileTab{path: long, doc: &document.Document{Path: long}, state: &fileReview{}})
+	app.updateCommentSidebar()
+
+	tree := &app.fileTree
+	i := slices.Index(treeRowPaths(app), long)
+	if i < 0 || i == tree.cursor {
+		t.Fatalf("row = %d, cursor = %d, want an unselected file row", i, tree.cursor)
+	}
+	tree.viewport.SetHeight(3)
+	tree.viewport.SetYOffset(i - 1)
+	rowOnScreen := i - tree.viewport.YOffset()
+	row := func() string {
+		return ansi.Strip(strings.Split(app.fileTree.viewport.View(), "\n")[rowOnScreen])
+	}
+	initial := row()
+	left, top, _, _ := app.commentBounds()
+	tab, cursor, focus := app.activeTab, tree.cursor, app.focused
+	for range 10 {
+		app = wheelMouse(app, left+2, top+rowOnScreen, tea.MouseWheelRight)
+	}
+	if got := row(); !strings.HasSuffix(got, "end.go") {
+		t.Fatalf("scrolled row = %q, want its end visible", got)
+	}
+	if app.activeTab != tab || app.fileTree.cursor != cursor || app.focused != focus {
+		t.Fatal("horizontal wheel changed the active tab, cursor, or focus")
+	}
+	for range 10 {
+		app = wheelMouse(app, left+2, top+rowOnScreen, tea.MouseWheelLeft)
+	}
+	if got := row(); got != initial {
+		t.Fatalf("left edge = %q, want %q", got, initial)
 	}
 }
 

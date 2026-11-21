@@ -4317,11 +4317,20 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	}
 	mouse := msg.Mouse()
 	if mouse.Button == tea.MouseWheelLeft || mouse.Button == tea.MouseWheelRight {
-		if table := m.horizontalBlockAtMouse(mouse); table != nil {
-			direction := 1
-			if mouse.Button == tea.MouseWheelLeft {
-				direction = -1
+		direction := 1
+		if mouse.Button == tea.MouseWheelLeft {
+			direction = -1
+		}
+		left, top, right, _ := m.commentBounds()
+		tree := &m.fileTree
+		row := mouse.Y - top
+		if m.sidebarView == filesView && mouse.X >= left && mouse.X < right && row >= 0 && row < tree.viewport.Height() {
+			if i := row + tree.viewport.YOffset(); i < len(tree.rows) {
+				m.scrollTreeRow(i, direction*m.treeScrollStep())
 			}
+			return m, nil
+		}
+		if table := m.horizontalBlockAtMouse(mouse); table != nil {
 			m.scrollHorizontalBlock(*table, direction*max(1, table.window.width/2))
 		}
 		return m, nil
@@ -4679,6 +4688,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			items = append(items, helpItem{keys: "V · O", desc: "reading view / open all comments"},
 				helpItem{keys: "s/t", desc: "toggle sidebar / view"},
 				helpItem{keys: "M-G", desc: "focus outline"},
+				helpItem{keys: "horizontal wheel", desc: "Files: scroll the row under the pointer"},
 				helpItem{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline"},
 				helpItem{keys: "enter/esc", desc: "outline: return to source"})
 		}
@@ -4739,6 +4749,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "V", desc: "toggle reading view: hide sidebar and reduce all comments to bubble markers; leaving restores the previous expansion setting"},
 		{keys: "O", desc: "reset individual folds and toggle all comments open / default (resolved folded); in View, leave View and open all comments"},
 		{keys: "C-↑/↓ · C-S-↑/↓", desc: "Files: ⇅ focus tree/outline · grow/shrink outline (up to two thirds); drag the Outline divider to resize"},
+		{keys: "horizontal wheel", desc: "Files: scroll the row under the pointer"},
 		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},
 		{keys: "↑/↓,k/j · ←/→,h/l · enter/esc", desc: "outline: ⇅ jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
 		{keys: "drag gutter", desc: "select lines for a comment"},

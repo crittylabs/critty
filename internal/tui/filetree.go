@@ -48,13 +48,14 @@ type treeRow struct {
 
 // fileTree is the sidebar's file tree state.
 type fileTree struct {
-	root      *treeNode
-	rows      []treeRow
-	cursor    int
-	hscroll   int             // columns the cursor row is scrolled to the right
-	collapsed map[string]bool // directory path -> folded
-	syncedTab int             // tab the cursor last followed; -1 before the first sync
-	viewport  viewport.Model
+	root       *treeNode
+	rows       []treeRow
+	cursor     int
+	hscroll    int             // columns the scrolled row is shifted to the right
+	scrollPath string          // path of the row with a horizontal offset
+	collapsed  map[string]bool // directory path -> folded
+	syncedTab  int             // tab the cursor last followed; -1 before the first sync
+	viewport   viewport.Model
 }
 
 func newFileTree() fileTree {
@@ -310,21 +311,9 @@ func (m *AppModel) treeTextWidth() int {
 	return max(1, m.fileTree.viewport.Width()-treeCursorWidth)
 }
 
-// maxTreeScroll returns how far the cursor row can scroll to the right
-// before its end is visible.
-func (m *AppModel) maxTreeScroll() int {
-	tree := &m.fileTree
-	if len(tree.rows) == 0 {
-		return 0
-	}
-	return max(0, lipgloss.Width(m.treeRowText(tree.cursor, m.tabIndicators()))-m.treeTextWidth())
-}
-
-// renderFileTree draws the visible rows into the tree viewport.  Only the
-// cursor row honors the horizontal scroll.
+// renderFileTree draws the visible rows into the tree viewport.
 func (m *AppModel) renderFileTree() {
 	tree := &m.fileTree
-	tree.hscroll = max(0, min(tree.hscroll, m.maxTreeScroll()))
 	width := m.treeTextWidth()
 	cursorCol := lipgloss.NewStyle().Width(treeCursorWidth)
 	lines := make([]string, len(tree.rows))
@@ -332,16 +321,18 @@ func (m *AppModel) renderFileTree() {
 	for i := range tree.rows {
 		prefix := cursorCol.Render("")
 		text := m.treeRowText(i, indicators)
-		if i == tree.cursor {
-			if m.focused == commentPane && !m.outline.focused {
-				prefix = cursorCol.Render(cursorMarker.Render(">"))
-			}
+		row := tree.rows[i]
+		if i == tree.cursor && m.focused == commentPane && !m.outline.focused {
+			prefix = cursorCol.Render(cursorMarker.Render(">"))
+		}
+		if row.path == tree.scrollPath && tree.hscroll > 0 {
+			textWidth := lipgloss.Width(text)
+			tree.hscroll = min(tree.hscroll, max(0, textWidth-width))
 			if tree.hscroll > 0 {
-				text = "…" + ansi.Cut(text, tree.hscroll+1, lipgloss.Width(text))
+				text = "…" + ansi.Cut(text, tree.hscroll+1, textWidth)
 			}
 		}
 		line := prefix + ansi.Truncate(text, width, "…")
-		row := tree.rows[i]
 		if !row.isDir && row.tabIndex == m.activeTab {
 			padding := strings.Repeat(" ", max(0, tree.viewport.Width()-ansi.StringWidth(line)))
 			// Reversing equal colors keeps the gray fill while preventing
@@ -354,14 +345,21 @@ func (m *AppModel) renderFileTree() {
 	tree.viewport.SetContent(strings.Join(lines, "\n"))
 }
 
-// scrollTreeRow scrolls the cursor row horizontally by delta columns and
+// scrollTreeRow scrolls one row horizontally by delta columns and
 // reports whether the view moved.
-func (m *AppModel) scrollTreeRow(delta int) bool {
+func (m *AppModel) scrollTreeRow(i, delta int) bool {
 	tree := &m.fileTree
-	next := max(0, min(tree.hscroll+delta, m.maxTreeScroll()))
-	if next == tree.hscroll {
+	path := tree.rows[i].path
+	offset := 0
+	if path == tree.scrollPath {
+		offset = tree.hscroll
+	}
+	limit := max(0, lipgloss.Width(m.treeRowText(i, m.tabIndicators()))-m.treeTextWidth())
+	next := max(0, min(offset+delta, limit))
+	if next == offset {
 		return false
 	}
+	tree.scrollPath = path
 	tree.hscroll = next
 	m.renderFileTree()
 	return true
@@ -475,7 +473,7 @@ func (m *AppModel) handleFileTreeKey(msg tea.KeyPressMsg) bool {
 		}
 	case msg.String() == "h" || msg.String() == "left":
 		// Scroll a shifted row back first; at the left edge, fold or climb.
-		if m.scrollTreeRow(-m.treeScrollStep()) {
+		if m.scrollTreeRow(tree.cursor, -m.treeScrollStep()) {
 			break
 		}
 		if row.isDir && !row.collapsed {
@@ -488,7 +486,7 @@ func (m *AppModel) handleFileTreeKey(msg tea.KeyPressMsg) bool {
 		// tail; then enter an open directory.
 		if row.isDir && row.collapsed {
 			m.toggleTreeDir(tree.cursor)
-		} else if m.scrollTreeRow(m.treeScrollStep()) {
+		} else if m.scrollTreeRow(tree.cursor, m.treeScrollStep()) {
 			break
 		} else if row.isDir {
 			m.setTreeCursor(tree.cursor + 1)
