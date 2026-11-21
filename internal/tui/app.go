@@ -194,10 +194,9 @@ type AppModel struct {
 	killRing          killRing
 	completion        completionState
 	pathInfo          formPathState
-	mouseSelecting    bool
+	lineDrag          mouseLineDrag
 	rankDrag          rankDragState
-	hoveredGutterLine int
-	hoveredGutterSide string
+	hoveredCommentAdd *tea.Mouse
 	contentLayout     renderedContentLayout
 	sidebarTargets    []int
 	sidebarActions    []commentHeaderRegion
@@ -248,6 +247,13 @@ type mouseRect struct {
 	top    int
 	right  int
 	bottom int
+}
+
+type mouseLineDrag struct {
+	origin  tea.Mouse
+	ref     lineRef
+	comment bool
+	started bool
 }
 
 func (r mouseRect) contains(mouse tea.Mouse) bool {
@@ -1107,9 +1113,8 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.modal == lightboxModal {
 		return m.handleLightboxKey(msg)
 	}
-	if m.hoveredGutterLine != 0 {
-		m.hoveredGutterLine = 0
-		m.hoveredGutterSide = ""
+	if m.hoveredCommentAdd != nil {
+		m.hoveredCommentAdd = nil
 		m.rebuildContent()
 	}
 	if m.modal == helpModal {
@@ -3224,12 +3229,13 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 
 	header, progressRegions := m.renderHeaderWithProgress()
 
-	content := m.contentViewport.View()
+	paneWidth := max(0, m.contentPaneWidth()-2)
+	content := m.extendSourceBackgrounds(m.contentViewport.View(), paneWidth)
 	if m.modal != noModal {
 		content = hideImagePlaceholders(content)
 	}
 	contentBox := lipgloss.NewStyle().
-		Width(max(0, m.contentPaneWidth()-2)).
+		Width(paneWidth).
 		Height(m.contentViewport.Height()).
 		Render(content)
 	contentPane := renderPane(m.renderTabBar(), contentBox, lipgloss.RoundedBorder(), lipgloss.NewStyle().Foreground(accent))
@@ -3483,8 +3489,8 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if len(m.tabs) == 0 {
 		return m.handleEmptyReviewClick(msg)
 	}
-	m.hoveredGutterLine = 0
-	m.hoveredGutterSide = ""
+	m.hoveredCommentAdd = nil
+	m.lineDrag = mouseLineDrag{}
 	if m.modal == noModal && m.hasTextSelection() {
 		_, layout := m.renderReviewScreen()
 		if layout.hasCopyTextButton && layout.copyTextButton.contains(mouse) {
@@ -3637,6 +3643,17 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 
 	left, top, right, bottom := m.contentBounds()
 	if mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
+		x, y := mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()
+		column := m.contentColumnOffset(x, y)
+		if column < m.sourceGutterWidth() {
+			t := m.tab()
+			ref, ok := m.commentAddAt(x, y)
+			current := ref.line == t.cursorLine && ref.side == t.cursorSide && !t.cursorOnAnnotation
+			if ok && (column == m.sourceGutterWidth()-1 || t.selecting || current) {
+				m.lineDrag = mouseLineDrag{origin: mouse, ref: ref, comment: true}
+				return m, nil
+			}
+		}
 		if !m.tab().selecting {
 			point := tea.Mouse{X: mouse.X - left, Y: mouse.Y - top + m.contentViewport.YOffset()}
 			for _, control := range m.contentLayout.formControls {
@@ -3660,22 +3677,14 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		previousFocus := m.focused
 		wasFocused := m.focused == contentPane
 		m.focused = contentPane
-		if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok {
+		if target, ok := m.contentMouseTargetAt(x, y); ok {
 			t := m.tab()
-			if !target.annotation && !m.isContentGutter(mouse.X-left) {
+			if !target.annotation && column >= m.sourceGutterWidth() {
 				m.startTextSelection(mouse)
 				if m.textSelection.dragging {
 					m.textSelection.target = target
 					m.textSelection.link = pendingTextLink
 					m.focused = previousFocus
-					return m, nil
-				}
-			}
-			if m.isContentGutter(mouse.X-left) && !target.annotation && t.selecting {
-				start, end := m.selectionRange()
-				if start < end && target.side == t.selectSide && target.line == end {
-					m.openLineComment()
-					m.rebuildContent()
 					return m, nil
 				}
 			}
@@ -3700,11 +3709,8 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 					return m, nil
 				}
 			}
-			if m.isContentGutter(mouse.X-left) && !target.annotation {
-				t.selecting = true
-				t.selectAnchor = target.line
-				t.selectSide = target.side
-				m.mouseSelecting = true
+			if column < m.sourceGutterWidth() && target.line > 0 && !target.annotation {
+				m.lineDrag = mouseLineDrag{origin: mouse, ref: lineRef{line: target.line, side: target.side}}
 			}
 		}
 		m.updateCommentSidebar()
@@ -3940,8 +3946,8 @@ func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd
 		m.dragRank(msg.Mouse())
 		return m, nil
 	}
-	if !m.mouseSelecting {
-		m.updateGutterHover(msg.Mouse())
+	if m.lineDrag.ref.line == 0 {
+		m.updateCommentAddHover(msg.Mouse())
 		return m, nil
 	}
 	if msg.Mouse().Button != tea.MouseLeft {
@@ -3951,23 +3957,53 @@ func (m *AppModel) handleMouseMotion(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd
 	return m, nil
 }
 
-func (m *AppModel) updateGutterHover(mouse tea.Mouse) {
-	line := 0
-	side := ""
-	if m.modal == noModal && len(m.tabs) > 0 && m.tab().state != nil {
-		left, top, _, bottom := m.contentBounds()
-		if m.isContentGutter(mouse.X-left) && mouse.Y >= top && mouse.Y < bottom {
-			if target, ok := m.contentMouseTargetAt(mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()); ok && !target.annotation {
-				line = target.line
-				side = target.side
+func (m *AppModel) updateCommentAddHover(mouse tea.Mouse) {
+	var button *tea.Mouse
+	if m.modal == noModal && len(m.tabs) > 0 {
+		left, top, right, bottom := m.contentBounds()
+		x, y := mouse.X-left, mouse.Y-top+m.contentViewport.YOffset()
+		if mouse.X >= left && mouse.X < right && mouse.Y >= top && mouse.Y < bottom {
+			if _, ok := m.commentAddAt(x, y); ok {
+				button = &tea.Mouse{X: x - m.contentColumnOffset(x, y) + m.sourceGutterWidth() - 1, Y: y}
 			}
 		}
 	}
-	if m.hoveredGutterLine == line && m.hoveredGutterSide == side {
+	old := m.hoveredCommentAdd
+	if old == button || (old != nil && button != nil && old.X == button.X && old.Y == button.Y) {
 		return
 	}
-	m.hoveredGutterLine = line
-	m.hoveredGutterSide = side
+	m.hoveredCommentAdd = button
+	m.rebuildContent()
+}
+
+func (m *AppModel) commentAddAt(x, y int) (lineRef, bool) {
+	t := m.tab()
+	column := m.contentColumnOffset(x, y)
+	if m.readOnly || t.state == nil || t.path == overallCommentsPath || column < 0 || column >= m.sourceGutterWidth() {
+		return lineRef{}, false
+	}
+	target, ok := m.contentMouseTargetAt(x, y)
+	if !ok || target.line == 0 || target.annotation || target.passive {
+		return lineRef{}, false
+	}
+	if t.selecting {
+		start, end := m.selectionRange()
+		if target.side != t.selectSide || target.line < start || target.line > end {
+			return lineRef{}, false
+		}
+	}
+	return lineRef{line: target.line, side: target.side}, true
+}
+
+func (m *AppModel) openCommentFromGutter(ref lineRef) {
+	t := m.tab()
+	if !t.selecting {
+		t.cursorLine, t.cursorSide, t.cursorAnnoIdx = ref.line, ref.side, 0
+		t.cursorOnAnnotation, t.cursorOnForm = false, false
+	}
+	m.focused = contentPane
+	m.openLineComment()
+	m.updateCommentSidebar()
 	m.rebuildContent()
 }
 
@@ -4020,15 +4056,26 @@ func (m *AppModel) handleMouseRelease(msg tea.MouseReleaseMsg) (tea.Model, tea.C
 		m.finishRankDrag()
 		return m, nil
 	}
-	if !m.mouseSelecting || msg.Mouse().Button != tea.MouseLeft {
+	mouse := msg.Mouse()
+	drag := &m.lineDrag
+	if mouse.Button != tea.MouseLeft || drag.ref.line == 0 {
 		return m, nil
 	}
-	m.updateMouseSelection(msg.Mouse(), false)
-	m.mouseSelecting = false
+	defer func() { m.lineDrag = mouseLineDrag{} }()
+	if !drag.started && mouse.X == drag.origin.X && mouse.Y == drag.origin.Y {
+		if drag.comment && m.modal == noModal {
+			m.openCommentFromGutter(drag.ref)
+		}
+		return m, nil
+	}
+	m.updateMouseSelection(mouse, false)
+	if !drag.started {
+		return m, nil
+	}
 	t := m.tab()
 	t.selecting = t.cursorLine != t.selectAnchor || t.cursorSide != t.selectSide
-	m.openLineComment()
 	m.rebuildContent()
+	m.updateCommentAddHover(mouse)
 	return m, nil
 }
 
@@ -4045,11 +4092,20 @@ func (m *AppModel) updateMouseSelection(mouse tea.Mouse, autoScroll bool) {
 		return
 	}
 
-	if target, ok := m.contentMouseTargetAt(mouse.X-left, viewportY); ok && !target.annotation {
-		t := m.tab()
-		if t.selecting && target.side != t.selectSide {
+	if target, ok := m.contentMouseTargetAt(mouse.X-left, viewportY); ok && target.line > 0 && !target.annotation {
+		drag := &m.lineDrag
+		if target.side != drag.ref.side {
 			return
 		}
+		t := m.tab()
+		if !drag.started {
+			if target.line == drag.ref.line {
+				return
+			}
+			t.selectAnchor, t.selectSide = drag.ref.line, drag.ref.side
+			drag.started = true
+		}
+		m.focused = contentPane
 		t.cursorLine, t.cursorSide = target.line, target.side
 		t.cursorOnAnnotation = false
 		t.cursorOnForm = false
@@ -4391,7 +4447,7 @@ func (m *AppModel) handleMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) 
 	case tea.MouseWheelDown:
 		m.contentViewport.ScrollDown(m.contentViewport.MouseWheelDelta)
 	}
-	m.updateGutterHover(mouse)
+	m.updateCommentAddHover(mouse)
 	return m, nil
 }
 
@@ -4758,7 +4814,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "horizontal wheel", desc: "Files: scroll the row under the pointer"},
 		{keys: "M-G", desc: "focus the current file's outline, opening the Files sidebar"},
 		{keys: "↑/↓,k/j · ←/→,h/l · enter/esc", desc: "outline: ⇅ jump to entry · parent/child · return to source; Markdown headings and source declarations follow the source cursor"},
-		{keys: "drag gutter", desc: "select lines for a comment"},
+		{keys: "drag line-number gutter", desc: "select lines"},
+		{keys: "click add-comment button", desc: "comment on a line or the selected range"},
+		{keys: "click current or selected line number", desc: "comment on the current line or selected range"},
 		{keys: "↑/↓,k/j,C-p/n (selection)", desc: "extend line selection; enter comments, v/C-SPC/C-@ toggles, esc cancels"},
 		{keys: "space (selected lines)", desc: "check form boxes and the first option per group in the range; press again to clear them"},
 		{keys: "C-PgUp/PgDn", desc: "scroll the focused thread"},

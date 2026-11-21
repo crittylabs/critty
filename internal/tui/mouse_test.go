@@ -71,22 +71,42 @@ func TestMouseClickFocusesCodeLine(t *testing.T) {
 	}
 }
 
-func TestMouseClickCodeGutterOpensLineComment(t *testing.T) {
+func TestMouseClickCommentAddUsesHoveredLine(t *testing.T) {
 	t.Parallel()
-	for _, gutter := range []bool{true, false} {
-		app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\n")
-		app.width = 100
-		app.contentViewport.SetWidth(75)
-		x := gutterWidth
-		if gutter {
-			x = 0
-		}
-		x, y := contentScreenPoint(app, x, 1)
-		app = clickMouse(app, x, y)
-		if (app.modal == commentModal) != gutter || app.tab().cursorLine != 2 || app.tab().selecting {
-			t.Fatalf("gutter %t: modal = %v, line = %d, selecting = %t",
-				gutter, app.modal, app.tab().cursorLine, app.tab().selecting)
-		}
+	for _, tc := range []struct {
+		name        string
+		column, row int
+		wantModal   modalType
+		wantLine    int
+		cursor      int
+		scroll      bool
+	}{
+		{name: "first line", column: gutterWidth - 1, row: 0, wantModal: commentModal, wantLine: 1},
+		{name: "scrolled after press", column: gutterWidth - 1, row: 1, wantModal: commentModal, wantLine: 2, scroll: true},
+		{name: "last line", column: gutterWidth - 1, row: 2, wantModal: commentModal, wantLine: 3},
+		{name: "marker", column: 0, row: 1, wantLine: 2},
+		{name: "line number", column: gutterWidth - 2, row: 1, wantLine: 2},
+		{name: "current line number", column: gutterWidth - 2, row: 1, cursor: 2, wantModal: commentModal, wantLine: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\n")
+			app.width = 100
+			app.contentViewport.SetWidth(75)
+			app.tab().cursorLine = tc.cursor
+			app.rebuildContent()
+			if tc.scroll {
+				app.contentViewport.SetHeight(2)
+			}
+			x, y := contentScreenPoint(app, tc.column, tc.row)
+			app = pressMouse(app, x, y)
+			if tc.scroll {
+				app.contentViewport.SetYOffset(1)
+			}
+			app = releaseMouse(app, x, y)
+			if app.modal != tc.wantModal || app.tab().cursorLine != tc.wantLine || app.tab().selecting {
+				t.Fatalf("modal = %v, line = %d, selecting = %t", app.modal, app.tab().cursorLine, app.tab().selecting)
+			}
+		})
 	}
 }
 
@@ -98,24 +118,28 @@ func TestMouseHoverCodeGutterShowsCommentMarker(t *testing.T) {
 	app.tabs[0].changedLines = map[int]bool{2: true}
 	app.rebuildContent()
 
-	x, y := contentScreenPoint(app, 0, 1)
-	app = hoverMouse(app, x, y)
-
-	lines := strings.Split(app.contentViewport.View(), "\n")
-	if app.hoveredGutterLine != 2 || !strings.HasPrefix(lines[1], commentGutterMarker.Render(">")) {
-		t.Fatalf("hovered line = %d, rendered line = %q; want comment marker on line 2",
-			app.hoveredGutterLine, ansi.Strip(lines[1]))
-	}
-
-	app = hoverMouse(app, x+gutterWidth, y)
-	lines = strings.Split(app.contentViewport.View(), "\n")
-	if app.hoveredGutterLine != 0 || !strings.HasPrefix(lines[1], diffAddedGutter.Render("+")) {
-		t.Fatalf("hovered line = %d, rendered line = %q; want diff marker restored",
-			app.hoveredGutterLine, ansi.Strip(lines[1]))
+	for _, set := range []icons.Set{icons.Plain, icons.Nerd} {
+		app.icons = set
+		x, y := contentScreenPoint(app, gutterWidth-2, 1)
+		app = hoverMouse(app, x, y)
+		runes, styles := renderedCells(strings.Split(app.contentViewport.View(), "\n")[1])
+		line := string(runes)
+		marker := set.Glyph(icons.AddComment, "⊞")
+		if !strings.HasPrefix(line, "+") || ansi.Cut(line, gutterWidth-1, gutterWidth) != marker || !strings.HasSuffix(strings.TrimRight(line, " "), marker+"second") {
+			t.Fatalf("rendered line = %q; want a one-cell comment button beside the number", line)
+		}
+		if !sameColor(styles[gutterWidth-1].Fg, commentFocusedBorderColor) {
+			t.Fatal("comment button should use the focused comment border color")
+		}
+		app = hoverMouse(app, x+2, y)
+		line = ansi.Strip(strings.Split(app.contentViewport.View(), "\n")[1])
+		if strings.Contains(line, marker) || !strings.HasPrefix(line, "+") {
+			t.Fatalf("rendered line = %q; want the diff marker without the hover button", line)
+		}
 	}
 }
 
-func TestMouseClickSelectionEndGutterPreservesRangeAndOpensComment(t *testing.T) {
+func TestMouseClickSelectedLineNumberCommentsOnRange(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
@@ -135,12 +159,13 @@ func TestMouseClickSelectionEndGutterPreservesRangeAndOpensComment(t *testing.T)
 			app.tabs[0].cursorLine = tt.cursor
 			app.rebuildContent()
 
-			x, y := contentScreenPoint(app, 0, 3)
+			x, y := contentScreenPoint(app, gutterWidth-2, 2)
+			app = hoverMouse(app, x, y)
 			app = clickMouse(app, x, y)
 
 			start, end := app.selectionRange()
 			if app.modal != commentModal || !app.tab().selecting || start != 2 || end != 4 {
-				t.Fatalf("modal = %v, selecting = %t, range = %d-%d; want selection comment for 2-4",
+				t.Fatalf("modal = %v, selecting = %t, range = %d-%d; want a comment on 2-4",
 					app.modal, app.tab().selecting, start, end)
 			}
 		})
@@ -235,26 +260,43 @@ func TestMouseDragRenderedCodeLinesUsesDisplayedPositions(t *testing.T) {
 	}
 }
 
-func TestMouseDragCodeGutterSelectsLinesAndOpensComment(t *testing.T) {
+func TestMouseDragCodeGutterSelectsLinesForComment(t *testing.T) {
 	t.Parallel()
 	app := setupPrivateAppWithDoc(t, "first\nsecond\nthird\nfourth\nfifth\n")
 	app.width = 100
 	app.filePath = strings.Repeat("x", 76)
 	app.contentViewport.SetWidth(75)
 
-	startX, startY := contentScreenPoint(app, 0, 1)
-	endX, endY := contentScreenPoint(app, 0, 3)
+	startX, startY := contentScreenPoint(app, gutterWidth-2, 1)
+	endX, endY := contentScreenPoint(app, gutterWidth-2, 3)
 	app = pressMouse(app, startX, startY)
 	app = moveMouse(app, endX, endY)
-	if !app.mouseSelecting || !app.tab().selecting || app.tab().selectAnchor != 2 || app.tab().cursorLine != 4 {
+	if !app.lineDrag.started || !app.tab().selecting || app.tab().selectAnchor != 2 || app.tab().cursorLine != 4 {
 		t.Fatalf("drag = %t, selecting = %t, range = %d-%d; want 2-4",
-			app.mouseSelecting, app.tab().selecting, app.tab().selectAnchor, app.tab().cursorLine)
+			app.lineDrag.started, app.tab().selecting, app.tab().selectAnchor, app.tab().cursorLine)
 	}
 
 	app = releaseMouse(app, endX, endY)
-	if app.mouseSelecting || app.modal != commentModal || !app.tab().selecting {
-		t.Fatalf("drag = %t, modal = %v, selecting = %t; want selection comment",
-			app.mouseSelecting, app.modal, app.tab().selecting)
+	if app.lineDrag.ref.line != 0 || app.modal != noModal || !app.tab().selecting {
+		t.Fatalf("drag = %+v, modal = %v, selecting = %t; want selection without a dialog",
+			app.lineDrag, app.modal, app.tab().selecting)
+	}
+
+	x, outside := contentScreenPoint(app, gutterWidth-1, 0)
+	app = hoverMouse(app, x, outside)
+	if app.hoveredCommentAdd != nil {
+		t.Fatal("hover outside the range revealed an add-comment button")
+	}
+	x, middle := contentScreenPoint(app, gutterWidth-1, 2)
+	app = hoverMouse(app, x, middle)
+	row := strings.Split(app.contentViewport.GetContent(), "\n")[2]
+	if !strings.Contains(ansi.Strip(row), "⊞") {
+		t.Fatalf("selected row did not show its add-comment button: %q", row)
+	}
+	app = clickMouse(app, x, middle)
+	start, end := app.selectionRange()
+	if app.modal != commentModal || start != 2 || end != 4 {
+		t.Fatalf("modal = %v, selection = %d-%d; want 2-4 comment", app.modal, start, end)
 	}
 }
 
@@ -319,8 +361,8 @@ func TestMouseDragSelectsDeletedLineRange(t *testing.T) {
 	app = releaseMouse(app, left, endY)
 
 	start, end := app.selectionRange()
-	if app.modal != commentModal || app.selectionSide() != "old" || start != 2 || end != 3 {
-		t.Fatalf("modal = %v, selection = %s:%d-%d; want old:2-3 comment",
+	if app.modal != noModal || app.selectionSide() != "old" || start != 2 || end != 3 {
+		t.Fatalf("modal = %v, selection = %s:%d-%d; want old:2-3 selection",
 			app.modal, app.selectionSide(), start, end)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/crittylabs/critty/v2/internal/review"
 )
@@ -51,14 +52,19 @@ func TestSourceFocusPreservesMarkdownFormatting(t *testing.T) {
 							t.Fatalf("missing %s", label)
 						}
 						at = len([]rune(string(runes)[:at]))
+						diffBg, wordBg := diffChangedLineBg, diffAddedTextBg
+						if side == "old" {
+							diffBg, wordBg = diffDeletedLineBg, diffDeletedTextBg
+						}
 						for i := at; i < at+len(label); i++ {
-							if focus != "none" {
-								expected := sidebarHighlightBg.GetBackground()
-								if focus == "selection" {
-									expected = selectedLineBg.GetBackground()
+							switch focus {
+							case "inline", "sidebar":
+								if !sameColor(styles[i].Bg, sidebarHighlightBg.GetBackground()) {
+									t.Fatalf("%s lost the comment highlight while %s has focus", label, focus)
 								}
-								if !sameColor(styles[i].Bg, expected) {
-									t.Fatalf("%s kept diff colors while %s has focus", label, focus)
+							default:
+								if !sameColor(styles[i].Bg, diffBg.GetBackground()) && !sameColor(styles[i].Bg, wordBg.GetBackground()) {
+									t.Fatalf("%s lost diff colors while %s has focus", label, focus)
 								}
 							}
 							if styles[i].Attrs&uv.AttrBold == 0 {
@@ -69,5 +75,60 @@ func TestSourceFocusPreservesMarkdownFormatting(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestSourceLineBackgroundsCoverGutterAndPadding(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dark=%t", dark), func(t *testing.T) {
+			initAdaptiveStyles(dark)
+			app := setupPrivateAppWithDoc(t, strings.Repeat("wrapped word ", 10)+"\n\nOutside")
+			app.width, app.height = 64, 20
+			app.viewMode = true
+			app.recalculateLayout()
+			app.tab().selecting, app.tab().selectAnchor, app.tab().cursorLine = true, 1, 2
+			for _, hidden := range []bool{false, true} {
+				app.hideLineNumbers = hidden
+				app.rebuildContent()
+				rows := strings.Split(app.contentViewport.GetContent(), "\n")
+				for line, style := range []lipgloss.Style{selectedLineBg, lipgloss.NewStyle().Background(buttonBackground)} {
+					r := app.contentLayout.lineRanges[line+1]
+					if line == 0 && r.end-r.start < 2 {
+						t.Fatal("selection did not contain wrapped rows")
+					}
+					for i := r.start; i < r.end; i++ {
+						runes, cells := renderedCells(rows[i])
+						if len(cells) != app.contentViewport.Width() || runes[0] != ' ' {
+							t.Fatalf("line %d row %d has an incomplete background or marker: %q", line+1, i, rows[i])
+						}
+						if !hidden && (runes[gutterWidth-1] != '┃' || !sameColor(cells[gutterWidth-1].Fg, commentFocusedBorderColor)) {
+							t.Fatalf("line %d row %d is missing the blue selection bar", line+1, i)
+						}
+						for col, cell := range cells {
+							if !sameColor(cell.Bg, style.GetBackground()) {
+								t.Fatalf("line %d row %d column %d background = %v, want %v", line+1, i, col, cell.Bg, style.GetBackground())
+							}
+						}
+					}
+				}
+				r := app.contentLayout.lineRanges[3]
+				runes, cells := renderedCells(rows[r.start])
+				if cells[0].Bg != nil || (!hidden && runes[gutterWidth-1] != ' ') {
+					t.Fatal("selection marked a line outside the range")
+				}
+			}
+			app.maxWrapWidth = 20
+			app.recalculateLayout()
+			app.rebuildContent()
+			app.scrollToCursor()
+			row := renderedLineY(t, app, "wrapped word")
+			view := strings.Split(app.View().Content, "\n")
+			_, cells := renderedCells(view[row])
+			if !sameColor(cells[app.contentPaneWidth()-2].Bg, selectedLineBg.GetBackground()) {
+				t.Fatal("wrap limit stopped the selection background before the pane border")
+			}
+		})
 	}
 }

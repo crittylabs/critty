@@ -113,17 +113,29 @@ func TestPatchSourceLateBackground(t *testing.T) {
 }
 
 func TestPatchSourceSelectionAndSearch(t *testing.T) {
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	initAdaptiveStyles(wasDark)
 	for _, split := range []bool{false, true} {
 		m := patchDocumentApp(t, false)
 		m.split = split
+		m.hideLineNumbers = false
+		m.recalculateLayout()
 		m.tab().cursorLine, m.tab().selectAnchor = 6, 6
 		m.tab().selecting = true
 		m.rebuildContent()
 		row := m.contentLayout.lineRanges[6].start
 		text := strings.Split(m.contentViewport.GetContent(), "\n")[row]
-		_, cells := renderedCells(text)
-		if !sameColor(cells[m.sourceGutterWidth()+1].Bg, selectedLineBg.GetBackground()) {
-			t.Fatalf("split=%v: patch background concealed line selection", split)
+		runes, cells := renderedCells(text)
+		if !sameColor(cells[m.sourceGutterWidth()-2].Bg, buttonBackground) ||
+			!sameColor(cells[m.sourceGutterWidth()+1].Bg, diffDeletedLineBg.GetBackground()) {
+			t.Fatalf("split=%v: expected the current-line gutter and the deletion background", split)
+		}
+		if runes[gutterWidth-1] != '┃' || !sameColor(cells[gutterWidth-1].Fg, commentFocusedBorderColor) {
+			t.Fatalf("split=%v: selected deletion is missing the blue selection bar", split)
+		}
+		if split && strings.Count(text, "┃") != 1 {
+			t.Fatal("selection bar should appear only on the selected side")
 		}
 		m.tab().selecting = false
 		m = ctrlKey(m, 's')

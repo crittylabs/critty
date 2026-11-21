@@ -90,6 +90,7 @@ const (
 	Bolt
 	Stop
 	LinkExternal
+	AddComment
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -113,16 +114,16 @@ var glyphs = [...]string{
 	Info: "\uea74", Flame: "\ueaf2", Question: "\ueb32", Error: "\uea87",
 	Bug: "\ueaaf", List: "\ueb17", Quote: "\ueb33", Clipboard: "\ueac0",
 	Report: "\uf50a", Bolt: "\U000f140b", Stop: "\uf46e",
-	LinkExternal: "\uf465",
+	LinkExternal: "\uf465", AddComment: "\uf0fe",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.
-// Close buttons, Powerline tab edges, and portable fallbacks keep their width.
+// Close and add-comment buttons, tab edges, and portable fallbacks keep their width.
 func (s Set) Glyph(kind Kind, fallback string) string {
 	if !s || int(kind) >= len(glyphs) {
 		return fallback
 	}
-	if kind == Close || kind == TabLeft || kind == TabRight {
+	if kind == Close || kind == AddComment || kind == TabLeft || kind == TabRight {
 		return glyphs[kind]
 	}
 	return glyphs[kind] + " "

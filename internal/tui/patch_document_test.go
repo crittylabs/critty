@@ -93,9 +93,8 @@ func TestPatchDocumentSourceInteractions(t *testing.T) {
 			t.Fatalf("mouse target x=%d: %+v, %v", target.x, ref, ok)
 		}
 	}
-	// Comment on the deletion using the real content gutter, not the old side
-	// of the file changed by the patch.
-	x, y := contentScreenPoint(m, 0, row)
+	// The add-comment button anchors to the patch's raw source.
+	x, y := contentScreenPoint(m, gutterWidth-1, row)
 	m = clickMouse(m, x, y)
 	if m.modal != commentModal {
 		t.Fatal("gutter did not open a comment")

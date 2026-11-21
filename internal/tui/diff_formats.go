@@ -118,18 +118,13 @@ func (m *AppModel) contentMouseTargetAt(x, y int) (contentMouseTarget, bool) {
 	return target, ok && (target.line > 0 || target.annotation || target.drifted)
 }
 
-func (m *AppModel) isContentGutter(x int) bool {
-	if x == 0 {
-		return true
-	}
-	if m.alternateDiff(m.tab()) || m.splitPatchDocument(m.tab()) {
-		for _, row := range m.contentLayout.columns {
-			if row.split > 0 {
-				return x == row.split+3
-			}
+func (m *AppModel) contentColumnOffset(x, y int) int {
+	if y >= 0 && y < len(m.contentLayout.columns) {
+		if split := m.contentLayout.columns[y].split; split > 0 && x >= split+3 {
+			return x - split - 3
 		}
 	}
-	return false
+	return x
 }
 
 func (m *AppModel) alternateDiff(t *FileTab) bool {
@@ -482,8 +477,7 @@ func (m *AppModel) rebuildDiffContent() {
 	}
 	m.mapMathRanges(&layout)
 	m.contentLayout = layout
-	content := m.shadeMarkdownCodeBlocks(b.String(), &m.contentLayout, width)
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(content, &m.contentLayout, groups)))
+	m.setRenderedSourceContent(b.String(), width, groups)
 }
 
 func updateDiffRange(ranges map[int]renderedRange, line, row int) {
@@ -577,9 +571,10 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 	if passive {
 		n = line.oldLine
 	}
-	selected := t.selecting && gutter.selSide == ref.side && ref.line >= gutter.selStart && ref.line <= gutter.selEnd
+	selected := !passive && t.selecting && gutter.selSide == ref.side && ref.line >= gutter.selStart && ref.line <= gutter.selEnd
 	highlighted := gutter.hlSide == ref.side && gutter.hlStart > 0 && ref.line >= gutter.hlStart && ref.line <= gutter.hlEnd
 	cursor := !passive && t.cursorLine == ref.line && t.cursorSide == ref.side
+	highlighted = highlighted && !selected && !(cursor && m.focused == contentPane && !t.cursorOnAnnotation)
 	marker := " "
 	if line.changed {
 		marker = gutter.markers.added
@@ -593,14 +588,6 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 			counts = gutter.oldAnnotated
 		}
 		switch {
-		case cursor && !t.cursorOnAnnotation:
-			marker = gutter.markers.cursor
-		case selected:
-			marker = gutter.markers.selected
-		case highlighted:
-			marker = gutter.markers.cursor
-		case m.hoveredGutterLine == ref.line && m.hoveredGutterSide == ref.side:
-			marker = gutter.markers.hovered
 		case counts[ref.line] > 1:
 			marker = gutter.markers.overlap
 		case counts[ref.line] == 1:
@@ -663,9 +650,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 	}
 	cells := make([]diffCellRow, len(rows))
 	for i, text := range rows {
-		if selected {
-			text = sourceLineHighlight(selectedLineBg, text)
-		} else if highlighted {
+		if highlighted {
 			text = sourceLineHighlight(sidebarHighlightBg, text)
 		}
 		cells[i] = diffCellRow{text: m.sourceRowGutter(sourceLine, oldSide, i, marker, num) + text}

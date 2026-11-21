@@ -9,7 +9,135 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
+
+func sourceLineBackground(current, selected bool) *lipgloss.Style {
+	switch {
+	case current:
+		style := lipgloss.NewStyle().Background(buttonBackground)
+		return &style
+	case selected:
+		return &selectedLineBg
+	default:
+		return nil
+	}
+}
+
+func (m *AppModel) setRenderedSourceContent(content string, width int, groups map[lineRef][]string) {
+	layout := &m.contentLayout
+	content = m.decorateCommentMarkers(content, layout, groups)
+	content = m.decorateTextSelection(content)
+	content = m.highlightSourceRows(content, layout)
+	content = m.shadeMarkdownCodeBlocks(content, layout, width)
+	m.contentViewport.SetContent(content)
+}
+
+func (m *AppModel) sourceRowHighlights() func(contentMouseTarget) (*lipgloss.Style, bool) {
+	t := m.tab()
+	showCursor := m.focused == contentPane && !t.cursorOnAnnotation
+	if !showCursor && !t.selecting {
+		return nil
+	}
+	start, end := m.selectionRange()
+	side := m.selectionSide()
+	return func(target contentMouseTarget) (*lipgloss.Style, bool) {
+		if target.line <= 0 || target.annotation || target.passive {
+			return nil, false
+		}
+		current := showCursor && target.line == t.cursorLine && target.side == t.cursorSide
+		selected := t.selecting && target.side == side && target.line >= start && target.line <= end
+		return sourceLineBackground(current, selected), selected
+	}
+}
+
+// Paint after recording text spans so the padding never becomes source text.
+// Existing syntax, diff and search backgrounds remain visible.
+func (m *AppModel) highlightSourceRows(content string, layout *renderedContentLayout) string {
+	highlightAt := m.sourceRowHighlights()
+	button := m.hoveredCommentAdd
+	if button != nil {
+		if _, ok := m.commentAddAt(button.X, button.Y); !ok {
+			button = nil
+		}
+	}
+	if highlightAt == nil && button == nil {
+		return content
+	}
+	rows := strings.Split(content, "\n")
+	if button != nil {
+		glyph := commentAddStyle.Render(m.icons.Glyph(icons.AddComment, "⊞"))
+		rows[button.Y] = replaceSourceCell(rows[button.Y], button.X, glyph)
+	}
+	if highlightAt == nil {
+		return strings.Join(rows, "\n")
+	}
+	width := m.contentViewport.Width()
+	divider := lipgloss.NewStyle().Foreground(commentFocusedBorderColor).Render("┃")
+	paint := func(row string, width int, style *lipgloss.Style, selected bool, x, y int) string {
+		hasButton := button != nil && button.Y == y && button.X == x+gutterWidth-1
+		if selected && !m.hideLineNumbers && !hasButton {
+			row = replaceSourceCell(row, gutterWidth-1, divider)
+		}
+		return fillSourceBackground(row, width, style)
+	}
+	for i, target := range layout.rows {
+		if i < len(layout.columns) && layout.columns[i].split > 0 {
+			columns := layout.columns[i]
+			left, leftSelected := highlightAt(columns.left)
+			right, rightSelected := highlightAt(columns.right)
+			if left != nil || right != nil {
+				row := rows[i]
+				rightStart := columns.split + 3
+				rows[i] = paint(ansi.Cut(row, 0, columns.split), columns.split, left, leftSelected, 0, i) +
+					ansi.Cut(row, columns.split, rightStart) +
+					paint(ansi.Cut(row, rightStart, ansi.StringWidth(row)), width-rightStart, right, rightSelected, rightStart, i)
+			}
+		} else if style, selected := highlightAt(target); style != nil {
+			rows[i] = paint(rows[i], width, style, selected, 0, i)
+		}
+	}
+	return strings.Join(rows, "\n")
+}
+
+func replaceSourceCell(row string, column int, replacement string) string {
+	return ansi.Cut(row, 0, column) + replacement + ansi.Cut(row, column+1, ansi.StringWidth(row))
+}
+
+// A wrap limit leaves space between the viewport and the pane border.
+func (m *AppModel) extendSourceBackgrounds(content string, paneWidth int) string {
+	if paneWidth <= m.contentViewport.Width() {
+		return content
+	}
+	highlightAt := m.sourceRowHighlights()
+	if highlightAt == nil {
+		return content
+	}
+	layout := &m.contentLayout
+	rows := strings.Split(content, "\n")
+	for i, row := range rows {
+		y := i + m.contentViewport.YOffset()
+		if y >= len(layout.rows) {
+			break
+		}
+		target := layout.rows[y]
+		if y < len(layout.columns) && layout.columns[y].split > 0 {
+			target = layout.columns[y].right
+		}
+		if style, _ := highlightAt(target); style != nil {
+			rows[i] += style.Render(strings.Repeat(" ", max(0, paneWidth-ansi.StringWidth(row))))
+		}
+	}
+	return strings.Join(rows, "\n")
+}
+
+func fillSourceBackground(content string, width int, style *lipgloss.Style) string {
+	if style == nil {
+		return content
+	}
+	padding := strings.Repeat(" ", max(0, width-ansi.StringWidth(content)))
+	return inlineBackground(*style, content+padding)
+}
 
 func (line *markdownLine) displayTokens() []markdownToken {
 	if line.previewTokens != nil {

@@ -53,6 +53,30 @@ func TestSplitDiffReplacementAlignment(t *testing.T) {
 	}
 }
 
+func TestMouseDragSplitRightLineNumbers(t *testing.T) {
+	t.Parallel()
+	m := patchApp(t, formatsPatch)
+	m.split = true
+	m.rebuildContent()
+	startRow := m.contentLayout.lineRanges[20].start
+	endRow := m.contentLayout.lineRanges[21].start
+	column := m.contentLayout.columns[startRow].split + 3 + gutterWidth - 2
+	x, startY := contentScreenPoint(m, column, startRow)
+	_, endY := contentScreenPoint(m, column, endRow)
+	m = pressMouse(m, x, startY)
+	m = moveMouse(m, x, endY)
+	m = releaseMouse(m, x, endY)
+	if m.modal != noModal {
+		t.Fatal("releasing a drag opened a comment")
+	}
+	m = clickMouse(m, x+1, startY)
+	start, end := m.selectionRange()
+	if m.modal != commentModal || m.selectionSide() != "" || start != 20 || end != 21 {
+		t.Fatalf("modal = %v, selection = %s:%d-%d; want 20-21 comment on the right",
+			m.modal, m.selectionSide(), start, end)
+	}
+}
+
 func TestDiffFormatsPartialPatch(t *testing.T) {
 	t.Parallel()
 	m := patchApp(t, formatsPatch)

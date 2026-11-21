@@ -236,7 +236,7 @@ func (m *AppModel) rebuildPatchDocument(patch *patchDocumentCache) {
 		}
 	}
 	m.contentLayout = layout
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(b.String(), &m.contentLayout, groups)))
+	m.setRenderedSourceContent(b.String(), width, groups)
 }
 
 func (m *AppModel) movePatchDocumentSide(before bool) {

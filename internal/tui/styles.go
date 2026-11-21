@@ -188,13 +188,7 @@ var (
 			Foreground(warning).
 			Bold(true)
 
-	commentGutterMarker = lipgloss.NewStyle().
-				Foreground(warning).
-				Bold(true)
-
-	selectedMarker = lipgloss.NewStyle().
-			Foreground(lipgloss.BrightMagenta).
-			Bold(true)
+	commentAddStyle = lipgloss.NewStyle().Foreground(commentFocusedBorderColor)
 
 	// Inline annotation box styles
 	inlineCommentBox = lipgloss.NewStyle().
@@ -368,8 +362,7 @@ var (
 
 	// Background-dependent styles — initialized with dark defaults,
 	// updated at runtime via tea.BackgroundColorMsg.
-	selectedLineBg = lipgloss.NewStyle().
-			Faint(true)
+	selectedLineBg  = lipgloss.NewStyle().Background(lipgloss.Color("#433721"))
 	textSelectionBg = lipgloss.NewStyle().Background(lipgloss.Color("#608786"))
 
 	sidebarHighlightBg = lipgloss.NewStyle().
@@ -445,9 +438,9 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	tabCountDelimiter = tabCountDelimiter.Foreground(textSecondary)
 	contextBoxStyle = contextBoxStyle.Foreground(textPrimary)
 	cursorColor := ld(textColors.brightYellow, warning)
-	cursorLineNumStyle = cursorLineNumStyle.Foreground(cursorColor)
+	cursorLineNumStyle = cursorLineNumStyle.Foreground(textPrimary)
+	selectedLineNumStyle = selectedLineNumStyle.Foreground(textPrimary)
 	cursorMarker = cursorMarker.Foreground(cursorColor)
-	commentGutterMarker = commentGutterMarker.Foreground(cursorColor)
 	// Black on yellow looks smudged on a light background; use white keys
 	// on dark yellow there instead.
 	keyForeground := ld(lipgloss.Color("#FFFFFF"), lipgloss.Black)
@@ -473,8 +466,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	modalBtnPrimaryLabel, modalBtnPrimaryFocusedLabel = newModalPrimaryStyles(ld)
 	modalDangerBtnLabel, modalDangerBtnFocused = newModalDangerStyles(ld)
 
-	selectedLineBg = lipgloss.NewStyle().
-		Background(ld(lipgloss.Color("#E8E0F8"), lipgloss.Color("#2D2B55")))
+	selectedLineBg = selectedLineBg.Background(ld(lipgloss.Color("#F5E8CB"), lipgloss.Color("#433721")))
 	textSelectionBg = lipgloss.NewStyle().
 		Background(ld(lipgloss.Color("#CADEDD"), lipgloss.Color("#608786")))
 
@@ -484,8 +476,8 @@ func initAdaptiveStyles(hasDarkBG bool) {
 
 	visualModeIndicator = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.BrightMagenta).
-		Background(ld(lipgloss.Color("#E8E0F8"), lipgloss.Color("#2D2B55"))).
+		Foreground(textPrimary).
+		Background(selectedLineBg.GetBackground()).
 		Padding(0, 1)
 
 	mdCodeStyle = lipgloss.NewStyle().

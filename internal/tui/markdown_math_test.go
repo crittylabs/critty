@@ -82,10 +82,10 @@ func TestMathGuttersGroupTallRows(t *testing.T) {
 		width, rows  int
 		gutters      []string
 	}{
-		{"one row", "Text before ", 100, 1, []string{">    1 "}},
-		{"tall first row", "Text before ", 100, 3, []string{"     ⎛ ", ">    1 ", "     ⎝ "}},
-		{"five rows", "Text before ", 100, 5, []string{"     ⎛ ", "     ⎜ ", ">    1 ", "     ⎜ ", "     ⎝ "}},
-		{"tall continuation", strings.Repeat("t", 19) + " ", 27, 3, []string{">    1 ", "     ⎛ ", "     ↪ ", "     ⎝ "}},
+		{"one row", "Text before ", 100, 1, []string{"     1 "}},
+		{"tall first row", "Text before ", 100, 3, []string{"     ⎛ ", "     1 ", "     ⎝ "}},
+		{"five rows", "Text before ", 100, 5, []string{"     ⎛ ", "     ⎜ ", "     1 ", "     ⎜ ", "     ⎝ "}},
+		{"tall continuation", strings.Repeat("t", 19) + " ", 27, 3, []string{"     1 ", "     ⎛ ", "     ↪ ", "     ⎝ "}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			source := tc.prefix + `$\frac{a}{b}$ after.`

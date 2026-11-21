@@ -123,6 +123,7 @@ func (m *AppModel) rebuildContent() {
 
 	selStart, selEnd := m.selectionRange()
 	selSide := m.selectionSide()
+	showCursor := m.focused == contentPane && !t.cursorOnAnnotation
 
 	// Determine which lines to highlight from the selected annotation.
 	sidebarHighlightStart, sidebarHighlightEnd, sidebarHighlightSide := m.highlightedCommentLines()
@@ -246,17 +247,10 @@ func (m *AppModel) rebuildContent() {
 			isCursor := t.cursorSide == "old" && del.OldLineNum == t.cursorLine
 			isSelected := t.selecting && selSide == "old" && del.OldLineNum >= selStart && del.OldLineNum <= selEnd
 			isSidebarHighlight := sidebarHighlightSide == "old" && del.OldLineNum >= sidebarHighlightStart && del.OldLineNum <= sidebarHighlightEnd
+			isSidebarHighlight = isSidebarHighlight && !isSelected && !(showCursor && isCursor)
 
 			marker := markers.deleted
 			switch {
-			case del.OldLineNum == m.hoveredGutterLine && m.hoveredGutterSide == "old":
-				marker = markers.hovered
-			case isCursor && !t.cursorOnAnnotation:
-				marker = markers.cursor
-			case isSelected:
-				marker = markers.selected
-			case isSidebarHighlight:
-				marker = markers.cursor
 			case oldAnnotatedLines[del.OldLineNum] > 1:
 				marker = markers.overlap
 			case oldAnnotatedLines[del.OldLineNum] == 1:
@@ -288,9 +282,7 @@ func (m *AppModel) rebuildContent() {
 				rows = deletedDisplayLines(del.Content, cached, del.Inline, false, textWidth, decorate)
 			}
 			for wi, content := range rows {
-				if isSelected {
-					content = sourceLineHighlight(selectedLineBg, content)
-				} else if isSidebarHighlight {
+				if isSidebarHighlight {
 					content = sourceLineHighlight(sidebarHighlightBg, content)
 				}
 				layout.appendSourceBlock(&b, m.sourceRowGutter(del.OldLineNum, true, wi, marker, num)+content, target, t.markdownHanging(del.OldLineNum, true, wi, textWidth))
@@ -323,9 +315,11 @@ func (m *AppModel) rebuildContent() {
 		isCursor := t.cursorSide == "" && lineNum == t.cursorLine
 		isSelected := t.selecting && selSide == "" && lineNum >= selStart && lineNum <= selEnd
 		isSidebarHighlight := sidebarHighlightSide == "" && sidebarHighlightStart > 0 && lineNum >= sidebarHighlightStart && lineNum <= sidebarHighlightEnd
+		focus := sourceLineBackground(showCursor && isCursor, isSelected)
+		isSidebarHighlight = isSidebarHighlight && focus == nil
 		isChanged := t.changedLines != nil && t.changedLines[lineNum]
 		inlineChanges := t.inlineChanges[lineNum]
-		formBackground := formLineBackground(isSelected, isSidebarHighlight)
+		formBackground := formLineBackground(focus, isSidebarHighlight)
 		decorate := m.isearchDecorator(lineRef{line: lineNum})
 		highlight := func(s string) string {
 			if decorate != nil {
@@ -336,15 +330,7 @@ func (m *AppModel) rebuildContent() {
 
 		// Marker column
 		var marker string
-		if lineNum == m.hoveredGutterLine && m.hoveredGutterSide == "" {
-			marker = markers.hovered
-		} else if isCursor && !t.cursorOnAnnotation {
-			marker = markers.cursor
-		} else if isSelected {
-			marker = markers.selected
-		} else if isSidebarHighlight {
-			marker = markers.cursor
-		} else if count, ok := annotatedLines[lineNum]; ok && count > 0 {
+		if count := annotatedLines[lineNum]; count > 0 {
 			if count > 1 {
 				marker = markers.overlap
 			} else {
@@ -365,11 +351,13 @@ func (m *AppModel) rebuildContent() {
 			} else if isSelected {
 				numStyle = selectedLineNumStyle
 			}
-			switch rank {
-			case -1:
-				numStyle = numStyle.Background(rankMovedUp.GetBackground())
-			case 1:
-				numStyle = numStyle.Background(rankMovedDown.GetBackground())
+			if focus == nil {
+				switch rank {
+				case -1:
+					numStyle = numStyle.Background(rankMovedUp.GetBackground())
+				case 1:
+					numStyle = numStyle.Background(rankMovedDown.GetBackground())
+				}
 			}
 			numStr = numStyle.Render(strconv.Itoa(lineNum))
 		}
@@ -377,7 +365,7 @@ func (m *AppModel) rebuildContent() {
 		// Check if this line is part of a table block
 		if t.previewLineHidden(lineNum, false) {
 			// Preserve annotations while replacing this source with its image.
-		} else if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSelected && !isSidebarHighlight && !inTable {
+		} else if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSidebarHighlight && !inTable {
 			var rows []string
 			if isMarkdown {
 				content := t.markdownDisplayLine(lineNum, false, line, inlineChanges, m.documentLinkSpans(lineNum, false))
@@ -406,9 +394,7 @@ func (m *AppModel) rebuildContent() {
 			firstRow := len(layout.rows)
 			var wrappedLines []string
 			for _, row := range rows {
-				if isSelected {
-					row = inlineBackground(selectedLineBg, row)
-				} else if isSidebarHighlight {
+				if isSidebarHighlight {
 					row = inlineBackground(sidebarHighlightBg, row)
 				} else if isChanged && len(inlineChanges) == 0 {
 					row = inlineBackground(diffChangedLineBg, row)
@@ -433,7 +419,7 @@ func (m *AppModel) rebuildContent() {
 				}
 			}
 		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
-			if isSelected || isSidebarHighlight {
+			if focus != nil || isSidebarHighlight {
 				formLine = inlineBackground(formBackground, formLine)
 			}
 			for wi, row := range strings.Split(lipgloss.Wrap(highlight(formLine), textWidth, ""), "\n") {
@@ -479,13 +465,11 @@ func (m *AppModel) rebuildContent() {
 			if !measured {
 				width = ansi.StringWidth(displayLine)
 			}
-			if !isSelected && !isSidebarHighlight {
+			if !isSidebarHighlight {
 				displayLine = t.patchDisplayLine(lineNum, displayLine)
 			}
 			displayLine = highlight(displayLine)
-			if isSelected {
-				displayLine = inlineBackground(selectedLineBg, displayLine)
-			} else if isSidebarHighlight {
+			if isSidebarHighlight {
 				displayLine = inlineBackground(sidebarHighlightBg, displayLine)
 			} else if isChanged {
 				displayLine = inlineBackground(diffChangedLineBg, displayLine)
@@ -541,8 +525,7 @@ func (m *AppModel) rebuildContent() {
 
 	m.mapMathRanges(&layout)
 	m.contentLayout = layout
-	content := m.shadeMarkdownCodeBlocks(b.String(), &m.contentLayout, contentWidth)
-	m.contentViewport.SetContent(m.decorateTextSelection(m.decorateCommentMarkers(content, &m.contentLayout, groups)))
+	m.setRenderedSourceContent(b.String(), contentWidth, groups)
 }
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
@@ -602,12 +585,10 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 	return b.String(), button
 }
 
-// formLineBackground returns the background of form labels, which yields to
-// selection and sidebar highlights.
-func formLineBackground(selected, highlighted bool) lipgloss.Style {
+func formLineBackground(focus *lipgloss.Style, highlighted bool) lipgloss.Style {
 	switch {
-	case selected:
-		return selectedLineBg
+	case focus != nil:
+		return formChip.label.Background(focus.GetBackground())
 	case highlighted:
 		return sidebarHighlightBg
 	}
@@ -770,13 +751,12 @@ func highlightMarkdownWith(line string, inline func(string) string) string {
 
 // gutterMarkers holds the one-column gutter markers rendered once per rebuild.
 type gutterMarkers struct {
-	hovered, cursor, selected, overlap, annotated, added, deleted string
+	overlap, annotated, added, deleted string
 }
 
 func renderGutterMarkers() gutterMarkers {
 	return gutterMarkers{
-		hovered: commentGutterMarker.Render(">"), cursor: cursorMarker.Render(">"),
-		selected: selectedMarker.Render("|"), overlap: gutterOverlap.Render("◆"),
+		overlap:   gutterOverlap.Render("◆"),
 		annotated: annotationGutter.Render("■"), added: diffAddedGutter.Render("+"),
 		deleted: diffDeletedGutter.Render("-"),
 	}
