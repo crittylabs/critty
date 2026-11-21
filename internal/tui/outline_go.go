@@ -9,6 +9,8 @@ import (
 	"go/token"
 	"strings"
 
+	"github.com/alecthomas/chroma/v2/lexers"
+
 	"github.com/crittylabs/critty/v2/internal/document"
 	"github.com/crittylabs/critty/v2/internal/icons"
 )
@@ -27,6 +29,9 @@ func (t *FileTab) ensureGoOutline() *goOutlineCache {
 	c := &goOutlineCache{doc: t.doc, content: t.doc.Content, partial: t.doc.Known != nil}
 	t.goOutline = c
 	c.rows = parseOutlineDocument(t.doc, parseGoOutline)
+	for i := range c.rows {
+		c.rows[i].tokenize(lexers.Go, true)
+	}
 	return c
 }
 
@@ -53,7 +58,7 @@ func parseGoOutline(source string, offset int) []outlineSymbol {
 		}
 		line := fset.PositionFor(pos, false).Line + offset
 		if line > 0 {
-			rows = append(rows, outlineSymbol{outlineHeading{line: line, level: 1, label: label}, kind, short})
+			rows = append(rows, outlineSymbol{outlineHeading: outlineHeading{line: line, level: 1, label: label}, kind: kind, name: short})
 		}
 	}
 	for _, decl := range file.Decls {

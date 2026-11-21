@@ -73,7 +73,7 @@ func TestNerdFontLabelSpacing(t *testing.T) {
 		kind           icons.Kind
 	}{
 		{"file", app.renderFileTypeIcon(icons.Go, lipgloss.NewStyle()) + "Name", icons.Go},
-		{"outline", (outlineSymbol{outlineHeading: outlineHeading{label: "Name"}, kind: icons.Heading}).displayLabel(icons.Nerd, lipgloss.NewStyle()), icons.Heading},
+		{"outline", (outlineSymbol{outlineHeading: outlineHeading{label: "Name"}, kind: icons.Heading}).displayLabel(icons.Nerd, lipgloss.NewStyle(), nil), icons.Heading},
 		{"button", app.iconBarButton(icons.Watch, "Name"), icons.Watch},
 		{"resolution", renderResolution(false, "Name", true, false, icons.Nerd), icons.Unchecked},
 		{"form", app.renderFormBadge(icons.Nerd.Glyph(icons.Unchecked, ""), "Name", lipgloss.Cyan, lipgloss.NewStyle()), icons.Unchecked},
@@ -255,10 +255,10 @@ func TestOutlineSymbolKinds(t *testing.T) {
 				if i >= len(tc.names) {
 					t.Fatalf("unexpected row: %+v", row)
 				}
-				if label := ansi.Strip(row.displayLabel(icons.Nerd, lipgloss.NewStyle())); label != icons.Nerd.Label(row.kind, tc.names[i]) {
+				if label := ansi.Strip(row.displayLabel(icons.Nerd, lipgloss.NewStyle(), nil)); label != icons.Nerd.Label(row.kind, tc.names[i]) {
 					t.Fatalf("Nerd Font label = %q, want name %q", label, tc.names[i])
 				}
-				if row.displayLabel(icons.Plain, lipgloss.NewStyle()) != row.label {
+				if row.displayLabel(icons.Plain, lipgloss.NewStyle(), nil) != row.label {
 					t.Fatal("plain label changed")
 				}
 			}

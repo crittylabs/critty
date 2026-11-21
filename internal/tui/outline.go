@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"bytes"
+	"image/color"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -9,6 +11,9 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/formatters"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
 
@@ -22,21 +27,110 @@ type outlineHeading struct {
 
 type outlineSymbol struct {
 	outlineHeading
-	kind icons.Kind
-	name string
+	kind   icons.Kind
+	name   string
+	tokens []chroma.Token
 }
 
-func (s outlineSymbol) displayLabel(symbols icons.Set, style lipgloss.Style) string {
+func (s outlineSymbol) displayLabel(symbols icons.Set, style lipgloss.Style, palette *outlinePalette) string {
 	label := s.label
 	if symbols && s.name != "" {
 		label = s.name
 	}
-	label = style.Render(label)
+	if palette != nil && len(s.tokens) > 0 {
+		label = s.renderTokens(label, style, palette)
+	} else {
+		label = style.Render(label)
+	}
 	if symbols {
 		icon := style.Foreground(mdCodeStyle.GetForeground()).Render(symbols.Glyph(s.kind, ""))
 		return symbols.Join(icon, label)
 	}
 	return label
+}
+
+// Tokenize the full label once so hiding the keyword with Nerd Fonts does
+// not change the lexer context for the name.
+func (s *outlineSymbol) tokenize(lexer chroma.Lexer, goSource bool) {
+	text := s.label
+	if s.kind == icons.Function || s.kind == icons.Method {
+		// Some lexers require an opening parenthesis to identify a function.
+		text += "("
+	}
+	iter, err := lexer.Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, text)
+	if err != nil {
+		return
+	}
+	remaining := len(s.label)
+	for token := iter(); token != chroma.EOF && remaining > 0; token = iter() {
+		token.Value = token.Value[:min(remaining, len(token.Value))]
+		remaining -= len(token.Value)
+		if goSource && token.Value == "*" {
+			token.Type = chroma.Punctuation
+		}
+		s.tokens = append(s.tokens, token)
+	}
+}
+
+func (s outlineSymbol) renderTokens(label string, style lipgloss.Style, palette *outlinePalette) string {
+	start := strings.LastIndex(s.label, label)
+	if start < 0 {
+		return style.Render(label)
+	}
+	end := start + len(label)
+	var b strings.Builder
+	pos := 0
+	for _, token := range s.tokens {
+		next := pos + len(token.Value)
+		if from, to := max(start, pos), min(end, next); from < to {
+			part := style
+			if fg := palette.foreground(token.Type); fg != nil {
+				part = part.Foreground(fg)
+			}
+			b.WriteString(part.Render(s.label[from:to]))
+		}
+		pos = next
+		if pos >= end {
+			break
+		}
+	}
+	if pos < end {
+		b.WriteString(style.Render(s.label[max(start, pos):end]))
+	}
+	return b.String()
+}
+
+type outlinePalette struct {
+	style  *chroma.Style
+	colors map[chroma.TokenType]color.Color
+}
+
+func (p *outlinePalette) foreground(kind chroma.TokenType) color.Color {
+	if fg, ok := p.colors[kind]; ok {
+		return fg
+	}
+	var pen uv.Style
+	var foreground color.Color
+	var output bytes.Buffer
+	// Quantize through the same formatter as the source pane, then keep
+	// the foreground so the outline still controls bold and background.
+	if err := formatters.Get("terminal256").Format(&output, p.style, chroma.Literator(chroma.Token{Type: kind, Value: "x"})); err == nil {
+		parser := ansi.GetParser()
+		defer ansi.PutParser(parser)
+		parser.SetHandler(ansi.Handler{
+			Print: func(rune) { foreground = pen.Fg },
+			HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
+				if cmd == 'm' {
+					uv.ReadStyle(params, &pen)
+				}
+			},
+		})
+		for _, c := range output.Bytes() {
+			parser.Advance(c)
+		}
+	}
+	p.colors[kind] = foreground
+	return foreground
 }
 
 type documentOutline struct {
@@ -47,6 +141,7 @@ type documentOutline struct {
 	dragging   bool
 	proportion int // requested percentage, zero means automatic
 	viewport   viewport.Model
+	palette    outlinePalette
 }
 
 func newDocumentOutline() documentOutline {
@@ -187,6 +282,9 @@ func (m *AppModel) outlineNewLine(old int) int {
 
 func (m *AppModel) renderOutline() {
 	o := &m.outline
+	if style := codeHighlightStyle(); o.palette.style != style {
+		o.palette = outlinePalette{style: style, colors: make(map[chroma.TokenType]color.Color)}
+	}
 	var levels []int
 	lines := make([]string, len(o.rows))
 	for i, heading := range o.rows {
@@ -206,7 +304,7 @@ func (m *AppModel) renderOutline() {
 		if heading.kind == icons.Heading {
 			style = style.Foreground(markdownHeadingStyle(heading.level).GetForeground())
 		}
-		line := prefix + strings.Repeat(" ", depth*treeIndent) + heading.displayLabel(m.icons, style)
+		line := prefix + strings.Repeat(" ", depth*treeIndent) + heading.displayLabel(m.icons, style, &o.palette)
 		line = ansi.Truncate(line, o.viewport.Width(), "…")
 		if i == o.active {
 			padding := strings.Repeat(" ", max(0, o.viewport.Width()-ansi.StringWidth(line)))

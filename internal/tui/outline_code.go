@@ -58,6 +58,9 @@ func (t *FileTab) ensureCodeOutline() *codeOutlineCache {
 			return parseCodeOutline(language, source, offset)
 		})
 	}
+	for i := range c.rows {
+		c.rows[i].tokenize(lexer, false)
+	}
 	t.codeOutline = c
 	return c
 }
@@ -281,7 +284,7 @@ func parseMaskedOutline(language, code string, offset int) []outlineSymbol {
 					kind = icons.Method
 				}
 			}
-			rows = append(rows, outlineSymbol{outlineHeading{line: i + 1 + offset, level: level, label: decl.label}, kind, decl.name})
+			rows = append(rows, outlineSymbol{outlineHeading: outlineHeading{line: i + 1 + offset, level: level, label: decl.label}, kind: kind, name: decl.name})
 			if container && !strings.Contains(text, ";") || packageLine && decl.prototype {
 				region, regionDepth = 1, depth
 			}

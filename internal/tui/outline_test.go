@@ -94,6 +94,64 @@ func TestMarkdownOutlineSharesHeadingColors(t *testing.T) {
 	}
 }
 
+func TestCodeOutlineSharesDeclarationColors(t *testing.T) {
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	for _, tc := range []struct {
+		path, source, keyword string
+		identifiers           []string
+	}{
+		{"sample.go", "package sample\nfunc (r *Runner[T]) Serve() {}\n", "func", []string{"Runner", "T", "Serve"}},
+		{"sample.rs", "pub fn serve() {}\n", "fn", []string{"serve"}},
+		{"sample.zig", "pub fn serve() void {}\n", "fn", []string{"serve"}},
+		{"sample.swift", "public func serve() {}\n", "func", []string{"serve"}},
+		{"sample.py", "async def serve(): pass\n", "def", []string{"serve"}},
+		{"sample.c", "void serve(void) {}\n", "", []string{"serve"}},
+		{"sample.ts", "export function serve(): void {}\n", "function", []string{"serve"}},
+		{"sample.el", "(defun serve () t)\n", "defun", []string{"serve"}},
+		{"sample.lua", "local function serve() end\n", "function", []string{"serve"}},
+		{"sample.kt", "fun serve() {}\n", "fun", []string{"serve"}},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			app := outlineTestApp(t, tc.source)
+			app.tab().path = tc.path
+			app, _ = updateApp(app, tea.WindowSizeMsg{Width: 150, Height: 30})
+			for _, dark := range []bool{false, true} {
+				initAdaptiveStyles(dark)
+				app.tab().resetHighlightCache()
+				app.rebuildContent()
+				if len(app.outline.rows) != 1 {
+					t.Fatalf("got %d rows, want one declaration", len(app.outline.rows))
+				}
+				source := app.tab().chromaLines[app.outline.rows[0].line-1]
+				for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
+					app.icons, app.outline.active = symbols, 0
+					app.renderOutline()
+					row := app.outline.viewport.GetContent()
+					check := func(word string) {
+						actual, want := sourceWordStyle(t, row, word), sourceWordStyle(t, source, word)
+						if !sameColor(actual.Fg, want.Fg) || !sameColor(actual.Bg, buttonBackground) {
+							t.Fatalf("dark=%t icons=%t %q: got %+v, want foreground %v and active background", dark, symbols, word, actual, want.Fg)
+						}
+					}
+					if tc.keyword != "" && symbols == icons.Plain {
+						check(tc.keyword)
+					}
+					for _, word := range tc.identifiers {
+						check(word)
+					}
+					if tc.path == "sample.go" {
+						check("(")
+						if !sameColor(sourceWordStyle(t, row, "*").Fg, sourceWordStyle(t, source, "(").Fg) {
+							t.Fatal("pointer marker should use the punctuation color")
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestOutlineFollowsSourceAndJumps(t *testing.T) {
 	app := outlineTestApp(t, "intro\n# Root\nbody\n### Child\nbody\n## Sibling\nbody\n# Last\n")
 	for _, tc := range []struct{ line, active int }{{1, -1}, {2, 0}, {3, 0}, {5, 1}, {6, 2}, {8, 3}} {

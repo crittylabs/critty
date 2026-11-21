@@ -11,7 +11,8 @@
 
 ### Changed
 
-- Markdown headings use level-specific colors in both the document and its outline.  The colors adapt to light and dark backgrounds, and fourth-level headings use upright text.
+- Markdown headings in the document use distinct colors for each level.  Fourth-level headings use upright text.
+- Outlines match the source pane's colors in light and dark terminals.  Markdown headings follow their level colors.  Code declarations use syntax colors for names and keywords, with neutral punctuation in Go method receivers.
 - External web links use the Octicons external link marker when Nerd Fonts are enabled.
 - The current source line and line selections use distinct backgrounds across the pane, including the line-number gutter.  The current line takes precedence within a selection, and a blue bar next to the line numbers marks every selected line.  Diff colors stay visible in the text.  Start a line selection by dragging from anywhere in the line-number gutter.
 - Hover over a line number to reveal an add-comment button.  Click the button, the current line number, or any line number in a selected range to comment.  Drag the line numbers to select a range.
