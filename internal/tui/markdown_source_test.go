@@ -18,6 +18,7 @@ func TestPatchMarkdownSharesDocumentStyles(t *testing.T) {
 		"Text **bold** and *italic* and `code`.", "", "> Quoted", "", "- [ ] Task", "",
 		"[Link](https://example.org) <kbd>Enter</kbd>", "", "```go", "var name = \"value\"", "```", "",
 		"```text", "# literal", "```", "", "\\# escaped", "", "---", "", "A &amp; B and é.",
+		"", "##### Subsection", "", "###### Note",
 	}
 	var patch strings.Builder
 	fmt.Fprintf(&patch, "--- /dev/null\n+++ b/docs.md\n@@ -0,0 +1,%d @@\n", len(lines))
@@ -38,12 +39,20 @@ func TestPatchMarkdownSharesDocumentStyles(t *testing.T) {
 			{0, "Heading"}, {2, "Section"}, {4, "Detail"}, {6, "Minor"},
 			{8, "bold"}, {8, "italic"}, {8, "code"}, {10, "Quoted"}, {12, "Task"},
 			{14, "Link"}, {14, "Enter"}, {17, "var"},
+			{30, "Subsection"}, {32, "Note"},
 		} {
 			normal := parsed.lines[sample.line].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
 			want := sourceWordStyle(t, normal, sample.word)
 			got := sourceWordStyle(t, tab.chromaLines[sample.line+3], sample.word)
 			if !sameColor(got.Fg, want.Fg) && (got.Fg != nil || want.Fg != nil) || got.Attrs != want.Attrs {
 				t.Fatalf("dark=%v, %q: source style %+v differs from document %+v", dark, sample.word, got, want)
+			}
+		}
+		for i, line := range []int{0, 2, 4, 6, 30, 32} {
+			rendered := parsed.lines[line].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
+			style := sourceWordStyle(t, rendered, "#")
+			if !sameColor(style.Fg, markdownHeadingStyle(i+1).GetForeground()) || style.Attrs&uv.AttrItalic != 0 {
+				t.Fatalf("dark=%v, H%d: got style %+v, want its heading color without italics", dark, i+1, style)
 			}
 		}
 		for i, line := range lines {
@@ -54,7 +63,7 @@ func TestPatchMarkdownSharesDocumentStyles(t *testing.T) {
 		}
 		for _, i := range []int{21, 24} {
 			style := sourceWordStyle(t, tab.chromaLines[i+3], "#")
-			if sameColor(style.Fg, mdH1Style.GetForeground()) || style.Attrs&uv.AttrBold != 0 {
+			if sameColor(style.Fg, markdownHeadingStyle(1).GetForeground()) || style.Attrs&uv.AttrBold != 0 {
 				t.Fatalf("literal or escaped heading on line %d received heading styling", i+1)
 			}
 		}

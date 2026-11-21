@@ -10,10 +10,6 @@ import (
 // Display decorations and layout changes belong to the document renderer.
 func (t *FileTab) highlightMarkdownSource(lines []string) []string {
 	parsed := parseMarkdownWithSyntax(lines, nil, t.syntax, t.symbols)
-	levels := make(map[int]int, len(parsed.headings))
-	for _, heading := range parsed.headings {
-		levels[heading.line-1] = heading.level
-	}
 	result := make([]string, len(lines))
 	foreground := lipgloss.NewStyle().GetForeground()
 	for i, line := range parsed.lines {
@@ -31,7 +27,7 @@ func (t *FileTab) highlightMarkdownSource(lines []string) []string {
 		}
 		b.WriteString(line.source[pos:])
 		result[i] = b.String()
-		if level := levels[i]; level != 0 {
+		if level := line.headingLevel; level > 0 {
 			result[i] = markdownHeadingStyle(level).Render(result[i])
 		}
 	}

@@ -65,6 +65,7 @@ type markdownToken struct {
 
 type markdownLine struct {
 	source        string
+	headingLevel  int
 	tokens        []markdownToken
 	cells         [][2]int
 	tableSep      bool
@@ -167,7 +168,8 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 	visit = func(n ast.Node) {
 		switch n.(type) {
 		case *ast.Paragraph, *ast.Heading, *extast.TableCell:
-			if heading, ok := n.(*ast.Heading); ok {
+			heading, isHeading := n.(*ast.Heading)
+			if isHeading {
 				m.headingText = append(m.headingText, outlineHeadingText(heading, data))
 				m.headings = append(m.headings, outlineSymbol{outlineHeading: outlineHeading{
 					line: start + lineAt(heading.Pos()) + 1, level: heading.Level,
@@ -176,6 +178,9 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			}
 			segments := n.(ast.BlockNode).Source()
 			if len(segments) == 0 {
+				if isHeading {
+					m.lines[start+lineAt(heading.Pos())].headingLevel = heading.Level
+				}
 				return
 			}
 			first, last := lineAt(segments[0].Start), lineAt(segments[len(segments)-1].Stop-1)
@@ -183,6 +188,11 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			// Do not invent an opening/closing context outside the supplied text.
 			if incomplete && (first == 0 && start > 0 || last == len(offsets)-1) {
 				return
+			}
+			if isHeading {
+				for i := first; i <= last; i++ {
+					m.lines[start+i].headingLevel = heading.Level
+				}
 			}
 			if _, cell := n.(*extast.TableCell); cell {
 				m.lines[start+first].cells = append(m.lines[start+first].cells, [2]int{segments[0].Start - offsets[first], segments[len(segments)-1].Stop - offsets[first]})

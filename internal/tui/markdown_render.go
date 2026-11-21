@@ -186,7 +186,9 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		}
 	}
 	result := b.String()
-	if !line.literal {
+	if line.headingLevel > 0 {
+		result = markdownHeadingStyle(line.headingLevel).Render(result)
+	} else if !line.literal {
 		result = highlightMarkdownBlock(result)
 	}
 	if cacheable {

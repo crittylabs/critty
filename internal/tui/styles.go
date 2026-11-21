@@ -229,22 +229,7 @@ var (
 				Render("↪")
 
 	// Markdown syntax highlighting styles
-	mdH1Style = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Magenta)
-
-	mdH2Style = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.BrightMagenta)
-
-	mdH3Style = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Cyan)
-
-	mdH4Style = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Cyan).
-			Italic(true)
+	mdHeadingStyles = newMarkdownHeadingStyles(lipgloss.LightDark(true))
 
 	mdBoldStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -427,8 +412,7 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	activeAttachmentColor = ld(textColors.brightYellow, lipgloss.Yellow)
 	mdHrStyle = mdHrStyle.Foreground(ld(lipgloss.Color("#9A9A9A"), lipgloss.Color("#646464")))
 	mdFenceAttributeStyle = mdFenceAttributeStyle.Foreground(ld(lipgloss.Color("#6B7C85"), lipgloss.Color("#71848C")))
-	mdH3Style = mdH3Style.Foreground(textColors.cyan)
-	mdH4Style = mdH4Style.Foreground(textColors.cyan)
+	mdHeadingStyles = newMarkdownHeadingStyles(ld)
 	mdLinkStyle = mdLinkStyle.Foreground(textColors.brightCyan)
 	helpHeadingStyle = helpHeadingStyle.Foreground(textColors.brightYellow)
 	helpKeyStyle = helpKeyStyle.Foreground(textColors.brightCyan)
@@ -579,6 +563,22 @@ func newModalDangerStyles(ld lipgloss.LightDarkFunc) (lipgloss.Style, lipgloss.S
 // out.  On light backgrounds, where ANSI colors are too pale to read, they
 // are fixed shades, and the bright variants are darker so they stand out
 // there in the same way.
+func newMarkdownHeadingStyles(ld lipgloss.LightDarkFunc) [6]lipgloss.Style {
+	colors := [...]struct{ light, dark string }{
+		{"#803B80", "#F4A7EA"},
+		{"#903F70", "#E39ADB"},
+		{"#146477", "#7CD9F0"},
+		{"#136F70", "#79D2CD"},
+		{"#396658", "#93C8A9"},
+		{"#495A62", "#A6B6C5"},
+	}
+	var styles [len(colors)]lipgloss.Style
+	for i, c := range colors {
+		styles[i] = lipgloss.NewStyle().Foreground(ld(lipgloss.Color(c.light), lipgloss.Color(c.dark))).Bold(i < 4)
+	}
+	return styles
+}
+
 type textPalette struct {
 	red, green, yellow, cyan color.Color
 	brightYellow, brightCyan color.Color

@@ -8,6 +8,10 @@
 - Preview remote HTTPS images in Markdown and comments using the global `remote_image_hosts` allowlist.  It supports exact hostnames, dot-prefixed subdomain suffixes, and `*` wildcards within DNS labels.  Each redirect must match the same allowlist.
 - Use the horizontal mouse wheel over a truncated row in the Files sidebar to read its full name without opening the file or moving the selection.
 
+### Changed
+
+- Markdown headings use level-specific colors in both the document and its outline.  The colors adapt to light and dark backgrounds, and fourth-level headings use upright text.
+
 ### Fixed
 
 - SVG changes in supplied patches show inline Before and After previews when complete source snapshots are available.  In Split View, SVG previews align with the source columns and their divider.  Incomplete patches keep the XML diff visible.

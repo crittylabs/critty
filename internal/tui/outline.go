@@ -26,16 +26,17 @@ type outlineSymbol struct {
 	name string
 }
 
-func (s outlineSymbol) displayLabel(symbols icons.Set) string {
+func (s outlineSymbol) displayLabel(symbols icons.Set, style lipgloss.Style) string {
 	label := s.label
 	if symbols && s.name != "" {
 		label = s.name
 	}
-	if !symbols {
-		return label
+	label = style.Render(label)
+	if symbols {
+		icon := style.Foreground(mdCodeStyle.GetForeground()).Render(symbols.Glyph(s.kind, ""))
+		return symbols.Join(icon, label)
 	}
-	icon := lipgloss.NewStyle().Foreground(mdCodeStyle.GetForeground()).Render(symbols.Glyph(s.kind, ""))
-	return symbols.Join(icon, label)
+	return label
 }
 
 type documentOutline struct {
@@ -202,7 +203,10 @@ func (m *AppModel) renderOutline() {
 				prefix = cursorMarker.Render(">") + " "
 			}
 		}
-		line := prefix + style.Render(strings.Repeat(" ", depth*treeIndent)+heading.displayLabel(m.icons))
+		if heading.kind == icons.Heading {
+			style = style.Foreground(markdownHeadingStyle(heading.level).GetForeground())
+		}
+		line := prefix + strings.Repeat(" ", depth*treeIndent) + heading.displayLabel(m.icons, style)
 		line = ansi.Truncate(line, o.viewport.Width(), "…")
 		if i == o.active {
 			padding := strings.Repeat(" ", max(0, o.viewport.Width()-ansi.StringWidth(line)))

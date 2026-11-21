@@ -11,6 +11,7 @@ import (
 
 	"github.com/crittylabs/critty/v2/internal/document"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 func outlineHeadings(rows []outlineSymbol) []outlineHeading {
@@ -54,6 +55,43 @@ func outlineTestApp(t *testing.T, source string) AppModel {
 	app.rebuildContent()
 	app.updateCommentSidebar()
 	return app
+}
+
+func TestMarkdownOutlineSharesHeadingColors(t *testing.T) {
+	wasDark := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	for _, tc := range []struct {
+		name    string
+		dark    bool
+		symbols icons.Set
+	}{
+		{"light", false, icons.Plain},
+		{"dark", true, icons.Plain},
+		{"light with icons", false, icons.Nerd},
+		{"dark with icons", true, icons.Nerd},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			initAdaptiveStyles(tc.dark)
+			app := outlineTestApp(t, "Title\n=====\n\n## Section\n### Detail\n#### Settings\n##### Colors\n###### Note\n")
+			app.icons = tc.symbols
+			if len(app.outline.rows) != 6 {
+				t.Fatalf("got %d outline rows, want 6", len(app.outline.rows))
+			}
+			for i, heading := range app.outline.rows {
+				app.outline.active = i
+				app.renderOutline()
+				row := strings.Split(app.outline.viewport.GetContent(), "\n")[i]
+				outline := sourceWordStyle(t, row, heading.label)
+				document := sourceWordStyle(t, app.contentViewport.GetContent(), heading.label)
+				if !sameColor(outline.Fg, markdownHeadingStyle(heading.level).GetForeground()) || !sameColor(outline.Fg, document.Fg) {
+					t.Fatalf("H%d: outline color %v, document color %v", heading.level, outline.Fg, document.Fg)
+				}
+				if !sameColor(outline.Bg, buttonBackground) {
+					t.Fatalf("H%d: active outline row lost its background", heading.level)
+				}
+			}
+		})
+	}
 }
 
 func TestOutlineFollowsSourceAndJumps(t *testing.T) {
