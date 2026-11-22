@@ -233,9 +233,12 @@ def verify(binary: Path, tmux_binary: Path) -> None:
             subprocess.run(
                 [str(tmux_binary), "-S", socket, "kill-server"], env=env, check=False
             )
+            # The synthetic terminals stop reading here, so attached clients
+            # may not finish their terminal cleanup on their own.
             for process, master in clients:
-                process.wait(timeout=5)
+                process.kill()
                 os.close(master)
+                process.wait(timeout=5)
 
 
 if __name__ == "__main__":
