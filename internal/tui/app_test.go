@@ -49,11 +49,43 @@ func sameColor(a, b color.Color) bool {
 func TestReviewBarProjectAndTopic(t *testing.T) {
 	app := setupAppWithDoc(t, "first\nsecond\n")
 	app.project, app.topic = "critty", "header-project-topic"
+	app.gitProject, app.branch = "repository", "main"
+	app.host = "tmux"
 	app.width = 120
 	bar := ansi.Strip(app.renderReviewBar())
-	if !strings.Contains(bar, "critty · header-project-topic") {
+	if !strings.Contains(bar, "▱ critty") || !strings.Contains(bar, "◇ header-project-topic") {
 		t.Fatalf("bar = %q", bar)
 	}
+	if !strings.Contains(bar, "◫ tmux") || strings.ContainsAny(bar, "‹›") {
+		t.Fatalf("plain header launcher = %q", bar)
+	}
+	header := ansi.Strip(app.renderHeader())
+	if !strings.Contains(header, "▱ repository  ⎇ main  ") || strings.Contains(bar, "⎇ main") {
+		t.Fatalf("path breadcrumb missing: %q", header)
+	}
+	app.icons = true
+	row := strings.Split(app.renderHeader(), "\n")[lipgloss.Height(app.renderReviewBar())]
+	runes, styles := renderedCells(row)
+	plain := string(runes)
+	for _, transition := range []struct {
+		text   string
+		fg, bg color.Color
+	}{
+		{"repository ", headerProjectBackground, headerBranchBackground},
+		{"main ", headerBranchBackground, headerBackground},
+		{".md ", headerBackground, nil},
+		{"% ", headerPositionStyle.GetBackground(), headerPercentStyle().GetBackground()},
+	} {
+		i := strings.Index(plain, transition.text)
+		if i < 0 {
+			t.Fatalf("missing transition %q in %q", transition.text, plain)
+		}
+		style := styles[len([]rune(plain[:i+len(transition.text)]))-1]
+		if !sameColor(style.Fg, transition.fg) || transition.bg != nil && !sameColor(style.Bg, transition.bg) {
+			t.Fatalf("transition %q has foreground %v and background %v", transition.text, style.Fg, style.Bg)
+		}
+	}
+	app.icons = false
 	app.topic = "\x1b[31m" + strings.Repeat("界é", 40) + "\n\t"
 	for _, width := range []int{20, 60, 100} {
 		app.width = width
@@ -102,9 +134,15 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 		setup func(*AppModel)
 		want  string
 	}{
-		{name: "document", want: "L0/3 0/0 💬"},
-		{name: "deleted", setup: func(app *AppModel) { app.tabs[0].cursorSide = "old" }, want: "L0 (deleted) 0/0 💬"},
-		{name: "selection", setup: func(app *AppModel) { app.tabs[0].selecting = true }, want: "VISUAL  L0-0"},
+		{name: "document", want: "0% L 0:3 0/0 💬"},
+		{name: "deleted", setup: func(app *AppModel) { app.tabs[0].cursorSide = "old" }, want: "L 0 (deleted) 0/0 💬"},
+		{name: "selection", setup: func(app *AppModel) {
+			app.tabs[0].selecting, app.tabs[0].selectAnchor, app.tabs[0].cursorLine = true, 1, 1
+		}, want: "33% L 1-1:3 0/0 💬"},
+		{name: "deleted selection", setup: func(app *AppModel) {
+			app.tabs[0].selecting, app.tabs[0].selectSide = true, "old"
+			app.tabs[0].selectAnchor, app.tabs[0].cursorLine = 2, 1
+		}, want: "L 1-2 (deleted) 0/0 💬"},
 		{name: "loading", setup: func(app *AppModel) { app.tabs[0].doc = nil }, want: "0/0 💬"},
 	}
 
@@ -127,6 +165,24 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 			}
 			if !strings.Contains(strings.Join(strings.Fields(plainHeader), " "), strings.Join(strings.Fields(tt.want), " ")) {
 				t.Errorf("header = %q, want status %q", plainHeader, tt.want)
+			}
+			if app.tab().selecting {
+				runes, styles := renderedCells(header)
+				start, end := app.selectionRange()
+				selected := fmt.Sprintf("%d-%d", start, end)
+				at := strings.Index(string(runes), selected)
+				if at < 0 {
+					t.Fatal("selected line range missing")
+				}
+				offset := len([]rune(string(runes)[:at]))
+				for i := range len(selected) {
+					if !sameColor(styles[offset+i].Bg, headerSelection) {
+						t.Error("selected line range lost its orange background")
+					}
+				}
+				if sameColor(styles[offset+len(selected)].Bg, headerSelection) {
+					t.Error("orange background extends beyond the selected line range")
+				}
 			}
 		})
 	}
@@ -1194,7 +1250,8 @@ func TestReadOnlyViewer(t *testing.T) {
 	}
 	app.locationError = ""
 	plain := ansi.Strip(app.View().Content)
-	if !strings.Contains(plain, "View the document.") || strings.Contains(plain, "read-only") || strings.Contains(plain, "Review the") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
+	header, _, _ := strings.Cut(plain, "\n")
+	if strings.Contains(header, "document") || strings.Contains(plain, "✏\ufe0e") || strings.Contains(plain, "▶\ufe0e") || !strings.Contains(plain, "Close q") || strings.Contains(plain, "Submit q") {
 		t.Fatalf("missing read-only UI: %s", plain)
 	}
 	if footer := ansi.Strip(app.renderFooter()); !strings.Contains(footer, "Images:") || strings.Contains(footer, "s/t file/outline") {
@@ -1232,12 +1289,14 @@ func TestProjectBranchLabels(t *testing.T) {
 			app.syncFileTree()
 			bar := ansi.Strip(app.renderReviewBar())
 			root := ansi.Strip(app.treeRowText(0, app.tabIndicators()))
-			wantBar, wantRoot := "sample · Review", "sample/"
+			wantRoot := "sample/"
 			if branch != "" {
-				wantBar = "sample (" + branch + ") · Review"
 				wantRoot += " (" + branch + ")"
+				if strings.Contains(bar, "⎇ "+branch) {
+					t.Fatalf("branch should only appear in the file row: %q", bar)
+				}
 			}
-			if !strings.Contains(bar, wantBar) || !strings.Contains(root, wantRoot) {
+			if !strings.Contains(bar, "▱ sample ") || !strings.Contains(bar, "◇ Review") || !strings.Contains(root, wantRoot) {
 				t.Fatalf("branch label: header %q, tree %q", bar, root)
 			}
 			for _, width := range []int{30, 60, 100} {
@@ -1259,16 +1318,13 @@ func TestProjectBranchDoesNotRepeatTopic(t *testing.T) {
 	}
 }
 
-func TestReviewDescriptionWraps(t *testing.T) {
+func TestReviewLabelsWrap(t *testing.T) {
 	for _, readOnly := range []bool{false, true} {
 		app := setupAppWithDoc(t, "line\n")
-		app.project, app.branch = "sample", "feature/sidebar"
+		app.project, app.branch, app.topic = "sample", "feature/sidebar", "Topic"
+		app.staged = true
 		app.readOnly = readOnly
-		action := "Review the document."
-		if readOnly {
-			action = "View the document."
-		}
-		for _, width := range []int{40, 54, 160} {
+		for _, width := range []int{40, 60, 160} {
 			app.width = width
 			lines := strings.Split(ansi.Strip(app.renderReviewBar()), "\n")
 			button := "Submit q"
@@ -1287,12 +1343,13 @@ func TestReviewDescriptionWraps(t *testing.T) {
 			if !found {
 				t.Fatalf("button missing at width %d: %q", width, lines)
 			}
-			if width == 160 {
-				if len(lines) != 1 || !strings.Contains(lines[0], action) {
-					t.Fatalf("wide header = %q", lines)
-				}
-			} else if len(lines) < 2 || !strings.HasPrefix(lines[1], "* "+strings.Fields(action)[0]) {
-				t.Fatalf("width %d: description missing its second-line marker: %q", width, lines)
+			bar := strings.Join(lines, "\n")
+			topic, scope := strings.Index(bar, "◇ Topic"), strings.Index(bar, "▣ staged")
+			if topic < 0 || scope <= topic {
+				t.Fatalf("width %d: diff scope missing after the topic: %q", width, lines)
+			}
+			if (width >= 60) != (len(lines) == 1) {
+				t.Fatalf("width %d: unexpected row count: %q", width, lines)
 			}
 		}
 	}
@@ -1300,9 +1357,9 @@ func TestReviewDescriptionWraps(t *testing.T) {
 
 func TestReviewButtonsStayRightOnSecondLine(t *testing.T) {
 	app := NewCodeReviewApp(nil, "", AppConfig{Project: strings.Repeat("project", 6), Branch: "feature/sidebar"})
-	app.width = 90
+	app.width = 65
 	lines := strings.Split(ansi.Strip(app.renderReviewBar()), "\n")
-	if len(lines) != 2 || !strings.HasPrefix(lines[1], "* Review") || !strings.Contains(lines[1], "Split:") || !strings.HasSuffix(lines[1], "Submit q ") || lipgloss.Width(lines[1]) != app.width {
+	if len(lines) != 2 || !strings.HasSuffix(lines[1], "Submit q ") || lipgloss.Width(lines[1]) != app.width {
 		t.Fatalf("second-line buttons are not right aligned: %q", lines)
 	}
 }

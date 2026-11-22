@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"sort"
@@ -85,6 +86,7 @@ type AppConfig struct {
 	Documents        []review.AttachedDocument
 	DocumentSnapshot *review.SnapshotFile
 	Project          string
+	GitProject       string
 	Branch           string
 	Topic            string
 	Version          string
@@ -141,6 +143,7 @@ type AppModel struct {
 	answerMode    bool
 	attachments   map[string]review.AttachedDocument
 	project       string
+	gitProject    string
 	branch        string
 	topic         string
 	version       string
@@ -404,6 +407,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		mermaid:          mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		svg:              svgrender.New(),
 		project:          cfg.Project,
+		gitProject:       cfg.GitProject,
 		branch:           cfg.Branch,
 		topic:            cfg.Topic,
 		version:          cfg.Version,
@@ -517,6 +521,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		mermaid:         mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		svg:             svgrender.New(),
 		project:         cfg.Project,
+		gitProject:      cfg.GitProject,
 		branch:          cfg.Branch,
 		topic:           cfg.Topic,
 		version:         cfg.Version,
@@ -2920,86 +2925,91 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 		displayPath = m.filePath
 	}
 
-	prefix := " "
-	var suffix string
-	if t.selecting {
-		start, end := m.selectionRange()
-		selLabel := visualModeIndicator.Render("VISUAL")
-		deleted := ""
-		if m.selectionSide() == "old" {
-			deleted = " (deleted)"
-		}
-		suffix = fmt.Sprintf("  %s L%d-%d%s", selLabel, start, end, deleted)
-	} else if t.doc != nil {
-		var position string
-		positionStyle := headerPathStyle.Foreground(headerPathCyan)
-		if t.cursorSide == "old" {
-			position = positionStyle.Render(fmt.Sprintf("L%d (deleted)", t.cursorLine))
-		} else {
-			slash := headerPathStyle.Foreground(headerPathSeparator).Bold(true).Render("/")
-			position = positionStyle.Render(fmt.Sprintf("L%d", t.cursorLine)) + slash +
-				positionStyle.Render(fmt.Sprintf("%d", t.doc.LineCount()))
-		}
-		suffix = " " + position
+	if m.gitProject != "" && t.path != overallCommentsPath {
+		displayPath = m.paths.treePath(displayPath)
 	}
+	rawPath := displayPath
 	if t.path != overallCommentsPath {
 		displayPath = m.paths.render(displayPath, headerPathStyle, false, true)
 	}
-	suffix = pathNote + suffix
+
+	ld := lipgloss.LightDark(terminalIsDark)
+	gapStyle := lipgloss.NewStyle().Background(ld(lipgloss.Color("#E9E7EB"), lipgloss.Color("#303030")))
+	pathEdge := headerPathStyle.Render(" ")
+	if m.icons {
+		pathEdge += m.headerEdge(icons.TabRight, headerBackground, gapStyle)
+	}
+	minPathWidth := 4
+	if m.width > 0 && m.width < 24 {
+		pathEdge, minPathWidth = "", 1
+	}
+	progressEdge := m.headerEdge(icons.TabLeft, buttonBackground, gapStyle)
+	percentStyle := headerPercentStyle()
+	position, percent := m.headerPosition(percentStyle)
+	positionEdge := ""
+	if position != "" {
+		positionEdge = m.headerEdge(icons.TabLeft, headerPositionStyle.GetBackground(), gapStyle)
+	}
+	if percent != "" {
+		percent = m.headerEdge(icons.TabLeft, percentStyle.GetBackground(), gapStyle) + percent
+	}
+
 	headerWidth := max(0, m.width-headerStyle.GetHorizontalFrameSize())
 	progress, regions := m.layoutProgressCounts(0, 0, -1)
-	progress = " " + progress
-	for i := range regions {
-		regions[i].rect.left++
-		regions[i].rect.right++
+	if progress != "" {
+		progress = progressEdge + inlineBackground(lipgloss.NewStyle().Background(buttonBackground), progress)
+		for i := range regions {
+			regions[i].rect.left++
+			regions[i].rect.right++
+		}
 	}
-	wrapProgress := m.width > 0 && ansi.StringWidth(prefix+suffix)+3+ansi.StringWidth(progress) > headerWidth
-	if t.selecting {
-		progress, regions = "", nil
+	pathFrame := 1 + ansi.StringWidth(pathNote+pathEdge)
+	wrapProgress := progress != "" && m.width > 0 &&
+		pathFrame+ansi.StringWidth(positionEdge+position+progress)+minPathWidth > headerWidth
+	right := position
+	if !wrapProgress {
+		right += progress
 	}
-	progressWidth := 0
-	if progress != "" && !wrapProgress {
-		progressWidth = 3 + ansi.StringWidth(progress)
+	if percent != "" && (m.width <= 0 || pathFrame+ansi.StringWidth(percent+positionEdge+right)+8 <= headerWidth) {
+		positionEdge = percent + m.headerEdge(icons.TabLeft, headerPositionStyle.GetBackground(), percentStyle)
 	}
-	if m.width > 0 {
-		pathWidth := max(0, headerWidth-ansi.StringWidth(prefix)-ansi.StringWidth(suffix)-progressWidth)
+	right = positionEdge + right
+
+	prefix := headerPathStyle.Render(" ")
+	breadcrumb := m.headerBreadcrumb()
+	if m.width <= 0 {
+		if breadcrumb != "" {
+			prefix = breadcrumb
+		}
+	} else {
+		pathWidth := max(0, headerWidth-pathFrame-ansi.StringWidth(right))
+		breadcrumbWidth := ansi.StringWidth(breadcrumb) - 1 // The frame already reserves the leading space.
+		name := filepath.Base(rawPath)
+		if breadcrumb != "" && breadcrumbWidth+min(ansi.StringWidth(name)+1, ansi.StringWidth(displayPath)) <= pathWidth {
+			prefix = breadcrumb
+			pathWidth -= breadcrumbWidth
+		}
 		displayPath = truncateLeftToWidth(displayPath, pathWidth)
 	}
-	headerContent := prefix + inlineBackground(headerPathStyle, headerPathStyle.Render(displayPath+suffix))
-	progressLeft, progressTop := ansi.StringWidth(headerContent)+3, 0
-	if progress != "" {
-		if wrapProgress {
-			progress, regions = m.layoutProgressCounts(max(1, headerWidth-1), 0, -1)
-			lines := strings.Split(progress, "\n")
-			for i, line := range lines {
-				padding := max(0, headerWidth-1-ansi.StringWidth(line))
-				lines[i] = strings.Repeat(" ", padding) + inlineBackground(lipgloss.NewStyle().Background(buttonBackground), " "+line)
-				for j := range regions {
-					if regions[j].rect.top == i {
-						regions[j].rect.left += padding + 1
-						regions[j].rect.right += padding + 1
-					}
+	headerContent := inlineBackground(headerPathStyle, prefix+headerPathStyle.Render(displayPath+pathNote)) + pathEdge
+	spare := max(0, headerWidth-ansi.StringWidth(headerContent+right))
+	headerContent += gapStyle.Render(strings.Repeat(" ", spare)) + right
+
+	progressLeft, progressTop := ansi.StringWidth(headerContent)-ansi.StringWidth(progress), 0
+	if wrapProgress {
+		progress, regions = m.layoutProgressCounts(max(1, headerWidth-1), 0, -1)
+		for y, line := range strings.Split(progress, "\n") {
+			padding := max(0, headerWidth-1-ansi.StringWidth(line))
+			headerContent += "\n" + gapStyle.Render(strings.Repeat(" ", padding)) + progressEdge +
+				inlineBackground(lipgloss.NewStyle().Background(buttonBackground), line)
+			for i := range regions {
+				if regions[i].rect.top == y {
+					regions[i].rect.left += padding + 1
+					regions[i].rect.right += padding + 1
 				}
 			}
-			progress = strings.Join(lines, "\n")
-			headerContent += "\n"
-			progressLeft, progressTop = 0, 1
-		} else {
-			headerContent += "   "
-			if m.width > 0 {
-				progressLeft = headerWidth - ansi.StringWidth(progress)
-				headerContent += strings.Repeat(" ", max(0, progressLeft-ansi.StringWidth(headerContent)))
-			}
-			progress = inlineBackground(lipgloss.NewStyle().Background(buttonBackground), progress)
 		}
-		headerContent += progress
-	}
-	if m.width > 0 {
-		lines := strings.Split(headerContent, "\n")
-		for i := range lines {
-			lines[i] = ansi.Truncate(lines[i], headerWidth, "")
-		}
-		headerContent = strings.Join(lines, "\n")
+		progressLeft, progressTop = 0, 1
 	}
 	bar := m.renderReviewBar()
 	for i := range regions {
@@ -3008,89 +3018,243 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 		regions[i].rect.top += lipgloss.Height(bar) + progressTop + headerStyle.GetPaddingTop()
 		regions[i].rect.bottom += lipgloss.Height(bar) + progressTop + headerStyle.GetPaddingTop()
 	}
-	return bar + "\n" + inlineBackground(headerStyle, headerStyle.Width(m.width).Render(headerContent)), regions
+	if m.width > 0 {
+		lines := strings.Split(headerContent, "\n")
+		for i, line := range lines {
+			lines[i] = ansi.Truncate(line, headerWidth, "")
+		}
+		headerContent = strings.Join(lines, "\n")
+	}
+	return bar + "\n" + inlineBackground(gapStyle, headerStyle.Background(gapStyle.GetBackground()).Width(m.width).Render(headerContent)), regions
 }
 
-// renderReviewBar renders the top bar: what is under review, the review-wide
-// toggles, and a right-aligned Submit button.  The parts are styled one by
-// one so the bar's background resumes after each embedded style.
+func (m AppModel) headerPosition(percentStyle lipgloss.Style) (position, percent string) {
+	t := m.tab()
+	if t.doc == nil && !t.selecting {
+		return "", ""
+	}
+	number := fmt.Sprint(t.cursorLine)
+	style := headerPositionStyle
+	numberStyle := style
+	if t.selecting {
+		start, end := m.selectionRange()
+		number = fmt.Sprintf("%d-%d", start, end)
+		numberStyle = style.Background(headerSelection)
+	}
+	marker := strings.TrimSuffix(m.icons.Glyph(icons.Line, "L"), " ")
+	offset := max(1, 4-ansi.StringWidth(number))
+	padding := " "
+	if m.width > 0 && m.width < 30 {
+		offset = 1
+		padding = ""
+	}
+	position = style.Render(padding+marker+strings.Repeat(" ", offset)) + numberStyle.Render(number)
+	if m.selectionSide() == "old" {
+		return position + style.Render(" (deleted) "), ""
+	}
+	if t.doc != nil {
+		total := t.doc.LineCount()
+		position += style.Render(fmt.Sprintf(":%d", total))
+		if total > 0 {
+			pct := 100 * min(max(t.cursorLine, 0), total) / total
+			percent = percentStyle.Render(fmt.Sprintf(" %3d%% ", pct))
+		}
+	}
+	return position + style.Render(padding), percent
+}
+
+func (m AppModel) headerBreadcrumb() string {
+	projectStyle := headerPathStyle.Background(headerProjectBackground)
+	branchStyle := headerPathStyle.Background(headerBranchBackground)
+	edge := func(from, to lipgloss.Style) string {
+		return from.Render(" ") + m.headerRightDivider(from, to)
+	}
+	var breadcrumb string
+	if m.gitProject != "" {
+		next := headerPathStyle
+		if m.branch != "" {
+			next = branchStyle
+		}
+		breadcrumb = projectStyle.Render(" "+m.icons.Join(m.icons.Glyph(icons.Project, "▱"), headerLabel(m.gitProject))) +
+			edge(projectStyle, next)
+	}
+	if m.branch != "" {
+		breadcrumb += branchStyle.Render(" "+m.icons.Join(m.icons.Glyph(icons.Branch, "⎇"), headerLabel(m.branch))) +
+			edge(branchStyle, headerPathStyle)
+	}
+	if breadcrumb != "" {
+		breadcrumb += headerPathStyle.Render(" ")
+	}
+	return breadcrumb
+}
+
+// renderReviewBar groups project identity on the left and review context and
+// controls on the right.  Narrow terminals wrap between items.
 func (m AppModel) renderReviewBar() string {
-	scope, subject := m.reviewSubject()
-	if m.host != "" {
-		subject += " on " + m.host
-	}
-	subject += "."
-	text := renderBrand() + reviewBarStyle.Render(" ")
-	if m.project != "" {
-		text += reviewBarStyle.Bold(true).Render(m.icons.Label(icons.Project, headerLabel(m.project)))
-		text += m.branchLabel(reviewBarStyle.Foreground(textSecondary))
-		if m.topic != "" && m.topic != m.branch {
-			text += reviewBarStyle.Render(" · " + headerLabel(m.topic))
-		}
-	} else if m.topic != "" {
-		text += reviewBarStyle.Render(headerLabel(m.topic))
-	}
-	if !m.readOnly && m.session != nil && m.session.InMemory() {
-		text += reviewBarStyle.Bold(true).Render(" · Demo · not saved")
-	}
-	action := "Review"
-	if m.readOnly {
-		action = "View"
-	}
-	description := reviewBarStyle.Render(action + " the ")
-	if style, ok := scopeWordStyle(scope); ok {
-		description += style.Render(scope) + reviewBarStyle.Render(" ")
-	}
-	description += reviewBarStyle.Render(subject)
-	buttons := []string{m.viewHistoryButton(false), m.viewHistoryButton(true), m.watchIndicator(), m.splitButton(), m.whitespaceButton(), m.submitButton()}
-	var rows []string
-	row := ""
+	left, right := m.reviewBarItems()
+	space := reviewBarStyle.Render(" ")
+	buttonEdge := m.headerEdge(icons.TabLeft, modalBtnFocusedLabel.GetBackground(), reviewBarStyle)
+	buttons := []string{m.viewHistoryButton(false), m.viewHistoryButton(true), m.watchIndicator(), m.submitButton()}
+	buttonPrefix := space + buttonEdge
 	for _, button := range buttons {
-		if button == "" {
-			continue
+		if button != "" {
+			right = append(right, headerItem{text: button, separator: buttonPrefix, leading: buttonEdge})
+			buttonPrefix = space
 		}
-		if row != "" && m.width > 0 && lipgloss.Width(row)+1+lipgloss.Width(button) > m.width {
-			rows = append(rows, row)
-			row = ""
-		}
-		if row != "" {
-			row += reviewBarStyle.Render(" ")
-		}
-		row += button
 	}
-	rows = append(rows, row)
-	inline := text + reviewBarStyle.Render(" — ") + description
+
+	leftRows := wrapHeaderItems(left, m.width, m.width)
+	firstRightWidth := m.width
+	var sharedRow string
+	if m.width > 0 && len(left) > 0 {
+		last := len(leftRows) - 1
+		available := m.width - lipgloss.Width(leftRows[last]) - 2
+		if available >= lipgloss.Width(right[0].leading+right[0].text) {
+			firstRightWidth = available
+			sharedRow = leftRows[last]
+			leftRows = leftRows[:last]
+		}
+	}
+	rightRows := wrapHeaderItems(right, m.width, firstRightWidth)
 	if m.width <= 0 {
-		return inline + reviewBarStyle.Render(" ") + row
+		return leftRows[0] + space + rightRows[0]
 	}
-	fullRow := func(value string) string {
-		return reviewBarStyle.Width(m.width).Render(ansi.Truncate(value, m.width, "…"))
+	if len(left) == 0 {
+		leftRows = nil
 	}
-	if len(rows) > 1 {
-		lines := []string{fullRow(text), fullRow(reviewBarStyle.Render("* ") + description)}
-		for _, row := range rows {
-			lines = append(lines, fullRow(reviewBarStyle.Render(strings.Repeat(" ", max(0, m.width-lipgloss.Width(row))))+row))
+	if sharedRow != "" {
+		gap := m.width - lipgloss.Width(sharedRow) - lipgloss.Width(rightRows[0]) - 1
+		rightRows[0] = sharedRow + reviewBarStyle.Render(strings.Repeat(" ", gap)) + rightRows[0]
+	}
+	for _, row := range rightRows {
+		if spare := m.width - lipgloss.Width(row); spare > 0 {
+			row = reviewBarStyle.Render(strings.Repeat(" ", spare-1)) + row + space
 		}
-		return strings.Join(lines, "\n")
+		leftRows = append(leftRows, row)
 	}
-	right := row
-	if lipgloss.Width(right) < m.width {
-		right += reviewBarStyle.Render(" ")
+	for i, row := range leftRows {
+		leftRows[i] = reviewBarStyle.Width(m.width).Render(ansi.Truncate(row, m.width, "…"))
 	}
-	available := max(0, m.width-lipgloss.Width(right)-1)
-	withButtons := func(left string) string {
-		left = ansi.Truncate(left, available, "…")
-		gap := max(0, m.width-lipgloss.Width(left)-lipgloss.Width(right))
-		return left + reviewBarStyle.Render(strings.Repeat(" ", gap)) + right
+	return strings.Join(leftRows, "\n")
+}
+
+type headerItem struct {
+	text, separator, leading, trailing string
+	optional                           bool
+}
+
+func wrapHeaderItems(items []headerItem, width, firstWidth int) []string {
+	var rows []string
+	var row, trailing string
+	limit := firstWidth
+	columns := 0
+	for _, item := range items {
+		prefix := item.separator
+		itemWidth := lipgloss.Width(item.text)
+		if row != "" && limit > 0 && columns+lipgloss.Width(prefix+item.trailing)+itemWidth > limit {
+			if item.optional {
+				continue
+			}
+			rows = append(rows, row+trailing)
+			row, columns = "", 0
+			limit = width
+		}
+		end := item.trailing
+		if row == "" {
+			prefix = item.leading
+			if limit > 0 && lipgloss.Width(prefix+end)+itemWidth > limit {
+				prefix, end = "", ""
+			}
+		}
+		row += prefix + item.text
+		columns += lipgloss.Width(prefix) + itemWidth
+		trailing = end
 	}
-	if lipgloss.Width(inline) <= available {
-		return withButtons(inline)
+	return append(rows, row+trailing)
+}
+
+func (m AppModel) headerEdge(kind icons.Kind, fill color.Color, base lipgloss.Style) string {
+	if !m.icons {
+		return base.Render(" ")
 	}
-	continued := reviewBarStyle.Render("* ") + description
-	if lipgloss.Width(text) <= available {
-		return withButtons(text) + "\n" + fullRow(continued)
+	return base.Foreground(fill).Render(m.icons.Glyph(kind, ""))
+}
+
+func (m AppModel) headerRightDivider(from, to lipgloss.Style) string {
+	if !m.icons {
+		return ""
 	}
-	return fullRow(text) + "\n" + withButtons(continued)
+	return m.headerEdge(icons.TabRight, from.GetBackground(), to)
+}
+
+func (m AppModel) reviewBarItems() (left, right []headerItem) {
+	compact := m.width > 0 && m.width < 24
+	ld := lipgloss.LightDark(terminalIsDark)
+	identity := lipgloss.NewStyle().Foreground(ld(lipgloss.Black, lipgloss.BrightWhite))
+	brand := identity.Background(ld(lipgloss.Color("#F3F3F3"), lipgloss.Color("#171717")))
+	topic := identity.Background(headerPercentStyle().GetBackground())
+	var previous lipgloss.Style
+	var previousSpace string
+	if !compact {
+		left = append(left, headerItem{
+			text:     renderBrandFor(terminalIsDark, brand.GetBackground()),
+			trailing: m.headerEdge(icons.TabRight, brand.GetBackground(), reviewBarStyle),
+		})
+		previous = brand
+	}
+	addIdentity := func(value string, style lipgloss.Style) {
+		if value == "" {
+			return
+		}
+		space := style.Render(" ")
+		separator := space
+		if len(left) > 0 {
+			separator = previousSpace + m.headerRightDivider(previous, style) + space
+		}
+		left = append(left, headerItem{
+			text:      style.Render(value),
+			separator: separator,
+			leading:   space,
+			trailing:  space + m.headerEdge(icons.TabRight, style.GetBackground(), reviewBarStyle),
+		})
+		previous = style
+		previousSpace = space
+	}
+	if m.project != "" {
+		addIdentity(m.icons.Join(m.icons.Glyph(icons.Project, "▱"), headerLabel(m.project)), reviewBarStyle)
+	}
+	if m.topic != "" {
+		addIdentity(m.icons.Join(m.icons.Glyph(icons.Topic, "◇"), headerLabel(m.topic)), topic)
+	}
+	if scope := m.reviewScopeLabel(); scope != "" {
+		kind, symbol := icons.Diff, "±"
+		switch scope {
+		case "staged":
+			kind, symbol = icons.Staged, "▣"
+		case "unstaged":
+			kind, symbol = icons.Unstaged, "▢"
+		}
+		label := m.icons.Join(m.icons.Glyph(kind, symbol), scope)
+		if m.icons {
+			label += " " + m.icons.Glyph(icons.DividerRight, "")
+		}
+		addIdentity(label, reviewBarStyle)
+		left[len(left)-1].trailing = ""
+	}
+
+	var rightLead string
+	if m.icons {
+		rightLead = reviewBarStyle.Render(m.icons.Glyph(icons.DividerLeft, "") + " ")
+	}
+	rightGap := reviewBarStyle.Render(" ") + rightLead
+	if diff := m.diffControlText(m.whitespaceButton(), m.splitButton()); diff != "" {
+		right = append(right, headerItem{text: diff, leading: rightLead})
+	}
+	if m.host != "" {
+		host := m.icons.Join(m.icons.Glyph(icons.Host, "◫"), headerLabel(m.host))
+		right = append(right, headerItem{text: reviewBarStyle.Render(host), separator: rightGap, leading: rightLead, optional: true})
+	}
+	return left, right
 }
 
 func (m AppModel) branchLabel(style lipgloss.Style) string {
@@ -3112,52 +3276,30 @@ func headerLabel(value string) string {
 // submitButton renders the button that opens the finish dialog.
 func (m AppModel) submitButton() string {
 	if m.readOnly {
-		return renderBarButton(m.icons.Label(icons.Close, "Close"), "q")
+		return renderBarButton(m.icons.Label(icons.Exit, "Close"), "q")
 	}
 	return renderBarButton(m.icons.Label(icons.Send, "Submit"), "q")
 }
 
-// scopeWordStyle styles the scope word in the top bar: white on the
-// inline-change background of the matching diff side, which follows the
-// terminal's light or dark theme.  Other scopes have no word.
-func scopeWordStyle(scope string) (lipgloss.Style, bool) {
-	switch scope {
-	case "staged":
-		return diffAddedTextBg.Foreground(lipgloss.BrightWhite), true
-	case "unstaged":
-		return diffDeletedTextBg.Foreground(lipgloss.BrightWhite), true
-	}
-	return lipgloss.Style{}, false
-}
-
-// reviewSubject names what the review covers, for the top bar.  The scope
-// is "staged" or "unstaged" when the review is limited to one of them and
-// empty otherwise.
-func (m AppModel) reviewSubject() (scope, subject string) {
-	if !m.multiFile || m.filePath != "" {
-		return "", "document"
-	}
+// reviewScopeLabel describes the changes even when an attachment tab is active.
+func (m AppModel) reviewScopeLabel() string {
 	if m.source != nil {
-		scope = m.source.Scope
+		switch m.source.Scope {
+		case "staged", "unstaged":
+			return m.source.Scope
+		}
+		return "diff"
 	} else if m.staged {
-		scope = "staged"
+		return "staged"
 	}
-	if _, ok := scopeWordStyle(scope); !ok {
-		scope = ""
-	}
-	if len(m.attachments) > 0 {
-		hasChanges := false
+	if m.multiFile && m.filePath == "" {
 		for _, tab := range m.tabs {
-			if tab.attachment == nil && !tab.outsideChanges {
-				hasChanges = true
-				break
+			if tab.attachment == nil && !tab.outsideChanges && tab.path != overallCommentsPath {
+				return "diff"
 			}
 		}
-		if !hasChanges {
-			return scope, "attachments (no file changes)"
-		}
 	}
-	return scope, "changes"
+	return ""
 }
 
 func (m AppModel) View() tea.View {
@@ -3256,12 +3398,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if button := m.watchIndicator(); button != "" {
 		layout.watchIndicator, layout.hasWatchIndicator = buttonRect(header, 0, button)
 	}
-	if button := m.whitespaceButton(); button != "" {
-		layout.whitespaceButton, layout.hasWhitespaceButton = buttonRect(header, 0, button)
-	}
-	if button := m.splitButton(); button != "" {
-		layout.splitButton, layout.hasSplitButton = buttonRect(header, 0, button)
-	}
+	m.layoutDiffControls(header, &layout)
 	if rect, ok := buttonRect(footer, footerTop, m.searchHint()); ok && m.searchHint() != "" && !m.isearch.active {
 		layout.isearchRegions = append(layout.isearchRegions, isearchMouseRegion{rect: rect, action: isearchStart})
 	}
@@ -4735,6 +4872,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "@", desc: "copy file/line reference"},
 			{keys: "#", desc: "toggle line numbers (all files)"},
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
+			{keys: "click Diff / layout icon", desc: "ignore whitespace / toggle split"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
 			{keys: "M-g · M-p", desc: "go to line / open file"},
 			{keys: "C-v/M-v (inputs)", desc: "paste clipboard text, including while editing a search query with M-e"},
@@ -4798,6 +4936,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "@", desc: "copy file/line reference or comment ID"},
 		{keys: "M-p", desc: "open file"},
 		{keys: "S · ←/→", desc: "split diff · diff side"},
+		{keys: "click Diff / layout icon", desc: "ignore whitespace / toggle split"},
 		{keys: "↑/↓", desc: "⇅ choose file"},
 		{keys: "enter/esc", desc: "open/cancel"},
 	}, columnWidth)
@@ -4930,7 +5069,11 @@ func (m AppModel) helpPageSize(width, height, lineCount int) int {
 }
 
 func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegion) {
-	brand := ansi.Truncate(BrandVersion(m.version, terminalIsDark), width, "…")
+	brand := BrandVersion(m.version, terminalIsDark)
+	if !m.readOnly && m.session != nil && m.session.InMemory() {
+		brand = m.helpDemoBrand(brand, width)
+	}
+	brand = ansi.Truncate(brand, width, "…")
 	if pageSize == 0 {
 		return "\n" + lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(brand), nil
 	}
@@ -4942,6 +5085,26 @@ func (m AppModel) helpFooter(width, pageSize, top int) (string, []modalMouseRegi
 		return "\n" + buttons + strings.Repeat(" ", width-lipgloss.Width(buttons)-lipgloss.Width(brand)) + brand, regions
 	}
 	return lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(brand) + "\n" + buttons, regions
+}
+
+func (m AppModel) helpDemoBrand(brand string, width int) string {
+	ld := lipgloss.LightDark(terminalIsDark)
+	background := ld(lipgloss.Color("#EEDC9A"), lipgloss.Color("#5E5220"))
+	style := lipgloss.NewStyle().Foreground(textPrimary).Background(background).Bold(true)
+	edge := lipgloss.NewStyle().Foreground(background)
+	icon := m.icons.Join(m.icons.Glyph(icons.Warning, "⚠\ufe0e"), "")
+	label := func(text string) string {
+		if !m.icons {
+			return style.Render(" " + icon + text + " ")
+		}
+		return edge.Render(m.icons.Glyph(icons.PillLeft, "")) + style.Render(icon+text) +
+			edge.Render(m.icons.Glyph(icons.PillRight, ""))
+	}
+	demo := label("Demo · not saved")
+	if lipgloss.Width(brand)+1+lipgloss.Width(demo) > width {
+		demo = label("Demo")
+	}
+	return brand + " " + demo
 }
 
 func (m AppModel) helpHeader(innerWidth int) (string, modalMouseRegion) {

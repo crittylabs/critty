@@ -536,9 +536,22 @@ def transient_views() -> None:
             lambda demo=demo: ("Submit q" if demo else "Close q") in screen(),
             "transient UI rendered",
         )
-        assert ("Demo · not saved" if demo else "View the ") in screen(), screen()
+        control = "Submit q" if demo else "Close q"
+        header = screen().partition(control)[0]
+        if name in ("view-git", "view-patch"):
+            assert re.search(r"[±] diff\b", header), header
+        else:
+            assert not re.search(r"\b(?:documents?|diff)\b", header), header
         assert snapshot() == before, "transient mode wrote files during startup"
         if demo:
+            assert "Demo · not saved" not in screen()
+            tmux("send-keys", "-t", pane, "M-?")
+            wait_until(
+                lambda: "Keyboard Help" in screen() and "Demo · not saved" in screen(),
+                "demo indication beside the version in Help",
+            )
+            tmux("send-keys", "-t", pane, "Escape")
+            wait_until(lambda: "Keyboard Help" not in screen(), "Help closed")
             tmux("send-keys", "-t", pane, "n", "Space")
             wait_until(
                 lambda: re.search(r"[✓\U000f0132].*Confirm demo", screen()),
@@ -1018,13 +1031,22 @@ def scenarios() -> None:
             "--- a/standalone.go\n+++ b/standalone.go\n"
             "@@ -10,3 +20,3 @@\n context\n-old call\n+new call\n tail\n"
         )
+        unified_layout = r"Diff:[󰯋▤](?! ?↹)"
+        split_layout = r"Diff:[◨]"
+        split_glyph = r"(?<=Diff:)[◨]"
         attached_patch = Round(
             "attached-patch", ["--null", "--attachment", str(patch)]
         )
         tmux("resize-pane", "-t", attached_patch.pane, "-x", "120")
-        attached_patch.wait_screen("Split: off", "attached patch defaults to unified")
+        wait_until(
+            lambda: re.search(unified_layout, attached_patch.screen()),
+            "attached patch defaults to unified",
+        )
         attached_patch.keys("S")
-        attached_patch.wait_screen("Split: on", "S enables attached patch splitting")
+        wait_until(
+            lambda: re.search(split_layout, attached_patch.screen()),
+            "S enables attached patch splitting",
+        )
         wait_until(
             lambda: any(
                 "-old call" in row and "+new call" in row
@@ -1038,8 +1060,11 @@ def scenarios() -> None:
         anchored = wait_until(attached_patch.comments, "patch comment saved")
         assert len(anchored) == 1 and anchored[0]["start_line"] == 6, anchored
         assert not anchored[0].get("side") and anchored[0]["anchor"] == "-old call"
-        attached_patch.click(r"Split: on")
-        attached_patch.wait_screen("Split: off", "mouse restores attached patch unified")
+        attached_patch.click(split_glyph)
+        wait_until(
+            lambda: re.search(unified_layout, attached_patch.screen()),
+            "mouse restores attached patch unified",
+        )
         assert attached_patch.comments() == anchored
         attached_patch.finish(False)
         report("attached patch splitting retains raw patch comment coordinates")
@@ -1057,19 +1082,31 @@ def scenarios() -> None:
             ),
             "review redrawn at the server's pane width before mouse input",
         )
-        formats.click(r"Ignore: none")
-        formats.wait_screen("Ignore: WS", "mouse disables whitespace-only changes")
+        formats.click(r"Diff:(?=[󰯋▤])")
+        wait_until(
+            lambda: re.search(r"Diff:[󰯋▤] ?↹", formats.screen()),
+            "mouse disables whitespace-only changes",
+        )
         formats.keys("w")
-        formats.wait_screen("Ignore: none", "w restores whitespace changes")
+        wait_until(
+            lambda: re.search(unified_layout, formats.screen()),
+            "w restores whitespace changes",
+        )
         formats.keys("S")
-        formats.wait_screen("Split: on", "side-by-side diff without source files")
+        wait_until(
+            lambda: re.search(split_layout, formats.screen()),
+            "side-by-side diff without source files",
+        )
         formats.keys("g", "j", "Left", "Enter")
         formats.text("Deleted line remains on its original side.")
         formats.keys("C-s")
         saved = wait_until(formats.comments, "old-side comment saved")
         assert saved[0]["side"] == "old" and saved[0]["start_line"] == 11
-        formats.click(r"Split: on")
-        formats.wait_screen("Split: off", "mouse disables split diff")
+        formats.click(split_glyph)
+        wait_until(
+            lambda: re.search(unified_layout, formats.screen()),
+            "mouse disables split diff",
+        )
         assert formats.comments() == saved
         assert not (WORK / "standalone.go").exists()
         formats.finish(False)
@@ -1422,7 +1459,10 @@ def scenarios() -> None:
         # the TUI's double-click guard (modalClickGuard) is ignored.
         time.sleep(0.5)
         mouse.click(r"Review r")
-        screen = mouse.wait_screen("L2/", "Review focuses the first unchecked item")
+        screen = wait_until(
+            lambda: screen if re.search(r"[L] +2:\d+", screen := mouse.screen()) else None,
+            "Review focuses the first unchecked item",
+        )
         assert "Required items must be completed" not in screen, screen
         rows = screen.splitlines()
         viewed_row = next(
@@ -1470,7 +1510,10 @@ def scenarios() -> None:
         form.settle()
         assert not form.result.exists(), "counter click submitted the review"
         form.keys("q", "BTab", "C-s", "Tab", "Tab", "Tab", "Enter")
-        form.wait_screen("L5/", "Submit counter focuses unchecked consent")
+        wait_until(
+            lambda: re.search(r"[L] +5:\d+", form.screen()),
+            "Submit counter focuses unchecked consent",
+        )
         form.keys("q", "c")
         screen = form.wait_screen("● Comment", "Comment selected")
         assert "Optional items remain unanswered" not in screen

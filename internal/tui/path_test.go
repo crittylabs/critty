@@ -140,17 +140,17 @@ func TestPathDisplayRepositoryBoundaries(t *testing.T) {
 	for _, dark := range []bool{true, false} {
 		initAdaptiveStyles(dark)
 		for _, tc := range []struct {
-			name, path, want, region string
-			roots                    []string
+			name, path, want string
+			roots            []string
 		}{
-			{"main", root + "/internal/tui/app.go", "~/s/atlas/i/t/app.go", "atlas", []string{"atlas"}},
-			{"linked", worktree + "/internal/app.go", "~/w/atlas.fix/i/app.go", "atlas.fix", []string{"atlas.fix"}},
-			{"nested", nested + "/app.go", "~/s/atlas/.t/feature/app.go", "atlas", []string{"atlas", "feature"}},
-			{"relative", "internal/界é/app.go", "i/界/app.go", "internal", nil},
-			{"combining", "éxample/app.go", "é/app.go", "éxample", nil},
-			{"outside", home + "/notes/app.go", "~/n/app.go", "", nil},
-			{"home boundary", home + "-other/app.go", "", "", nil},
-			{"leave repository", "../atlas-copy/app.go", "../a/app.go", "", nil},
+			{"main", root + "/internal/tui/app.go", "~/s/atlas/i/t/app.go", []string{"atlas"}},
+			{"linked", worktree + "/internal/app.go", "~/w/atlas.fix/i/app.go", []string{"atlas.fix"}},
+			{"nested", nested + "/app.go", "~/s/atlas/.t/feature/app.go", []string{"atlas", "feature"}},
+			{"relative", "internal/界é/app.go", "i/界/app.go", nil},
+			{"combining", "éxample/app.go", "é/app.go", nil},
+			{"outside", home + "/notes/app.go", "~/n/app.go", nil},
+			{"home boundary", home + "-other/app.go", "", nil},
+			{"leave repository", "../atlas-copy/app.go", "../a/app.go", nil},
 		} {
 			t.Run(fmt.Sprintf("dark=%t/%s", dark, tc.name), func(t *testing.T) {
 				tab := p.render(tc.path, activeTabStyle, true, true)
@@ -170,22 +170,8 @@ func TestPathDisplayRepositoryBoundaries(t *testing.T) {
 					t.Fatalf("unrelated home prefix collapsed: %q", plain)
 				}
 				runes, styles := renderedCells(rendered)
-				start := -1
-				if tc.region != "" {
-					start = len([]rune(plain[:strings.Index(plain, tc.region)]))
-				}
-				background := base.GetBackground()
-				if start >= 0 {
-					background = styles[start].Bg
-					if background == nil || sameColor(background, base.GetBackground()) {
-						t.Fatal("repository root lost its distinct background")
-					}
-				}
 				for i, r := range runes {
 					wantBG := base.GetBackground()
-					if start >= 0 && i >= start {
-						wantBG = background
-					}
 					if !sameColor(styles[i].Bg, wantBG) {
 						t.Fatalf("background at %d (%q) = %v, want %v", i, r, styles[i].Bg, wantBG)
 					}
@@ -213,16 +199,11 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 	app.width = 100
 	for _, dark := range []bool{true, false} {
 		initAdaptiveStyles(dark)
-		rootPath := app.paths.render(app.filePath, headerPathStyle, false, true)
-		rootRunes, rootStyles := renderedCells(rootPath)
-		rootText := string(rootRunes)
-		rootStart := len([]rune(rootText[:strings.Index(rootText, filepath.Base(root))]))
-		rootBackground := rootStyles[rootStart].Bg
 		for _, width := range []int{100, 24} {
 			app.width = width
 			header := strings.Split(app.renderHeader(), "\n")[lipgloss.Height(app.renderReviewBar())]
 			plain := ansi.Strip(header)
-			if !strings.Contains(plain, ".md L0/3") || strings.Contains(plain, ".md  ") {
+			if !strings.Contains(plain, ".md") || !strings.Contains(strings.Join(strings.Fields(plain), " "), "L 0:3") {
 				t.Fatalf("header lost filename or added space: %q", plain)
 			}
 			progress := strings.LastIndex(plain, "0/0")
@@ -245,12 +226,12 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 				}
 				last := -1
 				for i, style := range styles {
-					if sameColor(style.Bg, rootBackground) {
+					if sameColor(style.Bg, headerPathStyle.GetBackground()) {
 						last = i
 					}
 				}
-				if last < 0 || runes[last] == ' ' {
-					t.Fatalf("%s root background includes a trailing space or disappeared: %q", name, rendered)
+				if last < 1 || runes[last] != ' ' || runes[last-1] == ' ' {
+					t.Fatalf("%s path background must include one trailing space: %q", name, rendered)
 				}
 			}
 		}

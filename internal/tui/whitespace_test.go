@@ -15,14 +15,14 @@ const whitespacePatch = "diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1
 
 func TestWhitespaceToggleAcrossFiles(t *testing.T) {
 	m := patchApp(t, whitespacePatch)
-	if !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: none") {
+	if !strings.Contains(ansi.Strip(m.renderHeader()), "Diff:▤ ") {
 		t.Fatal("whitespace control should always be present")
 	}
 	before := m.tabs[0].doc.Content
 	m.tab().cursorLine, m.tab().cursorSide = 1, "old"
 	m.tab().selecting, m.tab().selectSide = true, "old"
 	m = pressKey(m, 'w')
-	if !m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: WS") {
+	if !m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Diff:▤↹") {
 		t.Fatal("missing whitespace mode")
 	}
 	if m.tabs[0].changedLines[1] || !m.tabs[0].changedLines[2] || len(m.tabs[1].changeChunks) != 0 {
@@ -44,7 +44,7 @@ func TestWhitespaceToggleAcrossFiles(t *testing.T) {
 			t.Fatal("original diff not restored")
 		}
 	}
-	if m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: none") {
+	if m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Diff:▤ ") {
 		t.Fatal("mode not cleared")
 	}
 }
@@ -57,7 +57,7 @@ func TestWhitespaceControlKeepsHeaderPositions(t *testing.T) {
 	}
 	m = clickMouse(m, before.whitespaceButton.left, before.whitespaceButton.top)
 	_, after := m.renderReviewScreen()
-	if !m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Ignore: WS") {
+	if !m.ignoreWhitespace || !strings.Contains(ansi.Strip(m.renderHeader()), "Diff:▤↹") {
 		t.Fatal("click did not toggle whitespace")
 	}
 	if before.whitespaceButton != after.whitespaceButton || before.splitButton != after.splitButton || !reflect.DeepEqual(before.isearchRegions, after.isearchRegions) {

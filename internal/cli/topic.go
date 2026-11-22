@@ -50,13 +50,20 @@ func applyHeaderFlags(sess *review.Session) {
 }
 
 func reviewProject(root string) string {
-	if common := reviewGitCommonDir(root); common != "" {
-		return gitProjectName(common)
+	if project := reviewGitProject(root); project != "" {
+		return project
 	}
 	if root == "" {
 		return ""
 	}
 	return filepath.Base(root)
+}
+
+func reviewGitProject(root string) string {
+	if common := reviewGitCommonDir(root); common != "" {
+		return gitProjectName(common)
+	}
+	return ""
 }
 
 func reviewGitCommonDir(root string) string {

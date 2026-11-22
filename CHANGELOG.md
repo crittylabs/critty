@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Scan the project, topic, and diff scope beside the controls in a compact Powerline-style header.  Without Nerd Fonts, the header uses single-column text symbols.  The file row shows the Git project and branch, file position, and progress through the file when space permits.  The selected line range has an orange background.
+  - The Diff group shows the layout and whether whitespace changes are ignored.  Click the layout symbol to switch between unified and split, or click Diff to toggle the whitespace filter.
+- When Nerd Fonts are disabled, see `M` for modified text files and `R` for renamed text files alongside the line counts in tabs and file lists.
+
 ## 2.1.0
 
 ### Added

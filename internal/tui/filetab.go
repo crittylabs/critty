@@ -376,7 +376,7 @@ func (t *FileTab) changeSummary(compact bool, symbols icons.Set) string {
 		case "deleted":
 			counts = append(counts, tabDeletedCount.Render(symbols.Glyph(icons.Removed, "D")))
 		default:
-			if t.isBinary || symbols == icons.Nerd && (t.status == "modified" || t.status == "renamed") {
+			if t.isBinary || t.status == "modified" || t.status == "renamed" {
 				marker := "M"
 				kind := icons.Modified
 				if t.status == "renamed" {

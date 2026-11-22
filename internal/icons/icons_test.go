@@ -11,7 +11,7 @@ func TestNerdGlyphWidth(t *testing.T) {
 		glyph := Nerd.Glyph(Kind(kind), "fallback")
 		want := 2
 		switch Kind(kind) {
-		case Close, AddComment, TabLeft, TabRight:
+		case Close, AddComment, TabLeft, TabRight, DividerLeft, DividerRight, PillLeft, PillRight:
 			want = 1
 		}
 		if width := ansi.StringWidth(glyph); width != want {

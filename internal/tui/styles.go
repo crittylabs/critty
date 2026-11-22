@@ -9,27 +9,23 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-func renderBrand() string {
-	return renderBrandFor(terminalIsDark)
-}
-
 // BrandVersion renders the Critty brand mark followed by the build version,
 // as shown in the Help dialog footer, for a dark or light background.
 func BrandVersion(version string, dark bool) string {
-	brand := renderBrandFor(dark)
+	ld := lipgloss.LightDark(dark)
+	brand := renderBrandFor(dark, ld(lipgloss.BrightWhite, lipgloss.Black))
 	if version == "" {
 		return brand
 	}
-	ld := lipgloss.LightDark(dark)
 	return brand + lipgloss.NewStyle().Bold(true).Foreground(ld(lipgloss.Blue, lipgloss.BrightBlue)).Render(version)
 }
 
-func renderBrandFor(dark bool) string {
+func renderBrandFor(dark bool, background color.Color) string {
 	ld := lipgloss.LightDark(dark)
 	tile := lipgloss.NewStyle().Bold(true).Background(lipgloss.BrightBlack)
 	word := lipgloss.NewStyle().Bold(true).
 		Foreground(ld(lipgloss.Black, lipgloss.BrightWhite)).
-		Background(ld(lipgloss.BrightWhite, lipgloss.Black))
+		Background(background)
 	return tile.Foreground(lipgloss.Color("#3fb950")).Render(">") +
 		tile.Foreground(lipgloss.BrightWhite).Render("_") +
 		word.Render(" crit") +
@@ -83,10 +79,18 @@ var (
 	commentBorderColor        = lipgloss.BrightBlack
 	commentFocusedBorderColor = lipgloss.BrightBlue
 
-	headerBackground    = lipgloss.Color("#C1A8CE")
-	headerForeground    = lipgloss.Color("#26182E")
-	headerPathCyan      = lipgloss.Color("#00758F")
-	headerPathSeparator = lipgloss.Color("#81608E")
+	headerProjectBackground = lipgloss.Color("#AA8CBD")
+	headerBranchBackground  = lipgloss.Color("#C1A8CE")
+	headerBackground        = lipgloss.Color("#D2BDDF")
+	headerForeground        = lipgloss.Color("#26182E")
+	headerPathCyan          = lipgloss.Color("#00677E")
+	headerPathSeparator     = lipgloss.Color("#6A4878")
+	headerSelection         = lipgloss.Color("#E89550")
+
+	headerPositionStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#28282B")).
+				Background(lipgloss.Color("#CECED0")).
+				Bold(true)
 
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -378,12 +382,6 @@ var (
 	// rather than the diff colors so a lower rank does not read as removal.
 	rankMovedUp   = lipgloss.NewStyle()
 	rankMovedDown = lipgloss.NewStyle()
-
-	visualModeIndicator = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.BrightMagenta).
-				Reverse(true).
-				Padding(0, 1)
 )
 
 // initAdaptiveStyles updates background-dependent styles based on terminal background.
@@ -474,12 +472,6 @@ func initAdaptiveStyles(hasDarkBG bool) {
 		Background(ld(lipgloss.Color("#D8E8F8"), lipgloss.Color("#1E3A5F"))).
 		Foreground(ld(lipgloss.Color("#333333"), lipgloss.Color("#E0E0E0")))
 
-	visualModeIndicator = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(textPrimary).
-		Background(selectedLineBg.GetBackground()).
-		Padding(0, 1)
-
 	mdCodeStyle = lipgloss.NewStyle().
 		Foreground(textColors.brightYellow).
 		Background(ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#3a3a3a")))
@@ -517,6 +509,14 @@ type formChipPalette struct {
 	requiredBadge color.Color
 	// badgeSymbol draws the symbol on every badge.
 	badgeSymbol color.Color
+}
+
+func headerPercentStyle() lipgloss.Style {
+	ld := lipgloss.LightDark(terminalIsDark)
+	return lipgloss.NewStyle().
+		Foreground(ld(lipgloss.Color("#405800"), lipgloss.Color("#C3DE59"))).
+		Background(ld(lipgloss.Color("#D7D9D0"), lipgloss.Color("#555555"))).
+		Bold(true)
 }
 
 func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {

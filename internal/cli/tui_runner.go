@@ -41,6 +41,10 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 	defer cancel()
 	finishCh := make(chan tui.FinishEvent, 4)
 	branch, _ := gitpkg.CurrentBranch()
+	topic := reviewTopicLabel(sess, mode)
+	if sess.Meta.Topic == nil && topic == branch {
+		topic = ""
+	}
 	appCfg := tui.AppConfig{
 		MaxWrapWidth:     configuredWrapWidth(cfg),
 		LineNumbers:      cfg.LineNumbers,
@@ -58,7 +62,8 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		DocumentSnapshot: mode.documentSnapshot,
 		Answers:          documents.Answers,
 		Project:          reviewProjectLabel(cfg.ProjectRoot, sess),
-		Topic:            reviewTopicLabel(sess, mode),
+		GitProject:       reviewGitProject(cfg.ProjectRoot),
+		Topic:            topic,
 		Version:          versionString(),
 		Session:          sess,
 		SearchHistory:    searchHistoryStore(cfg.ProjectRoot, sess),

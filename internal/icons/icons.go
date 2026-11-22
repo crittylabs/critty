@@ -91,6 +91,19 @@ const (
 	Stop
 	LinkExternal
 	AddComment
+	Host
+	Exit
+	UnifiedDiff
+	SplitDiff
+	Diff
+	Staged
+	Unstaged
+	Topic
+	DividerLeft
+	DividerRight
+	PillLeft
+	PillRight
+	Line
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -115,6 +128,12 @@ var glyphs = [...]string{
 	Bug: "\ueaaf", List: "\ueb17", Quote: "\ueb33", Clipboard: "\ueac0",
 	Report: "\uf50a", Bolt: "\U000f140b", Stop: "\uf46e",
 	LinkExternal: "\uf465", AddComment: "\uf0fe",
+	Host: "\uebc8", Exit: "\U000f0206",
+	UnifiedDiff: "\U000f0bcb", SplitDiff: "\ueb56",
+	Diff: "\uf440", Staged: "\uebd4", Unstaged: "\uebd2", Topic: "\uf412",
+	DividerLeft: "\ue0b3", DividerRight: "\ue0b1",
+	PillLeft: "\ue0b6", PillRight: "\ue0b4",
+	Line: "\ue0a1",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.
@@ -123,7 +142,8 @@ func (s Set) Glyph(kind Kind, fallback string) string {
 	if !s || int(kind) >= len(glyphs) {
 		return fallback
 	}
-	if kind == Close || kind == AddComment || kind == TabLeft || kind == TabRight {
+	switch kind {
+	case Close, AddComment, TabLeft, TabRight, DividerLeft, DividerRight, PillLeft, PillRight:
 		return glyphs[kind]
 	}
 	return glyphs[kind] + " "

@@ -6,17 +6,11 @@ import (
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
-// Keep the status width stable so toggling it does not move neighboring controls.
 func (m AppModel) whitespaceButton() string {
 	if !m.multiFile {
 		return ""
 	}
-	state := "none"
-	if m.ignoreWhitespace {
-		state = "WS  "
-	}
-	style := modalBtnFocusedLabel.Bold(true).Padding(0)
-	return style.Render("Ignore: "+state+" ") + modalBtnFocusedKey.Render("w")
+	return diffControlStyle().Render("Diff:")
 }
 
 func (m *AppModel) toggleWhitespace() {

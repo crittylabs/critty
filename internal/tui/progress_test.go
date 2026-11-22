@@ -87,6 +87,9 @@ func TestProgressCounterMouseRegionsSurviveWrappingAndResize(t *testing.T) {
 			if modal {
 				app.openFinishModal()
 				app.modalTextarea.SetValue("Mouse navigation draft.")
+			} else {
+				app.tab().selecting = true
+				app.tab().selectAnchor, app.tab().cursorLine = 1, 2
 			}
 			app, _ = updateApp(app, size)
 			var rect mouseRect

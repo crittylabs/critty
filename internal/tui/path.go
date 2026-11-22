@@ -185,11 +185,7 @@ func (p *pathDisplay) renderWithin(path string, base lipgloss.Style, tab, fileBo
 	}
 	styleFor := func(dir string) lipgloss.Style {
 		inside := !tab && (p.insideRepository(dir) || p.cwd != "" && within(p.cwd, dir))
-		style := base.Bold(inside)
-		if !tab && p.insideRepository(dir) {
-			style = style.Background(lipgloss.Color("#D2BDDF")).Foreground(headerForeground)
-		}
-		return style
+		return base.Bold(inside)
 	}
 	var rendered strings.Builder
 	if !tab {

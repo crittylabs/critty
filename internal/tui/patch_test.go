@@ -64,11 +64,11 @@ func TestBinaryChangeLabels(t *testing.T) {
 func TestTextChangeSummaryKeepsLineCounts(t *testing.T) {
 	t.Parallel()
 	m := patchApp(t, "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n")
-	if got := ansi.Strip(m.tab().changeSummary(false, icons.Plain)); got != "(+1 -1)" {
+	if got := ansi.Strip(m.tab().changeSummary(false, icons.Plain)); got != "(M +1 -1)" {
 		t.Fatalf("text summary = %q", got)
 	}
 	for _, tc := range []struct{ status, want string }{
-		{"added", "(A +1)"}, {"untracked", "(A +1)"}, {"deleted", "(D -1)"},
+		{"added", "(A +1)"}, {"untracked", "(A +1)"}, {"deleted", "(D -1)"}, {"renamed", "(R +1)"},
 	} {
 		t.Run(tc.status, func(t *testing.T) {
 			tab := m.tabs[0]

@@ -445,6 +445,7 @@ func TestMarkdownThematicBreaks(t *testing.T) {
 
 func TestMarkdownRuleWidthFollowsResize(t *testing.T) {
 	app := newScrollTestApp("notes.md", []string{"Before", "", "---", "", "After"}, true, 80, 30)
+	app.tab().state = &fileReview{}
 	for _, width := range []int{80, 32, 100} {
 		app, _ = updateApp(app, tea.WindowSizeMsg{Width: width, Height: 30})
 		line := &app.tab().markdown.after.lines[2]

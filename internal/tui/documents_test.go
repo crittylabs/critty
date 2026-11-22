@@ -233,9 +233,9 @@ func TestAttachedDocumentMixedReview(t *testing.T) {
 	if cmd := app.navigateSource(sourceLocation{path: d.Path(), line: 2}); cmd != nil || app.activeTab != 0 || app.tab().cursorLine != 2 {
 		t.Fatal("snapshot reference did not navigate")
 	}
-	app = NewCodeReviewApp(nil, "HEAD", AppConfig{Documents: []review.AttachedDocument{d}})
-	if _, subject := app.reviewSubject(); subject != "attachments (no file changes)" {
-		t.Fatalf("empty scope not identified: %q", subject)
+	app = NewCodeReviewApp(nil, "HEAD", AppConfig{Documents: []review.AttachedDocument{d}, Patch: &gitpkg.Patch{}})
+	if scope := app.reviewScopeLabel(); scope != "" {
+		t.Fatalf("attachment-only review has scope label %q", scope)
 	}
 }
 
@@ -255,8 +255,8 @@ func TestAttachedDocumentCommentsAndResume(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := NewApp(path, AppConfig{Session: sess, Documents: docs})
-	if _, subject := app.reviewSubject(); subject != "document" || !app.multiFile {
-		t.Fatal("document review lost identity or tab switching")
+	if app.reviewScopeLabel() != "" || !app.multiFile {
+		t.Fatal("document review shows a diff scope or lost tab switching")
 	}
 	for i := range app.tabs {
 		app.tabs[i].state = &fileReview{Comments: []review.Comment{{ID: app.tabs[i].path, Body: "comment"}}}

@@ -77,6 +77,7 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 		Watch:            reviewWatch,
 		Documents:        mode.documents,
 		Project:          project,
+		GitProject:       reviewGitProject(cfg.ProjectRoot),
 		Topic:            reviewTopic,
 		Version:          versionString(),
 		ReadOnly:         !reviewDemo,

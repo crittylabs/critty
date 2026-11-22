@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 const diffColumnMinimum = gutterWidth + 12
@@ -136,11 +137,59 @@ func (m AppModel) splitButton() string {
 	if !m.multiFile && (len(m.tabs) == 0 || m.documentPatch(m.tab()) == nil) {
 		return ""
 	}
-	state := "off"
+	glyph := m.icons.Glyph(icons.UnifiedDiff, "▤")
 	if m.split {
-		state = "on "
+		glyph = m.icons.Glyph(icons.SplitDiff, "◨")
 	}
-	return modalBtnFocusedKey.Render("S") + modalBtnFocusedLabel.Bold(true).Padding(0).Render("plit: "+state)
+	return diffControlStyle().Render(strings.TrimSuffix(glyph, " "))
+}
+
+func diffControlStyle() lipgloss.Style {
+	return reviewBarStyle.Bold(true)
+}
+
+func (m AppModel) diffControlText(whitespace, split string) string {
+	if split == "" {
+		return whitespace
+	}
+	prefix := diffControlStyle().Render("Diff:")
+	if whitespace == "" {
+		return prefix + split
+	}
+	padding := ""
+	if m.icons {
+		padding = " "
+	}
+	marker := " "
+	if m.ignoreWhitespace {
+		marker = "↹"
+	}
+	return prefix + split + diffControlStyle().Render(padding+marker)
+}
+
+func (m AppModel) layoutDiffControls(header string, layout *renderedScreenLayout) {
+	whitespace, split := m.whitespaceButton(), m.splitButton()
+	control := m.diffControlText(whitespace, split)
+	if control == "" {
+		return
+	}
+	for y, line := range strings.Split(header, "\n") {
+		before, _, found := strings.Cut(line, control)
+		if !found {
+			continue
+		}
+		start := lipgloss.Width(before)
+		if whitespace != "" {
+			layout.whitespaceButton = mouseRect{left: start, right: start + lipgloss.Width(whitespace), top: y, bottom: y + 1}
+			layout.hasWhitespaceButton = true
+		}
+		if size := lipgloss.Width(split); size > 0 {
+			left := start + len("Diff:")
+			layout.splitButton = mouseRect{left: left, right: left + size, top: y, bottom: y + 1}
+			layout.hasSplitButton = true
+		}
+		return
+	}
 }
 
 type diffAttention struct {

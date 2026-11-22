@@ -147,7 +147,7 @@ func TestNerdFontViewHistoryTargets(t *testing.T) {
 		t.Fatal("forward icon did not restore document")
 	}
 	_, layout = app.renderReviewScreen()
-	if !layout.hasFinishButton || !strings.Contains(app.submitButton(), icons.Nerd.Glyph(icons.Close, "")) {
+	if !layout.hasFinishButton || !strings.Contains(app.submitButton(), icons.Nerd.Glyph(icons.Exit, "")) {
 		t.Fatal("close icon missing")
 	}
 	_, cmd := clickMouseCmd(app, layout.finishButton.left, layout.finishButton.top)
@@ -166,16 +166,26 @@ func TestNerdFontHeaderControls(t *testing.T) {
 				app := patchApp(t, whitespacePatch)
 				app.icons = icons.Nerd
 				app.width, app.patch = width, nil
-				app.project, app.branch = "sample", "feature/viewer"
+				app.project, app.branch, app.topic = "sample", "feature/viewer", "Review"
+				app.host, app.staged = "tmux", true
 				app.reload.watch, app.images.enabled = true, true
 				app.recalculateLayout()
 				app.rebuildContent()
 				app.updateCommentSidebar()
 				if width == 120 {
-					bar := ansi.Strip(app.renderReviewBar())
-					for _, label := range []string{icons.Nerd.Label(icons.Project, "sample"), icons.Nerd.Label(icons.Branch, "feature/viewer")} {
+					runes, styles := renderedCells(app.renderReviewBar())
+					row := string(runes)
+					bar := strings.Join(strings.Fields(row), " ")
+					for _, label := range []string{"  sample", " Review   staged ", " Diff:󰯋   tmux", ""} {
 						if !strings.Contains(bar, label) {
 							t.Fatalf("header context missing: %q in %s", label, bar)
+						}
+					}
+					for _, marker := range []string{"sample ", "Review "} {
+						end := strings.Index(row, marker) + len(marker)
+						i := len([]rune(row[:end])) - 1
+						if !sameColor(styles[i].Fg, styles[i-1].Bg) || !sameColor(styles[i].Bg, styles[i+1].Bg) {
+							t.Fatalf("wrong transition colors at %q in %q", marker, row)
 						}
 					}
 				}

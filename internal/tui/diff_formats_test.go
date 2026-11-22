@@ -323,7 +323,7 @@ func TestDiffFormatWrappingAndNarrowFallback(t *testing.T) {
 	before := m.tab().cursorLine
 	m.contentViewport.SetWidth(35)
 	m.rebuildContent()
-	if m.alternateDiff(m.tab()) || !strings.Contains(ansi.Strip(m.splitButton()), "Split: on") {
+	if m.alternateDiff(m.tab()) || ansi.Strip(m.splitButton()) != "◨" {
 		t.Fatal("narrow fallback lost split preference")
 	}
 	m.contentViewport.SetWidth(95)
