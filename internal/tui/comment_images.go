@@ -78,69 +78,56 @@ func (m *AppModel) commentImageRefs(body string) []markdownImageRef {
 	return refs
 }
 
-// linkCommentLine links file references and the image references that refs
-// places on line number lineNumber.
-func (m *AppModel) linkCommentLine(line string, refs []markdownImageRef, lineNumber int) string {
-	var spans []linkSpan
-	for _, ref := range refs {
-		if ref.line != lineNumber {
-			continue
-		}
-		if target, ok := m.commentImageTarget(ref.destination); ok {
-			spans = append(spans, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
-		}
-	}
-	return linkedDisplayLine(line, spans, m.linkFileReferences)
-}
-
 func (m *AppModel) renderCommentContent(author, body, prefix string, width int, suggestion ...chroma.Lexer) string {
 	style := m.commentAuthorStyle(author)
 	width = max(1, width)
 	refs := m.commentImageRefs(body)
 	showImages := !m.images.hidden && m.modal == noModal
 	renderSource := m.commentRenderedDisplay(body, width, showImages, suggestion...)
+	tables := commentTableLayout(renderSource, width)
 	var lines []string
 	prefixed := false
-	for i, line := range strings.Split(body, "\n") {
-		if renderSource != nil && renderSource.lines[i].previewHidden {
+	for i := range renderSource.lines {
+		parsed := &renderSource.lines[i]
+		if parsed.previewHidden {
 			continue
 		}
-		content := style.Render(m.linkCommentLine(line, refs, i+1))
-		if renderSource != nil {
-			links := m.referenceSpans(line)
-			for _, ref := range refs {
-				if ref.line == i+1 {
-					if target, ok := m.commentImageTarget(ref.destination); ok {
-						links = append(links, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
-					}
+		links := m.referenceSpans(parsed.source)
+		for _, ref := range refs {
+			if ref.line == i+1 {
+				if target, ok := m.commentImageTarget(ref.destination); ok {
+					links = append(links, linkSpan{start: ref.start, end: ref.end, uri: target.uri()})
 				}
 			}
-			if !prefixed && prefix != "" && renderSource.lines[i].thematicBreak {
-				renderSource.lines[i].previewWidth = max(1, width-ansi.StringWidth(prefix))
-			}
-			content = style.Render(renderSource.lines[i].render(nil, style, style, links))
 		}
-		prefixWidth := 0
-		if !prefixed && prefix != "" {
-			content = style.Bold(true).Render(prefix) + content
-			prefixWidth = ansi.StringWidth(prefix)
+		var rows []string
+		if table, ok := tables[i+1]; ok {
+			if !prefixed && prefix != "" {
+				header := style.Bold(true).Render(strings.TrimRight(prefix, " "))
+				lines = append(lines, strings.Split(lipgloss.Wrap(header, width, ""), "\n")...)
+			}
+			rows = commentTableRows(parsed, table.colWidths, i+1 == table.startLine, style, links)
+		} else {
+			prefixWidth := 0
+			if !prefixed && prefix != "" {
+				prefixWidth = ansi.StringWidth(prefix)
+				if parsed.thematicBreak {
+					parsed.previewWidth = max(1, width-prefixWidth)
+				}
+			}
+			content := style.Render(parsed.render(nil, style, style, links))
+			if prefixWidth > 0 {
+				content = style.Bold(true).Render(prefix) + content
+			}
+			rows = parsed.wrapRows(expandDisplayTabs(content), width, prefixWidth)
+			if parsed.codeBlock && parsed.previewTokens == nil {
+				rows[0] = shadeCodeRow(rows[0], prefixWidth, width)
+				for row := 1; row < len(rows); row++ {
+					rows[row] = shadeCodeRow(rows[row], 0, width)
+				}
+			}
 		}
 		prefixed = true
-		var rows []string
-		if renderSource != nil {
-			rows = renderSource.lines[i].wrapRows(expandDisplayTabs(content), width, prefixWidth)
-		} else {
-			rows = strings.Split(lipgloss.Wrap(expandDisplayTabs(content), width, ""), "\n")
-		}
-		if renderSource != nil && renderSource.lines[i].codeBlock && renderSource.lines[i].previewTokens == nil {
-			for row := range rows {
-				left := 0
-				if row == 0 {
-					left = prefixWidth
-				}
-				rows[row] = shadeCodeRow(rows[row], left, width)
-			}
-		}
 		lines = append(lines, rows...)
 		if !showImages {
 			continue

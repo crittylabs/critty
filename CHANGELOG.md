@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Read Markdown tables in comments and replies with aligned columns and cells that wrap to fit the pane.
+
 ### Changed
 
 - Scan the project, topic, and diff scope beside the controls in a compact Powerline-style header.  Without Nerd Fonts, the header uses single-column text symbols.  The file row shows the Git project and branch, file position, and progress through the file when space permits.  The selected line range has an orange background.

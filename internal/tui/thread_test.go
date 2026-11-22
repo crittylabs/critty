@@ -70,6 +70,53 @@ func assertThreadMarkdown(t *testing.T, view string) {
 	}
 }
 
+func TestCommentThreadRendersTables(t *testing.T) {
+	const body = "| Step | Result |\n| --- | --- |\n| Build | Pass |"
+	const reply = "| Check | Status |\n| --- | --- |\n| **Tests** | Pass |"
+	app := setupAppWithDoc(t, "source\n")
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 120, Height: 40})
+	app.tab().state.Comments = []review.Comment{{ID: "thread", StartLine: 1, EndLine: 1, Author: "Reviewer", Body: body,
+		Replies: []review.Reply{{ID: "reply", Author: "Agent", Body: reply}}}}
+	app.selectComment(0, app.commentTargets(0)[0])
+	app.rebuildContent()
+	inline := app.contentViewport.GetContent()
+	app.focused, app.sidebarView = commentPane, commentsView
+	app.updateCommentSidebar()
+	sidebar := app.commentViewport.GetContent()
+	app.openCommentThread("thread")
+	for _, view := range []struct{ name, content string }{
+		{"inline", inline}, {"sidebar", sidebar}, {"dialog", app.View().Content},
+	} {
+		t.Run(view.name, func(t *testing.T) {
+			plain := ansi.Strip(view.content)
+			for _, row := range []string{"│ Step  │ Result │", "│───────┼────────│", "│ Build │ Pass   │", "│ Tests │ Pass   │"} {
+				if !strings.Contains(plain, row) {
+					t.Errorf("table row missing: %q", row)
+				}
+			}
+		})
+	}
+}
+
+func TestLatestCommentWrapsMarkdownTable(t *testing.T) {
+	const body = "| Check | Notes |\n| --- | --- |\n| **Build** | 日本語 and [details](https://example.org) |"
+	const width = 19
+	app := AppModel{}
+	view := app.renderLatestComment("Reviewer", "", []review.Reply{{Body: body}}, width, 10)
+	rows := strings.Split(ansi.Strip(view), "\n")
+	if len(rows) < 5 || rows[0] != "anonymous:" {
+		t.Fatalf("expected author followed by a wrapped table: %q", rows)
+	}
+	for _, row := range rows[1:] {
+		if !strings.HasPrefix(row, "│") || !strings.HasSuffix(row, "│") || ansi.StringWidth(row) != ansi.StringWidth(rows[1]) || ansi.StringWidth(row) > width {
+			t.Errorf("table row exceeds width or lost alignment: %q", row)
+		}
+	}
+	if !strings.Contains(view, ansi.SetHyperlink("https://example.org")) || !strings.Contains(ansi.Strip(view), "日本語") {
+		t.Errorf("wrapped table lost content: %q", view)
+	}
+}
+
 func TestThreadInitialOffset(t *testing.T) {
 	for _, tt := range []struct {
 		name       string

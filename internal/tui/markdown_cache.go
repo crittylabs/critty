@@ -86,33 +86,5 @@ func (t *FileTab) markdownTableCells(line int, links []linkSpan) []string {
 
 func (t *FileTab) markdownTableCellsWithInline(line int, links []linkSpan, inline []gitpkg.InlineSegment) []string {
 	t.ensureMarkdownCache()
-	parsed := &t.markdown.after.lines[line-1]
-	var cells []string
-	for _, span := range parsed.cells {
-		cell := markdownLine{literal: true, source: parsed.source}
-		for _, token := range parsed.displayTokens() {
-			if token.decoration != noDecoration && token.start >= span[0] && token.start <= span[1] {
-				cell.tokens = append(cell.tokens, token)
-				continue
-			}
-			from, to := max(span[0], token.start), min(span[1], token.end)
-			if from >= to {
-				continue
-			}
-			part := token
-			if len(token.text) == token.end-token.start {
-				part.text = token.text[from-token.start : to-token.start]
-			}
-			part.start, part.end = from, to
-			cell.tokens = append(cell.tokens, part)
-		}
-		for _, token := range cell.tokens {
-			if token.style&markdownRendered != 0 {
-				cell.previewTokens = cell.tokens
-				break
-			}
-		}
-		cells = append(cells, cell.render(inline, diffCommonTextBg, diffAddedTextBg, links))
-	}
-	return cells
+	return t.markdown.after.lines[line-1].renderTableCells(inline, diffCommonTextBg, diffAddedTextBg, links)
 }

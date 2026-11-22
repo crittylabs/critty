@@ -1,13 +1,73 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 )
 
 const tableColumnMaxWidth = 40
+
+func commentTableLayout(source *markdownSource, width int) map[int]*tableBlock {
+	tables := detectTableBlocks(source.lines, func(line int) []string {
+		return source.lines[line-1].renderTableCells(nil, lipgloss.Style{}, lipgloss.Style{}, nil)
+	})
+	if len(tables) == 0 {
+		return nil
+	}
+	rows := make(map[int]*tableBlock)
+	for i := range tables {
+		table := &tables[i]
+		// The regular comment renderer keeps multi-row previews intact.
+		if slices.ContainsFunc(source.lines[table.startLine-1:table.endLine], func(line markdownLine) bool {
+			return line.previewTokens != nil || line.previewHidden
+		}) {
+			continue
+		}
+		const minCellWidth = 2 // Leave room for wide characters.
+		budget := width - (1 + 3*len(table.colWidths))
+		if budget < minCellWidth*len(table.colWidths) {
+			continue
+		}
+		for _, desired := range table.colWidths {
+			budget -= max(minCellWidth, min(desired, tableColumnMaxWidth))
+		}
+		// Cap the widest columns first, leaving short columns intact.
+		limit := tableColumnMaxWidth
+		for budget < 0 && limit > minCellWidth {
+			for _, desired := range table.colWidths {
+				if desired >= limit {
+					budget++
+				}
+			}
+			limit--
+		}
+		for column, desired := range table.colWidths {
+			table.colWidths[column] = max(minCellWidth, min(desired, limit))
+		}
+		for line := table.startLine; line <= table.endLine; line++ {
+			rows[line] = table
+		}
+	}
+	return rows
+}
+
+func commentTableRows(line *markdownLine, widths []int, header bool, style lipgloss.Style, links []linkSpan) []string {
+	if line.tableSep {
+		return []string{formatTableSep(widths)}
+	}
+	cells := line.renderTableCells(nil, style, style, links)
+	columns := wrapTableCells(cells, widths, line)
+	rows := make([]string, tableRowHeight(columns))
+	for row := range rows {
+		rows[row] = formatTableRow(tableRowCells(columns, row), widths, header)
+	}
+	return rows
+}
 
 type tableCellFragment struct {
 	text   string
@@ -157,4 +217,35 @@ func (l *renderedContentLayout) addTableSpans(firstRow int, columns [][]tableCel
 		}
 		left += widths[i] + 3
 	}
+}
+
+func (parsed *markdownLine) renderTableCells(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan) []string {
+	var cells []string
+	for _, span := range parsed.cells {
+		cell := markdownLine{literal: true, source: parsed.source}
+		for _, token := range parsed.displayTokens() {
+			if token.decoration != noDecoration && token.start >= span[0] && token.start <= span[1] {
+				cell.tokens = append(cell.tokens, token)
+				continue
+			}
+			from, to := max(span[0], token.start), min(span[1], token.end)
+			if from >= to {
+				continue
+			}
+			part := token
+			if len(token.text) == token.end-token.start {
+				part.text = token.text[from-token.start : to-token.start]
+			}
+			part.start, part.end = from, to
+			cell.tokens = append(cell.tokens, part)
+		}
+		for _, token := range cell.tokens {
+			if token.style&markdownRendered != 0 {
+				cell.previewTokens = cell.tokens
+				break
+			}
+		}
+		cells = append(cells, cell.render(inline, base, changed, links))
+	}
+	return cells
 }
