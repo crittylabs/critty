@@ -25,7 +25,7 @@ While a review waits for you, Critty tells the terminal it needs your input thro
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/b55fa7e4-225f-4058-862e-50b18a8395d6
+https://github.com/user-attachments/assets/d116ad20-28ee-4a7a-be62-ce4ce9ab04cd
 
 For example:
 
@@ -142,7 +142,7 @@ With `allow-passthrough on`, keep the Critty pane selected in the only client di
 
 After enabling passthrough, run `critty doctor` in the foreground of that terminal to probe image support and check forwarding settings.  Herdr TUI checks read local configuration; running server and remote client settings may differ.
 
-PNG, JPEG, GIF, and WebP are supported directly.  SVG previews use `rsvg-convert`, `merman-cli`, or `resvg` found on PATH, with no extra setting.  SVG files retain their XML source alongside the preview; Markdown images and comment editors support SVG too.  Large or unsupported images and changed images in supplied diffs remain text placeholders.  You can opt in to previews from selected HTTPS hosts with `remote_image_hosts`.  See [SVG preview details](docs/configuration.md#svg-previews) and [remote image setup](docs/configuration.md#remote-image-previews).
+PNG, JPEG, GIF, and WebP are supported directly.  SVG previews use `rsvg-convert`, `merman-cli`, or `resvg` found on PATH, with no extra setting.  SVG files retain their XML source alongside the preview; Markdown images and comment editors support SVG too.  Large or unsupported images appear as text placeholders.  Supplied patches can show Before and After SVG previews when they contain complete source snapshots.  You can opt in to previews from selected HTTPS hosts with `remote_image_hosts`.  See [SVG preview details](docs/configuration.md#svg-previews) and [remote image setup](docs/configuration.md#remote-image-previews).
 
 Markdown math expressions in `$...$` and `$$...$$` can appear as images in documents and comments, including code blocks such as suggestions and Markdown examples.  Inline formulas follow the surrounding text size; wide block formulas in document views scroll horizontally.  Copying keeps the original TeX; searching, selecting lines, or turning Images off reveals the source.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH first, with LaTeX plus dvipng as fallback; multiline expressions use LaTeX directly.  These optional tools stay outside Critty, and missing tools or rendering failures leave the source visible.  See [math preview setup and limits](docs/configuration.md#math-previews).
 
@@ -176,7 +176,7 @@ critty changes.patch         # Read a patch with syntax highlighting
 
 Follow local Markdown links to browse related documents.  Back and Forward restore your reading position without creating a saved review.  Standalone patches support unified and side-by-side layouts; press `S` to switch.  Highlighting uses the patch's filenames and available hunk context, so a hunk starting inside a multiline string or comment may have limited syntax context.
 
-The viewer hides line numbers by default and shows an outline when one is available.  Set line-number visibility, wrapping width, and syntax associations in [configuration](docs/configuration.md#reading-layout).  Use Help for the full mouse and keyboard controls.
+The viewer hides line numbers by default and shows an outline when one is available.  Markdown headings and source declarations carry their colors into the outline.  Set line-number visibility, wrapping width, and syntax associations in [configuration](docs/configuration.md#reading-layout).  Use Help for the full mouse and keyboard controls.
 
 ### Review code and documents
 
@@ -188,7 +188,7 @@ Critty opens a review pane or tab in the detected multiplexer, or a new window o
 
 The agent reads your verdict and comments, makes revisions, and reopens the same session.  You can read its replies and the updated changes, add feedback, and continue until the work is ready.
 
-https://github.com/user-attachments/assets/08734f19-5938-4c79-bf56-57a9bc397b46
+Watch a review through to the commit with [Claude Code](#review-round-trips-with-claude-code) or [Codex](#review-round-trips-with-codex).
 
 For a manual review:
 
@@ -205,6 +205,8 @@ critty plan design.md         # A versioned plan
 Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Press `C-z` to undo a resolve or a deleted comment and return to it, and `C-y` to redo it.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
 Compact tabs leave two more rows for the document.  Each tab remembers your reading position in the document and Comments sidebar.  The Files tree shows pending comments and unanswered items.  Use `V` for full-width reading with all comments reduced to bubble markers.
+
+The current line and selected ranges are highlighted across the pane, with diff colors preserved in the text.  Drag the line numbers to select a range.  Hover over a line number to reveal the add-comment button, or click the current or a selected line number to comment.
 
 Word-level highlights estimate corresponding lines even when a change also adds or removes lines.  Side-by-side view uses the same matches.  Very long lines and expensive searches keep full-line highlighting so reviews stay responsive.
 
@@ -232,7 +234,7 @@ Saved plans, supplied diffs, and committed comparisons keep their snapshots.  Fi
 
 Drag across text in a document or diff, then press `M-w` or `Y`.  Copies contain the source text, with wrapped rows joined and gutters and annotations left out.  Markdown retains its formatting and link targets, even when selecting part of a link label.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.
 
-Input fields select the same way: drag in the comment editor or a single-line input, copy with `M-w` or **Copy text**, paste the clipboard with `C-v`, and press `C-z` to undo the last deletion, overwrite, or paste.
+Input fields select the same way: drag in the comment editor or a single-line input, copy with `M-w` or **Copy text**, paste the clipboard with `C-v` or `M-v`, and press `C-z` to undo the last deletion, overwrite, or paste.
 
 Without a text selection, `M-w` copies the current source line or selected line range.  On a comment it copies the body; on a thread it copies the parent and all replies with author names, retaining the original Markdown.  Press `@` to copy a file/line reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, `M-o` follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
 
@@ -308,7 +310,7 @@ The agent can also open a request document on its own, without a code diff.  Use
 >
 > Use critty-approval to show me the PR text and destination before publishing it.
 
-Read the request and supporting material, leave comments, and use the checkboxes or radio buttons to give your answers.  Submit your decision, and the agent continues from your feedback and answers.  The installed skills handle the interaction with Critty.
+Read the request and supporting material, leave comments, and use the checkboxes or radio buttons to give your answers.  Select several lines and press Space to check their boxes and the first option in each choice group.  Press Space again to clear them.  Submit your decision, and the agent continues from your feedback and answers.  The installed skills handle the interaction with Critty.
 
 ### Answer questionnaires and refine ideas
 
@@ -352,109 +354,101 @@ If you installed the earlier `crit-ai-review` or `crit-ai-cowork` skills, reinst
 
 Browse documents without starting a review.  Headings, highlighted code blocks, tables, task lists, alerts, and callouts stay readable in dark and light terminals.
 
-![Markdown view with code, a table, task lists, and callouts in a dark terminal](https://github.com/user-attachments/assets/1806d31b-86e8-40d6-adfd-2da86b04d176 "Captured with the v2.0.0 candidate")
+![Markdown view with code, a table, task lists, and callouts in a dark terminal](https://github.com/user-attachments/assets/cc33a9dd-7774-49cd-9f12-a097ddfb233c "Captured with the v2.1.0 candidate")
 
-![The same Markdown document in a light terminal](https://github.com/user-attachments/assets/993554ab-cca2-452b-8fc0-e15b74d3dd7b "Captured with the v2.0.0 candidate")
+![The same Markdown document in a light terminal](https://github.com/user-attachments/assets/c4e0fb71-18eb-46b4-ade3-6dee343411aa "Captured with the v2.1.0 candidate")
 
 ### Reading standalone patches
 
 Inspect a patch in unified or side-by-side view, with syntax highlighting for the changed source.
 
-![A standalone patch in side-by-side view in a dark terminal](https://github.com/user-attachments/assets/9974ecbc-1cd9-4bec-be7c-e53a1eeab75b "Captured with the v2.0.0 candidate")
+![A standalone patch in side-by-side view in a dark terminal](https://github.com/user-attachments/assets/71f85191-048b-4ce5-9b20-e0cfc6119527 "Captured with the v2.1.0 candidate")
 
-![The same patch in a light terminal](https://github.com/user-attachments/assets/38c80eab-1cd1-44b5-b3fd-7264c82707e6 "Captured with the v2.0.0 candidate")
+![The same patch in a light terminal](https://github.com/user-attachments/assets/610d9690-c00b-4cfc-b499-a0d5282c3b5c "Captured with the v2.1.0 candidate")
 
 ### Previewing math, Mermaid diagrams, and SVG images
 
 Read formulas, diagrams, and vector images alongside their source.  Missing renderers can be installed with `critty install tools`.
 
-https://github.com/user-attachments/assets/36f27831-8ee1-4e4a-bdbf-c54c63c4a235
+https://github.com/user-attachments/assets/2c000192-83e8-42c8-8019-594c82a4aaa6
 
 ### Block and inline math expressions
 
-![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/2a58168a-b888-4456-bce6-acec193e765c "Captured with the v2.0.0 candidate")
+![Math formulas rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/e57820b2-a0ea-423c-b359-0f9914a397b1 "Captured with the v2.1.0 candidate")
 
 ### Mermaid diagrams
 
-![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/68eec0fc-76ac-4aff-90fd-6bc18db78cc6 "Captured with the v2.0.0 candidate")
+![A Mermaid flowchart rendered in a Critty review in Ghostty](https://github.com/user-attachments/assets/33f1fc30-f98b-4dc0-acf5-c2d3cd34a995 "Captured with the v2.1.0 candidate")
 
 ### Navigating source and Markdown outlines
 
 Follow the source outline as you move through code, or jump to a Markdown heading.  `M-G` focuses the outline; Enter returns to the source.
 
-https://github.com/user-attachments/assets/f016ec9e-711c-4f21-ab01-9242a29a6258
+https://github.com/user-attachments/assets/d1c569d1-fe42-4d3d-bc4d-124322265088
 
-![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/e4f8940e-94fa-4612-9809-0222d3b78c38 "Captured with the v2.0.0 candidate")
+![Source declarations and their outline in Ghostty](https://github.com/user-attachments/assets/434ad21d-3ec0-4839-b27c-e74771a5a943 "Captured with the v2.1.0 candidate")
 
 ### Previewing an image attachment
 
-![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/91d9050f-7bd5-4cdd-8b91-08cad51664dd "Captured with the v2.0.0 candidate")
-
-### Code review with inline comments
-
-https://github.com/user-attachments/assets/08734f19-5938-4c79-bf56-57a9bc397b46
-
-### Side-by-side code review
-
-![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/9688ef4b-aa84-45da-a5a6-1c66a9722ee8 "Captured with the v2.0.0 candidate")
+![An image attached directly to a review in Ghostty](https://github.com/user-attachments/assets/571fef6d-8f1e-40cb-bfee-29fd29e48720 "Captured with the v2.1.0 candidate")
 
 ### Review round trips with Claude Code
 
-https://github.com/user-attachments/assets/c7febc50-2417-4ea4-928e-53ae217d89aa
+https://github.com/user-attachments/assets/00e5160f-639f-4631-83e8-499fe5b0ffa9
 
 ### Review round trips with Codex
 
-https://github.com/user-attachments/assets/0cc8f4f4-5df9-4305-b115-d1d6eb636b4c
+https://github.com/user-attachments/assets/a48b6771-7c5f-4c9c-bfb4-a8417a67d565
+
+### Side-by-side code review
+
+![Split diff view in Ghostty with an inline review comment and agent reply](https://github.com/user-attachments/assets/68bff444-7a83-41eb-8145-71c926363f28 "Captured with the v2.1.0 candidate")
 
 ### Asking Codex Astra for a review from Claude Code
 
 A comment in a Claude Code review requests a second opinion from Codex Astra.  Claude starts the reviewer, and Astra's inline findings and overall report return to the same Critty session.
 
-https://github.com/user-attachments/assets/a225d595-d3ce-4d63-8e1f-191f7e3917cc
+https://github.com/user-attachments/assets/ae2b5dae-705a-466c-b789-1844e1d25065
 
 ### Following live review updates
 
 Watch follows file edits and marks changed background tabs.  Follow a file reference from an attachment to inspect the updated source.
 
-https://github.com/user-attachments/assets/9efc1ea8-442b-46ff-a354-f25c3f4b07c7
-
-### Reviewing a document
-
-https://github.com/user-attachments/assets/faeb41f4-db13-4e21-8b35-d58acc153ab7
+https://github.com/user-attachments/assets/369900c1-f72e-42e7-8894-b117ef4f5b24
 
 ### Previewing an image while writing a comment
 
-![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/c143036a-c568-40f4-8412-6f54694bdf7f "Captured with the v2.0.0 candidate")
+![Image preview beneath a comment draft in Ghostty](https://github.com/user-attachments/assets/50617c77-bdd3-4f1e-ba1e-5c78378d5724 "Captured with the v2.1.0 candidate")
 
 ### Inspecting an attached image in the lightbox
 
-![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/0b7e0940-283d-48b2-808c-2670f09732b5 "Captured with the v2.0.0 candidate")
+![Lightbox showing a local image from an attached Markdown document](https://github.com/user-attachments/assets/5fff814c-0ad9-4c78-be9d-54d1fe186f48 "Captured with the v2.1.0 candidate")
 
 ### Reviewing an image replacement
 
-![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/7835ae32-7274-490b-92af-1c728f8c89e2 "Captured with the v2.0.0 candidate")
+![Before and After image previews in Ghostty](https://github.com/user-attachments/assets/ad5c5d2c-81e7-4a0a-9c54-2f8a088737d5 "Captured with the v2.1.0 candidate")
 
 ### Attached checklist with an inline image
 
-![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/b85be828-621d-4171-94bc-e77f9a573796 "Captured with the v2.0.0 candidate")
+![Attached review checklist with required confirmations, clickable checkboxes, and an inline image](https://github.com/user-attachments/assets/0db6588c-e5f4-440e-a8a0-1e10a4d344e1 "Captured with the v2.1.0 candidate")
 
 ### Answering a questionnaire with form widgets
 
 See the [questionnaire walkthrough above](#critty) for select-all controls, written answers, path completion, rankings, and the Answers list.
 
-![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/6dabe87a-f248-4f1b-8989-6d7d2362bb4f "Captured with the v2.0.0 candidate")
+![A release questionnaire in Critty with a mixed select-all control, checked and required items, a choice with a note, a text answer, and a reordered ranking](https://github.com/user-attachments/assets/2c09dacb-cd96-4641-9b5d-6499fbcd49cd "Captured with the v2.1.0 candidate")
 
 ### Review progress and pending items
 
-![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/6ebc5a35-a240-4b00-a275-0d8e92afbb01 "Captured with the v2.0.0 candidate")
+![Actionable counters, tab markers, and a thread on an attached checklist in Ghostty](https://github.com/user-attachments/assets/a1e371e5-7ac8-40df-bee0-a3ab7f2e9bd2 "Captured with the v2.1.0 candidate")
 
 ### Approval checks for unfinished items
 
-![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/946ea875-77a2-49e7-8860-41976fe966a9 "Captured with the v2.0.0 candidate")
+![Approval dialog warning about unresolved threads and unanswered required and optional items](https://github.com/user-attachments/assets/4a20ac4f-632e-494e-b68e-83cdedf59a2a "Captured with the v2.1.0 candidate")
 
 ### Incremental search
 
-![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/1269766e-acd8-47aa-8ca8-e2762ea02af0 "Captured with the v2.0.0 candidate")
+![Incremental search finds matches across attached files by default](https://github.com/user-attachments/assets/f892e60e-e3a9-494f-b583-47b5b9e8435f "Captured with the v2.1.0 candidate")
 
 ## Contributing
 
