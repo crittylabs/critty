@@ -57,7 +57,7 @@ For example:
 - **History management** — group reviews by task, retain feedback, and export portable archives with attachments and images.  See the [history workflow](internal/cli/skill/critty-history/SKILL.md).
 - **Source outlines** — jump to Markdown headings and declarations in code or attached source files from the Files sidebar.  YAML frontmatter has syntax highlighting, and its metadata stays out of the heading outline.
 - **Navigation and editing** — search across files as you type with regular expressions, word search, and a per-project query history; follow file and comment references; and return to each file where you left off.  Compact tabs leave more room for the document.
-- **Text Selection and Copying** — select text from documents, diffs, and input fields to reuse it, preserving Markdown formatting and link targets.  Undo a stray resolve, deletion, or edit with `C-z`.
+- **Text Selection and Copying** — select text from documents, diffs, and input fields to reuse it, preserving Markdown formatting and link targets.  Undo a stray resolve, deletion, or edit with <kbd>C-z</kbd>.
 - **Mouse and keyboard** — use vim-style keys or clickable tabs, comments, and controls.
 - **Scriptable and Crit-compatible** — automate comments with a [Crit](https://crit.md/)-compatible review format and resume saved sessions.
 
@@ -81,7 +81,7 @@ Release binaries are available for macOS and Linux on amd64 and arm64.  Building
 
 Go installations use the `/v2` module path shown above.  Release archives and mise keep their existing names; existing settings and saved reviews remain supported.  Refresh your agent's bundled skills after upgrading as described below.
 
-File arguments now open a read-only viewer: use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes.  `M-w` copies text or comment content; use `@` for file/line references and comment IDs.  See the [v2.0.0 release notes](CHANGELOG.md#200) for the complete changes.
+File arguments now open a read-only viewer: use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes.  <kbd>M-w</kbd> copies text or comment content; use <kbd>@</kbd> for file/line references and comment IDs.  See the [v2.0.0 release notes](CHANGELOG.md#200) for the complete changes.
 
 ### Check prerequisites
 
@@ -146,7 +146,7 @@ PNG, JPEG, GIF, and WebP are supported directly.  SVG previews use `rsvg-convert
 
 Markdown math expressions in `$...$` and `$$...$$` can appear as images in documents and comments, including code blocks such as suggestions and Markdown examples.  Inline formulas follow the surrounding text size; wide block formulas in document views scroll horizontally.  Copying keeps the original TeX; searching, selecting lines, or turning Images off reveals the source.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH first, with LaTeX plus dvipng as fallback; multiline expressions use LaTeX directly.  These optional tools stay outside Critty, and missing tools or rendering failures leave the source visible.  See [math preview setup and limits](docs/configuration.md#math-previews).
 
-Fenced `mermaid` blocks can appear as diagrams through the optional native Merman CLI, with mmdr as fallback.  The comment editor keeps the source with a preview below it.  Press `I` or `M-i` (`Alt+i`) outside input, use `M-i` while editing comments, or click **Images** to toggle image, math, and Mermaid previews together.  See [Mermaid setup and limits](docs/configuration.md#mermaid-previews).
+Fenced `mermaid` blocks can appear as diagrams through the optional native Merman CLI, with mmdr as fallback.  The comment editor keeps the source with a preview below it.  Press <kbd>I</kbd> or <kbd>M-i</kbd> (<kbd>Alt+i</kbd>) outside input, use <kbd>M-i</kbd> while editing comments, or click **Images** to toggle image, math, and Mermaid previews together.  See [Mermaid setup and limits](docs/configuration.md#mermaid-previews).
 
 Attach images alongside review documents with `--attachment image.png`, including in attachment-only reviews.  Images are saved with the review, so resuming keeps the reviewed version even if the original changes or disappears.  Supported terminals show the image inline and in the lightbox; other terminals show its format and dimensions.  Image attachments are limited to 5 MiB and 16 megapixels.  Animated GIFs display their first frame.
 
@@ -174,7 +174,7 @@ critty src/main.go:64         # Open source at a line
 critty changes.patch          # Read a patch with syntax highlighting
 ```
 
-Follow local Markdown links to browse related documents.  Back and Forward restore your reading position without creating a saved review.  Standalone patches support unified and side-by-side layouts; press `S` to switch.  Highlighting uses the patch's filenames and available hunk context, so a hunk starting inside a multiline string or comment may have limited syntax context.
+Follow local Markdown links to browse related documents.  Back and Forward restore your reading position without creating a saved review.  Standalone patches support unified and side-by-side layouts; press <kbd>S</kbd> to switch.  Highlighting uses the patch's filenames and available hunk context, so a hunk starting inside a multiline string or comment may have limited syntax context.
 
 The viewer hides line numbers by default and shows an outline when one is available.  Markdown headings and source declarations carry their colors into the outline.  Set line-number visibility, wrapping width, and syntax associations in [configuration](docs/configuration.md#reading-layout).  Use Help for the full mouse and keyboard controls.
 
@@ -202,9 +202,9 @@ critty plan design.md         # A versioned plan
 
 <a id="review-navigation"></a>
 
-Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Press `C-z` to undo a resolve or a deleted comment and return to it, and `C-y` to redo it.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
+Reviews support mouse and keyboard navigation, search, inline comments, and your preferred editor.  Progress indicators highlight unresolved feedback and unanswered items.  Press <kbd>C-z</kbd> to undo a resolve or a deleted comment and return to it, and <kbd>C-y</kbd> to redo it.  Use the in-app Help for controls and `critty --help` for commands.  The [CLI reference](internal/cli/skill/critty-cli/SKILL.md) covers review inputs, attachments, saved sessions, configuration, and scripted comments.
 
-Compact tabs leave two more rows for the document.  Each tab remembers your reading position in the document and Comments sidebar.  The Files tree shows pending comments and unanswered items.  Use `V` for full-width reading with all comments reduced to bubble markers.
+Compact tabs leave two more rows for the document.  Each tab remembers your reading position in the document and Comments sidebar.  The Files tree shows pending comments and unanswered items.  Use <kbd>V</kbd> for full-width reading with all comments reduced to bubble markers.
 
 The current line and selected ranges are highlighted across the pane, with diff colors preserved in the text.  Drag the line numbers to select a range.  Hover over a line number to reveal the add-comment button, or click the current or a selected line number to comment.
 
@@ -232,15 +232,15 @@ Saved plans, supplied diffs, and committed comparisons keep their snapshots.  Fi
 
 ### Text Selection and Copying
 
-Drag across text in a document or diff, then press `M-w` or `Y`.  Copies contain the source text, with wrapped rows joined and gutters and annotations left out.  Markdown retains its formatting and link targets, even when selecting part of a link label.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.
+Drag across text in a document or diff, then press <kbd>M-w</kbd> or <kbd>Y</kbd>.  Copies contain the source text, with wrapped rows joined and gutters and annotations left out.  Markdown retains its formatting and link targets, even when selecting part of a link label.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.
 
-Input fields select the same way: drag in the comment editor or a single-line input, copy with `M-w` or **Copy text**, paste the clipboard with `C-v` or `M-v`, and press `C-z` to undo the last deletion, overwrite, or paste.
+Input fields select the same way: drag in the comment editor or a single-line input, copy with <kbd>M-w</kbd> or **Copy text**, paste the clipboard with <kbd>C-v</kbd> or <kbd>M-v</kbd>, and press <kbd>C-z</kbd> to undo the last deletion, overwrite, or paste.
 
-Without a text selection, `M-w` copies the current source line or selected line range.  On a comment it copies the body; on a thread it copies the parent and all replies with author names, retaining the original Markdown.  Press `@` to copy a file/line reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, `M-o` follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
+Without a text selection, <kbd>M-w</kbd> copies the current source line or selected line range.  On a comment it copies the body; on a thread it copies the parent and all replies with author names, retaining the original Markdown.  Press <kbd>@</kbd> to copy a file/line reference or comment ID.  Follow these references in comments and attached documents by clicking them.  In an attachment, <kbd>M-o</kbd> follows a reference on the cursor line.  References such as `@src/main.go L64` select a review tab or offer to open the file in an editor; comment IDs select their thread.
 
 Local Markdown links in review documents select an existing tab first.  Without a matching tab, Markdown, files recognized by your syntax rules, and files detected as text open in the editor; other files, including videos and PDFs, open in the OS default application.  View mode keeps document navigation inside Critty.  External applications do not open over SSH.
 
-Search covers all review files by default.  Use the **Files** button or `M-s m` during search to restrict it to the current file.  Selecting lines keeps search in that file.  Regular expressions support backreferences and lookaround.  Press `M-e` to edit a long query in place, and `M-p` / `M-n` to recall earlier queries; Critty remembers them per repository, with their regexp, word, and case settings, across its worktrees.
+Search covers all review files by default.  Use the **Files** button or <kbd>M-s</kbd> <kbd>m</kbd> during search to restrict it to the current file.  Selecting lines keeps search in that file.  Regular expressions support backreferences and lookaround.  Press <kbd>M-e</kbd> to edit a long query in place, and <kbd>M-p</kbd> / <kbd>M-n</kbd> to recall earlier queries; Critty remembers them per repository, with their regexp, word, and case settings, across its worktrees.
 
 The outline below the Files tree lets you jump to Markdown headings or source declarations, including in attachments.  Source outlines support Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Known file names and shebangs such as `#!/usr/bin/env ruby` identify scripts without a language suffix for both syntax highlighting and outlines; `env -S` is also supported.  Go uses its standard parser; other languages use lightweight rules for conventionally formatted code and may miss or misidentify unusual syntax.  Entries stay in source order, with nesting where available.  See Keyboard Help for navigation and resizing.
 
@@ -382,7 +382,7 @@ https://github.com/user-attachments/assets/2c000192-83e8-42c8-8019-594c82a4aaa6
 
 ### Navigating source and Markdown outlines
 
-Follow the source outline as you move through code, or jump to a Markdown heading.  `M-G` focuses the outline; Enter returns to the source.
+Follow the source outline as you move through code, or jump to a Markdown heading.  <kbd>M-G</kbd> focuses the outline; Enter returns to the source.
 
 https://github.com/user-attachments/assets/d1c569d1-fe42-4d3d-bc4d-124322265088
 

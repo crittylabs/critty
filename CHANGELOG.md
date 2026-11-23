@@ -25,7 +25,7 @@
 
 - Preview remote HTTPS images in Markdown and comments using the global `remote_image_hosts` allowlist.  It supports exact hostnames, dot-prefixed subdomain suffixes, and `*` wildcards within DNS labels.  Each redirect must match the same allowlist.
 - Use the horizontal mouse wheel over a truncated row in the Files sidebar to read its full name without opening the file or moving the selection.
-- Paste from the system clipboard with `M-v` anywhere `C-v` already pastes, including images in comment editors.
+- Paste from the system clipboard with <kbd>M-v</kbd> anywhere <kbd>C-v</kbd> already pastes, including images in comment editors.
 
 ### Changed
 
@@ -46,7 +46,7 @@
 
 ### Fixed
 
-- Large reviews stay responsive while the mouse moves.  Drawing hidden file tabs no longer delays keyboard actions such as opening the submit dialog with `q`.
+- Large reviews stay responsive while the mouse moves.  Drawing hidden file tabs no longer delays keyboard actions such as opening the submit dialog with <kbd>q</kbd>.
 - Large reviews open faster by loading diffs and staged or committed file contents in batches, without rereading documents for the saved review snapshot.  Text conversions and renamed diffs retain their existing handling.
 - Reviewers receive summary attachments only for meaningful implementation choices, specific checks or confirmations, or disagreements left after AI review.  The bundled agent skills have both participants resolve settled threads, keeping AI agreements in comments.  Answers to the task initiator and departures from their proposals stay open until they confirm.
 - Image previews and `critty doctor` can detect image support in tmux with multiple connected clients.  With `allow-passthrough on`, only clients displaying the target window count; with `all`, clients sharing hidden windows also count.  Probing requires one receiving client with the pane selected and respects inherited settings and pane overrides.
@@ -57,7 +57,7 @@
 
 - **Go installation uses a new module path**: Run `go install github.com/crittylabs/critty/v2/cmd/critty@latest`.  Release archives and mise keep their existing names.  Existing settings and saved reviews remain supported.
 - **File arguments open the viewer**: Use `critty review <file>` when you want to collect feedback.  Bare `critty` still reviews Git changes.
-- **Copy references with `@`**: `M-w` now copies source text or comment content; use `@` for file/line references and comment IDs.  Input fields keep their existing copy behavior.
+- **Copy references with <kbd>@</kbd>**: <kbd>M-w</kbd> now copies source text or comment content; use <kbd>@</kbd> for file/line references and comment IDs.  Input fields keep their existing copy behavior.
 
 ### Added
 
@@ -71,7 +71,7 @@
     - **Wrapped list items align with their text**; nested quotes repeat their vertical bars.  Callouts keep their colors across wrapped rows.  Decorative indentation and bars stay out of copied text, including in split diffs.
     - Fenced and indented code blocks have faint backgrounds across blank lines, wrapped rows, and the available text width.  Selection, search, and diff colors take priority; copying excludes decorative padding.
   - **Diff and patch files**
-    - **Source-language highlighting and side-by-side view**: Read standalone diff/patch files and review attachments with syntax colors and red/green change backgrounds.  Toggle the layout with `S` or Split.  Unified remains the default; narrow panes fall back to it.  Git changes to a patch file keep their existing outer diff without a nested split.
+    - **Source-language highlighting and side-by-side view**: Read standalone diff/patch files and review attachments with syntax colors and red/green change backgrounds.  Toggle the layout with <kbd>S</kbd> or Split.  Unified remains the default; narrow panes fall back to it.  Git changes to a patch file keep their existing outer diff without a nested split.
     - **Consistent Markdown highlighting**: Markdown in diffs uses the same heading and inline text styles as the document viewer while keeping the source syntax visible.
   - **Custom syntax associations**
     - Map code-fence language names and filename patterns to supported languages in global or project settings.  Associations control highlighting, supported outlines, and Markdown rendering; project rules take precedence.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#syntax-associations).
@@ -79,7 +79,7 @@
 - **View mode and reading layout**
   - **Use Critty as a full-featured terminal viewer for Markdown, source code, and images.**  `critty <file[:LINE]>` opens a read-only view in the current terminal without saving a review or migrating stored data.  Use `critty review <file>` to collect feedback.  Bare `critty` still reviews Git changes, and `--session` still resumes a saved review.
   - Follow local file and heading links within the viewer, reusing existing tabs when available.  Back and Forward restore documents and reading positions, with up to 64 visits in memory.  Web links open in the browser; unsupported files offer external opening.  Browsing saves no review or history files.
-  - Toggle line numbers in view or review mode with `#` or Lines, keeping a one-column marker gutter.  View mode hides numbers by default; reviews retain them.  Set `line_numbers` to override the default.
+  - Toggle line numbers in view or review mode with <kbd>#</kbd> or Lines, keeping a one-column marker gutter.  View mode hides numbers by default; reviews retain them.  Set `line_numbers` to override the default.
   - Set `max_wrap_width` or pass `--max-wrap-width` to cap text wrapping without shrinking the pane or changing source coordinates.  By default, text uses the available width; `0` means no limit.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#reading-layout).
   - Single-file views omit the file tree and Comments sidebar.  They show only Outline when document structure is available and use the full width otherwise.
 
@@ -90,11 +90,11 @@
 
 - **Navigation improvements**
   - **Copying and references**
-    - Use `M-w` or `Y` to copy selected text, the current line or selected source range, a comment body, or a complete thread with author names.  Source text and Markdown are independent of wrapping and display options.  Press `@` to copy a file/line reference or comment ID.  Both operations use the kill ring and system clipboard.  Input fields keep their existing copy behavior.
+    - Use <kbd>M-w</kbd> or <kbd>Y</kbd> to copy selected text, the current line or selected source range, a comment body, or a complete thread with author names.  Source text and Markdown are independent of wrapping and display options.  Press <kbd>@</kbd> to copy a file/line reference or comment ID.  Both operations use the kill ring and system clipboard.  Input fields keep their existing copy behavior.
   - **Keyboard navigation**
-    - **Emacs- and vi-style navigation**: Use either style for line and page movement, line selection, and horizontal scrolling in tables and block formulas.  Jump to file boundaries or either horizontal edge.  `C-v` / `M-v` and Page Down / Up scroll with two rows of overlap, keeping the cursor position while visible; half-page movement remains available.  See Help for all navigation keys.
+    - **Emacs- and vi-style navigation**: Use either style for line and page movement, line selection, and horizontal scrolling in tables and block formulas.  Jump to file boundaries or either horizontal edge.  <kbd>C-v</kbd> / <kbd>M-v</kbd> and Page Down / Up scroll with two rows of overlap, keeping the cursor position while visible; half-page movement remains available.  See Help for all navigation keys.
   - **File navigation**
-    - In reviews, local Markdown links jump to an existing tab first.  Otherwise, Markdown, files recognized by the configured syntax rules, and files detected as text open in the editor; other files, including videos and PDFs, use the OS default application.  Relative links resolve from the document's source directory.  Back and Forward also restore positions after following file or thread references, including links from summary attachments, without undoing review edits.  The header buttons show `M-b` / `M-f` when history is available.  See Help for all bindings.
+    - In reviews, local Markdown links jump to an existing tab first.  Otherwise, Markdown, files recognized by the configured syntax rules, and files detected as text open in the editor; other files, including videos and PDFs, use the OS default application.  Relative links resolve from the document's source directory.  Back and Forward also restore positions after following file or thread references, including links from summary attachments, without undoing review edits.  The header buttons show <kbd>M-b</kbd> / <kbd>M-f</kbd> when history is available.  See Help for all bindings.
 
 ### Changed
 
@@ -137,12 +137,12 @@
 
 - **Math previews in Markdown**: Read `$...$` and `$$...$$` expressions as images in documents and comments, including suggestions and Markdown code blocks, in supported terminals.  Copying keeps their original TeX, and source-line navigation and review coordinates are retained.  The comment editor keeps the source with previews below it.  Single-line expressions try RaTeX found on PATH, then fall back to LaTeX plus dvipng; multiline expressions use LaTeX directly.  These optional tools are installed separately; `critty doctor` checks their executable availability.  Missing tools or failed rendering leave the source visible.  See [setup and limits](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#math-previews).
 - **Mermaid diagram previews**: Read fenced Mermaid blocks as diagrams in documents and comments through the optional native Merman CLI, with mmdr as fallback.  The comment editor keeps editable source with a preview below it; copying and review coordinates retain the source.  Missing tools or rendering failures leave the source visible.  `critty doctor` checks renderer and font-selection tools.  See [setup and compatibility limits](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#mermaid-previews).
-- **SVG image previews**: Preview SVGs in Markdown, comments, editors, and the lightbox using `rsvg-convert`, Merman, or resvg found on PATH, in that order.  SVG file reviews retain the XML source and line coordinates below the preview, including saved attachment snapshots.  `I` / `M-i` toggle SVG with other images; missing or failed conversion leaves the source visible.  See [limits and supported resources](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#svg-previews).
+- **SVG image previews**: Preview SVGs in Markdown, comments, editors, and the lightbox using `rsvg-convert`, Merman, or resvg found on PATH, in that order.  SVG file reviews retain the XML source and line coordinates below the preview, including saved attachment snapshots.  <kbd>I</kbd> / <kbd>M-i</kbd> toggle SVG with other images; missing or failed conversion leaves the source visible.  See [limits and supported resources](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#svg-previews).
 - **Preview tool installation**: Run `critty install tools` to set up missing SVG, math, and Mermaid renderers with an existing mise or Homebrew installation.  `critty doctor` suggests the relevant install command when preview tools are missing.  Select individual features or a package manager, and inspect commands with `--dry-run`.  mise is preferred automatically; Homebrew's math setup uses the full TeX Live distribution.  Existing PATH tools and renderer settings are kept.  See [setup and requirements](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#install-preview-tools).
 
 ### Changed
 
-- **Preview controls while writing**: Press `M-i` (`Alt+i`) or click **Images** in the comment editor to show or hide image, math, and Mermaid previews without changing the text.  Outside input, `I` and `M-i` both toggle them together.
+- **Preview controls while writing**: Press <kbd>M-i</kbd> (<kbd>Alt+i</kbd>) or click **Images** in the comment editor to show or hide image, math, and Mermaid previews without changing the text.  Outside input, <kbd>I</kbd> and <kbd>M-i</kbd> both toggle them together.
 - **More room for review content**: Footer key hints use at most 5% of terminal height, capped at two rows.  They remain hidden at 21 rows or fewer.  Omitted hints are marked with `…`; open Help for the full controls.
 
 ### Fixed
@@ -182,11 +182,11 @@
 
 ### Added
 
-- **Improved search experience**: Regexp search accepts backreferences and lookaround, such as `([a-z])\1` or `foo(?=bar)`, through the [regexp2](https://github.com/dlclark/regexp2) engine in RE2-compatible mode, so existing patterns keep working.  A pattern that backtracks for too long on a very long line stops after a short timeout and shows `[match timed out]`.  Queries are remembered per repository, shared across its worktrees, with their regexp, word, and case-folding settings: press `M-p` / `M-n` in search mode to recall them, or `C-s C-s` for the most recent one.  `M-e` edits the current query in place with the usual line-editing keys.  History is saved under `$XDG_STATE_HOME/critty`; demos keep it in memory only.
-- **Undo**: Press `C-z` (or `C-/`) to take back a review action or a text edit.
-  - **Review actions**: Undo reverts the last resolve made with `r`, `space`, or `R`, or the last deleted comment or reply, restores the thread, and moves the cursor back to it, so `R` followed by undo returns to the thread it left, even from the Submit dialog it opened.  `C-y` redoes the action as if its key had been pressed again.
-  - **Text fields**: In the comment editor and single-line inputs, undo restores the text before the last deletion, overwrite, or paste, such as a word killed with `C-w`, a selection replaced by typing, or a stray `C-y` / `C-v`; pressing it again returns to the edited text.  One step is kept.
-- **Mouse selection in input fields**: In the comment editor and single-line input fields, click to place the cursor, drag to select text, and copy the selection with `M-w` or the `Copy` button; `esc` cancels the selection.  The comment editor also selects with Shift and the arrow keys.  Typing or deleting replaces the selection, `C-v` pastes clipboard text, and single-line fields share the kill ring with the comment editor.
+- **Improved search experience**: Regexp search accepts backreferences and lookaround, such as `([a-z])\1` or `foo(?=bar)`, through the [regexp2](https://github.com/dlclark/regexp2) engine in RE2-compatible mode, so existing patterns keep working.  A pattern that backtracks for too long on a very long line stops after a short timeout and shows `[match timed out]`.  Queries are remembered per repository, shared across its worktrees, with their regexp, word, and case-folding settings: press <kbd>M-p</kbd> / <kbd>M-n</kbd> in search mode to recall them, or <kbd>C-s</kbd> <kbd>C-s</kbd> for the most recent one.  <kbd>M-e</kbd> edits the current query in place with the usual line-editing keys.  History is saved under `$XDG_STATE_HOME/critty`; demos keep it in memory only.
+- **Undo**: Press <kbd>C-z</kbd> (or <kbd>C-/</kbd>) to take back a review action or a text edit.
+  - **Review actions**: Undo reverts the last resolve made with <kbd>r</kbd>, <kbd>space</kbd>, or <kbd>R</kbd>, or the last deleted comment or reply, restores the thread, and moves the cursor back to it, so <kbd>R</kbd> followed by undo returns to the thread it left, even from the Submit dialog it opened.  <kbd>C-y</kbd> redoes the action as if its key had been pressed again.
+  - **Text fields**: In the comment editor and single-line inputs, undo restores the text before the last deletion, overwrite, or paste, such as a word killed with <kbd>C-w</kbd>, a selection replaced by typing, or a stray <kbd>C-y</kbd> / <kbd>C-v</kbd>; pressing it again returns to the edited text.  One step is kept.
+- **Mouse selection in input fields**: In the comment editor and single-line input fields, click to place the cursor, drag to select text, and copy the selection with <kbd>M-w</kbd> or the `Copy` button; <kbd>esc</kbd> cancels the selection.  The comment editor also selects with Shift and the arrow keys.  Typing or deleting replaces the selection, <kbd>C-v</kbd> pastes clipboard text, and single-line fields share the kill ring with the comment editor.
 
 ### Changed
 
@@ -213,9 +213,9 @@
 - **UI and UX refinements**:
   - **Compact tab bar**: Gain two rows for documents and code.  Tabs no longer jump sideways when many files are open, and colors are easier to read.  Unread dots flag updated tabs.
   - **More informative Files tree**: Entries show the same review indicators as tab titles, making pending comments and unanswered form items easier to find.
-  - **Clearer navigation**: `n`/`N` visits all hunks and review items, including resolved threads and answered items.  Help and footer hints are easier to follow.
+  - **Clearer navigation**: <kbd>n</kbd>/<kbd>N</kbd> visits all hunks and review items, including resolved threads and answered items.  Help and footer hints are easier to follow.
   - **Fold comments with arrow keys**: Use left/right arrows to fold or unfold comments.  Enter now opens comments whose original source location cannot be tracked.
-  - **Focus on reading**: View mode (`V`) minimizes every comment to a speech-bubble marker so you can focus on documents and code.
+  - **Focus on reading**: View mode (<kbd>V</kbd>) minimizes every comment to a speech-bubble marker so you can focus on documents and code.
   - **Per-tab scroll positions**: Each tab remembers its document and Comments sidebar scroll positions.
 - **Launcher refinements**:
   - **More desktop terminals**: Desktop reviews prefer terminals with image previews.  New launchers support kitty, WezTerm, and Alacritty; Ghostty also works on Linux.  WezTerm and Alacritty also work with Windows terminals from WSL; xterm is the final Linux fallback after `xdg-terminal-exec`.  Explicit launcher order takes precedence.  See [launcher requirements](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers).
@@ -226,13 +226,13 @@
 
 ### Added
 
-- **Source outlines**: jump to Markdown headings and source declarations from the Files sidebar, including in attachments.  Supports Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Entries follow source order, with nesting where available; Go methods include their receiver type in a flat list.  Go uses its standard parser, while other source languages use lightweight heuristics and may miss unusual syntax.  The outline follows the cursor, and short outlines leave more room for files.  `M-G` focuses the outline directly; contextual footer hints show how to reach it and switch between the file tree and outline.  See Keyboard Help for navigation and resizing.
+- **Source outlines**: jump to Markdown headings and source declarations from the Files sidebar, including in attachments.  Supports Go, JS/TS, Rust, Ruby, Python, Swift, Kotlin, C/C++, Objective-C/C++, Java, Zig, Lua, Bourne-family shell scripts, Perl, Emacs Lisp, and VimL.  Entries follow source order, with nesting where available; Go methods include their receiver type in a flat list.  Go uses its standard parser, while other source languages use lightweight heuristics and may miss unusual syntax.  The outline follows the cursor, and short outlines leave more room for files.  <kbd>M-G</kbd> focuses the outline directly; contextual footer hints show how to reach it and switch between the file tree and outline.  See Keyboard Help for navigation and resizing.
 - **Image attachments**: attach PNG, JPEG, GIF, and WebP images alongside documents or in attachment-only reviews.  Preview them inline and in the lightbox on supported terminals, or read their format and dimensions otherwise.  Saved images survive source changes and history exports.  The limit is 5 MiB and 16 megapixels; GIFs preview their first frame, and animated WebP is unsupported.
 
 ### Changed
 
-- Read at full width with `V`, which hides the sidebar and folds comments, then restores the previous expansion setting when leaving View.  `O` opens all comments or returns to the default display, which folds resolved threads.  These replace the former `h`/`H` controls; see Keyboard Help.
-- Open the image, link, or reference on the current line with `o`; `M-o` remains available.  Focused Resolve checkboxes are bold and accept Space as well as `r`.  The search shortcut now appears with footer hints.
+- Read at full width with <kbd>V</kbd>, which hides the sidebar and folds comments, then restores the previous expansion setting when leaving View.  <kbd>O</kbd> opens all comments or returns to the default display, which folds resolved threads.  These replace the former <kbd>h</kbd>/<kbd>H</kbd> controls; see Keyboard Help.
+- Open the image, link, or reference on the current line with <kbd>o</kbd>; <kbd>M-o</kbd> remains available.  Focused Resolve checkboxes are bold and accept Space as well as <kbd>r</kbd>.  The search shortcut now appears with footer hints.
 - Image placeholders show the format and original dimensions when previews are unavailable or hidden, including Before/After details.  Animated GIFs are identified.
 
 ### Fixed
@@ -253,14 +253,14 @@
   - Saved text remains readable when a document is missing or a file is outside the current changes.  Saved plans and supplied diffs retain their snapshots; unavailable binary data cannot be reconstructed.  Older sessions need the original checkout or its Git registration to identify the project.  Existing `--session`, `stop`, and `clear` forms remain supported.  See the [session reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#targeting-a-session-or-plan).
 - **Live Review Updates**: use Reload to refresh Git changes, documents, and file-backed attachments without reopening the review, or enable Watch to follow edits automatically.  Updated background tabs show an unread dot until opened; updates to the visible tab briefly show a notice.
   - Watch defaults off, and agents can enable it with `--watch`.  Updates wait during editing, selection, search, and dialogs.  Supplied diffs, saved plans, and committed comparisons keep their snapshots; file-backed attachments can still refresh.  See the [live source reference](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#live-sources).
-- **Text Selection and Copying**: drag across a document or code diff, then press `M-w` or click Copy text to reuse the source text.  Copies exclude gutters and annotations, join wrapped rows, and preserve Markdown formatting and link targets, including partial link labels.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.  Without a selection, `M-w` still copies a reference.
-- **Clickable References in Attachments**: follow file references such as `@src/main.go L64` and comment IDs by clicking them or pressing `M-o` on their line, including in form labels.  File references select an existing review tab or offer to open the file in an editor; comment references select the thread, including resolved comments.
+- **Text Selection and Copying**: drag across a document or code diff, then press <kbd>M-w</kbd> or click Copy text to reuse the source text.  Copies exclude gutters and annotations, join wrapped rows, and preserve Markdown formatting and link targets, including partial link labels.  Text goes to the kill ring and system clipboard; system clipboard access requires terminal OSC 52 support.  Without a selection, <kbd>M-w</kbd> still copies a reference.
+- **Clickable References in Attachments**: follow file references such as `@src/main.go L64` and comment IDs by clicking them or pressing <kbd>M-o</kbd> on their line, including in form labels.  File references select an existing review tab or offer to open the file in an editor; comment references select the thread, including resolved comments.
 - Review a single commit with `--scope=COMMIT`, such as `--scope=HEAD`, in `critty review` or `critty view`.  Merge commits compare against their first parent; root commits show all files as additions.
 - Herdr, Zellij, and cmux users can find their host's default pane and tab controls in Keyboard Help, including in read-only views.
 
 ### Changed
 
-- Incremental search covers all review files by default.  Use `M-s m` or the Files button to search only the current file; the choice lasts for the current run.  Selecting lines confines search to their file.
+- Incremental search covers all review files by default.  Use <kbd>M-s</kbd> <kbd>m</kbd> or the Files button to search only the current file; the choice lasts for the current run.  Selecting lines confines search to their file.
 - Send comments or reject a review without warnings or extra confirmation for unanswered form items and unresolved threads.  Approval retains its completion checks and confirmations.
 - The Files tab highlights the current file across the full row, including when scrolling long filenames or reading in the content pane.
 - Copying a reference shows a brief confirmation before restoring the footer hints.
@@ -284,7 +284,7 @@
 
 ### Fixed
 
-- Shortcuts using Alt with shifted punctuation work in terminals that report Shift separately: `M-?` opens and closes Help, and `M-<` / `M->` move to the beginning or end of comment and answer text.
+- Shortcuts using Alt with shifted punctuation work in terminals that report Shift separately: <kbd>M-?</kbd> opens and closes Help, and <kbd>M-&lt;</kbd> / <kbd>M-&gt;</kbd> move to the beginning or end of comment and answer text.
 
 ## 1.5.0
 
@@ -324,7 +324,7 @@
 
 - Use `critty view` to inspect changes, documents, patches, and attachments without starting or saving a review.  It replaces `--dry-run`; search and display controls remain available in the current terminal.
 - Dialogs make the primary action easier to find, with blue buttons at the right and red warnings for Abort and destructive actions.  Submit starts on the verdict choices: choose a verdict and press Enter, or Shift-Tab to write a comment and save it to return to the verdict.  See in-app Help for controls.
-- The Images control highlights its `I` shortcut like Split highlights `S`.
+- The Images control highlights its <kbd>I</kbd> shortcut like Split highlights <kbd>S</kbd>.
 
 ### Fixed
 
@@ -358,7 +358,7 @@
 
 - **Review before editing** — review proposed updates to notes, reports, configuration files, and other text outside Git while the originals stay untouched.  Use `critty tmp prepare`, `snapshot`, and `apply` to create, split, rename, or delete files through reviewed copies.  Originals stay unchanged until approval and explicit application consent.  Concurrent-edit checks, backups, and saved progress support safe retries; application is atomic per file, not across the batch.  See the [workflow](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty/references/temporary-tree.md).
 
-- **Side-by-side diffs** — compare code in unified or side-by-side diffs.  Switch with the `Split: off/on` header control or `S`, and set `split = true` to start with two columns.  Both views preserve comment anchors and support supplied patches without original files; narrow panes temporarily use unified rendering.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
+- **Side-by-side diffs** — compare code in unified or side-by-side diffs.  Switch with the `Split: off/on` header control or <kbd>S</kbd>, and set `split = true` to start with two columns.  Both views preserve comment anchors and support supplied patches without original files; narrow panes temporarily use unified rendering.  See [configuration](https://github.com/crittylabs/critty/blob/main/docs/configuration.md).
 
 - Check Git prerequisites and local marker delivery with `critty doctor`.  It reports missing Git or versions below 2.31.0 and tests marker delivery in a foreground terminal without launching an agent.  Unsupported terminal contexts are skipped; standalone documents and attachment-only reviews remain available without Git.  See [setup](https://github.com/crittylabs/critty#check-prerequisites).
 
@@ -374,7 +374,7 @@
 
 ### Fixed
 
-- Paste text with `C-v` in comment and reply editors.  Prefer plain text on Linux and macOS, with HTML text extraction when needed and an additional RTF fallback on macOS.  Image paste remains available.
+- Paste text with <kbd>C-v</kbd> in comment and reply editors.  Prefer plain text on Linux and macOS, with HTML text extraction when needed and an additional RTF fallback on macOS.  Image paste remains available.
 
 - Replaced attachments appear in collapsed, read-only history after current attachments.  Their checkboxes are inactive, and answers belong to current forms.
 
@@ -386,7 +386,7 @@
 
 ### Added
 
-- Inspect local images in a lightbox from documents, comments, and image diffs.  Click a preview or press `M-o` to open it, zoom with the keyboard or mouse wheel, and use the arrow keys to browse images on the same line or labeled Before/After revisions.  Comments show image previews while you write.  `M-o` also opens Markdown links, HTML links, and plain web URLs with the system browser or viewer; external applications do not open over SSH.  See [image previews](https://github.com/crittylabs/critty#image-previews).
+- Inspect local images in a lightbox from documents, comments, and image diffs.  Click a preview or press <kbd>M-o</kbd> to open it, zoom with the keyboard or mouse wheel, and use the arrow keys to browse images on the same line or labeled Before/After revisions.  Comments show image previews while you write.  <kbd>M-o</kbd> also opens Markdown links, HTML links, and plain web URLs with the system browser or viewer; external applications do not open over SSH.  See [image previews](https://github.com/crittylabs/critty#image-previews).
 
 - Open reviews in a floating pane on capable tmux 3.8+ servers, a split on older servers, or a desktop terminal window without a multiplexer.  Choose built-in or custom launchers with `--launcher` or configuration.  Desktop launchers support macOS, Linux with `xdg-terminal-exec`, and WSL with Windows Terminal; they skip known SSH connections.  See [review launchers](https://github.com/crittylabs/critty/blob/main/internal/cli/skill/critty-cli/SKILL.md#review-launchers).
 
@@ -432,7 +432,7 @@
 
 ### Fixed
 
-- Improved detection of inline image support, which could incorrectly report images as unavailable on supported terminals, especially through tmux.  Detection handles tmux's extended-key input and retries unanswered startup queries.  If support remains unconfirmed, the first keypress checks again after the terminal becomes visible.  Press `I` or click Images to restart an unsuccessful or ongoing check as often as needed.  The Images control shows when a check is in progress.
+- Improved detection of inline image support, which could incorrectly report images as unavailable on supported terminals, especially through tmux.  Detection handles tmux's extended-key input and retries unanswered startup queries.  If support remains unconfirmed, the first keypress checks again after the terminal becomes visible.  Press <kbd>I</kbd> or click Images to restart an unsuccessful or ongoing check as often as needed.  The Images control shows when a check is in progress.
 
 ## 1.1.0
 
@@ -440,11 +440,11 @@
 
 - **Experimental AI review:** Get second opinions with `crit-ai-review`, or refine work with another AI using `crit-ai-cowork` before final human review.  Both require an existing Critty session and authorized reviewer access.  Reviewers post findings and manage their own threads; your agent makes edits and runs checks.  All agent install targets include these skills, with restricted CLI setups for Claude Code (Python 3.10+) and Codex (Python 3.11+ with the MCP SDK).  See the [README](https://github.com/crittylabs/critty#ai-review-and-collaboration-experimental) for usage and setup.
 
-- Navigate attachment checkboxes and choices alongside review threads.  `[` / `]` visit every thread and form item; `{` / `}` visit unresolved threads and unanswered required items.  `n` / `N` visit diff hunks, unresolved threads, unanswered required items, and optional form items.  A required choice group has one unresolved stop until answered.  See the [navigation table](https://github.com/crittylabs/critty#review-navigation).
+- Navigate attachment checkboxes and choices alongside review threads.  <kbd>[</kbd> / <kbd>]</kbd> visit every thread and form item; <kbd>{</kbd> / <kbd>}</kbd> visit unresolved threads and unanswered required items.  <kbd>n</kbd> / <kbd>N</kbd> visit diff hunks, unresolved threads, unanswered required items, and optional form items.  A required choice group has one unresolved stop until answered.  See the [navigation table](https://github.com/crittylabs/critty#review-navigation).
 
 - Added actionable counters to the main screen and decision dialogs to show item counts and completion status.  Click a counter to jump to an item.  Tab titles flag unresolved threads and unanswered checkboxes and choices instead of underlining filenames.  Prominent messages and colors highlight unresolved threads and unanswered items to help prevent omissions.  Required answers block approval; optional answers remain optional, and unchecked consents stay unauthorized.
 
-- Switch to the previous or next file tab with `M-{` or `M-}`, alongside `S-TAB` and `TAB`.
+- Switch to the previous or next file tab with <kbd>M-{</kbd> or <kbd>M-}</kbd>, alongside <kbd>S-TAB</kbd> and <kbd>TAB</kbd>.
 
 - Export verdicts, feedback, and attachment identities as compact JSON with `--summary FILE`.  Bundled skills use it to read results and retain original human feedback for host permission checks.
 
@@ -452,7 +452,7 @@
 
 - Configuration uses `~/.config/critty/config.json` and `.critty.config.json`, falling back to the legacy TCrit file only when the new file is absent at that level.  Custom prompts use the corresponding `critty/prompts/` and `.critty/prompts/` directories, with TCrit paths as fallbacks.  Project settings still override global settings, and review storage stays unchanged.
 
-- **Resolve** and **Images** controls underline their shortcut keys, `r` and `I`; the Images button uses less footer space.
+- **Resolve** and **Images** controls underline their shortcut keys, <kbd>r</kbd> and <kbd>I</kbd>; the Images button uses less footer space.
 
 ## 1.0.0
 
@@ -464,7 +464,7 @@ Critty 1.0 brings code and document reviews, approvals, and user choices into on
 
 - Preview images referenced by relative paths in Markdown documents, image files in diff reviews, and images pasted into comments and replies.  PNG, JPEG, GIF, and WebP are supported.
 
-- Image previews require a terminal that implements the [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) with Unicode image placeholders, such as Kitty, Ghostty, and iTerm2.  Within these terminals, previews work through tmux or Herdr with passthrough enabled.  Press `I` or click the Images button to toggle image previews.
+- Image previews require a terminal that implements the [Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) with Unicode image placeholders, such as Kitty, Ghostty, and iTerm2.  Within these terminals, previews work through tmux or Herdr with passthrough enabled.  Press <kbd>I</kbd> or click the Images button to toggle image previews.
 
 - Incremental search supports regular expressions, smart case, Unicode word search, and searching across files.  Matching text is highlighted as you type.  Keyboard and clickable controls let you change search modes, move between matches across files, keep the result, or cancel.
 
@@ -472,7 +472,7 @@ Critty 1.0 brings code and document reviews, approvals, and user choices into on
 
 ### Changed
 
-- `n` / `N` also stop on whole-file reviews, attachments, and files whose diffs have disappeared, even without unresolved comments.
+- <kbd>n</kbd> / <kbd>N</kbd> also stop on whole-file reviews, attachments, and files whose diffs have disappeared, even without unresolved comments.
 
 - Buttons without a background now use the same subtle gray background as the Submit dialog, including close, comment navigation, and resolution controls.
 
@@ -482,7 +482,7 @@ Critty 1.0 brings code and document reviews, approvals, and user choices into on
 
 - The bundled `critty`, `critty-cli`, and `critty-approval` skills cover interactive reviews, CLI operations, and approval requests, with input and display rules in the CLI reference.
 
-- Keyboard Help moves to `M-?`, leaving `?` for incremental search.
+- Keyboard Help moves to <kbd>M-?</kbd>, leaving <kbd>?</kbd> for incremental search.
 
 - Updated Keyboard Help includes the search-mode shortcuts and scrolls with keys, the mouse wheel, and Up/Down buttons when it does not fit the terminal.
 
@@ -492,7 +492,7 @@ Critty 1.0 brings code and document reviews, approvals, and user choices into on
 
 - `critty env` and `critty env tty` report output write failures instead of returning success.
 
-- Unresolved drifted comments show their threads by default.  Resolved threads expand while focused with `[`, `]`, or the arrow keys, without requiring Enter.
+- Unresolved drifted comments show their threads by default.  Resolved threads expand while focused with <kbd>[</kbd>, <kbd>]</kbd>, or the arrow keys, without requiring Enter.
 
 - TUI saves preserve comments and replies added or changed by concurrent CLI commands.  Conflicting edits to the same field report a save error instead of overwriting another writer's changes.
 
@@ -513,7 +513,7 @@ Critty 1.0 brings code and document reviews, approvals, and user choices into on
 - Empty diff input, including `--diff=/dev/null`, can be reviewed with attachments and resumed from its saved session.
 
 - Markdown quotes and italic text use the primary text color to stay readable on diff backgrounds.
-- `n` and `N` stop at added, deleted, and modified binary files even though they have no diff hunks.
+- <kbd>n</kbd> and <kbd>N</kbd> stop at added, deleted, and modified binary files even though they have no diff hunks.
 - `demo/release.sh` can upload recordings to a draft release before its tag exists.
 
 ## 0.18.0
@@ -549,21 +549,21 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Comments
 
-- Threads support replies, resolution, and reopening.  `r` toggles resolution in place, and `R` resolves and moves to the next unresolved thread, or opens the finish dialog after the last one.
-- `f` comments on the whole file, and removed lines can be commented on too.
-- `ctrl+v` pastes clipboard images into comments as Markdown attachments.
-- The comment editor has a kill ring (`ctrl+y`, `alt+y`), GitHub-style suggestions (`alt+s`), `$EDITOR` editing (`ctrl+o`), and `@path` completion.  `alt+w` copies a source or thread reference, and clicking `@path L40` or a comment ID jumps to it.
+- Threads support replies, resolution, and reopening.  <kbd>r</kbd> toggles resolution in place, and <kbd>R</kbd> resolves and moves to the next unresolved thread, or opens the finish dialog after the last one.
+- <kbd>f</kbd> comments on the whole file, and removed lines can be commented on too.
+- <kbd>ctrl+v</kbd> pastes clipboard images into comments as Markdown attachments.
+- The comment editor has a kill ring (<kbd>ctrl+y</kbd>, <kbd>alt+y</kbd>), GitHub-style suggestions (<kbd>alt+s</kbd>), `$EDITOR` editing (<kbd>ctrl+o</kbd>), and `@path` completion.  <kbd>alt+w</kbd> copies a source or thread reference, and clicking `@path L40` or a comment ID jumps to it.
 - Comments follow edits between rounds: anchors match moved text, multi-line ranges resize with insertions and deletions, and comments without a matching line fold into markers at the right edge of the code.
-- `h` folds all resolved threads and `H` hides comment boxes for reading the diff.
+- <kbd>h</kbd> folds all resolved threads and <kbd>H</kbd> hides comment boxes for reading the diff.
 - A new round focuses the first thread with a fresh reply from another author.
 - Each author has a color, unfocused threads shrink to the latest message, and the focused thread has a bright border.
 
 ### Navigation and display
 
 - The sidebar has a **Files** tab with a foldable tree that follows the active file.  File tabs use compact paths, follow the tree order, and mark new and deleted files as `(A +12)` and `(D -8)`.
-- `n` / `N` visit changes and unresolved comments across files; `[` / `]` and `{` / `}` move between all or unresolved threads.  `alt+p` switches files by fuzzy search.
+- <kbd>n</kbd> / <kbd>N</kbd> visit changes and unresolved comments across files; <kbd>[</kbd> / <kbd>]</kbd> and <kbd>{</kbd> / <kbd>}</kbd> move between all or unresolved threads.  <kbd>alt+p</kbd> switches files by fuzzy search.
 - The top line names what is under review and ends with a **Submit** button.  The mouse can click tabs, lines, threads, and buttons, scroll, and drag the gutter to select lines.
-- `w` ignores whitespace in diffs.
+- <kbd>w</kbd> ignores whitespace in diffs.
 - Text adapts to light terminal backgrounds, approval dialogs are light green, and editors place the real terminal cursor for input methods.
 
 ### Diffs
@@ -581,7 +581,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 ### Added
 
 - Attach text and Markdown documents to any review with repeatable `--attachment FILE` flags.  Documents appear before the reviewed files, keep their own comments, and survive review restarts as saved snapshots.  Pass the complete attachment list to refresh it, or use `--clear-attachments` to remove it.
-- Answer task-list forms in attached Markdown with `Space` or by clicking their checkboxes and labels.  Forms support required human confirmations, single choices, and individual operation permissions.  Answers persist separately from source documents; changes to the review invalidate confirmations and permissions.
+- Answer task-list forms in attached Markdown with <kbd>Space</kbd> or by clicking their checkboxes and labels.  Forms support required human confirmations, single choices, and individual operation permissions.  Answers persist separately from source documents; changes to the review invalidate confirmations and permissions.
 - Export self-contained form results with `--result FILE`.  Results include the reviewed content, field definitions, human answers, and permissions explicitly granted on approval.  Overall approval alone grants no individual permission.
 - Bundled agent skills explain attachment snapshots, form answers, result verification, and cleanup.
 
@@ -648,8 +648,8 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- Resolution indicators on displaced comment markers and a clickable resolution control in reply dialogs, also available with `alt+r`.
-- Three comment display modes: normal display, `h` to fold all resolved threads, and `H` to hide comments.  Normal display keeps threads resolved in the current round visible.
+- Resolution indicators on displaced comment markers and a clickable resolution control in reply dialogs, also available with <kbd>alt+r</kbd>.
+- Three comment display modes: normal display, <kbd>h</kbd> to fold all resolved threads, and <kbd>H</kbd> to hide comments.  Normal display keeps threads resolved in the current round visible.
 - A Codex review-and-commit demo alongside refreshed Claude Code and document-review recordings.
 
 ### Changed
@@ -669,15 +669,15 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **Displaced comment markers** — comments whose positions no longer match the source stay accessible through faint `💬` markers.  Focus a marker and press `enter` to expand it, or click it; the thread shows its original text for context.
-- **Unresolved thread navigation** — `{` / `}` visits only unresolved comments; `[` / `]` visits all comments.
+- **Displaced comment markers** — comments whose positions no longer match the source stay accessible through faint `💬` markers.  Focus a marker and press <kbd>enter</kbd> to expand it, or click it; the thread shows its original text for context.
+- **Unresolved thread navigation** — <kbd>{</kbd> / <kbd>}</kbd> visits only unresolved comments; <kbd>[</kbd> / <kbd>]</kbd> visits all comments.
 - A custom review-and-commit flow demo, plus MP4 recording targets for the demos.
 
 ### Changed
 
-- Resolved threads stay folded when focused; `enter` opens their contents in the comment editor.  The `h` folding toggle is removed.
+- Resolved threads stay folded when focused; <kbd>enter</kbd> opens their contents in the comment editor.  The <kbd>h</kbd> folding toggle is removed.
 - Clicking **Resolve** folds the thread; clicking **Resolved** reopens it with its history visible.
-- `]`, `}`, and the thread header's **↓** open the finish dialog at the last eligible thread.  `R` opens it when no unresolved threads remain.
+- <kbd>]</kbd>, <kbd>}</kbd>, and the thread header's **↓** open the finish dialog at the last eligible thread.  <kbd>R</kbd> opens it when no unresolved threads remain.
 - The whitespace indicator is shortened to `[WS: ignored]` and placed beside **Submit**, remaining visible on narrow terminals.
 - Bundled agent skills wait on the review command itself and explain how to keep its execution timeout from interrupting an open review.
 - The README focuses on usage, with the full fork comparison in `docs/upstream-differences.md` and recording instructions in `demo/README.md`.
@@ -697,7 +697,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 ### Added
 
 - **Review bar** — the top line names what is under review and where.  The button that opens the finish dialog moves there from the footer as **Submit q**.
-- **Thread navigation buttons** — **↑** / **↓** in each comment header move to the previous or next thread like `[` / `]`, and the buttons line up across threads.
+- **Thread navigation buttons** — **↑** / **↓** in each comment header move to the previous or next thread like <kbd>[</kbd> / <kbd>]</kbd>, and the buttons line up across threads.
 - **Light terminal backgrounds** — text, the comment editor, and dialog dimming adapt to light backgrounds.
 
 ### Changed
@@ -717,14 +717,14 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **File tree sidebar** — the sidebar now has **Files** and **Comments** tabs and opens on **Files**, a directory tree of the reviewed files with foldable folders.  `t` switches views and focuses the sidebar; clicking a tab does the same.  The tree cursor follows the active file tab and vice versa, unfolding folders as needed.  Each level indents by one column, and rows too long for the sidebar scroll sideways with `→` / `l`, returning with `←` / `h` before those keys fold or climb.
+- **File tree sidebar** — the sidebar now has **Files** and **Comments** tabs and opens on **Files**, a directory tree of the reviewed files with foldable folders.  <kbd>t</kbd> switches views and focuses the sidebar; clicking a tab does the same.  The tree cursor follows the active file tab and vice versa, unfolding folders as needed.  Each level indents by one column, and rows too long for the sidebar scroll sideways with <kbd>→</kbd> / <kbd>l</kbd>, returning with <kbd>←</kbd> / <kbd>h</kbd> before those keys fold or climb.
 - **Help button** — the footer shows a **Help ?** button next to **Approve** / **Finish Review**; clicking it opens the keyboard help.
-- **Dialog dismissal** — every dialog has a red `x` at the right edge of its title row, and clicking outside a dialog dismisses it.  Both act like `esc`, so unsaved comment edits still ask before discarding.
+- **Dialog dismissal** — every dialog has a red `x` at the right edge of its title row, and clicking outside a dialog dismisses it.  Both act like <kbd>esc</kbd>, so unsaved comment edits still ask before discarding.
 
 ### Changed
 
-- `r` resolves or reopens the focused thread without moving.  The new `R` resolves it, or leaves an already resolved thread as is, and advances to the next unresolved thread as `r` used to.  Clicking **☐ Resolve** stays in place.
-- The comment sidebar is a separate pane to the right of the tabbed source pane, with the same height and its own tabs, instead of a divider inside the frame.  Hiding comments with `H` keeps the narrow gutter inside the source pane.  The sidebar is at least 26 columns wide.
+- <kbd>r</kbd> resolves or reopens the focused thread without moving.  The new <kbd>R</kbd> resolves it, or leaves an already resolved thread as is, and advances to the next unresolved thread as <kbd>r</kbd> used to.  Clicking **☐ Resolve** stays in place.
+- The comment sidebar is a separate pane to the right of the tabbed source pane, with the same height and its own tabs, instead of a divider inside the frame.  Hiding comments with <kbd>H</kbd> keeps the narrow gutter inside the source pane.  The sidebar is at least 26 columns wide.
 - Focused comment boxes, the sidebar, and dialogs keep rounded borders; focus is shown by a brighter border color instead of thick borders.
 - Footer key hints use bold cyan keys on a gray background with normal-colored descriptions, separated by middle dots, so they are readable and distinct from the clickable buttons.
 
@@ -750,8 +750,8 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **File path completion in comment editors** — typing `@` and a path character at the start of a line or after whitespace lists the entries of that directory, one level at a time, below the `@` or above it when the screen is short.  Candidates match fuzzily; `tab` accepts the first one, Up/Down with `enter` accept a chosen one, and `esc` closes the list.  A file completes with a trailing space; a directory completes with `/` and lists its entries.
-- **Fuzzy file selector** — `alt+p` opens a dialog with a search field over the review's file tabs.  Space-separated words must all match, and basename matches rank first.  Up/Down or `ctrl+p` / `ctrl+n` choose, `enter` switches tabs, and the dialog keeps a fixed size while typing.
+- **File path completion in comment editors** — typing <kbd>@</kbd> and a path character at the start of a line or after whitespace lists the entries of that directory, one level at a time, below the `@` or above it when the screen is short.  Candidates match fuzzily; <kbd>tab</kbd> accepts the first one, Up/Down with <kbd>enter</kbd> accept a chosen one, and <kbd>esc</kbd> closes the list.  A file completes with a trailing space; a directory completes with `/` and lists its entries.
+- **Fuzzy file selector** — <kbd>alt+p</kbd> opens a dialog with a search field over the review's file tabs.  Space-separated words must all match, and basename matches rank first.  Up/Down or <kbd>ctrl+p</kbd> / <kbd>ctrl+n</kbd> choose, <kbd>enter</kbd> switches tabs, and the dialog keeps a fixed size while typing.
 
 ### Changed
 
@@ -760,13 +760,13 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Removed
 
-- The `/` tab search.  The key is reserved for a future in-source search.
+- The <kbd>/</kbd> tab search.  The key is reserved for a future in-source search.
 
 ## TCrit 0.10.0
 
 ### Added
 
-- **Clipboard images in comments and replies** — `ctrl+v` pastes copied image files or bitmap data on macOS through AppKit, and images on Linux through `wl-paste` or `xclip`.  When no image is available, it falls back to text.  Attachments support PNG, JPEG, GIF, and WebP up to 5 MiB each; Escape cancels a pending paste.
+- **Clipboard images in comments and replies** — <kbd>ctrl+v</kbd> pastes copied image files or bitmap data on macOS through AppKit, and images on Linux through `wl-paste` or `xclip`.  When no image is available, it falls back to text.  Attachments support PNG, JPEG, GIF, and WebP up to 5 MiB each; Escape cancels a pending paste.
 - Image attachments persist across review rounds and stop/resume.  The agent reads images in the final review result before running the printed session cleanup command.  The TUI shows Markdown references rather than inline image previews.
 
 ### Changed
@@ -779,7 +779,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **File references and source navigation** — comments and replies link existing `@path/to/file` references, with optional ` L40` line numbers and backslash escapes for paths containing spaces.  Click to jump within the review or confirm opening other locations in `$EDITOR`.  `alt+g` asks for a line number, and `alt+e` opens the current file at the cursor line.  Editor navigation supports both `--goto FILE:LINE` and `+LINE FILE`.
+- **File references and source navigation** — comments and replies link existing `@path/to/file` references, with optional ` L40` line numbers and backslash escapes for paths containing spaces.  Click to jump within the review or confirm opening other locations in `$EDITOR`.  <kbd>alt+g</kbd> asks for a line number, and <kbd>alt+e</kbd> opens the current file at the cursor line.  Editor navigation supports both `--goto FILE:LINE` and `+LINE FILE`.
 
 ### Changed
 
@@ -794,7 +794,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Changed
 
-- New review rounds focus the first visible thread, in file and display order, with a reply added by another author since the previous submission.  The thread expands and scrolls to its latest new reply, including resolved threads and file comments.  Without a new reply, or when resuming an unfinished round, the starting position is unchanged.  `[` / `]` navigation is unchanged.
+- New review rounds focus the first visible thread, in file and display order, with a reply added by another author since the previous submission.  The thread expands and scrolls to its latest new reply, including resolved threads and file comments.  Without a new reply, or when resuming an unfinished round, the starting position is unchanged.  <kbd>[</kbd> / <kbd>]</kbd> navigation is unchanged.
 - File tabs show both added and deleted line counts, such as `(+12 -5)`, omitting zero counts.
 - Syntax highlighting reuses the lexer, style, and formatter within each file, substantially reducing startup time for diffs with many deleted lines while preserving rendered output.
 - Refactored TUI internals and consolidated overlapping tests without changing their intended behavior.
@@ -803,7 +803,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **Kill ring** — comment and reply editors share up to 60 entries during the current TUI run.  Line and word kills (`ctrl+k`, `ctrl+u`, `ctrl+w`, `alt+d`, and their aliases) save deleted text; consecutive kills combine in text order.  `ctrl+y` yanks the latest entry, and `alt+y` immediately after a yank or yank-pop cycles through older entries.  Other input ends the sequence.  The ring is independent of the system clipboard; ordinary Delete/Backspace do not add entries.
+- **Kill ring** — comment and reply editors share up to 60 entries during the current TUI run.  Line and word kills (<kbd>ctrl+k</kbd>, <kbd>ctrl+u</kbd>, <kbd>ctrl+w</kbd>, <kbd>alt+d</kbd>, and their aliases) save deleted text; consecutive kills combine in text order.  <kbd>ctrl+y</kbd> yanks the latest entry, and <kbd>alt+y</kbd> immediately after a yank or yank-pop cycles through older entries.  Other input ends the sequence.  The ring is independent of the system clipboard; ordinary Delete/Backspace do not add entries.
 
 ### Changed
 
@@ -811,13 +811,13 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Breaking changes
 
-- Suggestion insertion moves from `ctrl+y` to `alt+s` (`M-s`).  `ctrl+y` now yanks from the kill ring; the Suggest button remains available.
+- Suggestion insertion moves from <kbd>ctrl+y</kbd> to <kbd>alt+s</kbd> (<kbd>M-s</kbd>).  <kbd>ctrl+y</kbd> now yanks from the kill ring; the Suggest button remains available.
 
 ## TCrit 0.9.2
 
 ### Changed
 
-- `f` replies to an existing file-comment thread, including resolved threads, and creates a new thread only when none exists.  Saving a reply reopens a resolved thread.
+- <kbd>f</kbd> replies to an existing file-comment thread, including resolved threads, and creates a new thread only when none exists.  Saving a reply reopens a resolved thread.
 - Inline and sidebar thread headers now have clickable **Resolve / Resolved** toggles and a right-aligned red **x** deletion button.  Deletion remains limited to your comments from the current round with no replies and requires confirmation.
 - Resolution controls stay in place when toggled; collapsed resolved threads omit the author name.
 - Keyboard help uses distinct colors for section headings and key names, with brighter descriptions.
@@ -831,19 +831,19 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **Ignore whitespace** — `w` toggles whitespace-insensitive diffs across all files in Git and supplied-diff reviews.  Whitespace-only changes are excluded from highlighting and `n` / `N` navigation while source text, line numbers, and comment context remain intact.  Added and deleted blank lines remain visible; the setting lasts for the current TUI run.
+- **Ignore whitespace** — <kbd>w</kbd> toggles whitespace-insensitive diffs across all files in Git and supplied-diff reviews.  Whitespace-only changes are excluded from highlighting and <kbd>n</kbd> / <kbd>N</kbd> navigation while source text, line numbers, and comment context remain intact.  Added and deleted blank lines remain visible; the setting lasts for the current TUI run.
 
 ### Changed
 
-- `n` / `N` visits change hunks and unresolved comment threads in display order from either pane, including file comments, deleted-line comments, and multiple threads on one line.  Selecting a hidden comment reveals it; resolved threads are skipped.
-- `Tab` / `Shift+Tab` switches file tabs from the sidebar as well as the content pane, preserving pane focus.
+- <kbd>n</kbd> / <kbd>N</kbd> visits change hunks and unresolved comment threads in display order from either pane, including file comments, deleted-line comments, and multiple threads on one line.  Selecting a hidden comment reveals it; resolved threads are skipped.
+- <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> switches file tabs from the sidebar as well as the content pane, preserving pane focus.
 
 ## TCrit 0.9.0
 
 ### Added
 
 - **Saved review sessions** — stop a review with `tcrit stop --session <id>`, discover saved sessions with `tcrit status`, and resume after process exit with `tcrit --session <id>`.  Source snapshots preserve comment context across rounds; `tcrit clear --session <id>` deletes a stopped review.
-- **Read diffs without comment boxes** — `H` hides inline comments and replaces the sidebar with a narrow gutter.  Click a comment marker to open its thread; press `H` again to restore comments without changing resolved-comment folding.
+- **Read diffs without comment boxes** — <kbd>H</kbd> hides inline comments and replaces the sidebar with a narrow gutter.  Click a comment marker to open its thread; press <kbd>H</kbd> again to restore comments without changing resolved-comment folding.
 
 ### Changed
 
@@ -863,13 +863,13 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Changed
 
-- Resolving a thread with `r` now moves focus to the next unresolved thread, wrapping across files and skipping resolved threads even when unfolded with `h`.  When none remain, focus returns to the source.  Reopening a thread keeps its focus.
+- Resolving a thread with <kbd>r</kbd> now moves focus to the next unresolved thread, wrapping across files and skipping resolved threads even when unfolded with <kbd>h</kbd>.  When none remain, focus returns to the source.  Reopening a thread keeps its focus.
 
 ## TCrit 0.8.1
 
 ### Fixed
 
-- `[` / `]` now visit resolved line and file comments when unfolded with `h`, while continuing to skip them when folded
+- <kbd>[</kbd> / <kbd>]</kbd> now visit resolved line and file comments when unfolded with <kbd>h</kbd>, while continuing to skip them when folded
 
 ### Documentation
 
@@ -882,14 +882,14 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 - **Supplied diff reviews** — `tcrit --diff[=FILE]` accepts Git unified diffs from a file or stdin, including outside a repository; snapshots survive Herdr/tmux launches and can be replaced for another review round
 - **Fixed review scopes** — `--scope=all|staged|unstaged|A..B|A...B` keeps each comparison and its comments in a separate session; `--staged` and `--unstaged` are aliases, and committed comparisons display the right-hand commit's content
 - **Native input cursor** — comment and reply editors expose the real terminal cursor so IME composition follows the insertion point after wrapping and scrolling
-- **Resolved-thread display toggle** — `h` folds or unfolds resolved comments across all files, including their visibility in the sidebar
+- **Resolved-thread display toggle** — <kbd>h</kbd> folds or unfolds resolved comments across all files, including their visibility in the sidebar
 
 ### Changed
 
 - **Author-based comment colors** — comments and replies share a color per author, with your own messages in white
 - Unfocused threads show only the latest message; focused histories use at most 10 wrapped rows, and reply dialogs use up to 16, with older or longer content accessible by scrolling
 - The mouse wheel focuses and scrolls comment threads; resolved threads expand on focus and fold again on blur unless folding is disabled
-- `[` / `]` skip resolved comments; vertical movement still visits them, while visual range selection skips comment boxes
+- <kbd>[</kbd> / <kbd>]</kbd> skip resolved comments; vertical movement still visits them, while visual range selection skips comment boxes
 - Suggest selects the inserted code for immediate deletion or replacement while preserving the fences and existing comment
 - Gemini installs the same shared `tcrit` and `tcrit-cli` skills as the other integrations, with review rounds handled by the original agent
 
@@ -928,8 +928,8 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 - Files deleted since the base ref now show their removed lines in the code review TUI instead of an empty tab
 - A commented file whose addition is reverted in a later round now shows a placeholder instead of its stale content; the comments stay in the sidebar and in `review.json`
-- Resolved file comments stay in the sidebar as collapsed headers so they can be reopened with `r`, instead of vanishing
-- `[` and `]` now visit file comments too, moving focus to their sidebar entry, and work from the sidebar as well as the content pane
+- Resolved file comments stay in the sidebar as collapsed headers so they can be reopened with <kbd>r</kbd>, instead of vanishing
+- <kbd>[</kbd> and <kbd>]</kbd> now visit file comments too, moving focus to their sidebar entry, and work from the sidebar as well as the content pane
 
 ### Removed
 
@@ -953,7 +953,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Changed
 
-- `Ctrl-PgUp` and `Ctrl-PgDn` scroll through complete code context and thread history while the comment textarea keeps focus
+- <kbd>Ctrl-PgUp</kbd> and <kbd>Ctrl-PgDn</kbd> scroll through complete code context and thread history while the comment textarea keeps focus
 
 ### Fixed
 
@@ -977,7 +977,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 ### Added
 
 - **Deleted-line comments** — select and comment on removed lines with the keyboard or mouse, including lines in fully deleted files
-- **Direct comment deletion** — press `d` to delete the selected comment after confirmation without opening its thread first
+- **Direct comment deletion** — press <kbd>d</kbd> to delete the selected comment after confirmation without opening its thread first
 
 ### Fixed
 
@@ -994,8 +994,8 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **Suggestion blocks** — press `Ctrl-Y` to insert a GitHub-compatible `suggestion` block for the selected line or a line comment's anchor, including in replies
-- **External editor support** — press `Ctrl-O` to edit comment and reply bodies in `$EDITOR` without leaving the review session
+- **Suggestion blocks** — press <kbd>Ctrl-Y</kbd> to insert a GitHub-compatible `suggestion` block for the selected line or a line comment's anchor, including in replies
+- **External editor support** — press <kbd>Ctrl-O</kbd> to edit comment and reply bodies in `$EDITOR` without leaving the review session
 
 ### Fixed
 
@@ -1005,8 +1005,8 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 ### Added
 
-- **File-level comments** — press `f` to comment on the active file without attaching feedback to a specific line; file threads appear at the top of the comment sidebar
-- **Keyboard help** — press `?` for a compact reference covering navigation, review, search, selection, and dialog controls
+- **File-level comments** — press <kbd>f</kbd> to comment on the active file without attaching feedback to a specific line; file threads appear at the top of the comment sidebar
+- **Keyboard help** — press <kbd>?</kbd> for a compact reference covering navigation, review, search, selection, and dialog controls
 - **Native tmux context discovery** — tcrit can find the invoking pane through process ancestry when agent environments do not inherit `TMUX` or `TMUX_PANE`
 
 ### Changed
@@ -1032,7 +1032,7 @@ Critty is the new name of crit.  This first release from `crittylabs/critty`, th
 
 - **Versioned plan reviews** — `tcrit plan` stores immutable revisions and carries comments forward as plans change
 - **Thread lifecycle controls** — reviewers can resolve or reopen threads, reply from the TUI, and delete only comments or replies they authored in the current round
-- **Cross-file navigation** — `[` / `]` traverse comment threads, while `n` / `N` traverse changes without wrapping; `<` / `>` jump to the current file's first or last line
+- **Cross-file navigation** — <kbd>[</kbd> / <kbd>]</kbd> traverse comment threads, while <kbd>n</kbd> / <kbd>N</kbd> traverse changes without wrapping; <kbd>&lt;</kbd> / <kbd>&gt;</kbd> jump to the current file's first or last line
 - **Resolve-all approval** — finishing a round without new feedback can resolve every remaining thread and approve in one step
 
 ### Fixed
@@ -1065,12 +1065,12 @@ Forked from [crit](https://github.com/kevindutra/crit) and rebranded to **tcrit*
 - **Re-review flow** — starting a new review asks whether to keep or clear existing comments
 - **Approval confirmation** — quitting a review without new comments asks for confirmation before approving
 - **Gemini CLI support** — `tcrit setup-gemini` installs Gemini CLI agents for the review workflow (upstream PR #8)
-- **Paging keybindings** — `PgUp`/`PgDn`/`Home`/`End` in the review TUI (upstream PR #10)
+- **Paging keybindings** — <kbd>PgUp</kbd>/<kbd>PgDn</kbd>/<kbd>Home</kbd>/<kbd>End</kbd> in the review TUI (upstream PR #10)
 
 ### Fixed
 
 - Paths with spaces and special characters are handled correctly in git operations
-- `n`/`N` change navigation jumps to the correct offsets in files with long wrapped lines
+- <kbd>n</kbd>/<kbd>N</kbd> change navigation jumps to the correct offsets in files with long wrapped lines
 - Detached reviews open the tmux split from the invoking pane
 
 ## 0.2.2
@@ -1090,8 +1090,8 @@ Forked from [crit](https://github.com/kevindutra/crit) and rebranded to **tcrit*
 ### Added
 
 - **Multi-file code review** — `crit review --code` detects changed files in your git repo and opens a tabbed TUI with syntax highlighting and diff markers
-- **Tabbed file navigation** — `tab`/`shift+tab` to switch files, `/` to search
-- **Change navigation** — `n`/`N` to jump between changed lines within a file
+- **Tabbed file navigation** — <kbd>tab</kbd>/<kbd>shift+tab</kbd> to switch files, <kbd>/</kbd> to search
+- **Change navigation** — <kbd>n</kbd>/<kbd>N</kbd> to jump between changed lines within a file
 - **Aggregate status** — `crit status --code` outputs comments across all reviewed files as JSON
 - **Session management** — code review sessions are persisted to `.crit/code-review.yaml`
 - **Review router skill** — `/crit:review` asks whether to review code or a document, then routes to the appropriate workflow
@@ -1100,8 +1100,8 @@ Forked from [crit](https://github.com/kevindutra/crit) and rebranded to **tcrit*
 
 ### Changed
 
-- `tab` now switches between file tabs in code review mode (was: switch panes)
-- `s` toggles the comment sidebar (was: `tab`)
+- <kbd>tab</kbd> now switches between file tabs in code review mode (was: switch panes)
+- <kbd>s</kbd> toggles the comment sidebar (was: <kbd>tab</kbd>)
 - Review skill restructured into router pattern with separate code and plan review skills
 
 ## 0.1.0
