@@ -529,9 +529,13 @@ func (m AppModel) loadRemotePreview(rawURL string, msg imageLoadedMsg) imageLoad
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	data, svg, err := m.remoteImages.Fetch(ctx, rawURL)
+	remote, err := m.remoteImages.Fetch(ctx, rawURL)
 	msg.err = err
-	return m.encodePreview(data, svg, msg)
+	msg = m.encodePreview(remote.Data, remote.SVG, msg)
+	if msg.err == nil {
+		remote.Cache(ctx)
+	}
+	return msg
 }
 
 // matchesImageLoad keeps a completed network request from populating a

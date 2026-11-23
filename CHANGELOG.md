@@ -14,6 +14,7 @@
 - When Nerd Fonts are disabled, see `M` for modified text files and `R` for renamed text files alongside the line counts in tabs and file lists.
 - Added and deleted lines use background colors that adapt to the terminal, with stronger color on changed words.  Syntax colors with low contrast are adjusted against the diff background.
 - Clouds after remote Markdown image labels show whether images can be downloaded, have loaded, or failed to load.  With Nerd Fonts, a crossed-out cloud also identifies images outside the download allowlist.
+- Reuse downloaded images when scrolling back to them or reopening a document.  The disk cache discards the least recently used images first and defaults to 256 MiB.  Set the global `remote_image_cache_max_bytes` to change the limit or use `0` to disable caching.
 
 ### Fixed
 

@@ -3,6 +3,7 @@ package remoteimage
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -11,11 +12,17 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"path/filepath"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/crittylabs/critty/v2/internal/imageinfo"
+	"github.com/crittylabs/critty/v2/internal/xdg"
 )
 
 const (
@@ -41,16 +48,40 @@ type Client struct {
 	patterns []*regexp.Regexp
 	http     http.Client
 	slots    chan struct{}
+	cache    diskCache
+	trimOnce sync.Once
+	policy   [32]byte
+	refresh  atomic.Int64
 }
 
-// New creates a fetcher for validated hosts. A nil client denies every URL.
-func New(hosts []string) *Client {
+// Image contains the original response. Cache stores it only after the
+// caller has successfully prepared a preview.
+type Image struct {
+	Data []byte
+	SVG  bool
+	save func(context.Context)
+}
+
+func (i Image) Cache(ctx context.Context) {
+	if i.save != nil {
+		i.save(ctx)
+	}
+}
+
+// New creates a fetcher for validated hosts. A zero limit disables disk
+// caching. A nil client denies every URL.
+func New(hosts []string, cacheMaxBytes int64) *Client {
 	if len(hosts) == 0 {
 		return nil
 	}
-	c := &Client{hosts: make(map[string]bool, len(hosts)), slots: make(chan struct{}, 4)}
+	c := &Client{
+		hosts: make(map[string]bool, len(hosts)), slots: make(chan struct{}, 4),
+		cache: diskCache{dir: filepath.Join(xdg.CacheHome(), "remote-images", "v1"), limit: cacheMaxBytes},
+	}
+	policy := make([]string, 0, len(hosts))
 	for _, entry := range hosts {
 		entry = strings.ToLower(entry)
+		policy = append(policy, entry)
 		if !strings.Contains(entry, "*") {
 			c.hosts[entry] = true
 			continue
@@ -62,6 +93,8 @@ func New(hosts []string) *Client {
 		}
 		c.patterns = append(c.patterns, regexp.MustCompile("^"+pattern+"$"))
 	}
+	slices.Sort(policy)
+	c.policy = sha256.Sum256([]byte(strings.Join(slices.Compact(policy), "\n")))
 	c.http = http.Client{
 		Transport: &http.Transport{
 			DialContext:            dialPublic,
@@ -119,19 +152,36 @@ func (c *Client) checkRedirect(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-// Fetch returns the response body and whether it should be decoded as SVG.
-func (c *Client) Fetch(ctx context.Context, rawURL string) ([]byte, bool, error) {
+// Refresh makes the next fetch for each URL bypass entries from before a
+// manual reload. Other clients can still reuse those entries.
+func (c *Client) Refresh() {
+	if c != nil {
+		c.refresh.Store(time.Now().UnixNano())
+	}
+}
+
+// Fetch reads an image from the disk cache or directly from the remote host.
+func (c *Client) Fetch(ctx context.Context, rawURL string) (Image, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSpace(rawURL), nil)
 	if err != nil || !c.allows(req.URL) {
-		return nil, false, errors.New("URL is outside the image allowlist")
+		return Image{}, errors.New("URL is outside the image allowlist")
 	}
 	select {
 	case c.slots <- struct{}{}:
 		defer func() { <-c.slots }()
 	case <-ctx.Done():
-		return nil, false, ctx.Err()
+		return Image{}, ctx.Err()
+	}
+	req.URL.Fragment, req.URL.RawFragment = "", ""
+	c.trimOnce.Do(func() { _ = c.cache.trim(ctx) })
+	// A hit is valid only under the same policy that allowed every redirect.
+	// Keep signed URLs and their query strings out of filenames and metadata.
+	key := fmt.Sprintf("%x.image", sha256.Sum256(append(c.policy[:], req.URL.String()...)))
+	started := time.Now()
+	if entry, ok := c.cache.get(ctx, key, started, c.refresh.Load()); ok {
+		return entry, nil
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -140,24 +190,63 @@ func (c *Client) Fetch(ctx context.Context, rawURL string) ([]byte, bool, error)
 			// Request errors otherwise expose the full URL, including query parameters.
 			err = requestErr.Err
 		}
-		return nil, false, err
+		return Image{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, false, fmt.Errorf("image server returned HTTP %d", resp.StatusCode)
+		return Image{}, fmt.Errorf("image server returned HTTP %d", resp.StatusCode)
 	}
 	if resp.ContentLength > maxBytes {
-		return nil, false, errors.New("image exceeds 5 MiB")
+		return Image{}, errors.New("image exceeds 5 MiB")
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
 	if err != nil {
-		return nil, false, err
+		return Image{}, err
 	}
 	if len(data) > maxBytes {
-		return nil, false, errors.New("image exceeds 5 MiB")
+		return Image{}, errors.New("image exceeds 5 MiB")
 	}
 	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	return data, contentType == "image/svg+xml" || imageinfo.SVGPath(resp.Request.URL.Path), nil
+	svg := contentType == "image/svg+xml" || imageinfo.SVGPath(resp.Request.URL.Path)
+	image := Image{Data: data, SVG: svg}
+	if expires, ok := cacheExpiry(resp.Header, time.Now()); ok {
+		header := cacheHeader{fetched: started.UnixNano(), expires: expires, svg: svg}
+		image.save = func(ctx context.Context) {
+			// A cache on a read-only or busy filesystem is optional.
+			_ = c.cache.put(ctx, key, header, data)
+		}
+	}
+	return image, nil
+}
+
+func cacheExpiry(header http.Header, now time.Time) (int64, bool) {
+	var ageSeconds int64
+	var hasMaxAge bool
+	for directive := range strings.SplitSeq(strings.Join(header.Values("Cache-Control"), ","), ",") {
+		name, value, _ := strings.Cut(strings.TrimSpace(directive), "=")
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "no-store", "no-cache":
+			return 0, false
+		case "max-age":
+			seconds, err := strconv.ParseInt(strings.Trim(strings.TrimSpace(value), "\""), 10, 32)
+			if err != nil || seconds <= 0 || hasMaxAge {
+				return 0, false
+			}
+			ageSeconds, hasMaxAge = seconds, true
+		}
+	}
+	if hasMaxAge {
+		age, _ := strconv.ParseInt(header.Get("Age"), 10, 32)
+		remaining := ageSeconds - max(0, age)
+		if remaining <= 0 {
+			return 0, false
+		}
+		return now.Add(time.Duration(remaining) * time.Second).UnixNano(), true
+	}
+	if expires, err := http.ParseTime(header.Get("Expires")); err == nil {
+		return expires.UnixNano(), expires.After(now)
+	}
+	return 0, true
 }
 
 // dialPublic connects to the resolved address that passed the policy check.

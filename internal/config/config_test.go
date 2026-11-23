@@ -113,6 +113,32 @@ func TestRemoteImageHostsAreGlobalOnly(t *testing.T) {
 	}
 }
 
+func TestRemoteImageCacheLimitIsGlobalOnly(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	project := t.TempDir()
+	writeConfig(t, ProjectPath(project), "remote_image_cache_max_bytes = 1")
+	for _, tc := range []struct {
+		name, global string
+		want         int64
+	}{
+		{"default", "", 256 << 20},
+		{"custom", "remote_image_cache_max_bytes = 134217728", 128 << 20},
+		{"disabled", "remote_image_cache_max_bytes = 0", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writeConfig(t, GlobalPath(), tc.global)
+			cfg, err := Load(project)
+			if err != nil || cfg.RemoteImageCacheMaxBytes != tc.want {
+				t.Fatalf("cache bytes: config=%+v, err=%v, want=%d", cfg, err, tc.want)
+			}
+		})
+	}
+	writeConfig(t, GlobalPath(), "remote_image_cache_max_bytes = -1")
+	if _, err := Load(project); err == nil || !strings.Contains(err.Error(), "remote_image_cache_max_bytes") {
+		t.Fatalf("invalid cache limit error = %v", err)
+	}
+}
+
 func writeConfig(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

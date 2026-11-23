@@ -44,6 +44,8 @@ type Config struct {
 	DisableStats     bool              `json:"disable_stats,omitempty"`
 	Prompts          map[string]string `json:"prompts,omitempty"`
 
+	RemoteImageCacheMaxBytes int64 `json:"remote_image_cache_max_bytes"`
+
 	// ProjectRoot is the directory the project-level config was resolved
 	// against (git top level or cwd).  Not part of the file format.
 	ProjectRoot string `json:"-"`
@@ -72,6 +74,8 @@ type fileConfig struct {
 	CleanupOnApprove *bool             `toml:"cleanup_on_approve"`
 	DisableStats     *bool             `toml:"disable_stats"`
 	Prompts          map[string]string `toml:"prompts"`
+
+	RemoteImageCacheMaxBytes *int64 `toml:"remote_image_cache_max_bytes"`
 }
 
 // GlobalPath returns the global config file path.
@@ -87,7 +91,7 @@ func ProjectPath(root string) string {
 // Load merges global and project configuration.  projectRoot may be empty
 // to skip the project level.  Missing files are not errors.
 func Load(projectRoot string) (*Config, error) {
-	cfg := &Config{NerdFonts: "auto"}
+	cfg := &Config{NerdFonts: "auto", RemoteImageCacheMaxBytes: remoteimage.DefaultCacheMaxBytes}
 
 	global, err := readFile(GlobalPath())
 	if err != nil {
@@ -102,6 +106,12 @@ func Load(projectRoot string) (*Config, error) {
 		cfg.RemoteImageHosts = global.RemoteImageHosts
 		if err := remoteimage.ValidateHosts(cfg.RemoteImageHosts); err != nil {
 			return nil, err
+		}
+		if global.RemoteImageCacheMaxBytes != nil {
+			cfg.RemoteImageCacheMaxBytes = *global.RemoteImageCacheMaxBytes
+			if cfg.RemoteImageCacheMaxBytes < 0 {
+				return nil, fmt.Errorf("remote_image_cache_max_bytes in %s must be nonnegative", GlobalPath())
+			}
 		}
 	}
 	// Retention can delete saved data, so repositories cannot enable it.

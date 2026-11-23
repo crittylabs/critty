@@ -11,7 +11,7 @@ import (
 )
 
 func TestAllowedImageURL(t *testing.T) {
-	client := New([]string{"Images.Example.org", ".CDN.Example.org", "ASSET-*.example.org", ".media-*.example.net", "*.files.example.com"})
+	client := New([]string{"Images.Example.org", ".CDN.Example.org", "ASSET-*.example.org", ".media-*.example.net", "*.files.example.com"}, DefaultCacheMaxBytes)
 	for _, tc := range []struct {
 		url  string
 		want bool
@@ -42,7 +42,7 @@ func TestAllowedImageURL(t *testing.T) {
 			if got := client.Allows(tc.url); got != tc.want {
 				t.Errorf("Allows = %v, want %v", got, tc.want)
 			}
-			if New(nil).Allows(tc.url) {
+			if New(nil, DefaultCacheMaxBytes).Allows(tc.url) {
 				t.Error("empty allowlist allowed URL")
 			}
 		})
@@ -92,7 +92,7 @@ func TestFetchRedirects(t *testing.T) {
 		{"loop", "/start", "too many image redirects", []string{"images.example.org", "images.example.org", "images.example.org", "images.example.org"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := New([]string{"images.example.org", ".cdn.example.org", "asset-*.example.org"})
+			client := New([]string{"images.example.org", ".cdn.example.org", "asset-*.example.org"}, DefaultCacheMaxBytes)
 			var hosts []string
 			client.http.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
 				if ref := req.Referer(); ref != "" {
@@ -110,10 +110,10 @@ func TestFetchRedirects(t *testing.T) {
 				}
 				return resp, nil
 			})
-			data, svg, err := client.Fetch(t.Context(), "https://images.example.org/start?token=test")
+			image, err := client.Fetch(t.Context(), "https://images.example.org/start?token=test")
 			if tc.wantError == "" {
-				if err != nil || !svg || string(data) != "<svg/>" {
-					t.Fatalf("Fetch = %q, SVG %v, error %v", data, svg, err)
+				if err != nil || !image.SVG || string(image.Data) != "<svg/>" {
+					t.Fatalf("Fetch = %q, SVG %v, error %v", image.Data, image.SVG, err)
 				}
 			} else if err == nil || !strings.Contains(err.Error(), tc.wantError) || strings.Contains(err.Error(), "token=") {
 				t.Fatalf("Fetch error = %v, want %q without request query", err, tc.wantError)
@@ -137,14 +137,14 @@ func TestFetchResponseLimits(t *testing.T) {
 		{"streamed limit", "exceeds 5 MiB", http.StatusOK, -1, maxBytes + 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := New([]string{"images.example.org"})
+			client := New([]string{"images.example.org"}, DefaultCacheMaxBytes)
 			client.http.Transport = transportFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					Request: req, StatusCode: tc.status, ContentLength: tc.contentLength,
 					Body: io.NopCloser(strings.NewReader(strings.Repeat("x", tc.bodySize))),
 				}, nil
 			})
-			if _, _, err := client.Fetch(t.Context(), "https://images.example.org/pic.png"); err == nil || !strings.Contains(err.Error(), tc.want) {
+			if _, err := client.Fetch(t.Context(), "https://images.example.org/pic.png"); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("Fetch error = %v, want %q", err, tc.want)
 			}
 		})
@@ -152,7 +152,7 @@ func TestFetchResponseLimits(t *testing.T) {
 }
 
 func TestFetchWithEmptyAllowlist(t *testing.T) {
-	if _, _, err := New(nil).Fetch(context.Background(), "https://images.example.org/pic.png"); err == nil {
+	if _, err := New(nil, DefaultCacheMaxBytes).Fetch(context.Background(), "https://images.example.org/pic.png"); err == nil {
 		t.Fatal("empty allowlist accepted fetch")
 	}
 }

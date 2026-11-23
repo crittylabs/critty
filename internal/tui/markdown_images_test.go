@@ -90,7 +90,7 @@ func TestRemoteImagePreviewsRespectAllowlist(t *testing.T) {
 	const blocked = "https://other.example.org/badge"
 	body := "![image](" + allowed + ") ![other](" + blocked + ")"
 	app := setupAppWithDoc(t, body)
-	app.remoteImages = remoteimage.New([]string{"images.example.org"})
+	app.remoteImages = remoteimage.New([]string{"images.example.org"}, remoteimage.DefaultCacheMaxBytes)
 	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 100, Height: 30})
 	app.tab().markdownImages = app.findMarkdownImages()().(markdownImagesMsg).images
 	app.tab().markdownImagesPending = true
@@ -144,7 +144,7 @@ func TestRemoteImageMarksFollowPreviewState(t *testing.T) {
 			app := setupAppWithDoc(t, body)
 			app.icons, app.tab().symbols = mode.symbols, mode.symbols
 			app.tab().markdown = nil
-			app.remoteImages = remoteimage.New([]string{"images.example.org"})
+			app.remoteImages = remoteimage.New([]string{"images.example.org"}, remoteimage.DefaultCacheMaxBytes)
 			app.tab().markdownImages = app.findMarkdownImages()().(markdownImagesMsg).images
 			app.images.hidden = true
 			doc := &app.tab().markdownImages[0].previewSide

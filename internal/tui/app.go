@@ -109,6 +109,7 @@ type AppConfig struct {
 	MermaidMerman, MermaidMmdr string
 	MermaidFonts               []string
 	RemoteImageHosts           []string
+	RemoteImageCacheMaxBytes   int64
 }
 
 // gutterWidth is the total width of the left gutter: line number (5) + marker (1) + space (1).
@@ -402,7 +403,7 @@ func NewApp(filePath string, cfg AppConfig) AppModel {
 		searchRing:       loadSearchRing(cfg.SearchHistory),
 		reload:           reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:           newImageDisplay(),
-		remoteImages:     remoteimage.New(cfg.RemoteImageHosts),
+		remoteImages:     remoteimage.New(cfg.RemoteImageHosts, cfg.RemoteImageCacheMaxBytes),
 		math:             mathrender.New(cfg.MathRaTeX),
 		mermaid:          mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		svg:              svgrender.New(),
@@ -516,7 +517,7 @@ func NewCodeReviewApp(files []gitpkg.FileChange, ref string, cfg AppConfig) AppM
 		searchRing:      loadSearchRing(cfg.SearchHistory),
 		reload:          reloadState{watch: cfg.Watch, context: cfg.Context},
 		images:          newImageDisplay(),
-		remoteImages:    remoteimage.New(cfg.RemoteImageHosts),
+		remoteImages:    remoteimage.New(cfg.RemoteImageHosts, cfg.RemoteImageCacheMaxBytes),
 		math:            mathrender.New(cfg.MathRaTeX),
 		mermaid:         mermaidrender.New(cfg.MermaidMerman, cfg.MermaidMmdr, cfg.MermaidFonts),
 		svg:             svgrender.New(),

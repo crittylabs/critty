@@ -18,6 +18,15 @@ func StateHome() string {
 	return filepath.Join(base, "critty")
 }
 
+// CacheHome returns the cache directory for disposable Critty data.
+func CacheHome() string {
+	base := os.Getenv("XDG_CACHE_HOME")
+	if base == "" {
+		base = filepath.Join(homeDir(), ".cache")
+	}
+	return filepath.Join(base, "critty")
+}
+
 // ConfigHome returns the base config directory ($XDG_CONFIG_HOME or
 // ~/.config) with the critty application directory appended.
 func ConfigHome() string {

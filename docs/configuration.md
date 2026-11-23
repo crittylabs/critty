@@ -50,6 +50,7 @@ Prompt keys with `:` or `.` must be quoted.  The name is a single map key; an un
 | `mermaid_merman`, `mermaid_mmdr` | Global-only Mermaid CLI selections with the same `auto`, `off`, command, or absolute path values. |
 | `mermaid_fonts` | Global-only array of up to eight absolute font-file paths for Merman; omission enables automatic font selection. |
 | `remote_image_hosts` | Global-only allowlist of exact hostnames, subdomain suffixes, and wildcard patterns for remote image previews.  Defaults to `[]`. |
+| `remote_image_cache_max_bytes` | Global-only disk cache limit in bytes for remote images.  Defaults to 256 MiB.  Set to `0` to disable the cache. |
 
 Global settings are applied first, followed by project settings.  Settings merge as follows:
 
@@ -150,6 +151,7 @@ add their hosts to the top level of your global `config.toml`.
 
 ```toml
 remote_image_hosts = ["img.shields.io", ".cdn.example.org"]
+remote_image_cache_max_bytes = 134217728 # 128 MiB
 ```
 
 Use ASCII DNS names.  Matching ignores case.  An exact hostname applies to
@@ -171,9 +173,16 @@ responses use the same validation and renderer as local SVGs.
 
 The setting also applies in comment editors and the image lightbox.  Fetches
 use the host running Critty and require an image-capable terminal with previews
-enabled.  Where Reload is available, press `F5` or `M-r` to fetch the previews
-again.  Setting the array to `[]` disables fetching.  Links to images from other
-hosts can still be opened with the system viewer.
+enabled.  Successful previews can reuse downloaded data across sessions.  The
+disk cache under `$XDG_CACHE_HOME/critty/remote-images` (default
+`~/.cache/critty/remote-images`) holds up to 256 MiB by default and drops the least
+recently used images first.  Set `remote_image_cache_max_bytes` to adjust the limit.
+A lower positive limit applies when Critty loads a remote image.  Set it to
+`0` to bypass the cache and retain existing files.  Responses that prohibit
+caching or have expired are fetched again.  Where Reload is available, press
+`F5` or `M-r` to fetch fresh previews.  Setting `remote_image_hosts` to `[]`
+disables fetching.  Links to images from other hosts can still be opened with
+the system viewer.
 
 ## SVG previews
 

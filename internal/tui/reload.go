@@ -105,6 +105,9 @@ func (m *AppModel) requestReload(force bool) tea.Cmd {
 			return nil
 		}
 		m.reload.busy = true
+		if force {
+			m.remoteImages.Refresh()
+		}
 		return m.loadViewLink(m.tab().path, "", true)
 	}
 	if !m.canReload() || m.err != nil {
@@ -276,6 +279,9 @@ func (m *AppModel) finishReload(msg reloadMsg) (cmd tea.Cmd) {
 	if msg.model == nil {
 		m.reload.err = nil
 		return nil
+	}
+	if !msg.automatic {
+		m.remoteImages.Refresh()
 	}
 	m.persist()
 	if m.err != nil {

@@ -38,6 +38,8 @@ Quote prompt keys containing `:` or `.`.  These characters are part of the key, 
 
 `remote_image_hosts` is a global-only allowlist for HTTPS image previews in documents, attachments, comments, comment editors, and the lightbox.  It accepts exact DNS hostnames, dot-prefixed suffixes for subdomains, and `*` wildcards within a DNS label.  It defaults to `[]`, so opening review content makes no image requests by default.  Each redirect host must match the allowlist.  See [remote image previews](https://github.com/crittylabs/critty/blob/main/docs/configuration.md#remote-image-previews) for matching examples and connection limits.
 
+`remote_image_cache_max_bytes` is a global-only disk cache limit.  It defaults to 256 MiB.  Set it to `0` to bypass the cache.
+
 ## History policy
 
 Retention settings apply only in the global TOML file.  Omitted or empty `start` and `end` mean `auto`: the CLI retains originals quietly, reports any maintenance decision at task start, and rotates completed backups when capacity is exceeded.  This describes command behavior; it does not instruct agents to inspect old records or usage independently.  Project settings cannot authorize history actions.

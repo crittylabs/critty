@@ -75,6 +75,8 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		Patch:            mode.patch,
 		FocusPath:        mode.focusPath,
 		FocusLine:        mode.focusLine,
+
+		RemoteImageCacheMaxBytes: cfg.RemoteImageCacheMaxBytes,
 	}
 
 	var model tui.AppModel

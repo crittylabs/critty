@@ -90,6 +90,8 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 		Patch:            mode.patch,
 		FocusPath:        mode.focusPath,
 		FocusLine:        mode.focusLine,
+
+		RemoteImageCacheMaxBytes: cfg.RemoteImageCacheMaxBytes,
 	}
 	if reviewDemo {
 		appCfg.Session = review.NewMemorySession()
