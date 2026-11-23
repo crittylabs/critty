@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/icons"
 	"github.com/crittylabs/critty/v2/internal/remoteimage"
 	"github.com/crittylabs/critty/v2/internal/review"
 )
@@ -124,6 +125,50 @@ func TestRemoteImagePreviewsRespectAllowlist(t *testing.T) {
 	app.applyEditorImages(body)
 	if refs := app.editorImages.refs; len(refs) != 1 || refs[0].key.target.url != allowed {
 		t.Fatalf("editor registered the wrong previews: %+v", refs)
+	}
+}
+
+func TestRemoteImageMarksFollowPreviewState(t *testing.T) {
+	const remote = "https://images.example.org/badge"
+	const blocked = "https://other.example.org/badge"
+	const body = "![Remote](" + remote + ") ![Blocked](" + blocked + ") ![Local](local.png)"
+	for _, mode := range []struct {
+		name                       string
+		symbols                    icons.Set
+		available, off, done, fail string
+	}{
+		{"plain", icons.Plain, "☁\uFE0E", "☁\uFE0E", "⛅\uFE0E", "⛈\uFE0E"},
+		{"nerd", icons.Nerd, "\U000f0163 ", "\U000f0164 ", "\U000f12cc ", "\U000f0f2f "},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			app := setupAppWithDoc(t, body)
+			app.icons, app.tab().symbols = mode.symbols, mode.symbols
+			app.tab().markdown = nil
+			app.remoteImages = remoteimage.New([]string{"images.example.org"})
+			app.tab().markdownImages = app.findMarkdownImages()().(markdownImagesMsg).images
+			app.images.hidden = true
+			doc := &app.tab().markdownImages[0].previewSide
+			comment := app.commentImageSide(commentImageKey{target: imageTarget{url: remote}, width: 80})
+			for _, state := range []struct {
+				previewSide
+				mark string
+			}{
+				{previewSide{}, mode.available},
+				{previewSide{image: &inlineImage{id: 1, ready: true}}, mode.done},
+				{previewSide{failed: true}, mode.fail},
+			} {
+				*doc, *comment = state.previewSide, state.previewSide
+				app.prepareRenderedDisplay()
+				want := "!Remote " + state.mark + " !Blocked " + mode.off + " !Local"
+				document := app.tab().markdownDisplayLine(1, false, body, nil, nil)
+				comment := app.renderCommentContent("Reviewer", body, "", 80)
+				for surface, got := range map[string]string{"document": document, "comment": comment} {
+					if plain := ansi.Strip(got); plain != want {
+						t.Errorf("%s: got %q, want %q", surface, plain, want)
+					}
+				}
+			}
+		})
 	}
 }
 

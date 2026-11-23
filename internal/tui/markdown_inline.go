@@ -88,10 +88,16 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 			return linkedText(uri, linkStyle.Inherit(style).Render(n.Label.Str(source)+externalLinkSuffix(uri, symbols)))
 		case *ast.Image:
 			// Previewable images get lightbox links from the image renderer.
-			if !markdownHasLabel(n, source) {
-				return linkedText(n.Destination.Str(source), "!"+linkStyle.Inherit(style).Render(n.Destination.Str(source)))
+			uri := n.Destination.Str(source)
+			imageStyle := linkStyle.Inherit(style)
+			var suffix string
+			if _, remote := webImageURL(uri); remote {
+				suffix = imageStyle.Render(remoteImageMark(symbols, false, nil))
 			}
-			return linkedText(n.Destination.Str(source), "!"+children(n, linkStyle.Inherit(style)))
+			if !markdownHasLabel(n, source) {
+				return linkedText(uri, "!"+imageStyle.Render(uri)+suffix)
+			}
+			return linkedText(uri, "!"+children(n, imageStyle)+suffix)
 		case *ast.RawHTML:
 			var b strings.Builder
 			for _, token := range markdownHTMLTokens(n.Value.Str(source)) {

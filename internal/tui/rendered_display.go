@@ -461,6 +461,24 @@ func (m *AppModel) prepareRenderedDisplay() {
 		if source == nil {
 			continue
 		}
+		before := source == t.markdown.before
+		if len(source.remoteImageLines) > 0 {
+			sides := make(map[string]*previewSide)
+			for i := range t.markdownImages {
+				ref := &t.markdownImages[i]
+				if ref.before != before || ref.url == "" {
+					continue
+				}
+				side := sides[ref.url]
+				if side == nil || side.image == nil && (ref.image != nil || ref.failed) {
+					sides[ref.url] = &ref.previewSide
+				}
+			}
+			source.updateRemoteImageMarks(func(uri string) string {
+				url, _ := webImageURL(uri)
+				return remoteImageMark(m.icons, m.remoteImages.Allows(url), sides[url])
+			})
+		}
 		for i := range source.lines {
 			source.lines[i].previewTokens = nil
 			source.lines[i].previewHidden = false
@@ -476,7 +494,7 @@ func (m *AppModel) prepareRenderedDisplay() {
 		}
 		var refs []markdownImage
 		for _, ref := range t.markdownImages {
-			if ref.before == (source == t.markdown.before) {
+			if ref.before == before {
 				ref.renderOffset = t.horizontalOffsets[ref.renderFirst]
 				refs = append(refs, ref)
 			}

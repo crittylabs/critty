@@ -63,6 +63,8 @@ func TestExternalLinkMarkSourceMapping(t *testing.T) {
 	for _, tc := range []struct{ source, selected, want string }{
 		{"[Site](https://example.org) after", "Site ↗", "[Site](https://example.org)"},
 		{"[Site](https://example.org) after", "↗", ""},
+		{"![Image](https://example.org/chart.png) after", "!Image ☁\uFE0E", "![Image](https://example.org/chart.png)"},
+		{"![Image](https://example.org/chart.png) after", "☁\uFE0E", ""},
 		{"[Site](https://example.org) after", "after", "after"},
 		{"<https://example.org>", "https://example.org ↗", "<https://example.org>"},
 		{"https://example.org", "↗", ""},

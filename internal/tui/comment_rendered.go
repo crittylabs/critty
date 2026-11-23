@@ -58,6 +58,12 @@ func (m *AppModel) commentRenderedDisplay(body string, width int, show bool, sug
 		lexer = suggestion[0]
 	}
 	cached := m.parsedComment(body, lexer)
+	cached.source.updateRemoteImageMarks(func(uri string) string {
+		url, _ := webImageURL(uri)
+		target := imageTarget{url: url}
+		side := m.commentImages[commentImageKey{target: target, width: width}]
+		return remoteImageMark(m.icons, m.remoteImages.Allows(url), side)
+	})
 	for i := range cached.source.lines {
 		cached.source.lines[i].previewTokens = nil
 		cached.source.lines[i].previewHidden = false

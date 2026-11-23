@@ -8,6 +8,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
+
+	"github.com/crittylabs/critty/v2/internal/icons"
 )
 
 // imageTarget identifies a local file or a web image.  A document reference
@@ -78,6 +80,36 @@ func webImageURL(destination string) (string, bool) {
 		return u.String(), true
 	}
 	return "", false
+}
+
+func remoteImageMark(symbols icons.Set, allowed bool, side *previewSide) string {
+	switch {
+	case !allowed:
+		return " " + symbols.Glyph(icons.CloudOffOutline, "☁\uFE0E")
+	case side != nil && side.failed:
+		return " " + symbols.Glyph(icons.WeatherCloudyAlert, "⛈\uFE0E")
+	case side != nil && side.image != nil:
+		return " " + symbols.Glyph(icons.CloudCheckOutline, "⛅\uFE0E")
+	default:
+		return " " + symbols.Glyph(icons.CloudOutline, "☁\uFE0E")
+	}
+}
+
+func (m *markdownSource) updateRemoteImageMarks(mark func(string) string) {
+	for _, index := range m.remoteImageLines {
+		line := &m.lines[index]
+		for i := range line.tokens {
+			token := &line.tokens[i]
+			if token.decoration != remoteImageDecoration {
+				continue
+			}
+			if label := mark(token.uri); token.text != label {
+				token.text = label
+				line.plainRender.set = false
+				line.inlineRender.set = false
+			}
+		}
+	}
 }
 
 func linkedText(uri, text string) string {

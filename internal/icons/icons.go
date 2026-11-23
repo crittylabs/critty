@@ -104,6 +104,10 @@ const (
 	PillLeft
 	PillRight
 	Line
+	CloudOutline
+	CloudOffOutline
+	CloudCheckOutline
+	WeatherCloudyAlert
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -134,6 +138,9 @@ var glyphs = [...]string{
 	DividerLeft: "\ue0b3", DividerRight: "\ue0b1",
 	PillLeft: "\ue0b6", PillRight: "\ue0b4",
 	Line: "\ue0a1",
+
+	CloudOutline: "\U000f0163", CloudOffOutline: "\U000f0164",
+	CloudCheckOutline: "\U000f12cc", WeatherCloudyAlert: "\U000f0f2f",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.

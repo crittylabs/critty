@@ -157,7 +157,7 @@ func TestMarkdownEmptyLabels(t *testing.T) {
 		{"before [ ](https://example.org) after", "before https://example.org ↗ after", "https://example.org"},
 		{"[](https://example.org/a**b**)", "https://example.org/a**b** ↗", "https://example.org/a**b**"},
 		{"before ![ ](./chart.png) after", "before !./chart.png after", ""},
-		{"![](https://example.org/a**b**.png)", "!https://example.org/a**b**.png", ""},
+		{"![](https://example.org/a**b**.png)", "!https://example.org/a**b**.png ☁\uFE0E", ""},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
 			parsed := parseMarkdownSource([]string{tc.source}, nil)
@@ -192,15 +192,19 @@ func TestMarkdownExternalLinkMarks(t *testing.T) {
 		{"[Next](notes.md)", "Next"},
 		{"[Heading](#heading)", "Heading"},
 		{"[Email](mailto:reader@example.org)", "Email"},
-		{"![Image](https://example.org/chart.png)", "!Image"},
+		{"![**Image**](https://example.org/chart.png \"Tooltip\")", "!Image {cloud}"},
+		{"![](https://example.org/chart.png)", "!https://example.org/chart.png {cloud}"},
+		{"![Local](chart.png)", "!Local"},
+		{"[![Image](https://example.org/chart.png)](https://example.org/page)", "!Image {cloud} ↗"},
+		{"[![Image](chart.png)](https://example.org/page)", "!Image ↗"},
 		{"`https://example.org`", " https://example.org "},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
 			for _, mode := range []struct {
-				symbols icons.Set
-				mark    string
-			}{{icons.Plain, "↗"}, {icons.Nerd, "\uf465 "}} {
-				want := strings.ReplaceAll(tc.want, "↗", mode.mark)
+				symbols     icons.Set
+				mark, cloud string
+			}{{icons.Plain, "↗", "☁\uFE0E"}, {icons.Nerd, "\uf465 ", "\U000f0164 "}} {
+				want := strings.NewReplacer("↗", mode.mark, "{cloud}", mode.cloud).Replace(tc.want)
 				parsed := parseMarkdownWithSyntax([]string{tc.source}, nil, nil, mode.symbols)
 				cached := parsed.lines[0].render(nil, lipgloss.NewStyle(), lipgloss.NewStyle(), nil)
 				inline := highlightInlineReferences(tc.source, mdLinkStyle, mdCodeStyle, mode.symbols, nil)
@@ -222,6 +226,10 @@ func TestExternalLinkMarksInComments(t *testing.T) {
 	}
 	if got := ansi.Strip(app.renderCommentContent("Reviewer", "[first\nsecond](https://example.org)", "", 80)); got != "first\nsecond \uf465 " {
 		t.Fatalf("multiline comment=%q", got)
+	}
+	images := "![first\nsecond](https://example.org/chart.png) ![Local](chart.png)"
+	if got := ansi.Strip(app.renderCommentContent("Reviewer", images, "", 80)); got != "!first\nsecond \U000f0164  !Local" {
+		t.Fatalf("image labels in comment=%q", got)
 	}
 	app.modal = commentModal
 	app.modalTextarea.SetValue(source)

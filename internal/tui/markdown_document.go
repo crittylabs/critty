@@ -31,6 +31,7 @@ const (
 	noDecoration markdownDecoration = iota
 	openingDecoration
 	closingDecoration
+	remoteImageDecoration
 )
 
 const (
@@ -96,6 +97,8 @@ type markdownEdit struct {
 }
 
 type markdownSource struct {
+	remoteImageLines []int
+
 	lines           []markdownLine
 	source          string
 	offsets         []int
@@ -263,6 +266,11 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			pos = edit.end
 		}
 		line.tokens = append(line.tokens, markdownToken{start: pos, end: len(line.source), text: line.source[pos:]})
+		if slices.ContainsFunc(line.tokens, func(token markdownToken) bool {
+			return token.decoration == remoteImageDecoration
+		}) {
+			m.remoteImageLines = append(m.remoteImageLines, start+i)
+		}
 		line.literal = false
 	}
 	m.applyQuotePrefixes(root, data, context, start, offsets, lineAt, incomplete)
@@ -389,15 +397,33 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			style |= markdownBold
 		case *ast.Emphasis:
 			style |= markdownItalic
-		case *ast.Link:
+		case *ast.Link, *ast.Image:
+			var destination text.SingleLineValue
+			switch node := n.(type) {
+			case *ast.Link:
+				destination = node.Destination
+			case *ast.Image:
+				destination = node.Destination
+			}
+			uri = destination.Str(input)
+			var suffix string
+			decoration := closingDecoration
+			if _, image := node.(*ast.Image); image {
+				emit(node.Pos(), node.Pos()+1, "!", style, uri)
+				if _, remote := webImageURL(uri); remote {
+					suffix = remoteImageMark(m.symbols, false, nil)
+					decoration = remoteImageDecoration
+				}
+			} else {
+				suffix = externalLinkSuffix(uri, m.symbols)
+			}
 			style |= markdownLink
-			uri = node.Destination.Str(input)
 			if !markdownHasLabel(node, input) {
-				i := node.Destination.Index()
+				i := destination.Index()
 				if i.Start >= 0 && i.Stop <= len(input) {
 					emit(i.Start, i.Stop, uri, style, uri)
-					if suffix := externalLinkSuffix(uri, m.symbols); suffix != "" {
-						decorate(i.Stop, suffix, style, uri, closingDecoration)
+					if suffix != "" {
+						decorate(i.Stop, suffix, style, uri, decoration)
 					}
 				}
 				return
@@ -405,9 +431,9 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 			for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 				render(child, style, uri)
 			}
-			if suffix := externalLinkSuffix(uri, m.symbols); suffix != "" {
+			if suffix != "" {
 				if r, ok := ranges[node]; ok {
-					decorate(r.contentEnd, suffix, style, uri, closingDecoration)
+					decorate(r.contentEnd, suffix, style, uri, decoration)
 				}
 			}
 			return
@@ -419,17 +445,6 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 				decorate(i.Stop, suffix, style|markdownLink, uri, closingDecoration)
 			}
 			return
-		case *ast.Image:
-			uri = node.Destination.Str(input)
-			emit(node.Pos(), node.Pos()+1, "!", style, uri)
-			style |= markdownLink
-			if !markdownHasLabel(node, input) {
-				i := node.Destination.Index()
-				if i.Start >= 0 && i.Stop <= len(input) {
-					emit(i.Start, i.Stop, node.Destination.Str(input), style, uri)
-				}
-				return
-			}
 		case *ast.RawHTML:
 			if indices := node.Value.Indices(); len(indices) > 0 {
 				from := indices[0].Start
