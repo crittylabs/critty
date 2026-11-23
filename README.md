@@ -171,7 +171,7 @@ If your mux cannot list panes or read their screens, use a notifying terminal fi
 ```bash
 critty README.md              # Read a document in the current terminal
 critty src/main.go:64         # Open source at a line
-critty changes.patch         # Read a patch with syntax highlighting
+critty changes.patch          # Read a patch with syntax highlighting
 ```
 
 Follow local Markdown links to browse related documents.  Back and Forward restore your reading position without creating a saved review.  Standalone patches support unified and side-by-side layouts; press `S` to switch.  Highlighting uses the patch's filenames and available hunk context, so a hunk starting inside a multiline string or comment may have limited syntax context.
