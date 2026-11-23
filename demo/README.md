@@ -46,15 +46,15 @@ The script requires `gh`, `jq`, and `sha256sum` or `shasum`.  Authenticate `gh` 
 
 `list` prints tab-separated asset names, SHA-256 digests, and download URLs.  `upload FILE VERSION` accepts GIF or MP4 and preserves the extension, for example `review-flow-codex-v2.0.0.mp4`.  The version must have the form `vX.Y.Z`.  An existing asset with that name is reused only when its SHA-256 and size match; different content under the same name is rejected.  Existing assets are never overwritten.  Draft releases are supported; their download links become public when the release is published.
 
-v2.1.0 recordings:
+v2.2.0 recordings:
 
-- [Math, Mermaid and SVG previews](https://github.com/crittylabs/critty/releases/download/v2.1.0/previews-v2.1.0.mp4)
-- [Source and Markdown outlines](https://github.com/crittylabs/critty/releases/download/v2.1.0/outlines-v2.1.0.mp4)
-- [Review and commit with Claude Code](https://github.com/crittylabs/critty/releases/download/v2.1.0/review-flow-claude-v2.1.0.mp4)
-- [Review and commit with Codex](https://github.com/crittylabs/critty/releases/download/v2.1.0/review-flow-codex-v2.1.0.mp4)
-- [Claude Code requesting a Codex Astra review](https://github.com/crittylabs/critty/releases/download/v2.1.0/ai-review-claude-codex-astra-v2.1.0.mp4)
-- [Answering a questionnaire](https://github.com/crittylabs/critty/releases/download/v2.1.0/answering-questions-v2.1.0.mp4)
-- [Live review updates and references](https://github.com/crittylabs/critty/releases/download/v2.1.0/updates-v2.1.0.mp4)
+- [Math, Mermaid and SVG previews](https://github.com/crittylabs/critty/releases/download/v2.2.0/previews-v2.2.0.mp4)
+- [Source and Markdown outlines](https://github.com/crittylabs/critty/releases/download/v2.2.0/outlines-v2.2.0.mp4)
+- [Review and commit with Claude Code](https://github.com/crittylabs/critty/releases/download/v2.2.0/review-flow-claude-v2.2.0.mp4)
+- [Review and commit with Codex](https://github.com/crittylabs/critty/releases/download/v2.2.0/review-flow-codex-v2.2.0.mp4)
+- [Claude Code requesting a Codex Astra review](https://github.com/crittylabs/critty/releases/download/v2.2.0/ai-review-claude-codex-astra-v2.2.0.mp4)
+- [Answering a questionnaire](https://github.com/crittylabs/critty/releases/download/v2.2.0/answering-questions-v2.2.0.mp4)
+- [Live review updates and references](https://github.com/crittylabs/critty/releases/download/v2.2.0/updates-v2.2.0.mp4)
 
 ## Sending Alt keys and mouse events from a tape
 
