@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
@@ -275,7 +276,7 @@ func (m *AppModel) rebuildContent() {
 			} else if isMarkdown {
 				content := t.markdownDisplayLine(del.OldLineNum, true, del.Content, del.Inline, m.imageSpans(del.OldLineNum, true))
 				if len(del.Inline) == 0 {
-					content = inlineBackground(diffDeletedLineBg, content)
+					content = inlineDiffBackground(diffDeletedLineBg, content)
 				}
 				rows = t.markdownWrapRows(del.OldLineNum, true, content, textWidth, decorate)
 			} else {
@@ -397,7 +398,7 @@ func (m *AppModel) rebuildContent() {
 				if isSidebarHighlight {
 					row = inlineBackground(sidebarHighlightBg, row)
 				} else if isChanged && len(inlineChanges) == 0 {
-					row = inlineBackground(diffChangedLineBg, row)
+					row = inlineDiffBackground(diffChangedLineBg, row)
 				}
 				wrappedLines = append(wrappedLines, row)
 			}
@@ -472,7 +473,7 @@ func (m *AppModel) rebuildContent() {
 			if isSidebarHighlight {
 				displayLine = inlineBackground(sidebarHighlightBg, displayLine)
 			} else if isChanged {
-				displayLine = inlineBackground(diffChangedLineBg, displayLine)
+				displayLine = inlineDiffBackground(diffChangedLineBg, displayLine)
 			}
 
 			// Styling only adds escape sequences, so a line that fits needs
@@ -769,15 +770,15 @@ func inlineBackground(style lipgloss.Style, content string) string {
 // inlineColors applies style's background, and its foreground when
 // foreground is true, across content, restoring them after inner resets.
 func inlineColors(style lipgloss.Style, content string, foreground bool) string {
-	return inlineColorsWithOverride(style, content, foreground, false)
+	return inlineColorsWithOverride(style, content, foreground, false, false)
 }
 
 // sourceLineHighlight replaces diff colors while preserving text attributes and links.
 func sourceLineHighlight(style lipgloss.Style, content string) string {
-	return inlineColorsWithOverride(style, content, true, true)
+	return inlineColorsWithOverride(style, content, true, true, false)
 }
 
-func inlineColorsWithOverride(style lipgloss.Style, content string, foreground, override bool) string {
+func inlineColorsWithOverride(style lipgloss.Style, content string, foreground, override, adjustContrast bool) string {
 	bgAnsi := bgToAnsi(style.GetBackground())
 	fgAnsi := ""
 	if foreground {
@@ -789,11 +790,27 @@ func inlineColorsWithOverride(style lipgloss.Style, content string, foreground, 
 	var patched strings.Builder
 	patched.Grow(len(content) + len(bgAnsi) + len(fgAnsi))
 	reapplyBg, reapplyFg := false, false
+	var pen uv.Style
+	var contrastAnsi string
+	var wasAdjusted bool
 	parser := ansi.GetParser()
 	defer ansi.PutParser(parser)
 	parser.SetHandler(ansi.Handler{HandleCsi: func(cmd ansi.Cmd, params ansi.Params) {
 		if cmd != 'm' {
 			return
+		}
+		if adjustContrast {
+			uv.ReadStyle(params, &pen)
+			background := pen.Bg
+			if background == nil {
+				background = style.GetBackground()
+			}
+			foreground := readableDiffForeground(pen.Fg, background)
+			adjusted := foreground != pen.Fg
+			if adjusted || wasAdjusted {
+				contrastAnsi = fgToAnsi(foreground)
+			}
+			wasAdjusted = adjusted
 		}
 		if len(params) == 0 {
 			reapplyBg, reapplyFg = true, true
@@ -827,6 +844,10 @@ func inlineColorsWithOverride(style lipgloss.Style, content string, foreground, 
 		if reapplyFg {
 			patched.WriteString(fgAnsi)
 			reapplyFg = false
+		}
+		if contrastAnsi != "" {
+			patched.WriteString(contrastAnsi)
+			contrastAnsi = ""
 		}
 	}
 	return bgAnsi + fgAnsi + patched.String() + "\033[0m"
@@ -875,7 +896,7 @@ func deletedDisplayLines(content, cached string, inline []gitpkg.InlineSegment, 
 	if decorate != nil {
 		display, _ = decorate(display)
 	}
-	lines := strings.Split(lipgloss.Wrap(inlineBackground(diffDeletedLineBg, display), width, ""), "\n")
+	lines := strings.Split(lipgloss.Wrap(inlineDiffBackground(diffDeletedLineBg, display), width, ""), "\n")
 	return lines
 }
 

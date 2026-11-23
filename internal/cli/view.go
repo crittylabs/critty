@@ -121,7 +121,8 @@ func runTransientReview(cfg *config.Config, mode *reviewMode) (result error) {
 		return fmt.Errorf("this mode requires a foreground terminal: %w", err)
 	}
 	defer tty.Close()
-	_, err = tea.NewProgram(model, tea.WithInput(tty), tea.WithOutput(tty)).Run()
+	options := append([]tea.ProgramOption{tea.WithInput(tty), tea.WithOutput(tty)}, tmuxColorOptions(tty)...)
+	_, err = tea.NewProgram(model, options...).Run()
 	if reviewDemo {
 		_, _ = io.WriteString(tty, tui.ProgramStatusClear())
 	}

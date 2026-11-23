@@ -101,6 +101,7 @@ func runTUISession(cfg *config.Config, sess *review.Session, mode *reviewMode, s
 		options = append(options, tea.WithInput(tty), tea.WithOutput(tty))
 		output = tty
 	}
+	options = append(options, tmuxColorOptions(output)...)
 	p := tea.NewProgram(model, options...)
 
 	srv := &tuiServer{cfg: cfg, sess: sess, mode: mode, program: p, done: make(chan struct{}), connected: make(chan struct{}), delivered: make(chan struct{})}

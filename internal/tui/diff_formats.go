@@ -668,9 +668,9 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		}
 		content, contentPlain, contentWidth, measured := t.markdownDisplayLineInfo(sourceLine, oldSide, line.text, line.inline, m.imageSpans(sourceLine, oldSide))
 		if ref.side == "old" && len(line.inline) == 0 {
-			content = inlineBackground(diffDeletedLineBg, content)
+			content = inlineDiffBackground(diffDeletedLineBg, content)
 		} else if line.changed && len(line.inline) == 0 {
-			content = inlineBackground(diffChangedLineBg, content)
+			content = inlineDiffBackground(diffChangedLineBg, content)
 		}
 		rows = t.markdownWrapRows(sourceLine, oldSide, content, textWidth, decorate)
 		if measured && decorate == nil && contentWidth <= textWidth {
@@ -693,7 +693,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		}
 		if line.changed {
 			for i := range rows {
-				rows[i] = inlineBackground(diffChangedLineBg, rows[i])
+				rows[i] = inlineDiffBackground(diffChangedLineBg, rows[i])
 			}
 		}
 	}

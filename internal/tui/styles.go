@@ -386,9 +386,14 @@ var (
 
 // initAdaptiveStyles updates background-dependent styles based on terminal background.
 func initAdaptiveStyles(hasDarkBG bool) {
+	background := lipgloss.LightDark(hasDarkBG)(lipgloss.Color("#FFFFFF"), lipgloss.Color("#10141c"))
+	initAdaptiveStylesWithBackground(hasDarkBG, background)
+}
+
+func initAdaptiveStylesWithBackground(hasDarkBG bool, background color.Color) {
 	ld := lipgloss.LightDark(hasDarkBG)
 	terminalIsDark = hasDarkBG
-	terminalBackground = ld(lipgloss.Color("#FFFFFF"), lipgloss.Color("#10141c"))
+	terminalBackground = background
 	markdownPaletteRevision++
 	textPrimary = ld(lipgloss.Black, lipgloss.BrightWhite)
 	textSecondary = ld(lipgloss.BrightBlack, muted)
@@ -479,20 +484,24 @@ func initAdaptiveStyles(hasDarkBG bool) {
 	formChip = newFormChipPalette(ld)
 	progressColors = newProgressPalette()
 
+	// Match the Codex line fills on white and near-black backgrounds.
+	// Blend against the actual background for other terminal palettes.
+	lightAdded, lightDeleted := lipgloss.Color("#B5F7C3"), lipgloss.Color("#FFD7D3")
+	darkAdded, darkDeleted := lipgloss.Color("#507055"), lipgloss.Color("#84483B")
 	diffChangedLineBg = lipgloss.NewStyle().
-		Background(ld(lipgloss.Color("#D8F0D8"), lipgloss.Color("#1A3A1A")))
+		Background(tintedBackground(ld(lightAdded, darkAdded), 50))
 
 	diffDeletedLineBg = lipgloss.NewStyle().
-		Background(ld(lipgloss.Color("#F0D8D8"), lipgloss.Color("#3A1A1A")))
+		Background(tintedBackground(ld(lightDeleted, darkDeleted), 50))
 
 	diffCommonTextBg = lipgloss.NewStyle().
-		Background(ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#303030")))
+		Background(tintedBackground(ld(lipgloss.Color("#E8E8E8"), lipgloss.Color("#303030")), 35))
 
 	diffAddedTextBg = lipgloss.NewStyle().
-		Background(ld(lipgloss.Color("#A8DDA8"), lipgloss.Color("#286028")))
+		Background(ld(tintedBackground(lipgloss.Color("#A8DDA8"), 50), tintedBackground(darkAdded, 65)))
 
 	diffDeletedTextBg = lipgloss.NewStyle().
-		Background(ld(lipgloss.Color("#E8A8A8"), lipgloss.Color("#682828")))
+		Background(ld(tintedBackground(lipgloss.Color("#E8A8A8"), 50), tintedBackground(darkDeleted, 65)))
 
 	rankMovedUp = lipgloss.NewStyle().Background(ld(lipgloss.Color("#EEDC9A"), lipgloss.Color("#5E5220")))
 	rankMovedDown = lipgloss.NewStyle().Background(ld(lipgloss.Color("#B8CCF0"), lipgloss.Color("#2A3F6E")))

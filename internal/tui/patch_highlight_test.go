@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func TestPatchSourceHighlight(t *testing.T) {
-	const source = "--- a/sample.go\n+++ b/sample.go\n@@ -1,3 +1,3 @@\n package sample\n-var message = \"old\"\n+var message = \"new\"\n func Read() {}\n"
+	const source = "--- a/sample.go\n+++ b/sample.go\n@@ -1,3 +1,3 @@\n package sample\n-var message = \"old\" // previous label\n+var message = \"new\" // current label\n func Read() {}\n"
 	wasDark := terminalIsDark
 	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
 	for _, dark := range []bool{false, true} {
@@ -54,7 +55,12 @@ func assertPatchSourceForeground(t *testing.T, got, path, source string) {
 		t.Fatalf("source cells=%d, want %d plus prefix", len(cells), len(want))
 	}
 	for i := range want {
-		if !sameColor(cells[i+1].Fg, want[i].Fg) {
+		got := cells[i+1]
+		if got.Bg != nil && want[i].Fg != nil && contrastRatio(relativeLuminance(want[i].Fg), relativeLuminance(got.Bg)) < 4.5 {
+			if got.Fg == nil || contrastRatio(relativeLuminance(got.Fg), relativeLuminance(got.Bg)) < 4.5 {
+				t.Fatalf("source color at cell %d remains hard to read for %q", i, source)
+			}
+		} else if !sameColor(got.Fg, want[i].Fg) {
 			t.Fatalf("source color at cell %d differs for %q", i, source)
 		}
 	}
@@ -99,16 +105,29 @@ func TestPatchSourceStateAndLanguages(t *testing.T) {
 }
 
 func TestPatchSourceLateBackground(t *testing.T) {
-	wasDark := terminalIsDark
-	t.Cleanup(func() { initAdaptiveStyles(wasDark) })
+	wasDark, previousBackground := terminalIsDark, terminalBackground
+	t.Cleanup(func() { initAdaptiveStylesWithBackground(wasDark, previousBackground) })
 	initAdaptiveStyles(true)
-	tab := FileTab{path: "sample.patch", doc: document.FromContent("sample.patch", []byte(formatsPatch))}
-	tab.ensureHighlightCache()
-	// Simulate the terminal palette becoming available after source caching.
-	diffChangedLineBg = lipgloss.NewStyle().Background(lipgloss.Color("#123456"))
-	_, cells := renderedCells(tab.patchDisplayLine(8, documentDisplayLine(&tab, 7, tab.doc.LineAt(8))))
-	if !sameColor(cells[1].Bg, diffChangedLineBg.GetBackground()) {
-		t.Fatal("patch background was frozen before terminal detection")
+	app := patchDocumentApp(t, false)
+	for _, tc := range []struct {
+		background, added, deleted string
+	}{
+		{"#020203", "#29392C", "#43251F"},
+		{"#202830", "#384C42", "#523835"},
+		{"#FFFFFF", "#DAFBE1", "#FFEBE9"},
+		{"#F5F6F8", "#D5F7DE", "#FAE7E6"},
+	} {
+		app, _ = updateApp(app, tea.BackgroundColorMsg{Color: lipgloss.Color(tc.background)})
+		rows := strings.Split(app.contentViewport.GetContent(), "\n")
+		for _, side := range []struct {
+			line int
+			want string
+		}{{6, tc.deleted}, {8, tc.added}} {
+			_, cells := renderedCells(rows[app.contentLayout.lineRanges[side.line].start])
+			if got := cells[app.sourceGutterWidth()+1].Bg; !sameColor(got, lipgloss.Color(side.want)) {
+				t.Errorf("terminal %s, line %d: background = %v, want %s", tc.background, side.line, got, side.want)
+			}
+		}
 	}
 }
 

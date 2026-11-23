@@ -82,9 +82,9 @@ func (t *FileTab) patchDisplayLine(n int, text string) string {
 	}
 	switch patch.kinds[n] {
 	case gitdiff.OpAdd:
-		return inlineBackground(diffChangedLineBg, text)
+		return inlineDiffBackground(diffChangedLineBg, text)
 	case gitdiff.OpDelete:
-		return inlineBackground(diffDeletedLineBg, text)
+		return inlineDiffBackground(diffDeletedLineBg, text)
 	default:
 		return text
 	}

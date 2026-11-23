@@ -12,10 +12,12 @@
 - Scan the project, topic, and diff scope beside the controls in a compact Powerline-style header.  Without Nerd Fonts, the header uses single-column text symbols.  The file row shows the Git project and branch, file position, and progress through the file when space permits.  The selected line range has an orange background.
   - The Diff group shows the layout and whether whitespace changes are ignored.  Click the layout symbol to switch between unified and split, or click Diff to toggle the whitespace filter.
 - When Nerd Fonts are disabled, see `M` for modified text files and `R` for renamed text files alongside the line counts in tabs and file lists.
+- Added and deleted lines use background colors that adapt to the terminal, with stronger color on changed words.  Syntax colors with low contrast are adjusted against the diff background.
 
 ### Fixed
 
 - Keep Markdown table borders aligned when horizontal scrolling cuts through a wide character.
+- Preserve truecolor in tmux when the client advertises RGB through terminal features.
 
 ## 2.1.0
 

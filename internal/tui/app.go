@@ -861,8 +861,7 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.BackgroundColorMsg:
 		recolor := msg.IsDark() != terminalIsDark
 		var clearMath strings.Builder
-		initAdaptiveStyles(msg.IsDark())
-		terminalBackground = msg.Color
+		initAdaptiveStylesWithBackground(msg.IsDark(), msg.Color)
 		if recolor {
 			for key, side := range m.commentImages {
 				if key.renderBody == "" {

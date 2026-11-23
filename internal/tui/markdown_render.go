@@ -139,7 +139,11 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 		write := func(value string, background lipgloss.Style) {
 			tokenStyle := style
 			if len(inline) > 0 {
-				tokenStyle = tokenStyle.Background(background.GetBackground())
+				bg := background.GetBackground()
+				tokenStyle = tokenStyle.Background(bg)
+				if fg := tokenStyle.GetForeground(); fg != nil {
+					tokenStyle = tokenStyle.Foreground(readableDiffForeground(fg, bg))
+				}
 			}
 			value = tokenStyle.Render(displaySourceText(value))
 			if len(inline) > 0 {

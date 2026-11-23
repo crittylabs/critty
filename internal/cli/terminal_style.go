@@ -1,15 +1,41 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"os"
+	"os/exec"
+	"slices"
+	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 	"golang.org/x/term"
 
 	"github.com/crittylabs/critty/v2/internal/tui"
 )
+
+func tmuxColorOptions(w io.Writer) []tea.ProgramOption {
+	out, ok := w.(*os.File)
+	if !ok || !term.IsTerminal(int(out.Fd())) || !tmuxAdvertisesRGB() {
+		return nil
+	}
+	return []tea.ProgramOption{tea.WithColorProfile(colorprofile.TrueColor)}
+}
+
+func tmuxAdvertisesRGB() bool {
+	pane := os.Getenv("TMUX_PANE")
+	if os.Getenv("TMUX") == "" || !validTMUXPaneID(pane) || colorprofile.Env(os.Environ()) != colorprofile.ANSI256 {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	// tmux can report RGB in client_termfeatures even when tmux info has
+	// no RGB or Tc flag, which colorprofile uses for capability detection.
+	features, err := commandOutput(exec.CommandContext(ctx, "tmux", "display-message", "-p", "-t", pane, "#{client_termfeatures}"))
+	return err == nil && slices.Contains(strings.Split(strings.TrimSpace(string(features)), ","), "RGB")
+}
 
 // outputStyle describes how decorated text should be written to a writer.
 type outputStyle struct {

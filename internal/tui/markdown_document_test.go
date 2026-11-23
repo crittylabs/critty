@@ -376,6 +376,9 @@ func TestMarkdownCodeWordDiffHighlightsChangedText(t *testing.T) {
 						if !sameColor(styles[i].Bg, tt.style.GetBackground()) {
 							t.Fatalf("changed code %q at %d has background %v, want %v", runes[i], i, styles[i].Bg, tt.style.GetBackground())
 						}
+						if styles[i].Fg == nil || contrastRatio(relativeLuminance(styles[i].Fg), relativeLuminance(styles[i].Bg)) < 4.5 {
+							t.Fatalf("changed code %q at %d has low contrast", runes[i], i)
+						}
 					}
 					for _, width := range []int{12, 80} {
 						rows := inlineDiffDisplayLines(tt.segments, true, width, diffCommonTextBg, tt.style, nil)

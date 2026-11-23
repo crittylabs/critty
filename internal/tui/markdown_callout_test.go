@@ -70,16 +70,18 @@ func TestCalloutTypes(t *testing.T) {
 }
 
 func TestCalloutColorsAndCoordinates(t *testing.T) {
-	previous := terminalIsDark
-	t.Cleanup(func() { terminalIsDark = previous })
+	previousDark, previousBackground := terminalIsDark, terminalBackground
+	t.Cleanup(func() { initAdaptiveStylesWithBackground(previousDark, previousBackground) })
 	for _, dark := range []bool{false, true} {
-		terminalIsDark = dark
+		initAdaptiveStyles(dark)
 		source := "> [!WARNING]"
 		line := &parseMarkdownSource([]string{source, "> Body"}, nil).lines[0]
 		inline := []gitpkg.InlineSegment{{Content: "> [!"}, {Content: "WARNING", Changed: true}, {Content: "]"}}
 		rendered := line.render(inline, diffCommonTextBg, diffAddedTextBg, nil)
 		_, styles := renderedCells(rendered)
-		if !sameColor(styles[2].Fg, calloutColor(calloutWarning)) || !sameColor(styles[2].Bg, diffAddedTextBg.GetBackground()) {
+		background := diffAddedTextBg.GetBackground()
+		foreground := readableDiffForeground(calloutColor(calloutWarning), background)
+		if !sameColor(styles[2].Fg, foreground) || !sameColor(styles[2].Bg, background) {
 			t.Fatalf("dark=%t: callout or word-diff color missing: %q", dark, rendered)
 		}
 		plain := ansi.Strip(rendered)
