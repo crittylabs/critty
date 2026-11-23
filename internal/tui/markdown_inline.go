@@ -93,7 +93,11 @@ func highlightInlineReferences(line string, linkStyle, codeStyle lipgloss.Style,
 			}
 			return linkedText(n.Destination.Str(source), "!"+children(n, linkStyle.Inherit(style)))
 		case *ast.RawHTML:
-			return style.Render(n.Value.Str(source))
+			var b strings.Builder
+			for _, token := range markdownHTMLTokens(n.Value.Str(source)) {
+				b.WriteString(markdownHTMLStyle(style, token.Type).Render(token.Value))
+			}
+			return b.String()
 		}
 		return children(n, style)
 	}

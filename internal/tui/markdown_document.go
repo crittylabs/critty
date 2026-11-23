@@ -48,6 +48,7 @@ const (
 	markdownCalloutBar
 	markdownAtomic
 	markdownQuoteBar
+	markdownHTML
 )
 
 // Tokens retain source byte ranges so word-diff colors can be applied after
@@ -220,6 +221,16 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 			}
 			return
 		case *ast.HTMLBlock:
+			segments := n.(*ast.HTMLBlock).Value.Segments()
+			if len(segments) == 0 {
+				return
+			}
+			first, last := lineAt(segments[0].Start), lineAt(segments[len(segments)-1].Stop-1)
+			if incomplete && (first == 0 && start > 0 || last == len(offsets)-1) {
+				return
+			}
+			projection := projectMarkdownSegments(data, segments)
+			m.highlightSyntaxSegments(projection, base, chroma.Literator(markdownHTMLTokens(projection.text)...), markdownHTML)
 			return
 		case *ast.ThematicBreak:
 			row := lineAt(n.Pos())
@@ -294,7 +305,7 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 	projection := projectMarkdownSegments(data, segments)
 	input := []byte(projection.text)
 	output := make(map[int][]markdownToken)
-	emit := func(from, to int, value string, style markdownStyle, uri string) {
+	emitSyntax := func(from, to int, value string, style markdownStyle, uri string, kind chroma.TokenType) {
 		for from < to {
 			p := projection.spanAt(from)
 			stop := min(to, p.end)
@@ -314,13 +325,16 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 				if style&markdownKeyboard != 0 && style&markdownCode == 0 {
 					part = string(text.NewDecoder().Decode([]byte(part)))
 				}
-				output[line] = append(output[line], markdownToken{start: column, end: end, text: part, style: style, uri: uri, sourceEnd: min(column+stop-from, len(m.lines[base+line].source))})
+				output[line] = append(output[line], markdownToken{start: column, end: end, text: part, style: style, uri: uri, syntax: kind, sourceEnd: min(column+stop-from, len(m.lines[base+line].source))})
 			}
 			if value != "" && len(value) >= stop-from {
 				value = value[stop-from:]
 			}
 			from = stop
 		}
+	}
+	emit := func(from, to int, value string, style markdownStyle, uri string) {
+		emitSyntax(from, to, value, style, uri, 0)
 	}
 	ranges := make(map[ast.Node]markdownMarkup)
 	var render func(ast.Node, markdownStyle, string)
@@ -417,8 +431,13 @@ func (m *markdownSource) parseBlock(data []byte, segments []text.Segment, offset
 				return
 			}
 		case *ast.RawHTML:
-			for _, i := range node.Value.Indices() {
-				emit(i.Start, i.Stop, "", style, uri)
+			if indices := node.Value.Indices(); len(indices) > 0 {
+				from := indices[0].Start
+				for _, token := range markdownHTMLTokens(string(input[from:indices[len(indices)-1].Stop])) {
+					to := from + len(token.Value)
+					emitSyntax(from, to, "", style|markdownHTML, uri, token.Type)
+					from = to
+				}
 			}
 			return
 		}

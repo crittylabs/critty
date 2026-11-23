@@ -5,6 +5,7 @@
 ### Added
 
 - Read Markdown tables in comments and replies with aligned columns and cells that wrap to fit the pane.
+- Read HTML tags in Markdown with subdued syntax colors that adapt to the terminal background.
 
 ### Changed
 

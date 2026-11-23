@@ -147,11 +147,15 @@ func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, b
 		return
 	}
 	projection := projectMarkdownSegments(data, block.Value.Segments())
-	source := projection.text
-	iterator, err := lexer.Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, source)
+	iterator, err := lexer.Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, projection.text)
 	if err != nil {
 		return
 	}
+	m.highlightSyntaxSegments(projection, base, iterator, 0)
+}
+
+func (m *markdownSource) highlightSyntaxSegments(projection markdownProjection, base int, iterator chroma.Iterator, style markdownStyle) {
+	source := projection.text
 	// Project tokens through the parser's segments so quote/list prefixes and
 	// source columns remain intact.  Commit only a lossless tokenisation.
 	output := make(map[int][]markdownToken)
@@ -173,7 +177,7 @@ func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, b
 				kind = chroma.Text
 			}
 			if length > 0 {
-				output[row] = append(output[row], markdownToken{start: column, end: column + length, text: source[pos : pos+length], syntax: kind})
+				output[row] = append(output[row], markdownToken{start: column, end: column + length, text: source[pos : pos+length], syntax: kind, style: style})
 			}
 			pos = stop
 		}

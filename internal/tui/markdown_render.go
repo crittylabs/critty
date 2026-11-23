@@ -53,7 +53,7 @@ func markdownTokenStyle(token markdownToken, quoted bool, foreground color.Color
 	if token.style&markdownCalloutTitle != 0 {
 		style = style.Background(calloutTitleBackground(token.callout)).Bold(true)
 	}
-	if token.syntax != 0 {
+	if token.syntax != 0 && token.style&markdownHTML == 0 {
 		entry := codeHighlightStyle().Get(token.syntax)
 		if entry.Colour.IsSet() {
 			style = style.Foreground(lipgloss.Color(entry.Colour.String()))
@@ -86,6 +86,9 @@ func markdownTokenStyle(token markdownToken, quoted bool, foreground color.Color
 	}
 	if token.style&markdownKeyboard != 0 {
 		style = keyboardStyle().Inherit(style)
+	}
+	if token.style&markdownHTML != 0 {
+		style = markdownHTMLStyle(style, token.syntax)
 	}
 	if foreground != nil && token.callout == 0 && token.syntax == 0 && token.style&(markdownLink|markdownCode|markdownKeyboard|markdownDelimiter|markdownFenceLanguage|markdownFenceAttribute) == 0 {
 		style = style.Foreground(foreground)
