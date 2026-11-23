@@ -53,6 +53,56 @@ func TestTableHorizontalControlsAndResize(t *testing.T) {
 	}
 }
 
+func TestScrolledTableKeepsBordersAlignedAcrossWideCharacters(t *testing.T) {
+	t.Parallel()
+	content := "| Name | Notes |\n| --- | --- |\n| 字 | " + strings.Repeat("word ", 12) + " |"
+	app := setupPrivateAppWithDoc(t, content)
+	app.viewMode = true
+	app, _ = updateApp(app, tea.WindowSizeMsg{Width: 44, Height: 24})
+	app.scrollHorizontalBlock(*app.horizontalBlockAtLine(3), 3)
+	rows := strings.Split(app.contentViewport.GetContent(), "\n")
+	separatorColumn := func(line int, separator string) int {
+		row := ansi.Strip(rows[app.contentLayout.lineRanges[line].start])
+		index := strings.Index(row, separator)
+		if index < 0 {
+			t.Fatalf("line %d has no separator %q: %q", line, separator, row)
+		}
+		return ansi.StringWidth(row[:index])
+	}
+	want := separatorColumn(2, "┼")
+	for _, line := range []int{1, 3} {
+		if got := separatorColumn(line, "│"); got != want {
+			t.Errorf("line %d: separator at column %d, want %d", line, got, want)
+		}
+	}
+}
+
+func TestHorizontalViewportClipsWideCharactersAtBothEdges(t *testing.T) {
+	t.Parallel()
+	const url = "https://example.org"
+	text := ansi.SetHyperlink(url) + "字é語" + ansi.ResetHyperlink()
+	for _, tc := range []struct {
+		name          string
+		offset, width int
+		want          string
+	}{
+		{"both", 1, 3, " é "},
+		{"left", 1, 4, " é語"},
+		{"right", 0, 4, "字é "},
+		{"within one character", 1, 1, " "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			view := horizontalViewport{offset: tc.offset, width: tc.width, contentWidth: 5}.render(text)
+			if got := ansi.Strip(view); got != tc.want || ansi.StringWidth(got) != tc.width {
+				t.Errorf("visible text = %q, want %q in %d columns", got, tc.want, tc.width)
+			}
+			if strings.Contains(tc.want, "é") && !strings.Contains(view, ansi.SetHyperlink(url)) {
+				t.Error("clipped link lost its destination")
+			}
+		})
+	}
+}
+
 func TestTableSearchRevealsHiddenLinkAndWrappedRow(t *testing.T) {
 	t.Parallel()
 	content := "| First | Second |\n| --- | --- |\n| " + strings.Repeat("left ", 25) + " | " + strings.Repeat("filler ", 30) + " [日本語](https://hidden.example) |"

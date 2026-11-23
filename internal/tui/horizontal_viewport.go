@@ -20,8 +20,24 @@ func (v horizontalViewport) clamp(offset int) int {
 }
 
 func (v horizontalViewport) render(text string) string {
-	visible := ansi.Cut(text, v.offset, v.offset+v.width)
-	return visible + strings.Repeat(" ", max(0, v.width-ansi.StringWidth(visible)))
+	if v.width <= 0 {
+		return ""
+	}
+	visible := text
+	leftPad := 0
+	if v.offset > 0 {
+		visible = ansi.TruncateLeft(text, v.offset, "")
+		// TruncateLeft keeps a whole grapheme when the cut falls inside it.
+		// Reserve only its visible cells so later columns stay in place.
+		if excess := ansi.StringWidth(visible) - max(0, ansi.StringWidth(text)-v.offset); excess > 0 {
+			_, width := ansi.FirstGraphemeCluster(ansi.Strip(visible), ansi.GraphemeWidth)
+			leftPad = min(v.width, width-excess)
+			visible = ansi.TruncateLeft(visible, width, "")
+		}
+	}
+	visible = ansi.Truncate(visible, v.width-leftPad, "")
+	rightPad := max(0, v.width-leftPad-ansi.StringWidth(visible))
+	return strings.Repeat(" ", leftPad) + visible + strings.Repeat(" ", rightPad)
 }
 
 func (v horizontalViewport) reveal(start, end int) int {

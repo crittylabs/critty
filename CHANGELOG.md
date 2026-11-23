@@ -12,6 +12,10 @@
   - The Diff group shows the layout and whether whitespace changes are ignored.  Click the layout symbol to switch between unified and split, or click Diff to toggle the whitespace filter.
 - When Nerd Fonts are disabled, see `M` for modified text files and `R` for renamed text files alongside the line counts in tabs and file lists.
 
+### Fixed
+
+- Keep Markdown table borders aligned when horizontal scrolling cuts through a wide character.
+
 ## 2.1.0
 
 ### Added
