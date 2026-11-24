@@ -191,12 +191,17 @@ func (m *AppModel) rebuildPatchDocument(patch *patchDocumentCache) {
 		}
 	}
 	annotations(0)
+	sourceLines := t.doc.SourceLineCount()
 	for _, row := range patch.rows {
 		if row.full {
-			cells, target := cell(row.left, width, false)
-			for _, c := range cells {
-				layout.addCellSpan(len(layout.rows), 0, 0, c, target)
-				layout.appendBlock(&b, c.text, target)
+			if row.left > sourceLines {
+				layout.appendBlock(&b, "", contentMouseTarget{line: row.left, endOfFile: true})
+			} else {
+				cells, target := cell(row.left, width, false)
+				for _, c := range cells {
+					layout.addCellSpan(len(layout.rows), 0, 0, c, target)
+					layout.appendBlock(&b, c.text, target)
+				}
 			}
 		} else {
 			leftWidth := max(1, (width-3)/2)

@@ -299,10 +299,11 @@ func (m *AppModel) rebuildContent() {
 			}
 		}
 	}
+	sourceLineCount := t.doc.SourceLineCount()
 	for _, i := range m.lineOrder(t) {
 		line := t.doc.Lines[i]
 		lineNum := i + 1
-		lineTarget := contentMouseTarget{line: lineNum}
+		lineTarget := contentMouseTarget{line: lineNum, endOfFile: lineNum > sourceLineCount}
 
 		// Render deleted lines that appear before this line
 		renderDeleted(lineNum - 1)
@@ -364,7 +365,9 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		// Check if this line is part of a table block
-		if t.previewLineHidden(lineNum, false) {
+		if lineTarget.endOfFile {
+			layout.appendBlock(&b, "", lineTarget)
+		} else if t.previewLineHidden(lineNum, false) {
 			// Preserve annotations while replacing this source with its image.
 		} else if _, inTable := tableBlockMap[lineNum]; len(inlineChanges) > 0 && !isSidebarHighlight && !inTable {
 			var rows []string

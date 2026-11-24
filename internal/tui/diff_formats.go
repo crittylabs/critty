@@ -301,6 +301,7 @@ func diffHunks(t *FileTab) []diffHunk {
 			}
 		}
 	}
+	sourceLines := t.doc.SourceLineCount()
 	for n := 0; n <= t.doc.LineCount(); n++ {
 		for i, del := range t.deletedAfter[n] {
 			line := &diffLine{ref: lineRef{side: "old", line: del.OldLineNum},
@@ -322,9 +323,8 @@ func diffHunks(t *FileTab) []diffHunk {
 			flush()
 			continue
 		}
-		if next == t.doc.LineCount() && t.doc.Lines[n] == "" &&
-			(t.doc.Content == "" || strings.HasSuffix(t.doc.Content, "\n")) && t.doc.Known == nil {
-			continue // strings.Split's trailing sentinel is not a source line
+		if next > sourceLines {
+			continue
 		}
 		line := &diffLine{ref: lineRef{line: next}, text: t.doc.Lines[n],
 			styled:  documentDisplayLine(t, n, t.doc.Lines[n]),

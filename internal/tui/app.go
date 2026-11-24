@@ -3027,13 +3027,28 @@ func (m AppModel) headerPosition(percentStyle lipgloss.Style) (position, percent
 	if t.doc == nil && !t.selecting {
 		return "", ""
 	}
-	number := fmt.Sprint(t.cursorLine)
+	side := m.selectionSide()
+	total := 0
+	if t.doc != nil {
+		total = t.doc.SourceLineCount()
+	}
+	start, end := t.cursorLine, t.cursorLine
 	style := headerPositionStyle
 	numberStyle := style
 	if t.selecting {
-		start, end := m.selectionRange()
-		number = fmt.Sprintf("%d-%d", start, end)
+		start, end = m.selectionRange()
 		numberStyle = style.Background(headerSelection)
+	}
+	number := fmt.Sprint(start)
+	isSource := side != "old" && t.doc != nil
+	switch {
+	case isSource && start > total:
+		number = "EOF"
+	case t.selecting:
+		if isSource {
+			end = min(end, total)
+		}
+		number = fmt.Sprintf("%d-%d", start, end)
 	}
 	marker := strings.TrimSuffix(m.icons.Glyph(icons.Line, "L"), " ")
 	offset := max(1, 4-ansi.StringWidth(number))
@@ -3043,11 +3058,10 @@ func (m AppModel) headerPosition(percentStyle lipgloss.Style) (position, percent
 		padding = ""
 	}
 	position = style.Render(padding+marker+strings.Repeat(" ", offset)) + numberStyle.Render(number)
-	if m.selectionSide() == "old" {
+	if side == "old" {
 		return position + style.Render(" (deleted) "), ""
 	}
 	if t.doc != nil {
-		total := t.doc.LineCount()
 		position += style.Render(fmt.Sprintf(":%d", total))
 		if total > 0 {
 			pct := 100 * min(max(t.cursorLine, 0), total) / total
@@ -4114,7 +4128,7 @@ func (m *AppModel) commentAddAt(x, y int) (lineRef, bool) {
 		return lineRef{}, false
 	}
 	target, ok := m.contentMouseTargetAt(x, y)
-	if !ok || target.line == 0 || target.annotation || target.passive {
+	if !ok || target.line == 0 || target.annotation || target.passive || target.endOfFile {
 		return lineRef{}, false
 	}
 	if t.selecting {
@@ -4248,6 +4262,7 @@ func (m *AppModel) updateMouseSelection(mouse tea.Mouse, autoScroll bool) {
 
 type contentMouseTarget struct {
 	passive         bool // repeated context maps to a source line without extending its scroll range
+	endOfFile       bool
 	line            int
 	side            string
 	annotation      bool

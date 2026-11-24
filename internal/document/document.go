@@ -52,3 +52,14 @@ func (d *Document) LineAt(n int) string {
 func (d *Document) LineCount() int {
 	return len(d.Lines)
 }
+
+// SourceLineCount excludes the cursor row after a final newline and the
+// sole cursor row of an empty document.
+func (d *Document) SourceLineCount() int {
+	count := d.LineCount()
+	if count > 0 && d.Known == nil && d.Lines[count-1] == "" &&
+		(d.Content == "" || strings.HasSuffix(d.Content, "\n")) {
+		return count - 1
+	}
+	return count
+}

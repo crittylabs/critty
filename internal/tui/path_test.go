@@ -203,7 +203,7 @@ func TestPathColorsSurviveHeaderAndTabClipping(t *testing.T) {
 			app.width = width
 			header := strings.Split(app.renderHeader(), "\n")[lipgloss.Height(app.renderReviewBar())]
 			plain := ansi.Strip(header)
-			if !strings.Contains(plain, ".md") || !strings.Contains(strings.Join(strings.Fields(plain), " "), "L 0:3") {
+			if !strings.Contains(plain, ".md") || !strings.Contains(strings.Join(strings.Fields(plain), " "), "L 0:2") {
 				t.Fatalf("header lost filename or added space: %q", plain)
 			}
 			progress := strings.LastIndex(plain, "0/0")

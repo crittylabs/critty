@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -11,6 +12,56 @@ import (
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 	"github.com/crittylabs/critty/v2/internal/review"
 )
+
+func TestEndOfFileRowHasNoLineNumber(t *testing.T) {
+	for _, tc := range []struct {
+		name, text string
+		lines      int
+		eof        bool
+	}{
+		{"final newline", "first\n", 1, true},
+		{"real blank line", "first\n\n", 2, true},
+		{"no final newline", "first", 1, false},
+		{"empty file", "", 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newScrollTestApp("sample.txt", strings.Split(tc.text, "\n"), false, 80, 12)
+			app.tab().cursorLine = 1
+			app.rebuildContent()
+			if tc.lines > 0 {
+				line := app.contentLayout.lineRanges[tc.lines].start
+				visible := strings.Split(app.contentViewport.View(), "\n")
+				if !strings.Contains(ansi.Strip(ansi.Cut(visible[line], 0, gutterWidth)), fmt.Sprint(tc.lines)) {
+					t.Fatalf("source line %d has no number: %q", tc.lines, visible[line])
+				}
+			}
+			wantHeader := fmt.Sprintf("%d:%d", tc.lines, tc.lines)
+			if tc.eof {
+				row := app.contentLayout.lineRanges[tc.lines+1].start
+				app.tab().cursorLine = tc.lines + 1
+				app.rebuildContent()
+				visible := strings.Split(app.contentViewport.View(), "\n")
+				if strings.TrimSpace(ansi.Strip(visible[row])) != "" || !strings.Contains(visible[row], "\x1b[7m") {
+					t.Fatalf("current EOF row must be blank and reversed: %q", visible[row])
+				}
+				if tc.lines > 0 {
+					app.tab().cursorLine = tc.lines
+					app.rebuildContent()
+					unfocused := strings.Split(app.contentViewport.View(), "\n")[row]
+					if strings.TrimSpace(ansi.Strip(unfocused)) != "" || strings.Contains(unfocused, "\x1b[7m") {
+						t.Fatalf("inactive EOF row must be blank: %q", unfocused)
+					}
+					app.tab().cursorLine = tc.lines + 1
+				}
+				wantHeader = fmt.Sprintf("EOF:%d", tc.lines)
+			}
+			position, _ := app.headerPosition(headerPercentStyle())
+			if !strings.Contains(ansi.Strip(position), wantHeader) {
+				t.Fatalf("header position = %q, want %q", ansi.Strip(position), wantHeader)
+			}
+		})
+	}
+}
 
 func TestRenderedContentLayoutTracksWrappedLines(t *testing.T) {
 	for _, tt := range []struct {

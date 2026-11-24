@@ -134,11 +134,11 @@ func TestRenderHeaderStaysOnOneLineWithLongPath(t *testing.T) {
 		setup func(*AppModel)
 		want  string
 	}{
-		{name: "document", want: "0% L 0:3 0/0 💬"},
+		{name: "document", want: "0% L 0:2 0/0 💬"},
 		{name: "deleted", setup: func(app *AppModel) { app.tabs[0].cursorSide = "old" }, want: "L 0 (deleted) 0/0 💬"},
 		{name: "selection", setup: func(app *AppModel) {
 			app.tabs[0].selecting, app.tabs[0].selectAnchor, app.tabs[0].cursorLine = true, 1, 1
-		}, want: "33% L 1-1:3 0/0 💬"},
+		}, want: "50% L 1-1:2 0/0 💬"},
 		{name: "deleted selection", setup: func(app *AppModel) {
 			app.tabs[0].selecting, app.tabs[0].selectSide = true, "old"
 			app.tabs[0].selectAnchor, app.tabs[0].cursorLine = 2, 1

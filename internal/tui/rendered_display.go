@@ -41,11 +41,18 @@ func (m *AppModel) sourceRowHighlights() func(contentMouseTarget) (*lipgloss.Sty
 	}
 	start, end := m.selectionRange()
 	side := m.selectionSide()
+	reverse := lipgloss.NewStyle().Reverse(true)
 	return func(target contentMouseTarget) (*lipgloss.Style, bool) {
 		if target.line <= 0 || target.annotation || target.passive {
 			return nil, false
 		}
 		current := showCursor && target.line == t.cursorLine && target.side == t.cursorSide
+		if target.endOfFile {
+			if current {
+				return &reverse, false
+			}
+			return nil, false
+		}
 		selected := t.selecting && target.side == side && target.line >= start && target.line <= end
 		return sourceLineBackground(current, selected), selected
 	}
@@ -136,6 +143,9 @@ func fillSourceBackground(content string, width int, style *lipgloss.Style) stri
 		return content
 	}
 	padding := strings.Repeat(" ", max(0, width-ansi.StringWidth(content)))
+	if style.GetReverse() {
+		return style.Render(content + padding)
+	}
 	return inlineBackground(*style, content+padding)
 }
 
