@@ -22,11 +22,11 @@ func TestEmacsFileNavigation(t *testing.T) {
 				key  tea.KeyPressMsg
 				line int
 			}{
-				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, 19},
-				{tea.KeyPressMsg{Code: tea.KeyPgDown}, 37},
-				{tea.KeyPressMsg{Code: tea.KeyPgUp}, 37},
-				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModAlt}, 20},
-				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModAlt}, 20},
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, 20},
+				{tea.KeyPressMsg{Code: tea.KeyPgDown}, 38},
+				{tea.KeyPressMsg{Code: tea.KeyPgUp}, 38},
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModAlt}, 19},
+				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModAlt}, 1},
 				{tea.KeyPressMsg{Code: '>', Mod: tea.ModAlt}, 101},
 				{tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}, 101},
 				{tea.KeyPressMsg{Code: '<', Mod: tea.ModAlt}, 1},
@@ -42,27 +42,35 @@ func TestEmacsFileNavigation(t *testing.T) {
 	}
 }
 
-func TestEmacsPageScrollUsesViewport(t *testing.T) {
+func TestPageScrollKeepsCursorVisible(t *testing.T) {
 	for _, tc := range []struct {
-		name                                              string
-		cursor, offset, direction, wantCursor, wantOffset int
+		name                                           string
+		key                                            tea.KeyPressMsg
+		height, cursor, offset, wantCursor, wantOffset int
 	}{
-		{"cursor at top", 1, 0, 1, 19, 18},
-		{"cursor in middle", 10, 0, 1, 19, 18},
-		{"cursor in overlap", 20, 0, 1, 20, 18},
-		{"page up", 35, 30, -1, 32, 12},
-		{"page up overlap", 32, 30, -1, 32, 12},
+		{"cursor at top", tea.KeyPressMsg{Code: tea.KeyPgDown}, 20, 1, 0, 20, 18},
+		{"cursor in middle", tea.KeyPressMsg{Code: tea.KeyPgDown}, 20, 10, 0, 20, 18},
+		{"cursor in overlap", tea.KeyPressMsg{Code: tea.KeyPgDown}, 20, 19, 0, 19, 18},
+		{"page up", tea.KeyPressMsg{Code: tea.KeyPgUp}, 20, 35, 30, 31, 12},
+		{"page up overlap", tea.KeyPressMsg{Code: tea.KeyPgUp}, 20, 32, 30, 32, 12},
+		{"half page down", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 5, 1, 0, 4, 2},
+		{"half page up", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 5, 8, 4, 6, 2},
+		{"half page down overlap", tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModShift}, 5, 3, 0, 3, 2},
+		{"half page up overlap", tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModShift}, 5, 4, 2, 4, 0},
+		{"page up at start", tea.KeyPressMsg{Code: tea.KeyPgUp}, 20, 8, 0, 1, 0},
+		{"page down at end", tea.KeyPressMsg{Code: tea.KeyPgDown}, 20, 90, 81, 101, 81},
+		{"half page up at start", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 5, 4, 0, 2, 0},
+		{"half page down at end", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 5, 98, 97, 100, 97},
+		{"half page up stops at first line", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 5, 2, 0, 1, 0},
+		{"half page down stops at last line", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 5, 100, 97, 101, 97},
+		{"one visible row", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 1, 1, 0, 2, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			app := newScrollTestApp("notes.txt", strings.Split(strings.Repeat("line\n", 100), "\n"), false, 80, 20)
+			app := newScrollTestApp("notes.txt", strings.Split(strings.Repeat("line\n", 100), "\n"), false, 80, tc.height)
 			app.tab().cursorLine = tc.cursor
 			app.rebuildContent()
 			app.contentViewport.SetYOffset(tc.offset)
-			key := tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl}
-			if tc.direction < 0 {
-				key.Mod = tea.ModAlt
-			}
-			app, _ = updateApp(app, key)
+			app, _ = updateApp(app, tc.key)
 			if app.tab().cursorLine != tc.wantCursor || app.contentViewport.YOffset() != tc.wantOffset {
 				t.Fatalf("cursor/offset = %d/%d, want %d/%d", app.tab().cursorLine, app.contentViewport.YOffset(), tc.wantCursor, tc.wantOffset)
 			}
@@ -290,10 +298,6 @@ func TestLineNavigation(t *testing.T) {
 	}{
 		{"home", tea.KeyPressMsg{Code: tea.KeyHome}, 8, 1},
 		{"end", tea.KeyPressMsg{Code: tea.KeyEnd}, 1, 10},
-		{"half page down", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 1, 3},
-		{"half page up", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 8, 6},
-		{"half page up at start", tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}, 2, 1},
-		{"half page down at end", tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}, 9, 10},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app := setupAppWithDoc(t, strings.Repeat("line\n", 9)+"line")

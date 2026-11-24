@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Page and half-page keys scroll the content pane while keeping the current line if it is visible.  When the current line leaves the pane, it moves to the second visible row from the top when scrolling down or from the bottom when scrolling up.  At a scroll limit, half-page keys move the current line by half a page and full-page keys move it to the beginning or end.
+
 ## 2.2.0
 
 ### Added

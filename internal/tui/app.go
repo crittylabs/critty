@@ -1464,10 +1464,16 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		moved := false
 		switch {
 		case key.Matches(msg, keys.PageDown):
-			m.scrollFilePage(1)
+			m.scrollFilePage(1, false)
 			return m, nil
 		case key.Matches(msg, keys.PageUp):
-			m.scrollFilePage(-1)
+			m.scrollFilePage(-1, false)
+			return m, nil
+		case key.Matches(msg, keys.HalfPageDown):
+			m.scrollFilePage(1, true)
+			return m, nil
+		case key.Matches(msg, keys.HalfPageUp):
+			m.scrollFilePage(-1, true)
 			return m, nil
 		case key.Matches(msg, keys.Down):
 			if t.cursorOnAnnotation {
@@ -1516,18 +1522,6 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			moved = true
-		case key.Matches(msg, keys.HalfPageDown):
-			t.cursorOnAnnotation = false
-			t.cursorAnnoIdx = 0
-			jump := m.contentViewport.Height() / 2
-			m.moveCursorBy(t, 1, jump)
-			moved = true
-		case key.Matches(msg, keys.HalfPageUp):
-			t.cursorOnAnnotation = false
-			t.cursorAnnoIdx = 0
-			jump := m.contentViewport.Height() / 2
-			m.moveCursorBy(t, -1, jump)
 			moved = true
 		case key.Matches(msg, keys.Top):
 			t.cursorOnAnnotation = false
@@ -4919,8 +4913,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "↑/↓,k/j · C-p/C-n", desc: "next/previous line"},
 		{keys: "←/→,h/l · C-b/C-f", desc: "scroll table/formula"},
 		{keys: "C-a/^ · C-e/$", desc: "table/formula left/right edge"},
-		{keys: "PgUp/PgDn · M-v/C-v", desc: "next/previous page (2-row overlap)"},
-		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page"},
+		{keys: "PgUp/PgDn · M-v/C-v", desc: "⇅ page (2-row overlap, cursor follows)"},
+		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page (cursor follows)"},
 		{keys: "Home/End,g/G,</> · M-</M->", desc: "top/bottom"},
 		{keys: "{/}", desc: "⇅ pending items"},
 		{keys: "[/]", desc: "⇅ all items"},

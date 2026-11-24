@@ -575,45 +575,74 @@ func (m *AppModel) selectChange(tabIndex int, chunk changeChunk, step int) {
 	}
 }
 
-// scrollFilePage leaves two rendered rows of overlap, like Emacs.  Keep the
-// current source position while visible, otherwise move it to the nearest edge.
-func (m *AppModel) scrollFilePage(direction int) {
+// scrollFilePage keeps the cursor visible, using the second rendered row from
+// the edge where the cursor scrolled out.  At a scroll limit, a half page
+// moves the cursor by lines and a full page moves it to the edge.
+func (m *AppModel) scrollFilePage(direction int, halfPage bool) {
 	height := m.contentViewport.Height()
-	m.contentViewport.SetYOffset(m.contentViewport.YOffset() + direction*max(1, height-2))
-	top := m.contentViewport.YOffset()
-	t := m.tab()
-	var first, last contentMouseTarget
-	found := false
-	for row := top; row < top+height; row++ {
-		x := 0
-		if row < len(m.contentLayout.columns) && m.contentLayout.columns[row].split > 0 && t.cursorSide != "old" {
-			x = m.contentLayout.columns[row].split + 3
-		}
-		target, ok := m.contentMouseTargetAt(x, row)
-		if !ok && x > 0 {
-			target, ok = m.contentMouseTargetAt(0, row)
-		}
-		if !ok || t.selecting && (target.annotation || target.side != t.selectSide) {
-			continue
-		}
-		if target.line == t.cursorLine && target.side == t.cursorSide && target.annotation == t.cursorOnAnnotation &&
-			(!target.annotation || target.annotationIndex == t.cursorAnnoIdx) {
-			return
-		}
-		if !found {
-			first, found = target, true
-		}
-		last = target
+	rows := max(1, height-2)
+	if halfPage {
+		rows = max(1, height/2)
 	}
-	if !found {
+	previousTop := m.contentViewport.YOffset()
+	// The viewport may count the trailing newline as an extra blank row.
+	if direction < 0 || previousTop+height < len(m.contentLayout.rows) {
+		m.contentViewport.SetYOffset(previousTop + direction*rows)
+	}
+	top := m.contentViewport.YOffset()
+	scrolled := top != previousTop
+	t := m.tab()
+	if !scrolled && halfPage {
+		line, side := t.cursorLine, t.cursorSide
+		m.moveCursorBy(t, direction, rows)
+		if line != t.cursorLine || side != t.cursorSide || t.cursorOnAnnotation || t.cursorOnForm {
+			t.cursorOnAnnotation, t.cursorOnForm, t.cursorAnnoIdx = false, false, 0
+			m.rebuildContent()
+			m.contentViewport.SetYOffset(top)
+		}
 		return
 	}
-	target := first
-	if direction < 0 {
-		target = last
+	step, inset := direction, 1
+	if !scrolled {
+		step, inset = -direction, 0
 	}
-	t.cursorLine, t.cursorSide = target.line, target.side
-	t.cursorOnAnnotation, t.cursorAnnoIdx = target.annotation, target.annotationIndex
+	edge := top
+	if step < 0 {
+		edge = top + height - 1
+	}
+	var nearest contentMouseTarget
+	bestDistance := height + 1
+	for offset := range height {
+		row := edge + step*offset
+		xPositions := []int{0}
+		if row < len(m.contentLayout.columns) && m.contentLayout.columns[row].split > 0 {
+			// Visit the preferred column last so it wins ties for this row.
+			xPositions = []int{0, m.contentLayout.columns[row].split + 3}
+			if t.cursorSide == "old" {
+				xPositions[0], xPositions[1] = xPositions[1], xPositions[0]
+			}
+		}
+		distance := max(inset-offset, offset-inset)
+		for _, x := range xPositions {
+			target, ok := m.contentMouseTargetAt(x, row)
+			if !ok || t.selecting && (target.annotation || target.side != t.selectSide) {
+				continue
+			}
+			if scrolled && target.line == t.cursorLine && target.side == t.cursorSide && target.annotation == t.cursorOnAnnotation &&
+				(!target.annotation || target.annotationIndex == t.cursorAnnoIdx) {
+				return
+			}
+			if distance <= bestDistance {
+				nearest, bestDistance = target, distance
+			}
+		}
+	}
+	if bestDistance == height+1 || (nearest.line == t.cursorLine && nearest.side == t.cursorSide &&
+		nearest.annotation == t.cursorOnAnnotation && nearest.annotationIndex == t.cursorAnnoIdx) {
+		return
+	}
+	t.cursorLine, t.cursorSide = nearest.line, nearest.side
+	t.cursorOnAnnotation, t.cursorAnnoIdx = nearest.annotation, nearest.annotationIndex
 	t.cursorOnForm = false
 	m.rebuildContent()
 	m.contentViewport.SetYOffset(top)

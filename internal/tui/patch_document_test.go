@@ -154,6 +154,17 @@ func TestPatchDocumentSourceInteractions(t *testing.T) {
 	}
 }
 
+func TestPatchDocumentPageScrollKeepsVisibleLeftCursor(t *testing.T) {
+	m := pressKey(patchDocumentApp(t, false), 'S')
+	m.tab().cursorLine = 6
+	m.rebuildContent()
+	m.contentViewport.SetHeight(5)
+	m, _ = updateApp(m, tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+	if m.tab().cursorLine != 6 || m.contentViewport.YOffset() != 2 {
+		t.Fatalf("cursor/offset = %d/%d, want 6/2", m.tab().cursorLine, m.contentViewport.YOffset())
+	}
+}
+
 func TestPatchDocumentNarrowAndOuterDiff(t *testing.T) {
 	m := patchDocumentApp(t, false)
 	m = pressKey(m, 'S')
