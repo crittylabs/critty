@@ -25,7 +25,7 @@ While a review waits for you, Critty tells the terminal it needs your input thro
 
 Work through a questionnaire: check related items together, write answers, choose paths, and rank priorities.  Check the **Answers** list before sending your choices back to the agent.
 
-https://github.com/user-attachments/assets/aa6966cb-a270-4c7b-adb7-e552d299ca15
+https://github.com/user-attachments/assets/c505db32-3ea5-4e56-beae-2e39723488c1
 
 For example:
 
