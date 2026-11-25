@@ -78,7 +78,7 @@ func (s *Session) LoadForms() (FormState, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return state, err
 	}
-	if state.Version != 1 && state.Version != 2 && state.Version != 3 {
+	if state.Version < 1 || state.Version > 4 {
 		return state, fmt.Errorf("unsupported form version: %d", state.Version)
 	}
 	return state, nil
@@ -101,17 +101,6 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 			return state, err
 		}
 		state.Documents = append(state.Documents, FormDocument{AttachedDocument: d, Items: items, Answers: form.Defaults(items)})
-		for _, item := range items {
-			if item.Type != "" || item.Default != "" || item.Checkbox || item.Choice && item.Text {
-				state.Version = 3
-				break
-			}
-			if item.Tags != nil || item.SelectAll != nil || item.Text || item.Rank {
-				// Readers of version 1 know neither select-all items without
-				// answers nor text and ranking answers.
-				state.Version = max(state.Version, 2)
-			}
-		}
 	}
 	data, err := json.Marshal(struct {
 		Input ReviewInput
@@ -142,7 +131,10 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 				if err != nil {
 					return state, err
 				}
-				if current != previous {
+				// Earlier versions treated all ranks as flat, even in nested Markdown.
+				// Preserve that answer when reopening the same source.
+				legacyRank := old.Version < 4 && item.Rank && d.Content == prev.Content
+				if current != previous && !legacyRank {
 					continue
 				}
 				if answer, ok := prev.Answers[item.ID]; ok {
@@ -151,10 +143,30 @@ func (s *Session) BeginForms(input ReviewInput, docs []AttachedDocument) (FormSt
 			}
 		}
 	}
+	state.Version = state.schemaVersion()
 	return state, s.SaveForms(state)
 }
 
+func (state FormState) schemaVersion() int {
+	version := 1
+	for _, doc := range state.Documents {
+		for _, item := range doc.Items {
+			switch {
+			case item.RankParent != "", item.RankFixed, item.RankMaxDepth != nil,
+				item.RankMinLevel != 0, item.RankMaxLevel != 0, len(doc.Answers[item.ID].RankParents) != 0:
+				return 4
+			case item.Type != "" || item.Default != "" || item.Checkbox || item.Choice && item.Text:
+				version = 3
+			case item.Tags != nil || item.SelectAll != nil || item.Text || item.Rank:
+				version = max(version, 2)
+			}
+		}
+	}
+	return version
+}
+
 func (s *Session) SaveForms(state FormState) error {
+	state.Version = state.schemaVersion()
 	return s.writeJSON("forms.json", state)
 }
 
@@ -220,6 +232,7 @@ func (state FormState) Missing() []string {
 }
 
 func (state FormState) Result(approved bool, round int) FormResult {
+	state.Version = state.schemaVersion()
 	approved = approved && len(state.Missing()) == 0
 	state.Documents = slices.Clone(state.Documents)
 	for i := range state.Documents {

@@ -53,11 +53,30 @@ Text is Markdown, entered and shown like a comment body.  Pasted images are save
 
 ## Rankings
 
-Until the reviewer moves an item or confirms the order, the answer stays `null`.  Critty displays a contiguous ranking in its answered order without changing the source.  A comment on a ranked item keeps that item's source `start_line` and `anchor`, so it names the item regardless of its displayed position; read the position from the answer.  Inside a reordered ranking, a comment covers one item, and a range reaching into it covers the whole ranking.
+Use the same `id` and a distinct `value` on each ranked item.  Indent a ranked item under another item of that field to give it a parent.
+
+```markdown
+- [ ] Prepare <!-- form: id=steps rank value=prepare -->
+  - [ ] Gather inputs <!-- form: id=steps rank value=inputs -->
+  - [ ] Validate inputs <!-- form: id=steps rank value=validate -->
+- [ ] Publish <!-- form: id=steps rank value=publish -->
+```
+
+A reviewer can reorder siblings and move a branch with all its descendants.  In a contiguous ranking, they can change a branch's depth and parent.  An outdented branch follows its former parent's remaining children.  Leave unrelated content outside the ranked list so the items can move together on screen.
+
+Add `fixed` to keep an item under its original parent and in order relative to other fixed siblings.  It can still receive children and travels with its branch when an ancestor moves.
+
+Add `max-depth=N` to limit how many levels can exist below that item.  Use `0` for no children, `1` for children only, and `2` to allow grandchildren.  The limit applies to the source and every move, including the moving item's descendants.  Without it, the item has no depth limit of its own.
+
+Add `min-level=N` to set the shallowest level where an item can appear.  Root items are level `1`, so `min-level=2` requires a parent.  Add `max-level=N` to set the deepest level where an item can appear.  With `min-level=2 max-level=2`, items can move between root parents and all stay at level 2.  Moving an ancestor must keep every descendant within its level limits.  If an up or down move cannot promote a branch, Critty looks for the next parent that can take it at its current depth.
+
+Until the reviewer moves an item or confirms the order, the answer stays `null`.  An answered ranking has a `value` array in depth-first order.  When it has children, the answer also has a `rank_parents` object that maps each child value to its parent value.  Root items are absent from the map.  The corresponding definitions use `rank_parent` for each item's original parent.
+
+Critty displays a contiguous ranking in its answered order without changing the source.  Colored brackets mark each ranking, using the same color if its items appear in separate runs.  A gold dot in the left gutter marks the first row of an unanswered ranking.  A lock marks fixed items.  A four-way handle marks items that can currently change depth.  Each ranked row shows its position among its siblings.  The Answers list includes the full path, such as `2-1` for the first child of the second root item.  A comment on a ranked item keeps that item's source `start_line` and `anchor`, so it names the item regardless of its displayed position; read the position from the answer.  Inside a reordered ranking, a comment covers one item, and a range reaching into it covers the whole ranking.
 
 ## Saved answers
 
-`forms.json` stores definitions, draft answers, and human provenance separately from source documents and comments.  Version 1 covers the basic controls; version 2 adds tags, select-all, text, and ranking.  Version 3 adds path types, optional existence restrictions, defaults, associated checkbox inputs, and per-choice input drafts.  Older readers reject unsupported versions or annotations.  Results keep standalone string input in `value` and associated input in `text`; the saved `drafts` map is omitted from results.
+`forms.json` stores definitions, draft answers, and human provenance separately from source documents and comments.  Version 1 covers the basic controls; version 2 adds tags, select-all, text, and ranking.  Version 3 adds path types, optional existence restrictions, defaults, associated checkbox inputs, and per-choice input drafts.  Version 4 adds ranked hierarchies in source definitions or answers, and `rank_fixed`, `rank_max_depth`, `rank_min_level`, and `rank_max_level` in definitions.  Older readers reject unsupported versions or annotations.  Results keep standalone string input in `value` and associated input in `text`; the saved `drafts` map is omitted from results.
 
 Changed field definitions, including an item's visible wording, reset their answers.  Put clarifications in surrounding prose or comment replies to preserve the field.  Changed target snapshots or attachment contents, order, or membership reset every `required` or `consent` field, including required choices and text fields.  Ordinary explicit-ID answers survive unchanged definitions in the same attachment, whose identity comes from its absolute source path; renaming or moving that file loses its answers.  A previous select-all does not select newly added candidates; leave their source checkboxes unchecked.
 

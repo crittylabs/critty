@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/crittylabs/critty/v2/internal/document"
@@ -730,6 +731,42 @@ func TestFormListModal(t *testing.T) {
 	}
 }
 
+func TestRankGroupBrackets(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Alpha <!-- form: id=first rank value=a -->
+- [ ] Beta <!-- form: id=first rank value=b -->
+- [ ] Gamma <!-- form: id=second rank value=c -->
+- [ ] Delta <!-- form: id=second rank value=d -->
+- [ ] Epsilon <!-- form: id=first rank value=e -->
+- [ ] Zeta <!-- form: id=first rank value=f -->
+
+Unrelated text
+
+- [ ] Eta <!-- form: id=first rank value=g -->
+`)
+	want := map[int]rune{1: '⎛', 2: '⎝', 3: '⎛', 4: '⎝', 5: '⎛', 6: '⎝', 10: '⎜'}
+	for _, numbers := range []bool{true, false} {
+		app.hideLineNumbers = !numbers
+		app.rebuildContent()
+		rows := strings.Split(app.contentViewport.GetContent(), "\n")
+		colors := rankGroupColors(2, lipgloss.LightDark(terminalIsDark))
+		column := app.sourceGutterWidth()
+		for line, bracket := range want {
+			runes, cells := renderedCells(rows[app.contentLayout.lineRanges[line].start])
+			group := 0
+			if line == 3 || line == 4 {
+				group = 1
+			}
+			if runes[column] != bracket || !sameColor(cells[column].Fg, colors[group]) {
+				t.Errorf("line %d with line numbers %t: got %q in %v, want %q in %v", line, numbers, runes[column], cells[column].Fg, bracket, colors[group])
+			}
+		}
+		if row := ansi.Strip(rows[app.contentLayout.lineRanges[8].start]); strings.ContainsAny(row, "⎛⎜⎝") {
+			t.Errorf("unrelated text has a bracket: %q", row)
+		}
+	}
+}
+
 func TestRankFieldReordersInPlace(t *testing.T) {
 	t.Parallel()
 	app, _ := formTestAppWithContent(t, "# Lead\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
@@ -745,8 +782,21 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 		}
 		return labels
 	}
-	if !strings.Contains(ansi.Strip(app.contentViewport.GetContent()), "Unranked") || len(app.missingForms()) != 0 {
-		t.Fatal("unranked field not marked")
+	assertPendingDot := func(want bool) {
+		t.Helper()
+		rows := strings.Split(app.contentViewport.GetContent(), "\n")
+		row := rows[app.contentLayout.lineRanges[2].start]
+		runes, styles := renderedCells(row)
+		if got := runes[0] == '●'; got != want {
+			t.Fatalf("unanswered dot present = %t, want %t in %q", got, want, row)
+		}
+		if want && !sameColor(styles[0].Fg, unreadDotStyle.GetForeground()) {
+			t.Fatalf("unanswered dot color = %v, want %v", styles[0].Fg, unreadDotStyle.GetForeground())
+		}
+	}
+	assertPendingDot(true)
+	if len(app.missingForms()) != 0 {
+		t.Fatal("optional ranking requires an answer")
 	}
 	if content := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(content, " 1  Alpha") || !strings.Contains(content, " 3  Gamma") {
 		t.Fatalf("unranked items lack numbers: %q", content)
@@ -756,6 +806,7 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"a", "b", "c"}) || !d.Answers["lead"].Human {
 		t.Fatalf("M-↑ on the first item did not confirm the order: %+v", d.Answers["lead"])
 	}
+	assertPendingDot(false)
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
 	if got := rows(); !slices.Equal(got, []string{"Beta", "Alpha", "Gamma", "After"}) {
 		t.Fatalf("display order: %v", got)
@@ -780,8 +831,8 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 	app = pressMouse(app, x, y)
 	_, y = contentScreenPoint(app, gutterWidth+4, rowTop[2])
 	app = moveMouse(app, x, y)
-	if d.Answers["lead"].Human {
-		t.Fatal("dragging saved before release")
+	if order, _ := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !slices.Equal(order, []string{"b", "a", "c"}) {
+		t.Fatal("dragging changed the saved answer before release")
 	}
 	app = releaseMouse(app, x, y)
 	if got := rows(); !slices.Equal(got, []string{"Beta", "Gamma", "Alpha", "After"}) {
@@ -832,6 +883,439 @@ func TestReorderedRegions(t *testing.T) {
 	} {
 		if got := reorderedRegions(tt.order); !slices.Equal(got, tt.want) {
 			t.Errorf("%v: got %v, want %v", tt.order, got, tt.want)
+		}
+	}
+}
+
+func TestNestedRankingMovesSubtrees(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `Overview
+- [ ] Alpha <!-- form: id=lead rank value=a -->
+  - [ ] Child <!-- form: id=lead rank value=child -->
+    - [ ] Grandchild <!-- form: id=lead rank value=grandchild -->
+  - [ ] Sibling <!-- form: id=lead rank value=sibling -->
+- [ ] Beta <!-- form: id=lead rank value=b -->
+  - [ ] Other child <!-- form: id=lead rank value=other -->
+`)
+	doc := app.forms.Document(app.tab().path)
+	check := func(values []string, parents map[string]string) {
+		t.Helper()
+		answer := doc.Answers["lead"]
+		order, ranked := form.RankOrder(doc.Items, "lead", answer)
+		if !ranked || !answer.Human || !slices.Equal(order, values) || !maps.Equal(answer.RankParents, parents) {
+			t.Fatalf("answer = %+v, want order %v and parents %v", answer, values, parents)
+		}
+	}
+	move := func(line int, key rune, mod tea.KeyMod) {
+		t.Helper()
+		app.tab().cursorLine = line
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: key, Mod: mod})
+		if app.tab().cursorLine != line {
+			t.Fatalf("cursor moved away from source line %d", line)
+		}
+	}
+	move(2, tea.KeyDown, tea.ModAlt)
+	check([]string{"b", "other", "a", "child", "grandchild", "sibling"},
+		map[string]string{"other": "b", "child": "a", "grandchild": "child", "sibling": "a"})
+	move(3, tea.KeyLeft, tea.ModAlt)
+	check([]string{"b", "other", "a", "sibling", "child", "grandchild"},
+		map[string]string{"other": "b", "grandchild": "child", "sibling": "a"})
+	move(3, tea.KeyUp, tea.ModAlt)
+	move(3, tea.KeyRight, tea.ModAlt)
+	check([]string{"b", "other", "child", "grandchild", "a", "sibling"},
+		map[string]string{"other": "b", "child": "b", "grandchild": "child", "sibling": "a"})
+
+	control := func(line int) mouseRect {
+		t.Helper()
+		for _, control := range app.contentLayout.formControls {
+			if control.line == line {
+				return control.rect
+			}
+		}
+		t.Fatalf("no control for line %d", line)
+		return mouseRect{}
+	}
+	drag := func(from, to int) {
+		t.Helper()
+		start, target := control(from), control(to)
+		x, y := contentScreenPoint(app, start.left, start.top)
+		tx, ty := contentScreenPoint(app, max(start.left+rankIndentWidth, target.left), target.top)
+		app = pressMouse(app, x, y)
+		app = moveMouse(app, tx, ty)
+		app = releaseMouse(app, tx, ty)
+	}
+	drag(6, 2)
+	values := []string{"a", "sibling", "b", "other", "child", "grandchild"}
+	parents := map[string]string{"b": "a", "other": "b", "child": "b", "grandchild": "child", "sibling": "a"}
+	check(values, parents)
+	if got := app.lineOrder(app.tab()); !slices.Equal(got[:7], []int{0, 1, 4, 5, 6, 2, 3}) {
+		t.Fatalf("visible source lines: %v", got)
+	}
+	root, grandchild := control(2), control(4)
+	if grandchild.left-root.left != 3*rankIndentWidth {
+		t.Fatalf("grandchild indentation: root %v, grandchild %v", root, grandchild)
+	}
+	drag(2, 4) // A branch cannot be dropped onto its own descendant.
+	check(values, parents)
+
+	saved, err := app.session.LoadForms()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := saved.Result(true, 1)
+	if result.Version != 4 || !maps.Equal(result.Document(doc.Path()).Answers["lead"].RankParents, parents) {
+		t.Fatalf("hierarchy missing from saved result: %+v", result)
+	}
+	app.tab().markdownSourceView = true
+	if got := app.lineOrder(app.tab()); !slices.Equal(got[:7], []int{0, 1, 2, 3, 4, 5, 6}) {
+		t.Fatalf("source view order changed: %v", got)
+	}
+}
+
+func TestFlatRankingCanGainAndLoseChildren(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Alpha <!-- form: id=lead rank value=a -->
+
+- [ ] Beta <!-- form: id=lead rank value=b -->
+  with a continuation
+`)
+	doc := app.forms.Document(app.tab().path)
+	app.tab().cursorLine = 3
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt})
+	if got := doc.Answers["lead"].RankParents["b"]; got != "a" {
+		t.Fatalf("Beta's parent is %q", got)
+	}
+	if got := app.forms.Result(true, 1).Version; got != 4 {
+		t.Fatalf("nested result version = %d", got)
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt})
+	if got := doc.Answers["lead"].RankParents; len(got) != 0 {
+		t.Fatalf("unexpected hierarchy: %v", got)
+	}
+	if got := app.forms.Result(true, 1).Version; got != 2 {
+		t.Fatalf("flat result version = %d", got)
+	}
+}
+
+func TestRankMovesPastParentAtSiblingBoundary(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		key  rune
+		line int
+		want []string
+	}{
+		{"first child up", tea.KeyUp, 3, []string{"root", "first", "leaf", "parent", "last", "next"}},
+		{"last child down", tea.KeyDown, 5, []string{"root", "parent", "first", "leaf", "last", "next"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, `- [ ] Root <!-- form: id=r rank value=root -->
+  - [ ] Parent <!-- form: id=r rank value=parent -->
+    - [ ] First <!-- form: id=r rank value=first -->
+      - [ ] Leaf <!-- form: id=r rank value=leaf -->
+    - [ ] Last <!-- form: id=r rank value=last -->
+  - [ ] Next <!-- form: id=r rank value=next -->
+`)
+			app.tab().cursorLine = tt.line
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tt.key, Mod: tea.ModAlt})
+			d := app.forms.Document(app.tab().path)
+			answer := d.Answers["r"]
+			order, ranked := form.RankOrder(d.Items, "r", answer)
+			parents := map[string]string{"parent": "root", "first": "parent", "leaf": "first", "last": "parent", "next": "root"}
+			if tt.key == tea.KeyUp {
+				parents["first"] = "root"
+			} else {
+				parents["last"] = "root"
+			}
+			if !ranked || !slices.Equal(order, tt.want) || !maps.Equal(answer.RankParents, parents) {
+				t.Fatalf("move = %v with parents %v, want %v with %v", order, answer.RankParents, tt.want, parents)
+			}
+		})
+	}
+}
+
+func TestRankHorizontalDragChangesDepth(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] First <!-- form: id=r rank value=first -->
+  - [ ] Child <!-- form: id=r rank value=child -->
+  - [ ] Sibling <!-- form: id=r rank value=sibling -->
+- [ ] Second <!-- form: id=r rank value=second -->
+  - [ ] Leaf <!-- form: id=r rank value=leaf -->
+`)
+	d := app.forms.Document(app.tab().path)
+	drag := func(line, delta int) {
+		t.Helper()
+		for _, control := range app.contentLayout.formControls {
+			if control.line == line {
+				x, y := contentScreenPoint(app, control.rect.left, control.rect.top)
+				before := ansi.Strip(app.contentViewport.GetContent())
+				app = pressMouse(app, x, y)
+				app = moveMouse(app, x+delta, y)
+				if line == 4 {
+					during := ansi.Strip(app.contentViewport.GetContent())
+					for _, pair := range []string{" 2  Second", " 3  Second", " 1  Leaf"} {
+						if strings.Contains(during, pair) != strings.Contains(before, pair) {
+							t.Fatalf("number changed during drag: %q", pair)
+						}
+					}
+				}
+				app = moveMouse(app, x+2*delta, y) // Repeat motion changes depth only once.
+				app = releaseMouse(app, x+2*delta, y)
+				return
+			}
+		}
+		t.Fatalf("no control at line %d", line)
+	}
+	check := func(parent string, want []int) {
+		t.Helper()
+		answer := d.Answers["r"]
+		if answer.RankParents["second"] != parent || answer.RankParents["leaf"] != "second" {
+			t.Fatalf("wrong drag answer: %+v", answer)
+		}
+		if order := app.lineOrder(app.tab()); !slices.Equal(order[:len(want)], want) {
+			t.Fatalf("display order: %v, want %v", order, want)
+		}
+	}
+	drag(2, rankIndentWidth) // First child cannot indent.
+	if d.Answers["r"].Human {
+		t.Fatal("an invalid depth change confirmed the ranking")
+	}
+	drag(4, rankIndentWidth)
+	check("first", []int{0, 1, 2, 3, 4})
+	if content := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(content, " 3  Second") || !strings.Contains(content, " 1  Leaf") {
+		t.Fatalf("drop did not update hierarchy numbers: %q", content)
+	}
+	drag(4, -rankIndentWidth)
+	check("", []int{0, 1, 2, 3, 4})
+}
+
+func TestRankHorizontalDragOutdentsPastRemainingSiblings(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Parent <!-- form: id=r rank value=parent -->
+  - [ ] Branch <!-- form: id=r rank value=branch -->
+    - [ ] Leaf <!-- form: id=r rank value=leaf -->
+  - [ ] Sibling <!-- form: id=r rank value=sibling -->
+- [ ] Next <!-- form: id=r rank value=next -->
+`)
+	for _, control := range app.contentLayout.formControls {
+		if control.line != 2 {
+			continue
+		}
+		x, y := contentScreenPoint(app, control.rect.left, control.rect.top)
+		app = pressMouse(app, x, y)
+		app = moveMouse(app, x-2, y)
+		app = moveMouse(app, x-3, y)
+		app = releaseMouse(app, x-3, y)
+		d := app.forms.Document(app.tab().path)
+		answer := d.Answers["r"]
+		order, ranked := form.RankOrder(d.Items, "r", answer)
+		want := []string{"parent", "sibling", "branch", "leaf", "next"}
+		if !ranked || !slices.Equal(order, want) || !maps.Equal(answer.RankParents, map[string]string{"leaf": "branch", "sibling": "parent"}) {
+			t.Fatalf("outdent = %v with parents %v", order, answer.RankParents)
+		}
+		return
+	}
+	t.Fatal("no control for Branch")
+}
+
+func TestRankAcceptsGhosttyOptionArrowSequences(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] First <!-- form: id=r rank value=first -->
+- [ ] Second <!-- form: id=r rank value=second -->
+`)
+	app.tab().cursorLine = 2
+	d := app.forms.Document(app.tab().path)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
+	if parent := d.Answers["r"].RankParents["second"]; parent != "first" {
+		t.Fatalf("M-f set parent to %q", parent)
+	}
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
+	if parent := d.Answers["r"].RankParents["second"]; parent != "" {
+		t.Fatalf("M-b left parent at %q", parent)
+	}
+}
+
+func TestRankFixedAndDepthLimits(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Inbox <!-- form: id=r rank value=inbox fixed max-depth=1 -->
+- [ ] Review <!-- form: id=r rank value=review -->
+  - [ ] Verify <!-- form: id=r rank value=verify -->
+- [ ] Draft <!-- form: id=r rank value=draft -->
+`)
+	d := app.forms.Document(app.tab().path)
+	app.tab().cursorLine = 1
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
+	if d.Answers["r"].Human || !strings.Contains(app.locationError, "fixed") {
+		t.Fatalf("fixed keyboard move: %+v, %s", d.Answers["r"], app.locationError)
+	}
+	app.tab().cursorLine = 2
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt})
+	if d.Answers["r"].Human || !strings.Contains(app.locationError, "Inbox") {
+		t.Fatalf("over-depth keyboard move: %+v, %s", d.Answers["r"], app.locationError)
+	}
+	control := func(line int) mouseRect {
+		t.Helper()
+		for _, control := range app.contentLayout.formControls {
+			if control.line == line {
+				return control.rect
+			}
+		}
+		t.Fatalf("no control at line %d", line)
+		return mouseRect{}
+	}
+	drag := func(from, to int) {
+		t.Helper()
+		origin, target := control(from), control(to)
+		x, y := contentScreenPoint(app, origin.left, origin.top)
+		tx, ty := contentScreenPoint(app, max(origin.left+rankIndentWidth, target.left), target.top)
+		app = pressMouse(app, x, y)
+		app = moveMouse(app, tx, ty)
+		app = releaseMouse(app, tx, ty)
+	}
+	drag(1, 4)
+	if d.Answers["r"].Human {
+		t.Fatal("drag moved fixed item")
+	}
+	drag(2, 1)
+	if d.Answers["r"].Human || !strings.Contains(app.locationError, "Inbox") {
+		t.Fatalf("over-depth drop: %+v, %s", d.Answers["r"], app.locationError)
+	}
+	drag(4, 1)
+	if parent := d.Answers["r"].RankParents["draft"]; parent != "inbox" {
+		t.Fatalf("valid drop set parent to %q", parent)
+	}
+}
+
+func TestVerticalRankMovesSkipParentsThatCannotAcceptBranch(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, source string
+		line         int
+		key          rune
+		want         []string
+	}{
+		{
+			name: "down to first child",
+			source: `- [ ] Source <!-- form: id=r rank value=source fixed -->
+  - [ ] Branch <!-- form: id=r rank value=branch min-level=2 -->
+    - [ ] Leaf <!-- form: id=r rank value=leaf -->
+- [ ] Shallow <!-- form: id=r rank value=shallow fixed max-depth=1 -->
+- [ ] Destination <!-- form: id=r rank value=destination fixed max-depth=2 -->
+  - [ ] Peer <!-- form: id=r rank value=peer -->
+`,
+			line: 2,
+			key:  tea.KeyDown,
+			want: []string{"source", "shallow", "destination", "branch", "leaf", "peer"},
+		},
+		{
+			name: "up to last child when descendant requires its depth",
+			source: `- [ ] Destination <!-- form: id=r rank value=destination fixed max-depth=2 -->
+  - [ ] Peer <!-- form: id=r rank value=peer -->
+- [ ] Shallow <!-- form: id=r rank value=shallow fixed max-depth=1 -->
+- [ ] Source <!-- form: id=r rank value=source fixed -->
+  - [ ] Branch <!-- form: id=r rank value=branch -->
+    - [ ] Leaf <!-- form: id=r rank value=leaf min-level=3 -->
+`,
+			line: 5,
+			key:  tea.KeyUp,
+			want: []string{"destination", "peer", "branch", "leaf", "shallow", "source"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, tt.source)
+			d := app.forms.Document(app.tab().path)
+			app.tab().cursorLine = tt.line
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt})
+			if d.Answers["r"].Human || !strings.Contains(app.locationError, "must stay") {
+				t.Fatalf("disallowed outdent: %+v, %s", d.Answers["r"], app.locationError)
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: tt.key, Mod: tea.ModAlt})
+			answer := d.Answers["r"]
+			order, ranked := form.RankOrder(d.Items, "r", answer)
+			wantParents := map[string]string{"branch": "destination", "leaf": "branch", "peer": "destination"}
+			if !ranked || !slices.Equal(order, tt.want) || !maps.Equal(answer.RankParents, wantParents) {
+				t.Fatalf("move = %v with parents %v, want %v with %v", order, answer.RankParents, tt.want, wantParents)
+			}
+			if app.tab().cursorLine != tt.line || app.locationError != "" {
+				t.Fatalf("cursor = %d, error = %q", app.tab().cursorLine, app.locationError)
+			}
+		})
+	}
+}
+
+func TestFixedRankLockReplacesDragHandle(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		font icons.Set
+	}{
+		{"plain", icons.Plain},
+		{"nerd", icons.Nerd},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, `- [ ] Inbox <!-- form: id=r rank value=inbox fixed -->
+  - [ ] Review <!-- form: id=r rank value=review -->
+`)
+			app.icons = tt.font
+			check := func(wantDot bool) {
+				t.Helper()
+				app.rebuildContent()
+				rows := strings.Split(app.contentViewport.GetContent(), "\n")
+				row := rows[app.contentLayout.lineRanges[1].start]
+				handle := app.sourceGutterWidth() + 1
+				if dot := ansi.Strip(ansi.Cut(row, 0, 1)) == "●"; dot != wantDot {
+					t.Fatalf("left gutter dot = %t, want %t", dot, wantDot)
+				}
+				if got, want := ansi.Strip(ansi.Cut(row, handle, handle+1)), tt.font.Glyph(icons.Lock, "▣"); got != want {
+					t.Fatalf("fixed item handle = %q, want %q", got, want)
+				}
+				movable := rows[app.contentLayout.lineRanges[2].start]
+				handle += rankIndentWidth
+				if got, want := ansi.Strip(ansi.Cut(movable, handle, handle+1)), tt.font.Glyph(icons.MoveFourDirections, "✥"); got != want {
+					t.Fatalf("movable item handle = %q, want %q", got, want)
+				}
+				if strings.Contains(ansi.Strip(row), "Fixed") {
+					t.Fatal("fixed item still has label text")
+				}
+			}
+			check(true)
+			app.toggleLineNumbers()
+			check(true)
+			app.toggleForm(1)
+			check(false)
+		})
+	}
+}
+
+func TestRankHandleReflectsAvailableDepthChanges(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Inbox <!-- form: id=r rank value=inbox fixed -->
+  - [ ] Pinned level <!-- form: id=r rank value=pinned min-level=2 max-level=2 -->
+- [ ] Archive <!-- form: id=r rank value=archive fixed max-depth=0 -->
+- [ ] Review <!-- form: id=r rank value=review -->
+- [ ] Draft <!-- form: id=r rank value=draft -->
+`)
+	for _, font := range []icons.Set{icons.Plain, icons.Nerd} {
+		app.icons = font
+		app.rebuildContent()
+		rows := strings.Split(app.contentViewport.GetContent(), "\n")
+		for i, want := range []string{
+			font.Glyph(icons.Lock, "▣"), font.Glyph(icons.MoveVertical, "↕"),
+			font.Glyph(icons.Lock, "▣"), font.Glyph(icons.MoveVertical, "↕"),
+			font.Glyph(icons.MoveFourDirections, "✥"),
+		} {
+			start := app.sourceGutterWidth() + 1
+			if i == 1 {
+				start += rankIndentWidth
+			}
+			row := rows[app.contentLayout.lineRanges[i+1].start]
+			if got := ansi.Strip(ansi.Cut(row, start, start+1)); got != want {
+				t.Errorf("line %d handle = %q, want %q", i+1, got, want)
+			}
+			wantNumber := []string{"1", "1", "2", "3", "4"}[i]
+			if got := ansi.Strip(ansi.Cut(row, start+2, start+5)); got != " "+wantNumber+" " {
+				t.Errorf("line %d rank badge shifted: %q", i+1, got)
+			}
 		}
 	}
 }

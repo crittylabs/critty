@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/crittylabs/critty/v2/internal/form"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
 	"github.com/crittylabs/critty/v2/internal/icons"
 )
@@ -300,6 +302,9 @@ func (m *AppModel) rebuildContent() {
 		}
 	}
 	sourceLineCount := t.doc.SourceLineCount()
+	formDoc := m.forms.Document(t.path)
+	rankGroups := map[string]int{}
+	var rankGroupRows []rankGroupRow
 	for _, i := range m.lineOrder(t) {
 		line := t.doc.Lines[i]
 		lineNum := i + 1
@@ -321,13 +326,27 @@ func (m *AppModel) rebuildContent() {
 		isSidebarHighlight = isSidebarHighlight && focus == nil
 		isChanged := t.changedLines != nil && t.changedLines[lineNum]
 		inlineChanges := t.inlineChanges[lineNum]
-		formBackground := formLineBackground(focus, isSidebarHighlight)
+		formItem := m.formRows[t.path][lineNum].item
+		formBackground := formLineBackground(focus, isSidebarHighlight, formItem)
 		decorate := m.isearchDecorator(lineRef{line: lineNum})
 		highlight := func(s string) string {
 			if decorate != nil {
 				s, _ = decorate(s)
 			}
 			return s
+		}
+
+		unansweredRank := false
+		rankGroup := -1
+		if !t.markdownSourceView && formDoc != nil && formItem != nil && formItem.Rank {
+			var seen bool
+			rankGroup, seen = rankGroups[formItem.ID]
+			if !seen {
+				rankGroup = len(rankGroups)
+				rankGroups[formItem.ID] = rankGroup
+				_, ranked := form.RankTree(formDoc.Items, formItem.ID, formDoc.Answers[formItem.ID])
+				unansweredRank = !ranked
+			}
 		}
 
 		// Marker column
@@ -340,6 +359,8 @@ func (m *AppModel) rebuildContent() {
 			}
 		} else if isChanged {
 			marker = markers.added
+		} else if unansweredRank {
+			marker = markers.unansweredRank
 		} else {
 			marker = " "
 		}
@@ -406,7 +427,7 @@ func (m *AppModel) rebuildContent() {
 				wrappedLines = append(wrappedLines, row)
 			}
 			for wi, row := range wrappedLines {
-				prefix := m.sourceRowGutter(lineNum, false, wi, marker, numStr)
+				prefix := m.sourceRowGutter(lineNum, false, min(wi, 1), marker, numStr)
 				if columns == nil {
 					layout.addTextSpan(len(layout.rows), 0, 0, prefix+row, lineTarget)
 					span := &layout.textSpans[len(layout.textSpans)-1]
@@ -422,29 +443,35 @@ func (m *AppModel) rebuildContent() {
 					tb.viewport.match = match
 				}
 			}
-		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground); interactive {
+		} else if formLine, checkboxX, interactive := m.formDisplayLine(lineNum, line, formBackground, focus != nil); interactive {
 			if focus != nil || isSidebarHighlight {
 				formLine = inlineBackground(formBackground, formLine)
 			}
-			for wi, row := range strings.Split(lipgloss.Wrap(highlight(formLine), textWidth, ""), "\n") {
+			width, left := textWidth, m.sourceGutterWidth()
+			if rankGroup >= 0 {
+				width--
+				left++
+			}
+			for wi, row := range strings.Split(lipgloss.Wrap(highlight(formLine), width, ""), "\n") {
 				if checkboxX >= 0 {
 					plain := ansi.Strip(row)
 					start := lipgloss.Width(plain[:len(plain)-len(strings.TrimLeft(plain, " \t"))])
 					if wi == 0 {
 						start = checkboxX
 					}
-					end := contentWidth - m.sourceGutterWidth()
+					end := contentWidth - left
 					if start < end {
 						layout.formControls = append(layout.formControls, formControl{line: lineNum,
-							rect: mouseRect{left: m.sourceGutterWidth() + start, right: m.sourceGutterWidth() + end, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+							rect: mouseRect{left: left + start, right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
 					}
-					row += formBackground.Render(strings.Repeat(" ", max(0, textWidth-lipgloss.Width(row))))
+					row += formBackground.Render(strings.Repeat(" ", max(0, width-lipgloss.Width(row))))
 				}
-				if wi == 0 {
-					layout.appendBlock(&b, m.sourceRowGutter(lineNum, false, 0, marker, numStr)+row, lineTarget)
-				} else {
-					layout.appendBlock(&b, m.sourceRowGutter(lineNum, false, 1, marker, numStr)+row, lineTarget)
+				prefix := m.sourceRowGutter(lineNum, false, wi, marker, numStr)
+				if rankGroup >= 0 {
+					rankGroupRows = append(rankGroupRows, rankGroupRow{row: len(layout.rows), offset: b.Len() + len(prefix), group: rankGroup})
+					prefix += " "
 				}
+				layout.appendBlock(&b, prefix+row, lineTarget)
 			}
 			for _, row := range m.formTextRows(lineNum, textWidth) {
 				if item := m.formRows[t.path][lineNum].item; item != nil {
@@ -529,7 +556,7 @@ func (m *AppModel) rebuildContent() {
 
 	m.mapMathRanges(&layout)
 	m.contentLayout = layout
-	m.setRenderedSourceContent(b.String(), contentWidth, groups)
+	m.setRenderedSourceContent(addRankGroupBrackets(b.String(), rankGroupRows, len(rankGroups)), contentWidth, groups)
 }
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
@@ -589,12 +616,16 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 	return b.String(), button
 }
 
-func formLineBackground(focus *lipgloss.Style, highlighted bool) lipgloss.Style {
+func formLineBackground(focus *lipgloss.Style, highlighted bool, item *form.Item) lipgloss.Style {
 	switch {
 	case focus != nil:
 		return formChip.label.Background(focus.GetBackground())
 	case highlighted:
 		return sidebarHighlightBg
+	case item != nil && item.RankFixed:
+		return formChip.label.Background(formChip.fixedRankBackground)
+	case item != nil && item.Rank:
+		return formChip.label.Background(formChip.rankBackground)
 	}
 	return formChip.label
 }
@@ -755,14 +786,15 @@ func highlightMarkdownWith(line string, inline func(string) string) string {
 
 // gutterMarkers holds the one-column gutter markers rendered once per rebuild.
 type gutterMarkers struct {
-	overlap, annotated, added, deleted string
+	overlap, annotated, added, deleted, unansweredRank string
 }
 
 func renderGutterMarkers() gutterMarkers {
 	return gutterMarkers{
 		overlap:   gutterOverlap.Render("◆"),
 		annotated: annotationGutter.Render("■"), added: diffAddedGutter.Render("+"),
-		deleted: diffDeletedGutter.Render("-"),
+		deleted:        diffDeletedGutter.Render("-"),
+		unansweredRank: unreadDotStyle.Render("●"),
 	}
 }
 
@@ -822,20 +854,33 @@ func inlineColorsWithOverride(style lipgloss.Style, content string, foreground, 
 			reapplyBg, reapplyFg = true, true
 			return
 		}
-		params.ForEach(0, func(_ int, param int, _ bool) {
+		for i := 0; i < len(params); i++ {
+			param, _, _ := params.Param(i, 0)
 			switch {
+			case param == 38 || param == 48 || param == 58:
+				// RGB components and palette indices are operands, not SGR commands.
+				var c color.Color
+				if n := ansi.ReadStyleColor(params[i:], &c); n > 0 {
+					i += n - 1
+					switch param {
+					case 38:
+						reapplyFg = false
+					case 48:
+						reapplyBg = false
+					}
+				}
 			case param == 0:
 				reapplyBg, reapplyFg = true, true
 			case param == 49:
 				reapplyBg = true
 			case param == 39:
 				reapplyFg = true
-			case param == 48, param >= 40 && param <= 47, param >= 100 && param <= 107:
+			case param >= 40 && param <= 47 || param >= 100 && param <= 107:
 				reapplyBg = false
-			case param == 38, param >= 30 && param <= 37, param >= 90 && param <= 97:
+			case param >= 30 && param <= 37 || param >= 90 && param <= 97:
 				reapplyFg = false
 			}
-		})
+		}
 	}})
 	for i := range len(content) {
 		parser.Advance(content[i])

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mattn/go-shellwords"
@@ -55,7 +56,12 @@ type Item struct {
 	// Checkbox keeps a boolean control alongside an associated input.
 	Checkbox bool `json:"checkbox,omitempty"`
 	// Rank makes items sharing an ID one field ordered by the reviewer.
-	Rank bool `json:"rank,omitempty"`
+	Rank         bool   `json:"rank,omitempty"`
+	RankParent   string `json:"rank_parent,omitempty"`
+	RankFixed    bool   `json:"rank_fixed,omitempty"`
+	RankMaxDepth *int   `json:"rank_max_depth,omitempty"`
+	RankMinLevel int    `json:"rank_min_level,omitempty"`
+	RankMaxLevel int    `json:"rank_max_level,omitempty"`
 }
 
 type Answer struct {
@@ -71,6 +77,8 @@ type Answer struct {
 	Text string `json:"text,omitempty"`
 	// Drafts holds per-choice input values while another option is selected.
 	Drafts map[string]string `json:"drafts,omitempty"`
+	// RankParents maps each ranked child to the value of its parent.
+	RankParents map[string]string `json:"rank_parents,omitempty"`
 }
 
 // Parse uses the Markdown AST so examples, escaped lists, and quotations are inert.
@@ -78,6 +86,7 @@ func Parse(source string) ([]Item, error) {
 	data := []byte(source)
 	root := parser.New(parser.WithExtensions(extension.TaskListItemParser)).Parse(data)
 	var items []Item
+	rankItems := map[ast.Node]Item{}
 	err := ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		status, ok := extension.TaskStatusOf(n)
 		if !entering || !ok {
@@ -162,6 +171,13 @@ func Parse(source string) ([]Item, error) {
 				return ast.WalkStop, fmt.Errorf("line %d: rank requires a value and cannot be consent, text, or tagged", item.Line)
 			}
 			item.Choice = false
+			for parent := n.Parent(); parent != nil; parent = parent.Parent() {
+				if ranked, ok := rankItems[parent]; ok && ranked.ID == item.ID {
+					item.RankParent = ranked.Value
+					break
+				}
+			}
+			rankItems[n] = item
 		}
 		if item.SelectAll != nil && (item.Required || item.Consent || item.Choice || item.Text) {
 			return ast.WalkStop, fmt.Errorf("line %d: select-all cannot be required, consent, text, or have a value", item.Line)
@@ -206,8 +222,15 @@ func Parse(source string) ([]Item, error) {
 		groups[item.ID] = append(groups[item.ID], item)
 	}
 	for id, group := range groups {
-		if group[0].Rank && len(group) < 2 {
+		if !group[0].Rank {
+			continue
+		}
+		if len(group) < 2 {
 			return nil, fmt.Errorf("line %d: ranking %q needs at least two items", group[0].Line, id)
+		}
+		nodes, definitions := rankSource(group, id)
+		if err := validateRankConstraints(nodes, definitions); err != nil {
+			return nil, fmt.Errorf("ranking %q: %w", id, err)
 		}
 	}
 	if _, err := Targets(items); err != nil {
@@ -282,6 +305,24 @@ func attributes(item *Item, source string) error {
 			item.Default = value
 		case key == "rank" && !assigned:
 			item.Rank = true
+		case key == "fixed" && !assigned:
+			item.RankFixed = true
+		case key == "max-depth" && assigned:
+			depth, err := strconv.Atoi(value)
+			if err != nil || depth < 0 {
+				return fmt.Errorf("max-depth must be a non-negative integer")
+			}
+			item.RankMaxDepth = &depth
+		case (key == "min-level" || key == "max-level") && assigned:
+			level, err := strconv.Atoi(value)
+			if err != nil || level < 1 {
+				return fmt.Errorf("%s must be a positive integer", key)
+			}
+			if key == "min-level" {
+				item.RankMinLevel = level
+			} else {
+				item.RankMaxLevel = level
+			}
 		case key == "tags" && assigned:
 			if item.Tags, err = tagList(key, value); err != nil {
 				return err
@@ -293,6 +334,12 @@ func attributes(item *Item, source string) error {
 		default:
 			return fmt.Errorf("invalid form attribute %q", word)
 		}
+	}
+	if !item.Rank && (item.RankFixed || item.RankMaxDepth != nil || item.RankMinLevel != 0 || item.RankMaxLevel != 0) {
+		return fmt.Errorf("fixed, max-depth, min-level, and max-level require rank")
+	}
+	if item.RankMaxLevel != 0 && item.RankMinLevel > item.RankMaxLevel {
+		return fmt.Errorf("min-level cannot exceed max-level")
 	}
 	if seen["type"] && seen["text"] {
 		return fmt.Errorf("type and text cannot be combined")
@@ -430,24 +477,158 @@ func SelectAnswer(items []Item, item Item, previous Answer, selected bool, answe
 	return answer
 }
 
-// RankOrder returns the values of a ranking in the answered order, or in
-// source order with ranked false until a complete ranking is answered.
-func RankOrder(items []Item, id string, answer Answer) (values []string, ranked bool) {
+// RankNode is an item in display order, with its parent and derived depth.
+type RankNode struct {
+	Value, Parent string
+	Depth         int
+}
+
+func rankSource(items []Item, id string) ([]RankNode, map[string]Item) {
+	var source []RankNode
+	definitions := map[string]Item{}
+	depths := map[string]int{"": -1}
 	for _, item := range items {
 		if item.ID == id && item.Rank {
-			values = append(values, item.Value)
+			depth := depths[item.RankParent] + 1
+			source = append(source, RankNode{Value: item.Value, Parent: item.RankParent, Depth: depth})
+			depths[item.Value] = depth
+			definitions[item.Value] = item
 		}
 	}
-	answered := rankValues(answer.Value)
-	if len(answered) != len(values) {
-		return values, false
+	return source, definitions
+}
+
+func decodeRank(definitions map[string]Item, answer Answer) ([]RankNode, error) {
+	order := rankValues(answer.Value)
+	if len(order) == 0 || len(order) != len(definitions) {
+		return nil, fmt.Errorf("incomplete ranking")
 	}
-	for _, value := range values {
-		if !slices.Contains(answered, value) {
-			return values, false
+	for value, parent := range answer.RankParents {
+		if _, found := definitions[value]; !found || parent == "" {
+			return nil, fmt.Errorf("invalid parent for %q", value)
 		}
 	}
-	return answered, true
+	seen := map[string]bool{}
+	var ancestors []string
+	nodes := make([]RankNode, 0, len(order))
+	for _, value := range order {
+		if _, ok := definitions[value]; !ok || seen[value] {
+			return nil, fmt.Errorf("invalid ranked item %q", value)
+		}
+		seen[value] = true
+		parent := answer.RankParents[value]
+		depth := 0
+		if parent != "" {
+			index := slices.Index(ancestors, parent)
+			if index < 0 {
+				return nil, fmt.Errorf("invalid parent for %q", value)
+			}
+			depth = index + 1
+		}
+		ancestors = append(ancestors[:depth], value)
+		nodes = append(nodes, RankNode{Value: value, Parent: parent, Depth: depth})
+	}
+	return nodes, validateRankConstraints(nodes, definitions)
+}
+
+func validateRankConstraints(nodes []RankNode, definitions map[string]Item) error {
+	var ancestors []Item
+	lastFixed := map[string]int{}
+	for _, node := range nodes {
+		item := definitions[node.Value]
+		if node.Depth+1 < item.RankMinLevel {
+			return fmt.Errorf("%q must stay at level %d or deeper", item.Label, item.RankMinLevel)
+		}
+		if item.RankMaxLevel != 0 && node.Depth+1 > item.RankMaxLevel {
+			return fmt.Errorf("%q must stay at level %d or shallower", item.Label, item.RankMaxLevel)
+		}
+		if item.RankFixed {
+			if node.Parent != item.RankParent || item.Line <= lastFixed[node.Parent] {
+				return fmt.Errorf("%q is fixed", item.Label)
+			}
+			lastFixed[node.Parent] = item.Line
+		}
+		ancestors = ancestors[:node.Depth]
+		for depth, parent := range ancestors {
+			if limit := parent.RankMaxDepth; limit != nil && node.Depth-depth > *limit {
+				return fmt.Errorf("%q allows at most %d levels below it", parent.Label, *limit)
+			}
+		}
+		ancestors = append(ancestors, item)
+	}
+	return nil
+}
+
+// CheckRank validates a proposed order and its parent relationships.
+func CheckRank(items []Item, id string, answer Answer) error {
+	_, definitions := rankSource(items, id)
+	_, err := decodeRank(definitions, answer)
+	return err
+}
+
+// RankTree returns a complete answer, or the source tree if the answer is incomplete.
+func RankTree(items []Item, id string, answer Answer) ([]RankNode, bool) {
+	source, definitions := rankSource(items, id)
+	if nodes, err := decodeRank(definitions, answer); err == nil {
+		return nodes, true
+	}
+	return source, false
+}
+
+// RankOrder returns values in depth-first order.
+func RankOrder(items []Item, id string, answer Answer) ([]string, bool) {
+	nodes, ranked := RankTree(items, id, answer)
+	values := make([]string, len(nodes))
+	for i, node := range nodes {
+		values[i] = node.Value
+	}
+	return values, ranked
+}
+
+// RankNumbers numbers the siblings at each level of a depth-first ranking.
+func RankNumbers(nodes []RankNode) []string {
+	numbers := make([]string, len(nodes))
+	var levels []int
+	for i, node := range nodes {
+		if node.Depth == len(levels) {
+			levels = append(levels, 0)
+		} else {
+			levels = levels[:node.Depth+1]
+		}
+		levels[node.Depth]++
+		var number []byte
+		for j, part := range levels {
+			if j != 0 {
+				number = append(number, '-')
+			}
+			number = strconv.AppendInt(number, int64(part), 10)
+		}
+		numbers[i] = string(number)
+	}
+	return numbers
+}
+
+// RankLabels formats an answered ranking for the answer list and archive.
+func RankLabels(items []Item, id string, answer Answer) []string {
+	nodes, ranked := RankTree(items, id, answer)
+	if !ranked {
+		return nil
+	}
+	labels := map[string]string{}
+	for _, item := range items {
+		if item.Rank && item.ID == id {
+			labels[item.Value] = item.Label
+		}
+	}
+	numbers := RankNumbers(nodes)
+	result := make([]string, len(nodes))
+	for i, node := range nodes {
+		result[i] = numbers[i] + ". " + labels[node.Value]
+		if node.Parent != "" {
+			result[i] += " (under " + labels[node.Parent] + ")"
+		}
+	}
+	return result
 }
 
 // rankValues accepts answers decoded from JSON as well as those set in memory.

@@ -547,17 +547,8 @@ func (w *archiveWriter) answers(main *strings.Builder, session *review.Session, 
 		switch {
 		case field.Rank:
 			state, label = "○", field.ID
-			if order, ranked := form.RankOrder(d.Items, field.ID, answer); ranked {
-				state = "✓"
-				var labels []string
-				for i, value := range order {
-					for _, item := range d.Items {
-						if item.ID == field.ID && item.Value == value {
-							labels = append(labels, fmt.Sprintf("%d. %s", i+1, item.Label))
-						}
-					}
-				}
-				label = field.ID + ": " + strings.Join(labels, ", ")
+			if labels := form.RankLabels(d.Items, field.ID, answer); len(labels) > 0 {
+				state, label = "✓", field.ID+": "+strings.Join(labels, ", ")
 			}
 		case field.Choice:
 			state = "○"

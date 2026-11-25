@@ -7,6 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/crittylabs/critty/v2/internal/icons"
 	"github.com/crittylabs/critty/v2/internal/review"
 )
 
@@ -128,6 +129,61 @@ func TestSourceLineBackgroundsCoverGutterAndPadding(t *testing.T) {
 			_, cells := renderedCells(view[row])
 			if !sameColor(cells[app.contentPaneWidth()-2].Bg, selectedLineBg.GetBackground()) {
 				t.Fatal("wrap limit stopped the selection background before the pane border")
+			}
+		})
+	}
+}
+
+func TestRankCursorOverridesFixedAndMovableColors(t *testing.T) {
+	previous := terminalIsDark
+	t.Cleanup(func() { initAdaptiveStyles(previous) })
+	for _, dark := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dark=%t", dark), func(t *testing.T) {
+			initAdaptiveStyles(dark)
+			app, _ := formTestAppWithContent(t, `- [ ] Inbox <!-- form: id=r rank value=inbox fixed -->
+- [ ] Draft <!-- form: id=r rank value=draft -->
+`)
+			for _, current := range []int{1, 2} {
+				app.tab().cursorLine = current
+				app.rebuildContent()
+				rows := strings.Split(app.contentViewport.GetContent(), "\n")
+				for line, background := range []lipgloss.Style{
+					lipgloss.NewStyle().Background(formChip.fixedRankBackground),
+					lipgloss.NewStyle().Background(formChip.rankBackground),
+				} {
+					row := rows[app.contentLayout.lineRanges[line+1].start]
+					runes, cells := renderedCells(row)
+					if hasHandle := strings.Contains(string(runes), app.icons.Glyph(icons.MoveFourDirections, "✥")); hasHandle != (line == 1) {
+						t.Fatalf("unexpected drag handle on line %d", line+1)
+					}
+					handle := cells[app.sourceGutterWidth()+1]
+					if !sameColor(handle.Fg, formChip.rankHandleForeground) {
+						t.Fatalf("handle on line %d lost its gray foreground: %v", line+1, handle.Fg)
+					}
+					label := []string{"Inbox", "Draft"}[line]
+					labelAt := len([]rune(strings.SplitN(string(runes), label, 2)[0]))
+					want := background.GetBackground()
+					if line+1 == current {
+						want = buttonBackground
+					}
+					badge := formChip.rankPendingBadge
+					if line == 0 {
+						badge = formChip.fixedRankBadge
+					}
+					badgeStart := app.sourceGutterWidth() + 3
+					for col := app.sourceGutterWidth() + 1; col < len(cells); col++ {
+						if col >= badgeStart && col < badgeStart+3 {
+							if !sameColor(cells[col].Bg, badge) || !sameColor(cells[col].Fg, formChip.rankBadgeSymbol) {
+								t.Fatalf("rank badge changed at column %d on line %d", col, line+1)
+							}
+						} else if line+1 == current && !sameColor(cells[col].Bg, want) {
+							t.Fatalf("cursor lost background at column %d on line %d", col, line+1)
+						}
+					}
+					if !sameColor(cells[labelAt].Bg, want) {
+						t.Fatalf("%s background = %v, want %v", label, cells[labelAt].Bg, want)
+					}
+				}
 			}
 		})
 	}

@@ -515,9 +515,11 @@ type formChipPalette struct {
 	cyan, green, red  color.Color
 	// requiredBadge is the background of unanswered required badges, where
 	// ANSI red looks muddy on light backgrounds.
-	requiredBadge color.Color
-	// badgeSymbol draws the symbol on every badge.
-	badgeSymbol color.Color
+	requiredBadge                                                       color.Color
+	badgeSymbol                                                         color.Color
+	rankBackground, fixedRankBackground, rankHandleForeground           color.Color
+	rankPendingBadge, rankSavedBadge, rankRequiredBadge, fixedRankBadge color.Color
+	rankBadgeSymbol                                                     color.Color
 }
 
 func headerPercentStyle() lipgloss.Style {
@@ -543,9 +545,46 @@ func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
 		green: ld(lipgloss.Color("#22652A"), lipgloss.Green),
 		red:   textColors.red,
 
-		requiredBadge: ld(lipgloss.Color("#E09494"), lipgloss.Red),
-		badgeSymbol:   ld(lipgloss.Color("#FFFFFF"), lipgloss.Black),
+		requiredBadge:        ld(lipgloss.Color("#E09494"), lipgloss.Red),
+		badgeSymbol:          ld(lipgloss.Color("#FFFFFF"), lipgloss.Black),
+		rankBackground:       ld(lipgloss.Color("#E5EFEB"), lipgloss.Color("#23332E")),
+		fixedRankBackground:  ld(lipgloss.Color("#EAE4D7"), lipgloss.Color("#3D392E")),
+		rankHandleForeground: ld(lipgloss.Color("#6E6E6E"), lipgloss.Color("#8F8F8F")),
+		rankPendingBadge:     ld(lipgloss.Color("#39BDD7"), lipgloss.Color("#7EC0C4")),
+		rankSavedBadge:       ld(lipgloss.Color("#65C675"), lipgloss.Color("#A4C477")),
+		rankRequiredBadge:    ld(lipgloss.Color("#F77887"), lipgloss.Color("#E9989D")),
+		fixedRankBadge:       ld(lipgloss.Color("#E7AF4B"), lipgloss.Color("#CFBC8F")),
+		rankBadgeSymbol:      ld(lipgloss.Color("#111820"), lipgloss.Black),
 	}
+}
+
+func rankGroupColors(count int, ld lipgloss.LightDarkFunc) []color.Color {
+	colors := []color.Color{
+		ld(lipgloss.Color("#CC6072"), lipgloss.Color("#AC4758")),
+		ld(lipgloss.Color("#B97348"), lipgloss.Color("#9B5326")),
+		ld(lipgloss.Color("#998030"), lipgloss.Color("#7D680E")),
+		ld(lipgloss.Color("#598A56"), lipgloss.Color("#39713C")),
+		ld(lipgloss.Color("#418785"), lipgloss.Color("#237274")),
+		ld(lipgloss.Color("#5E83BB"), lipgloss.Color("#3E639B")),
+		ld(lipgloss.Color("#966AAE"), lipgloss.Color("#79538D")),
+	}
+	if count <= len(colors) {
+		return colors[:count]
+	}
+	// Keep the main hues and add shades between them for larger forms.
+	gaps := len(colors) - 1
+	extra := count - len(colors)
+	for i := range gaps {
+		between := extra / gaps
+		if i < extra%gaps {
+			between++
+		}
+		if between > 0 {
+			shades := lipgloss.Blend1D(between+2, colors[i], colors[i+1])
+			colors = append(colors, shades[1:len(shades)-1]...)
+		}
+	}
+	return colors
 }
 
 // Primary role colors remain visible independently of keyboard focus.

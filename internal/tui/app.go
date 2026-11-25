@@ -1207,6 +1207,12 @@ func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.tab()
 	switch msg.String() {
+	case "alt+up", "alt+down", "alt+left", "alt+b", "alt+right", "alt+f":
+		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.moveRank(t.cursorLine, msg.String()) {
+			return m, nil
+		}
+	}
+	switch msg.String() {
 	case "alt+left", "alt+b":
 		return m, m.stepViewHistory(false)
 	case "alt+right", "alt+f":
@@ -1232,11 +1238,6 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.toggleForm(t.cursorLine) {
-			return m, nil
-		}
-	}
-	if direction := map[string]int{"alt+up": -1, "alt+down": 1}[msg.String()]; direction != 0 {
-		if m.focused == contentPane && !t.selecting && !t.cursorOnAnnotation && t.cursorSide == "" && m.moveRank(t.cursorLine, direction) {
 			return m, nil
 		}
 	}
@@ -3837,7 +3838,7 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 					m.focused = contentPane
 					m.tab().cursorLine, m.tab().cursorSide, m.tab().cursorOnAnnotation = control.line, "", false
 					m.tab().cursorOnForm = true
-					if !m.startRankDrag(control.line) {
+					if !m.startRankDrag(control.line, mouse) {
 						m.toggleForm(control.line)
 					}
 					return m, nil
@@ -4773,6 +4774,9 @@ func (m AppModel) renderFooterHints() string {
 			}
 		}
 		items = append([]string{k("space", action)}, items...)
+		if row.item.Rank && !t.markdownSourceView && !row.item.RankFixed {
+			items = append([]string{k("M-←/→", "depth"), k("M-↑/↓", "move")}, items...)
+		}
 	}
 	controls := []string{m.footerHelpButton(), m.imagesButton(), m.lineNumbersButton()}
 	if button := m.formListButton(); !m.readOnly && button != "" {
@@ -4940,7 +4944,9 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "enter", desc: "comment/open"},
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
-		{keys: "M-↑/↓", desc: "⇅ move ranked item"},
+		{keys: "M-↑/↓", desc: "move ranked branch to the next allowed place"},
+		{keys: "M-←/→ · M-b/M-f (rank)", desc: "outdent / indent under previous sibling"},
+		{keys: "rank drag", desc: "drag sideways on the same row for depth; drag to another row to move"},
 		{keys: "v/C-SPC/C-@ · space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
 		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},

@@ -67,16 +67,7 @@ func (m *AppModel) formAnswerSummary(items []form.Item, field form.Item, answer 
 	}
 	switch {
 	case field.Rank:
-		order, _ := form.RankOrder(items, field.ID, answer)
-		labels := make([]string, len(order))
-		for i, value := range order {
-			for _, item := range items {
-				if item.ID == field.ID && item.Value == value {
-					labels[i] = fmt.Sprintf("%d. %s", i+1, item.Label)
-				}
-			}
-		}
-		return strings.Join(labels, "  ")
+		return strings.Join(form.RankLabels(items, field.ID, answer), "  ")
 	case field.Choice:
 		for _, item := range items {
 			if item.ID == field.ID && form.Selected(item, answer) {

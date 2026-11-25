@@ -108,6 +108,9 @@ const (
 	CloudOffOutline
 	CloudCheckOutline
 	WeatherCloudyAlert
+	Lock
+	MoveVertical
+	MoveFourDirections
 )
 
 // Codepoints from Nerd Fonts v3.4.0's glyphnames.json.
@@ -141,16 +144,18 @@ var glyphs = [...]string{
 
 	CloudOutline: "\U000f0163", CloudOffOutline: "\U000f0164",
 	CloudCheckOutline: "\U000f12cc", WeatherCloudyAlert: "\U000f0f2f",
+	Lock:         "\uf456",
+	MoveVertical: "\U000f09c8", MoveFourDirections: "\uf0b2",
 }
 
 // Glyph reserves two cells for Nerd Font glyphs, which may overhang one cell.
-// Close and add-comment buttons, tab edges, and portable fallbacks keep their width.
+// Buttons, gutter markers, tab edges, and portable fallbacks keep their width.
 func (s Set) Glyph(kind Kind, fallback string) string {
 	if !s || int(kind) >= len(glyphs) {
 		return fallback
 	}
 	switch kind {
-	case Close, AddComment, TabLeft, TabRight, DividerLeft, DividerRight, PillLeft, PillRight:
+	case Close, AddComment, TabLeft, TabRight, DividerLeft, DividerRight, PillLeft, PillRight, Lock, MoveVertical, MoveFourDirections:
 		return glyphs[kind]
 	}
 	return glyphs[kind] + " "

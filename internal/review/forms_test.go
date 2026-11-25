@@ -203,3 +203,33 @@ func TestPathFormDefaultsAndPersistence(t *testing.T) {
 		t.Fatal("changed default retained the previous answer")
 	}
 }
+
+func TestReopenLegacyRankingOfNestedMarkdown(t *testing.T) {
+	t.Parallel()
+	session, err := OpenSession(t.TempDir(), "rank")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := AttachedDocument{ID: "a", Source: "/rank.md", Name: "rank.md", Content: `- [ ] Parent <!-- form: id=rank rank value=parent -->
+  - [ ] Child <!-- form: id=rank rank value=child -->
+`}
+	state, err := session.BeginForms(ReviewInput{}, []AttachedDocument{doc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Versions 2 and 3 saved such an answer as one flat list.
+	state.Documents[0].Items[1].RankParent = ""
+	state.Documents[0].Answers["rank"] = form.Answer{Value: []string{"child", "parent"}, Human: true}
+	if err := session.SaveForms(state); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := session.BeginForms(state.Input, []AttachedDocument{doc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	field := resumed.Documents[0]
+	rank, ranked := form.RankTree(field.Items, "rank", field.Answers["rank"])
+	if resumed.Version != 4 || !ranked || rank[0].Value != "child" || rank[0].Parent != "" || field.Items[1].RankParent != "parent" {
+		t.Fatalf("legacy ranking after reopen: %v, ranked %t, version %d", rank, ranked, resumed.Version)
+	}
+}

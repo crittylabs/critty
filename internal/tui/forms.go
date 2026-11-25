@@ -255,7 +255,8 @@ func (m *AppModel) toggleForm(line int) bool {
 		}
 		m.tab().cursorOnForm = true
 		if item.Rank {
-			m.saveRank(d, item.ID, m.rankLayout(d, item.ID).order)
+			layout := m.rankLayout(d, item.ID)
+			m.saveRank(d, item.ID, rankAnswer(layout.nodes))
 			m.rebuildContent()
 			return true
 		}
@@ -478,7 +479,7 @@ func (m *AppModel) formTextRows(line int, width int) []string {
 // formDisplayLine hides only parsed metadata and retains each original line.
 // Labels of form items are drawn on background, which the caller extends to
 // the end of each row.
-func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Style) (string, int, bool) {
+func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Style, focused bool) (string, int, bool) {
 	if m.tab().markdownSourceView {
 		return "", 0, false
 	}
@@ -503,7 +504,16 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 		if checkbox.Required {
 			label = lipgloss.NewStyle().Bold(true).Render(label)
 		}
-		indent := expandDisplayTabs(raw[:len(raw)-len(strings.TrimLeft(raw, " \t"))])
+		width := rankSourceIndent(raw)
+		if checkbox.Rank {
+			source := d.Content[m.formRows[d.Path()][checkbox.Line].offset:]
+			start := rankSourceIndent(source)
+			width = max(0, width-start+m.rankIndent(d, checkbox, start))
+		}
+		indent := strings.Repeat(" ", width)
+		if checkbox.Rank && focused {
+			return sourceLineHighlight(background, indent+label), width, true
+		}
 		return indent + inlineColors(background, label, true), lipgloss.Width(indent), true
 	}
 	column := checkbox.Offset - row.offset
@@ -515,10 +525,8 @@ func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Sty
 		return indent + m.selectAllDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
 	}
 	if checkbox.Rank {
-		// The drag handle sits between the line number and the rank.
-		handle := lipgloss.NewStyle().Foreground(formChip.cyan).Render("⇅") + " "
-		indent = strings.TrimSuffix(indent, "  ")
-		return indent + handle + m.rankDisplay(d, checkbox, label, background), lipgloss.Width(indent), true
+		indent = strings.Repeat(" ", m.rankIndent(d, checkbox, rankSourceIndent(prefix)))
+		return indent + m.rankDisplay(d, checkbox, label, background, focused), lipgloss.Width(indent), true
 	}
 	answer := d.Answers[checkbox.ID]
 	selected := form.Selected(*checkbox, answer)

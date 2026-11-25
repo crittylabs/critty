@@ -331,3 +331,131 @@ func TestExistingPathDefinition(t *testing.T) {
 		t.Fatal("existing requirement did not change the definition")
 	}
 }
+
+func TestRankTreeRejectsInvalidAnswers(t *testing.T) {
+	t.Parallel()
+	items, err := Parse(`- [ ] First <!-- form: id=rank rank value=first -->
+  - [ ] Child <!-- form: id=rank rank value=child -->
+- [ ] Next <!-- form: id=rank rank value=next -->`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := []RankNode{{Value: "first"}, {Value: "child", Parent: "first", Depth: 1}, {Value: "next"}}
+	for _, tt := range []struct {
+		name    string
+		order   []string
+		parents map[string]string
+	}{
+		{"duplicate", []string{"first", "first", "next"}, nil},
+		{"self parent", []string{"first", "child", "next"}, map[string]string{"child": "child"}},
+		{"later parent", []string{"first", "child", "next"}, map[string]string{"child": "next"}},
+		{"separated from parent", []string{"first", "next", "child"}, map[string]string{"child": "first"}},
+		{"unknown child", []string{"first", "child", "next"}, map[string]string{"other": "first"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			want := Answer{Value: tt.order, RankParents: tt.parents}
+			if tree, ranked := RankTree(items, "rank", want); ranked || !slices.Equal(tree, source) {
+				t.Fatalf("invalid answer produced tree %v, ranked %t", tree, ranked)
+			}
+		})
+	}
+}
+
+func TestRankConstraints(t *testing.T) {
+	t.Parallel()
+	items, err := Parse(`- [ ] Inbox <!-- form: id=r rank value=inbox fixed max-depth=1 -->
+  - [ ] Triage <!-- form: id=r rank value=triage -->
+- [ ] Review <!-- form: id=r rank value=review -->
+  - [ ] Verify <!-- form: id=r rank value=verify fixed -->
+- [ ] Later <!-- form: id=r rank value=later fixed max-depth=0 -->
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name    string
+		order   []string
+		parents map[string]string
+		want    string
+	}{
+		{"fixed descendant follows branch", []string{"review", "verify", "inbox", "triage", "later"},
+			map[string]string{"verify": "review", "triage": "inbox"}, ""},
+		{"one level allowed", []string{"inbox", "triage", "review", "verify", "later"},
+			map[string]string{"triage": "inbox", "verify": "review"}, ""},
+		{"ancestor limit", []string{"inbox", "triage", "review", "verify", "later"},
+			map[string]string{"triage": "inbox", "review": "inbox", "verify": "review"}, "Inbox"},
+		{"leaf limit", []string{"inbox", "review", "verify", "later", "triage"},
+			map[string]string{"verify": "review", "triage": "later"}, "Later"},
+		{"fixed parent", []string{"inbox", "triage", "review", "verify", "later"},
+			map[string]string{"triage": "inbox"}, "Verify"},
+		{"fixed order", []string{"later", "inbox", "triage", "review", "verify"},
+			map[string]string{"triage": "inbox", "verify": "review"}, "Inbox"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			answer := Answer{Value: tt.order, RankParents: tt.parents}
+			err := CheckRank(items, "r", answer)
+			switch {
+			case tt.want == "" && err == nil:
+			case tt.want != "" && err != nil && strings.Contains(err.Error(), tt.want):
+			default:
+				t.Fatalf("validation error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+	for _, source := range []string{
+		"- [ ] A <!-- form: fixed -->",
+		"- [ ] A <!-- form: id=r rank value=a max-depth=-1 -->",
+		"- [ ] A <!-- form: id=r rank value=a max-depth=0 -->\n  - [ ] B <!-- form: id=r rank value=b -->",
+	} {
+		if _, err := Parse(source); err == nil {
+			t.Errorf("parsed invalid constraints: %q", source)
+		}
+	}
+}
+
+func TestMinimumRankLevelAppliesToMovedDescendants(t *testing.T) {
+	t.Parallel()
+	const source = `- [ ] Root <!-- form: id=r rank value=root -->
+  - [ ] Branch <!-- form: id=r rank value=branch -->
+    - [ ] Leaf <!-- form: id=r rank value=leaf min-level=3 -->
+`
+	items, err := Parse(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer := Answer{Value: []string{"root", "branch", "leaf"}, RankParents: map[string]string{"leaf": "branch"}}
+	if err := CheckRank(items, "r", answer); err == nil || !strings.Contains(err.Error(), "Leaf") {
+		t.Fatalf("promoting its ancestor returned %v", err)
+	}
+	for _, level := range []string{"0", "4", "none"} {
+		if _, err := Parse(strings.Replace(source, "min-level=3", "min-level="+level, 1)); err == nil {
+			t.Errorf("accepted %s", level)
+		}
+	}
+}
+
+func TestMaximumRankLevelAppliesToMovedDescendants(t *testing.T) {
+	t.Parallel()
+	const source = `- [ ] Inbox <!-- form: id=r rank value=inbox -->
+- [ ] Branch <!-- form: id=r rank value=branch -->
+  - [ ] Leaf <!-- form: id=r rank value=leaf min-level=2 max-level=2 -->
+`
+	items, err := Parse(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer := Answer{Value: []string{"inbox", "branch", "leaf"}, RankParents: map[string]string{"branch": "inbox", "leaf": "branch"}}
+	if err := CheckRank(items, "r", answer); err == nil || !strings.Contains(err.Error(), "shallower") {
+		t.Fatalf("indenting its ancestor returned %v", err)
+	}
+	answer.RankParents = map[string]string{"leaf": "inbox"}
+	answer.Value = []string{"inbox", "leaf", "branch"}
+	if err := CheckRank(items, "r", answer); err != nil {
+		t.Fatalf("reparenting at the same level failed: %v", err)
+	}
+	for _, level := range []string{"0", "1", "none"} {
+		if _, err := Parse(strings.Replace(source, "max-level=2", "max-level="+level, 1)); err == nil {
+			t.Errorf("accepted %s", level)
+		}
+	}
+}
