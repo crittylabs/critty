@@ -4,7 +4,7 @@
 
 ### Added
 
-- Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Colored brackets identify each ranking even when its items are separated.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
+- Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
 - Press <kbd>M-u</kbd> or click the syntax name in the file header to switch between formatted Markdown and its syntax-highlighted source.  Source view keeps markup and table spacing as written and uses a subdued color for cell separators.
 - Use the same highlighting for Markdown source references and suggestions, including suggestions for lines that contain code fences.
 
@@ -12,7 +12,7 @@
 
 - Page and half-page keys scroll the content pane while keeping the current line if it is visible.  When the current line leaves the pane, it moves to the second visible row from the top when scrolling down or from the bottom when scrolling up.  At a scroll limit, half-page keys move the current line by half a page and full-page keys move it to the beginning or end.
 - The row after a final newline appears without a line number and uses reverse video when current.  The file header shows the source line count and labels that cursor position EOF.
-- Find unanswered form fields and unresolved comment threads by the gold dot in the gutter.
+- Find unanswered form fields and unresolved comment threads by the gold dot in the gutter.  Colored brackets identify ranking and radio-button groups, even when their rows are separated.
 
 ## 2.2.0
 

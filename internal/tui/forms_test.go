@@ -731,6 +731,23 @@ func TestFormListModal(t *testing.T) {
 	}
 }
 
+func TestRadioGroupBrackets(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Review all <!-- form: id=review select-all=review -->
+- [ ] Brief <!-- form: id=length value=brief tags=review -->
+- [ ] Detailed <!-- form: id=length value=detailed -->
+- [ ] Check wording <!-- form: id=wording tags=review -->
+`)
+	rows := strings.Split(app.contentViewport.GetContent(), "\n")
+	for line, want := range []string{" ", "⎛", "⎝", " "} {
+		row := rows[app.contentLayout.lineRanges[line+1].start]
+		column := app.sourceGutterWidth()
+		if got := ansi.Strip(ansi.Cut(row, column, column+1)); got != want {
+			t.Errorf("line %d bracket = %q, want %q", line+1, got, want)
+		}
+	}
+}
+
 func TestRankGroupBrackets(t *testing.T) {
 	t.Parallel()
 	app, _ := formTestAppWithContent(t, `- [ ] Alpha <!-- form: id=first rank value=a -->
@@ -749,7 +766,7 @@ Unrelated text
 		app.hideLineNumbers = !numbers
 		app.rebuildContent()
 		rows := strings.Split(app.contentViewport.GetContent(), "\n")
-		colors := rankGroupColors(2, lipgloss.LightDark(terminalIsDark))
+		colors := formGroupColors(2, lipgloss.LightDark(terminalIsDark))
 		column := app.sourceGutterWidth()
 		for line, bracket := range want {
 			runes, cells := renderedCells(rows[app.contentLayout.lineRanges[line].start])

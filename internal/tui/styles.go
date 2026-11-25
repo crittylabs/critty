@@ -558,7 +558,7 @@ func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
 	}
 }
 
-func rankGroupColors(count int, ld lipgloss.LightDarkFunc) []color.Color {
+func formGroupColors(count int, ld lipgloss.LightDarkFunc) []color.Color {
 	colors := []color.Color{
 		ld(lipgloss.Color("#CC6072"), lipgloss.Color("#AC4758")),
 		ld(lipgloss.Color("#B97348"), lipgloss.Color("#9B5326")),

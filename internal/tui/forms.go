@@ -637,3 +637,37 @@ func (m *AppModel) formSummary(width int) string {
 	}
 	return lipgloss.Wrap(strings.Join(lines, "\n"), width, "")
 }
+
+type formBracketRow struct {
+	row, offset int
+	group       int
+}
+
+// addFormGroupBrackets fills the reserved cell on each rendered group row.
+// Interrupted runs close and reopen with the same color, including when an
+// inline comment separates two items of the group.
+func addFormGroupBrackets(content string, rows []formBracketRow, groups int) string {
+	if len(rows) == 0 {
+		return content
+	}
+	colors := formGroupColors(groups, lipgloss.LightDark(terminalIsDark))
+	var result strings.Builder
+	result.Grow(len(content))
+	from := 0
+	for i, mark := range rows {
+		continues := i > 0 && rows[i-1].group == mark.group && rows[i-1].row+1 == mark.row
+		continuesAfter := i+1 < len(rows) && rows[i+1].group == mark.group && mark.row+1 == rows[i+1].row
+		bracket := "⎜"
+		switch {
+		case !continues && continuesAfter:
+			bracket = "⎛"
+		case continues && !continuesAfter:
+			bracket = "⎝"
+		}
+		result.WriteString(content[from:mark.offset])
+		result.WriteString(lipgloss.NewStyle().Foreground(colors[mark.group]).Render(bracket))
+		from = mark.offset + 1
+	}
+	result.WriteString(content[from:])
+	return result.String()
+}

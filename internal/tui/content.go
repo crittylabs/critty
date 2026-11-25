@@ -282,8 +282,8 @@ func (m *AppModel) rebuildContent() {
 	sourceLineCount := t.doc.SourceLineCount()
 	formDoc := m.forms.Document(t.path)
 	seenForms := map[string]bool{}
-	rankGroups := map[string]int{}
-	var rankGroupRows []rankGroupRow
+	formGroups := map[string]int{}
+	var bracketRows []formBracketRow
 	for _, i := range m.lineOrder(t) {
 		line := t.doc.Lines[i]
 		lineNum := i + 1
@@ -316,18 +316,18 @@ func (m *AppModel) rebuildContent() {
 		}
 
 		unanswered := false
-		rankGroup := -1
+		group := -1
 		if !t.markdownSourceView && formDoc != nil && formItem != nil && formItem.SelectAll == nil {
 			if !seenForms[formItem.ID] {
 				seenForms[formItem.ID] = true
 				unanswered = !formItemAnswered(formDoc, *formItem)
 			}
-			if formItem.Rank {
+			if formItem.Rank || formItem.Choice {
 				var seen bool
-				rankGroup, seen = rankGroups[formItem.ID]
+				group, seen = formGroups[formItem.ID]
 				if !seen {
-					rankGroup = len(rankGroups)
-					rankGroups[formItem.ID] = rankGroup
+					group = len(formGroups)
+					formGroups[formItem.ID] = group
 				}
 			}
 		}
@@ -421,9 +421,17 @@ func (m *AppModel) rebuildContent() {
 				formLine = inlineBackground(formBackground, formLine)
 			}
 			width, left := textWidth, m.sourceGutterWidth()
-			if rankGroup >= 0 {
+			if group >= 0 {
 				width--
 				left++
+			}
+			appendFormRow := func(wi int, row string) {
+				prefix := m.sourceRowGutter(lineNum, false, wi, marker, numStr)
+				if group >= 0 {
+					bracketRows = append(bracketRows, formBracketRow{row: len(layout.rows), offset: b.Len() + len(prefix), group: group})
+					prefix += " "
+				}
+				layout.appendBlock(&b, prefix+row, lineTarget)
 			}
 			for wi, row := range strings.Split(lipgloss.Wrap(highlight(formLine), width, ""), "\n") {
 				if checkboxX >= 0 {
@@ -439,19 +447,14 @@ func (m *AppModel) rebuildContent() {
 					}
 					row += formBackground.Render(strings.Repeat(" ", max(0, width-lipgloss.Width(row))))
 				}
-				prefix := m.sourceRowGutter(lineNum, false, wi, marker, numStr)
-				if rankGroup >= 0 {
-					rankGroupRows = append(rankGroupRows, rankGroupRow{row: len(layout.rows), offset: b.Len() + len(prefix), group: rankGroup})
-					prefix += " "
-				}
-				layout.appendBlock(&b, prefix+row, lineTarget)
+				appendFormRow(wi, row)
 			}
-			for _, row := range m.formTextRows(lineNum, textWidth) {
+			for _, row := range m.formTextRows(lineNum, width) {
 				if item := m.formRows[t.path][lineNum].item; item != nil {
 					layout.formControls = append(layout.formControls, formControl{line: item.Line,
-						rect: mouseRect{left: m.sourceGutterWidth(), right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
+						rect: mouseRect{left: left, right: contentWidth, top: len(layout.rows), bottom: len(layout.rows) + 1}})
 				}
-				layout.appendBlock(&b, m.sourceRowGutter(lineNum, false, 1, marker, numStr)+row, lineTarget)
+				appendFormRow(1, row)
 			}
 		} else {
 			// Get the display content: Markdown, linked text, or Chroma-highlighted
@@ -529,7 +532,7 @@ func (m *AppModel) rebuildContent() {
 
 	m.mapMathRanges(&layout)
 	m.contentLayout = layout
-	m.setRenderedSourceContent(addRankGroupBrackets(b.String(), rankGroupRows, len(rankGroups)), contentWidth, groups)
+	m.setRenderedSourceContent(addFormGroupBrackets(b.String(), bracketRows, len(formGroups)), contentWidth, groups)
 }
 
 // renderAnnotationBox renders a bordered annotation box indented under the gutter.
