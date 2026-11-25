@@ -11,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/ansi/kitty"
 )
 
 func TestCommentCodeHighlighting(t *testing.T) {
@@ -103,6 +104,55 @@ func TestSuggestionLanguageCache(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("suggestion did not inherit Python syntax from its target")
+	}
+}
+
+func TestMarkdownCommentSourceAndSuggestionHighlighting(t *testing.T) {
+	const source = "# Heading\n\n[Link](https://example.org)\n\n```go\nvar count = 42\n```\n\n![Preview](sample.png)"
+	app := setupAppWithDoc(t, source)
+	app.images.enabled = true
+	tab := app.tab()
+	tab.markdownImages = app.findMarkdownImages()().(markdownImagesMsg).images
+	if len(tab.markdownImages) != 1 {
+		t.Fatalf("got %d document images, want one", len(tab.markdownImages))
+	}
+	tab.markdownImages[0].image = &inlineImage{id: 0x123456, columns: 1, rows: 1, ready: true}
+	tab.selecting, tab.selectAnchor, tab.cursorLine = true, 1, 9
+	app.openLineComment()
+	context := app.renderContextPreview("", 1, 9, 90, 0)
+	if strings.ContainsRune(context, kitty.Placeholder) || tab.markdownSourceView {
+		t.Fatal("the source reference should show raw markup without switching the document view")
+	}
+	app.insertSuggestion()
+	want := "````suggestion\n" + source + "\n````"
+	if got := app.modalTextarea.Value(); got != want {
+		t.Fatalf("suggestion changed source or used a conflicting fence: %q", got)
+	}
+	app.modalTextarea.ClearSelection()
+	app.modalTextarea.SetWidth(90)
+	app.modalTextarea.SetHeight(12)
+	app.modalTextarea.MoveToBegin()
+	editor, _ := app.editorView()
+	saved := app.renderCommentContent("Reviewer", want, "", 90)
+	for _, surface := range []struct{ name, text string }{{"context", context}, {"editor", editor}, {"saved", saved}} {
+		t.Run(surface.name, func(t *testing.T) {
+			for _, sample := range []struct {
+				line int
+				word string
+			}{{1, "Heading"}, {3, "Link"}, {6, "var"}, {9, "Preview"}} {
+				tab := *app.tab()
+				tab.markdownSourceView = true
+				raw := tab.doc.LineAt(sample.line)
+				display := tab.markdownDisplayLine(sample.line, false, raw, nil, nil)
+				if !strings.Contains(ansi.Strip(surface.text), raw) {
+					t.Errorf("source %q missing from %q", raw, surface.text)
+				}
+				got, want := sourceWordStyle(t, surface.text, sample.word), sourceWordStyle(t, display, sample.word)
+				if !sameColor(got.Fg, want.Fg) || got.Underline != want.Underline {
+					t.Errorf("%q style = %+v, want %+v", sample.word, got, want)
+				}
+			}
+		})
 	}
 }
 

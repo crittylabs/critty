@@ -167,9 +167,11 @@ func TestHeaderProgressPositionDoesNotDependOnPathLength(t *testing.T) {
 		app := progressTestApp(t, false)
 		app.width = width
 		app.tabs[0].attachment.Source = "a.md"
-		_, short := app.renderHeaderWithProgress()
+		_, shortHeader := app.renderHeaderLayout()
+		short := shortHeader.progressRegions
 		app.tabs[0].attachment.Source = strings.Repeat("long-directory/", 12) + "review.md"
-		_, long := app.renderHeaderWithProgress()
+		_, longHeader := app.renderHeaderLayout()
+		long := longHeader.progressRegions
 		if len(short) != len(long) || len(short) == 0 {
 			t.Fatal("path length changed the counter layout")
 		}

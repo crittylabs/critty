@@ -212,7 +212,7 @@ func (m *AppModel) selectedText() string {
 			end = span.offset + tableSourceOffset(span.tableSource[span.offset:], span.text, end-span.offset, true)
 		}
 		raw := false
-		if m.tab().isMarkdown {
+		if m.tab().isMarkdown && !m.tab().markdownSourceView {
 			m.tab().ensureMarkdownCache()
 			source := m.tab().markdown.after
 			if span.ref.side == "old" {
@@ -262,7 +262,7 @@ func (m *AppModel) selectedText() string {
 		if i > 0 {
 			result.WriteByte('\n')
 		}
-		if m.tab().isMarkdown {
+		if m.tab().isMarkdown && !m.tab().markdownSourceView {
 			m.tab().ensureMarkdownCache()
 			source := m.tab().markdown.after
 			if r.first.ref.side == "old" {
@@ -469,7 +469,7 @@ func (m *AppModel) prepareTextSpans() {
 			}
 			raw := value
 			atomic := false
-			if t.isMarkdown {
+			if t.isMarkdown && !t.markdownSourceView {
 				display, plain, _, measured := t.markdownDisplayLineInfo(span.ref.line, span.ref.side == "old", value, nil, nil)
 				value = plain
 				if !measured {

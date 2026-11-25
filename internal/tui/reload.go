@@ -310,6 +310,7 @@ func (m *AppModel) finishReload(msg reloadMsg) (cmd tea.Cmd) {
 		tab.syntax = m.syntax
 		tab.symbols = m.icons
 		if previous, ok := old[tab.path]; ok {
+			tab.markdownSourceView = previous.markdownSourceView && tab.markdownFile()
 			tab.unread = previous.unread || tabContentChanged(previous, *tab)
 			tab.cursorLine, tab.cursorSide = previous.cursorLine, previous.cursorSide
 			tab.sidebarCursor = previous.sidebarCursor

@@ -479,6 +479,9 @@ func (m *AppModel) formTextRows(line int, width int) []string {
 // Labels of form items are drawn on background, which the caller extends to
 // the end of each row.
 func (m *AppModel) formDisplayLine(line int, raw string, background lipgloss.Style) (string, int, bool) {
+	if m.tab().markdownSourceView {
+		return "", 0, false
+	}
 	d := m.forms.Document(m.tab().path)
 	if d == nil || len(d.Items) == 0 {
 		return "", 0, false

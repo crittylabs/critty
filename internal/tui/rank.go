@@ -62,7 +62,7 @@ func (m *AppModel) lineOrder(t *FileTab) []int {
 	for i := range order {
 		order[i] = i
 	}
-	if m.forms == nil {
+	if m.forms == nil || t.markdownSourceView {
 		return order
 	}
 	d := m.forms.Document(t.path)
@@ -89,6 +89,9 @@ func (m *AppModel) lineOrder(t *FileTab) []int {
 // rankMove reports whether the ranked item on line is displayed above (-1)
 // or below (1) its source position, or 0.
 func (m *AppModel) rankMove(t *FileTab, line int) int {
+	if t.markdownSourceView {
+		return 0
+	}
 	row, ok := m.formRows[t.path][line]
 	if !ok || row.item == nil || !row.item.Rank || row.item.Line != line {
 		return 0

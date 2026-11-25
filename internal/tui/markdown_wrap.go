@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/yuin/goldmark/v2/ast"
 	"github.com/yuin/goldmark/v2/parser"
@@ -126,7 +127,7 @@ func (line *markdownLine) wrapRows(content string, width, initialPrefix int) []s
 }
 
 func (t *FileTab) markdownParsedLine(line int, before bool) *markdownLine {
-	if t.markdown == nil {
+	if t.markdown == nil || t.markdownSourceView {
 		return nil
 	}
 	source := t.markdown.after
@@ -142,6 +143,17 @@ func (t *FileTab) markdownParsedLine(line int, before bool) *markdownLine {
 func (t *FileTab) markdownWrapRows(line int, before bool, content string, width int, decorate func(string) (string, bool)) []string {
 	if decorate != nil {
 		content, _ = decorate(content)
+	}
+	if t.markdownSourceView {
+		if ansi.StringWidth(content) <= width {
+			return []string{content}
+		}
+		lines := uv.NewStyledString(ansi.Hardwrap(content, width, true)).Lines(ansi.GraphemeWidth)
+		rows := make([]string, len(lines))
+		for i, line := range lines {
+			rows[i] = line.Render()
+		}
+		return rows
 	}
 	return t.markdownParsedLine(line, before).wrapRows(content, width, 0)
 }

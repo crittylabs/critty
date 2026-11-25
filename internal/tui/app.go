@@ -294,7 +294,14 @@ func (r *commentHeaderRegion) translate(x, y int) {
 	}
 }
 
+type renderedHeaderLayout struct {
+	progressRegions    []progressRegion
+	markdownViewButton mouseRect
+	hasMarkdownView    bool
+}
+
 type renderedScreenLayout struct {
+	renderedHeaderLayout
 	watchIndicator       mouseRect
 	hasWatchIndicator    bool
 	copyTextButton       mouseRect
@@ -320,7 +327,6 @@ type renderedScreenLayout struct {
 	modalRegions         []modalMouseRegion
 	isearchCursor        *tea.Cursor
 	isearchRegions       []isearchMouseRegion
-	progressRegions      []progressRegion
 }
 
 func newRenderedContentLayout() renderedContentLayout {
@@ -1240,6 +1246,9 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.String() == "alt+g" {
 		return m, m.openGotoLine()
+	}
+	if key.Matches(msg, keys.MarkdownSource) {
+		return m, m.toggleMarkdownSource()
 	}
 	if msg.String() == "alt+G" || msg.String() == "alt+shift+g" || msg.String() == "alt+shift+G" {
 		m.focusOutline()
@@ -2172,7 +2181,13 @@ func (m *AppModel) insertSuggestion() {
 	if body != "" {
 		body += "\n\n"
 	}
-	m.replaceTextareaValue(body + "```suggestion\n" + code + "\n```")
+	fenceLength := 3
+	for line := range strings.SplitSeq(code, "\n") {
+		line = strings.TrimLeft(line, " \t")
+		fenceLength = max(fenceLength, len(line)-len(strings.TrimLeft(line, "`"))+1)
+	}
+	fence := strings.Repeat("`", fenceLength)
+	m.replaceTextareaValue(body + fence + "suggestion\n" + code + "\n" + fence)
 	m.modalFocus = 0
 	m.modalTextarea.Focus()
 	m.modalTextarea.CursorStart()
@@ -2899,13 +2914,13 @@ func truncateLeftToWidth(s string, width int) string {
 }
 
 func (m AppModel) renderHeader() string {
-	header, _ := m.renderHeaderWithProgress()
+	header, _ := m.renderHeaderLayout()
 	return header
 }
 
-func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
+func (m AppModel) renderHeaderLayout() (string, renderedHeaderLayout) {
 	if len(m.tabs) == 0 {
-		return m.renderReviewBar(), nil
+		return m.renderReviewBar(), renderedHeaderLayout{}
 	}
 	t := m.tab()
 	displayPath := t.displayPath()
@@ -2968,6 +2983,11 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 		positionEdge = percent + m.headerEdge(icons.TabLeft, headerPositionStyle.GetBackground(), percentStyle)
 	}
 	right = positionEdge + right
+	syntax := m.headerSyntax(gapStyle.Foreground(ld(lipgloss.Color("#49484B"), lipgloss.Color("#D6D5D8"))))
+	if m.width > 0 && pathFrame+ansi.StringWidth(syntax+right)+8 > headerWidth {
+		syntax = ""
+	}
+	right = syntax + right
 
 	prefix := headerPathStyle.Render(" ")
 	breadcrumb := m.headerBreadcrumb()
@@ -2987,6 +3007,7 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 	}
 	headerContent := inlineBackground(headerPathStyle, prefix+headerPathStyle.Render(displayPath+pathNote)) + pathEdge
 	spare := max(0, headerWidth-ansi.StringWidth(headerContent+right))
+	syntaxLeft := ansi.StringWidth(headerContent) + spare
 	headerContent += gapStyle.Render(strings.Repeat(" ", spare)) + right
 
 	progressLeft, progressTop := ansi.StringWidth(headerContent)-ansi.StringWidth(progress), 0
@@ -3019,7 +3040,14 @@ func (m AppModel) renderHeaderWithProgress() (string, []progressRegion) {
 		}
 		headerContent = strings.Join(lines, "\n")
 	}
-	return bar + "\n" + inlineBackground(gapStyle, headerStyle.Background(gapStyle.GetBackground()).Width(m.width).Render(headerContent)), regions
+	layout := renderedHeaderLayout{progressRegions: regions}
+	if syntax != "" && t.isMarkdown {
+		left := syntaxLeft + headerStyle.GetPaddingLeft()
+		top := lipgloss.Height(bar) + headerStyle.GetPaddingTop()
+		layout.markdownViewButton = mouseRect{left: left, right: left + ansi.StringWidth(syntax), top: top, bottom: top + 1}
+		layout.hasMarkdownView = true
+	}
+	return bar + "\n" + inlineBackground(gapStyle, headerStyle.Background(gapStyle.GetBackground()).Width(m.width).Render(headerContent)), layout
 }
 
 func (m AppModel) headerPosition(percentStyle lipgloss.Style) (position, percent string) {
@@ -3377,7 +3405,7 @@ func (m AppModel) placeModalCursor(v *tea.View, regions []modalMouseRegion) {
 func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	t := m.tab()
 
-	header, progressRegions := m.renderHeaderWithProgress()
+	header, headerLayout := m.renderHeaderLayout()
 
 	paneWidth := max(0, m.contentPaneWidth()-2)
 	content := m.extendSourceBackgrounds(m.contentViewport.View(), paneWidth)
@@ -3402,7 +3430,7 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if footer != "" {
 		sections = append(sections, footer)
 	}
-	layout := renderedScreenLayout{progressRegions: progressRegions}
+	layout := renderedScreenLayout{renderedHeaderLayout: headerLayout}
 	if button := m.watchIndicator(); button != "" {
 		layout.watchIndicator, layout.hasWatchIndicator = buttonRect(header, 0, button)
 	}
@@ -3762,6 +3790,9 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	if imageLayout.hasLineNumbersButton && imageLayout.lineNumbersButton.contains(mouse) {
 		m.toggleLineNumbers()
 		return m, nil
+	}
+	if imageLayout.hasMarkdownView && imageLayout.markdownViewButton.contains(mouse) {
+		return m, m.toggleMarkdownSource()
 	}
 	if imageLayout.hasImagesButton && imageLayout.imagesButton.contains(mouse) {
 		cmd := m.toggleImages()
@@ -4880,6 +4911,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 			{keys: "M-w/Y", desc: "copy selected text, current line, or selected lines"},
 			{keys: "@", desc: "copy file/line reference"},
 			{keys: "#", desc: "toggle line numbers (all files)"},
+			{keys: "M-u", desc: "toggle Markdown source"},
 			{keys: "w · S · I/M-i", desc: "whitespace / split / image, math, and Mermaid previews"},
 			{keys: "click Diff / layout icon", desc: "ignore whitespace / toggle split"},
 			{keys: "F5/M-r · W/S-F5/M-R", desc: "reload sources / toggle watch (default off)"},
@@ -4914,6 +4946,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},
 		{keys: "V · O", desc: "reading view / open all"},
 		{keys: "#", desc: "toggle line numbers"},
+		{keys: "M-u", desc: "toggle Markdown source"},
 		{keys: "w · I/M-i", desc: "WS changes · image/math/Mermaid previews"},
 		{keys: "F5/M-r", desc: "reload sources"},
 		{keys: "W/S-F5/M-R", desc: "watch (default off)"},
@@ -5163,20 +5196,27 @@ func (m AppModel) renderContextPreview(side string, start, end, maxWidth, maxLin
 	if t.doc == nil {
 		return ""
 	}
+	t.markdownSourceView = t.isMarkdown
 	var lines []string
 	maxLineText := maxWidth - 7
 	if maxLineText < 10 {
 		maxLineText = 10
 	}
 	for i := start; i <= end; i++ {
-		lineText := displaySourceText(m.anchorText(&t, side, i, i))
-		if lineText == "" {
+		source := m.anchorText(&t, side, i, i)
+		if source == "" {
 			continue
 		}
-		wrapped := lipgloss.Wrap(lineText, maxLineText, "")
+		var rows []string
+		if t.markdownSourceView {
+			before := side == "old"
+			line := t.markdownDisplayLine(i, before, source, nil, nil)
+			rows = t.markdownWrapRows(i, before, line, maxLineText, nil)
+		} else {
+			rows = strings.Split(lipgloss.Wrap(displaySourceText(source), maxLineText, ""), "\n")
+		}
 		num := lineNumStyle.Render(fmt.Sprintf("%d", i))
-		wrapLines := strings.Split(wrapped, "\n")
-		for wi, wl := range wrapLines {
+		for wi, wl := range rows {
 			if wi == 0 {
 				lines = append(lines, num+" "+wl)
 			} else {

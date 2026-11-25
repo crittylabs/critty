@@ -307,6 +307,9 @@ func (m AppModel) markdownImageSize(img *inlineImage) (int, int) {
 }
 
 func (m AppModel) markdownImageVisible(ref markdownImage) bool {
+	if m.tab().markdownSourceView {
+		return false
+	}
 	ranges := m.contentLayout.lineRanges
 	if ref.before {
 		ranges = m.contentLayout.oldRanges
@@ -440,7 +443,7 @@ func (m *AppModel) prepareMarkdownImages() tea.Cmd {
 }
 
 func (m *AppModel) renderMarkdownImages(line int, before bool) string {
-	if !m.images.enabled || m.images.hidden {
+	if !m.images.enabled || m.images.hidden || m.tab().markdownSourceView {
 		return ""
 	}
 	width := max(1, m.contentViewport.Width()-m.sourceGutterWidth())

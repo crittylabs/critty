@@ -55,6 +55,7 @@ type keyMap struct {
 	Watch            key.Binding
 	IgnoreWhitespace key.Binding
 	Split            key.Binding
+	MarkdownSource   key.Binding
 	Images           key.Binding
 	Delete           key.Binding
 	FileComment      key.Binding
@@ -98,6 +99,7 @@ var keys = keyMap{
 	Watch:            key.NewBinding(key.WithKeys("W", "shift+w", "shift+W", "shift+f5", "alt+R", "alt+shift+r", "alt+shift+R"), key.WithHelp("W/S-F5/M-R", "watch")),
 	IgnoreWhitespace: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "ignore whitespace")),
 	Split:            key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "toggle split diff")),
+	MarkdownSource:   key.NewBinding(key.WithKeys("alt+u"), key.WithHelp("M-u", "toggle Markdown source")),
 	Images:           key.NewBinding(key.WithKeys("I", "alt+i"), key.WithHelp("I/M-i", "show/hide image, math, and Mermaid previews")),
 	Delete:           key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete comment")),
 	FileComment:      key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "comment on file")),

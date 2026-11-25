@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Press <kbd>M-u</kbd> or click the syntax name in the file header to switch between formatted Markdown and its syntax-highlighted source.  Source view keeps markup and table spacing as written and uses a subdued color for cell separators.
+- Use the same highlighting for Markdown source references and suggestions, including suggestions for lines that contain code fences.
+
 ### Changed
 
 - Page and half-page keys scroll the content pane while keeping the current line if it is visible.  When the current line leaves the pane, it moves to the second visible row from the top when scrolling down or from the bottom when scrolling up.  At a scroll limit, half-page keys move the current line by half a page and full-page keys move it to the beginning or end.

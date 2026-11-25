@@ -70,6 +70,7 @@ type markdownLine struct {
 	headingLevel  int
 	tokens        []markdownToken
 	cells         [][2]int
+	tableRow      bool
 	tableSep      bool
 	thematicBreak bool
 	ruleStart     int
@@ -86,6 +87,8 @@ type markdownLine struct {
 	previewBands  []previewDisplayBand
 	previewWidth  int
 	previewScroll *horizontalBlockViewport
+
+	markdownSuggestion bool
 	// plainRender caches the rendering without word-diff segments, and
 	// inlineRender the one for the segments it was last rendered with.
 	plainRender, inlineRender markdownRender
@@ -171,6 +174,8 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 	var visit func(ast.Node)
 	visit = func(n ast.Node) {
 		switch n.(type) {
+		case *extast.TableHeader, *extast.TableRow:
+			m.lines[start+lineAt(n.Pos())].tableRow = true
 		case *ast.Paragraph, *ast.Heading, *extast.TableCell:
 			heading, isHeading := n.(*ast.Heading)
 			if isHeading {
@@ -215,7 +220,7 @@ func (m *markdownSource) parseRun(start, end int, incomplete bool) {
 					m.styleCodeFence(*fence, info)
 					m.markCodeRows(fence.start, fence.end)
 				}
-				m.highlightCodeBlock(block, data, base, info.lexer)
+				m.highlightCodeBlock(block, data, base, info)
 			} else if block.CodeBlockKind == ast.CodeBlockKindIndented && !incomplete {
 				segments := block.Value.Segments()
 				if len(segments) > 0 {

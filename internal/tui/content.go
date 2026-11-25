@@ -155,7 +155,7 @@ func (m *AppModel) rebuildContent() {
 		sourceLines = t.doc.Lines
 	}
 	var tableBlocks []tableBlock
-	if isMarkdown {
+	if isMarkdown && !t.markdownSourceView {
 		t.ensureMarkdownCache()
 		if t.markdown != nil {
 			tableBlocks = detectTableBlocks(t.markdown.after.lines, func(line int) []string { return t.markdownTableCells(line, nil) })

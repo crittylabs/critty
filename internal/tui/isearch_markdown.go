@@ -113,7 +113,7 @@ func searchDisplayRanges(tokens []markdownSearchToken, start, end int) [][2]int 
 
 func (m *AppModel) markdownISearchDecorator(ref lineRef) func(string) (string, bool) {
 	t := m.tab()
-	if !t.isMarkdown {
+	if !t.isMarkdown || t.markdownSourceView {
 		return nil
 	}
 	t.ensureMarkdownCache()

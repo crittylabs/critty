@@ -365,7 +365,7 @@ func (m *AppModel) prepareVisibleImage() tea.Cmd {
 	// Supplied diffs carry no files to resolve against, but attachments
 	// keep their original location.
 	if t.isMarkdown && !t.isBinary && !t.outsideChanges && (m.patch == nil || t.attachment != nil) {
-		if m.images.hidden {
+		if m.images.hidden || t.markdownSourceView {
 			return nil
 		}
 		if !t.markdownImagesPending {

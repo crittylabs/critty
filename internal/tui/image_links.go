@@ -145,6 +145,9 @@ type linkSpan struct {
 // imageSpans returns the hyperlink spans of the image references on a
 // document line of the active tab.
 func (m *AppModel) imageSpans(line int, before bool) []linkSpan {
+	if m.tab().markdownSourceView {
+		return nil
+	}
 	var spans []linkSpan
 	for _, ref := range m.tab().markdownImages {
 		if ref.line == line && ref.before == before && ref.end > ref.start {

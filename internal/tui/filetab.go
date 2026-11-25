@@ -33,6 +33,7 @@ type FileTab struct {
 	attachment            *review.AttachedDocument
 	path                  string
 	viewDocument          bool // local document reached by browsing in view mode
+	markdownSourceView    bool
 	oldPath               string
 	status                string
 	textconv              gitpkg.Textconv

@@ -27,19 +27,9 @@ func (m *AppModel) highlightEditor(view string) string {
 		text        string
 	}
 	var wrapped []wrappedRow
-	kinds := make([][]chroma.TokenType, len(source.lines))
+	styles := make([][]uv.Style, len(source.lines))
 	for i, line := range source.lines {
-		kinds[i] = make([]chroma.TokenType, utf8.RuneCountInString(line.source))
-		for _, token := range line.tokens {
-			if token.syntax == 0 {
-				continue
-			}
-			from := utf8.RuneCountInString(line.source[:token.start])
-			to := from + utf8.RuneCountInString(token.text)
-			for j := from; j < to; j++ {
-				kinds[i][j] = token.syntax
-			}
-		}
+		styles[i] = editorLineStyles(&line)
 		start := 0
 		for _, runes := range textareaWrap([]rune(line.source), m.modalTextarea.Width()) {
 			text := string(runes)
@@ -53,7 +43,6 @@ func (m *AppModel) highlightEditor(view string) string {
 	selectionStart, selectionEnd, selected := m.modalTextarea.Selection()
 	promptWidth := lipgloss.Width(m.modalTextarea.Prompt)
 	rows := uv.NewStyledString(view).Lines(ansi.GraphemeWidth)
-	palette := codeHighlightStyle()
 	var out strings.Builder
 	for y, cells := range rows {
 		if y > 0 {
@@ -71,18 +60,14 @@ func (m *AppModel) highlightEditor(view string) string {
 				matches := strings.HasPrefix(row.text[byteOffset:], cell.Content)
 				inSelection := selected && (row.line > selectionStart.Row || row.line == selectionStart.Row && column+utf8.RuneCountInString(cell.Content) > selectionStart.Col) &&
 					(row.line < selectionEnd.Row || row.line == selectionEnd.Row && column < selectionEnd.Col)
-				if matches && column < len(kinds[row.line]) && !inSelection {
-					if kind := kinds[row.line][column]; kind != 0 {
-						entry := palette.Get(kind)
-						if entry.Colour.IsSet() {
-							cell.Style.Fg = lipgloss.Color(entry.Colour.String())
-						}
-						if entry.Bold == chroma.Yes {
-							cell.Style.Attrs |= uv.AttrBold
-						}
-						if entry.Italic == chroma.Yes {
-							cell.Style.Attrs |= uv.AttrItalic
-						}
+				if matches && column < len(styles[row.line]) && !inSelection {
+					style := styles[row.line][column]
+					if style.Fg != nil {
+						cell.Style.Fg = style.Fg
+					}
+					cell.Style.Attrs |= style.Attrs
+					if style.Underline != 0 {
+						cell.Style.Underline = style.Underline
 					}
 				}
 				if matches {
@@ -96,4 +81,52 @@ func (m *AppModel) highlightEditor(view string) string {
 		}
 	}
 	return out.String()
+}
+
+func editorLineStyles(line *markdownLine) []uv.Style {
+	var result []uv.Style
+	palette := codeHighlightStyle()
+	tokens := line.tokens
+	if line.markdownSuggestion {
+		tokens = line.sourceTokens()
+	}
+	for _, token := range tokens {
+		var style uv.Style
+		if line.markdownSuggestion {
+			syntax := markdownTokenStyle(token, false, nil).Inherit(markdownHeadingStyle(line.headingLevel))
+			if fg := syntax.GetForeground(); fg != (lipgloss.NoColor{}) {
+				style.Fg = fg
+			}
+			if syntax.GetBold() {
+				style.Attrs |= uv.AttrBold
+			}
+			if syntax.GetItalic() {
+				style.Attrs |= uv.AttrItalic
+			}
+			style.Underline = uv.Underline(syntax.GetUnderlineStyle())
+		} else if token.syntax != 0 {
+			entry := palette.Get(token.syntax)
+			if entry.Colour.IsSet() {
+				style.Fg = lipgloss.Color(entry.Colour.String())
+			}
+			if entry.Bold == chroma.Yes {
+				style.Attrs |= uv.AttrBold
+			}
+			if entry.Italic == chroma.Yes {
+				style.Attrs |= uv.AttrItalic
+			}
+		}
+		if style.IsZero() {
+			continue
+		}
+		if result == nil {
+			result = make([]uv.Style, utf8.RuneCountInString(line.source))
+		}
+		from := utf8.RuneCountInString(line.source[:token.start])
+		to := from + utf8.RuneCountInString(line.source[token.start:token.end])
+		for i := from; i < to; i++ {
+			result[i] = style
+		}
+	}
+	return result
 }

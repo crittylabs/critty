@@ -16,6 +16,7 @@ type markdownRender struct {
 	text, plain string
 	width       int
 	dark, set   bool
+	source      bool
 	palette     uint64
 	foreground  string
 	with        markdownInlineKey
@@ -116,17 +117,28 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 	if line.previewTokens != nil {
 		return line.renderPreview(inline, base, changed, links)
 	}
+	return line.renderTokens(inline, base, changed, links, false)
+}
+
+func (line *markdownLine) renderTokens(inline []gitpkg.InlineSegment, base, changed lipgloss.Style, links []linkSpan, source bool) string {
 	key := inlineKey(inline)
 	foreground := base.GetForeground()
+	if line.markdownSuggestion {
+		foreground = nil
+	}
 	foregroundKey := fgToAnsi(foreground)
 	cacheable := len(links) == 0 && line.previewTokens == nil
 	slot := line.cacheSlot(key)
-	if cacheable && slot.set && slot.dark == terminalIsDark && slot.palette == markdownPaletteRevision && slot.foreground == foregroundKey && slot.with == key {
+	if cacheable && slot.set && slot.source == source && slot.dark == terminalIsDark && slot.palette == markdownPaletteRevision && slot.foreground == foregroundKey && slot.with == key {
 		return slot.text
+	}
+	tokens := line.displayTokens()
+	if source {
+		tokens = line.sourceTokens()
 	}
 	var b strings.Builder
 	segmentIndex, segmentStart := 0, 0
-	for _, token := range linkedMarkdownTokens(line.displayTokens(), links) {
+	for _, token := range linkedMarkdownTokens(tokens, links) {
 		if token.text == "" {
 			continue
 		}
@@ -195,11 +207,11 @@ func (line *markdownLine) render(inline []gitpkg.InlineSegment, base, changed li
 	result := b.String()
 	if line.headingLevel > 0 {
 		result = markdownHeadingStyle(line.headingLevel).Render(result)
-	} else if !line.literal {
+	} else if !source && !line.literal {
 		result = highlightMarkdownBlock(result)
 	}
 	if cacheable {
-		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, palette: markdownPaletteRevision, foreground: foregroundKey, set: true, with: key}
+		*slot = markdownRender{text: result, plain: ansi.Strip(result), width: ansi.StringWidth(result), dark: terminalIsDark, palette: markdownPaletteRevision, foreground: foregroundKey, set: true, with: key, source: source}
 	}
 	return result
 }

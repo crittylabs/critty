@@ -67,6 +67,15 @@ func TestReviewBarProjectAndTopic(t *testing.T) {
 	row := strings.Split(app.renderHeader(), "\n")[lipgloss.Height(app.renderReviewBar())]
 	runes, styles := renderedCells(row)
 	plain := string(runes)
+	syntax := strings.Index(plain, " Markdown ")
+	if syntax < 0 || syntax > strings.Index(plain, "%") {
+		t.Fatalf("syntax label is missing before the percentage: %q", plain)
+	}
+	syntaxColumn := len([]rune(plain[:syntax]))
+	if !sameColor(styles[syntaxColumn-1].Bg, styles[syntaxColumn].Bg) ||
+		!sameColor(styles[syntaxColumn-1].Bg, styles[syntaxColumn+2].Bg) {
+		t.Fatal("syntax label changes the gray background")
+	}
 	for _, transition := range []struct {
 		text   string
 		fg, bg color.Color

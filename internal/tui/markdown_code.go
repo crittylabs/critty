@@ -11,8 +11,9 @@ import (
 )
 
 type codeFenceInfo struct {
-	lexer      chroma.Lexer
-	start, end int
+	lexer              chroma.Lexer
+	start, end         int
+	markdownSuggestion bool
 }
 
 func (m *markdownSource) codeFenceInfo(block *ast.CodeBlock, data []byte) codeFenceInfo {
@@ -51,7 +52,8 @@ func (m *markdownSource) codeFenceInfo(block *ast.CodeBlock, data []byte) codeFe
 	if start < end {
 		start, end = index.Start+start, index.Start+end
 	}
-	return codeFenceInfo{lexer: lexer, start: start, end: end}
+	markdownSuggestion := language == "suggestion" && !m.syntax.HasAlias(language) && lexer != nil && lexer.Config().Name == "markdown"
+	return codeFenceInfo{lexer: lexer, start: start, end: end, markdownSuggestion: markdownSuggestion}
 }
 
 // Cache hits and misses for this parse; names without a direct Chroma match
@@ -142,12 +144,16 @@ func (m *markdownSource) styleCodeFence(fence markdownFence, info codeFenceInfo)
 	}
 }
 
-func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, base int, lexer chroma.Lexer) {
-	if lexer == nil {
+func (m *markdownSource) highlightCodeBlock(block *ast.CodeBlock, data []byte, base int, info codeFenceInfo) {
+	if info.lexer == nil {
 		return
 	}
 	projection := projectMarkdownSegments(data, block.Value.Segments())
-	iterator, err := lexer.Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, projection.text)
+	if info.markdownSuggestion {
+		m.highlightMarkdownSuggestion(projection, base)
+		return
+	}
+	iterator, err := info.lexer.Tokenise(&chroma.TokeniseOptions{State: "root", EnsureLF: false}, projection.text)
 	if err != nil {
 		return
 	}
@@ -165,30 +171,65 @@ func (m *markdownSource) highlightSyntaxSegments(projection markdownProjection, 
 			return
 		}
 		end := pos + len(token.Value)
-		for pos < end {
-			span := projection.spanAt(pos)
-			stop := min(end, span.end)
-			offset := base + span.source + pos - span.local
-			row := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > offset }) - 1
-			column := offset - m.offsets[row]
-			length := min(stop-pos, len(m.lines[row].source)-column)
-			kind := token.Type
-			if kind == chroma.Error {
-				kind = chroma.Text
-			}
-			if length > 0 {
-				output[row] = append(output[row], markdownToken{start: column, end: column + length, text: source[pos : pos+length], syntax: kind, style: style})
-			}
-			pos = stop
+		kind := token.Type
+		if kind == chroma.Error {
+			kind = chroma.Text
 		}
+		m.projectSyntaxToken(projection, base, markdownToken{start: pos, end: end, syntax: kind, style: style}, output)
+		pos = end
 	}
 	if pos != len(source) {
 		return
 	}
+	m.setSyntaxTokens(output)
+}
+
+func (m *markdownSource) projectSyntaxToken(projection markdownProjection, base int, token markdownToken, output map[int][]markdownToken) {
+	for pos := token.start; pos < token.end; {
+		span := projection.spanAt(pos)
+		stop := min(token.end, span.end)
+		offset := base + span.source + pos - span.local
+		row := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > offset }) - 1
+		column := offset - m.offsets[row]
+		length := min(stop-pos, len(m.lines[row].source)-column)
+		if length > 0 {
+			part := token
+			part.start, part.end, part.text = column, column+length, projection.text[pos:pos+length]
+			output[row] = append(output[row], part)
+		}
+		pos = stop
+	}
+}
+
+func (m *markdownSource) setSyntaxTokens(output map[int][]markdownToken) {
 	for row, tokens := range output {
 		line := &m.lines[row]
 		first, last := tokens[0].start, tokens[len(tokens)-1].end
 		line.tokens = append([]markdownToken{{end: first, text: line.source[:first]}}, tokens...)
 		line.tokens = append(line.tokens, markdownToken{start: last, end: len(line.source), text: line.source[last:]})
 	}
+}
+
+func (m *markdownSource) highlightMarkdownSuggestion(projection markdownProjection, base int) {
+	// The replacement is source code. Parse it on its own, without inheriting
+	// suggestion syntax for any fences it contains.
+	source := parseMarkdownWithSyntax(strings.Split(projection.text, "\n"), nil, m.syntax, m.symbols)
+	output := make(map[int][]markdownToken)
+	for i, line := range source.lines {
+		if line.source == "" {
+			continue
+		}
+		start := source.offsets[i]
+		offset := base + projection.sourceOffset(start)
+		row := sort.Search(len(m.offsets), func(i int) bool { return m.offsets[i] > offset }) - 1
+		m.lines[row].markdownSuggestion = true
+		m.lines[row].headingLevel = line.headingLevel
+		for _, token := range line.sourceTokens() {
+			token.start += start
+			token.end += start
+			token.sourceEnd = 0
+			m.projectSyntaxToken(projection, base, token, output)
+		}
+	}
+	m.setSyntaxTokens(output)
 }

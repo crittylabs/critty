@@ -472,7 +472,7 @@ func (m *AppModel) prepareRenderedDisplay() {
 			continue
 		}
 		before := source == t.markdown.before
-		if len(source.remoteImageLines) > 0 {
+		if !t.markdownSourceView && len(source.remoteImageLines) > 0 {
 			sides := make(map[string]*previewSide)
 			for i := range t.markdownImages {
 				ref := &t.markdownImages[i]
@@ -499,7 +499,7 @@ func (m *AppModel) prepareRenderedDisplay() {
 				source.lines[i].previewWidth = max(1, (m.contentViewport.Width()-3)/2-m.sourceGutterWidth()-1)
 			}
 		}
-		if !m.images.enabled || m.images.hidden || m.isearch.active || t.selecting {
+		if t.markdownSourceView || !m.images.enabled || m.images.hidden || m.isearch.active || t.selecting {
 			continue
 		}
 		var refs []markdownImage

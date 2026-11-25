@@ -54,12 +54,16 @@ func (t *FileTab) markdownDisplayLine(line int, before bool, fallback string, in
 	if before {
 		changed = diffDeletedTextBg
 	}
-	if source != nil && line > 0 && line <= len(source.lines) && source.lines[line-1].source == fallback {
-		return source.lines[line-1].render(inline, base, changed, images)
+	if source == nil || line <= 0 || line > len(source.lines) || source.lines[line-1].source != fallback {
+		// Standalone deleted lines and test fixtures may have no document cache.
+		source = parseMarkdownWithSyntax([]string{fallback}, nil, t.syntax, t.symbols)
+		line = 1
 	}
-	// Standalone deleted lines and test fixtures may have no document cache.
-	source = parseMarkdownWithSyntax([]string{fallback}, nil, t.syntax, t.symbols)
-	return source.lines[0].render(inline, base, changed, images)
+	parsed := &source.lines[line-1]
+	if t.markdownSourceView {
+		return parsed.renderTokens(inline, base, changed, images, true)
+	}
+	return parsed.render(inline, base, changed, images)
 }
 
 // markdownDisplayLineInfo renders a document line and also returns its plain
