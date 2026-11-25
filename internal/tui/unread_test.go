@@ -7,8 +7,70 @@ import (
 
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/crittylabs/critty/v2/internal/form"
 	gitpkg "github.com/crittylabs/critty/v2/internal/git"
+	"github.com/crittylabs/critty/v2/internal/review"
 )
+
+func TestUnansweredFormGutter(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] All <!-- form: id=all select-all=checks -->
+- [ ] Include notes <!-- form: id=notes tags=checks -->
+- [ ] Brief <!-- form: id=length value=brief -->
+- [ ] Detailed <!-- form: id=length value=detailed -->
+- [ ] Reason <!-- form: id=reason text required -->
+`)
+	assertDots := func(want map[int]bool) {
+		t.Helper()
+		app.rebuildContent()
+		rows := strings.Split(app.contentViewport.GetContent(), "\n")
+		for line := 1; line <= 5; line++ {
+			runes, cells := renderedCells(rows[app.contentLayout.lineRanges[line].start])
+			if (runes[0] == '●') != want[line] {
+				t.Errorf("line %d gutter = %q, want pending dot %t", line, runes[0], want[line])
+			}
+			if want[line] && !sameColor(cells[0].Fg, unreadDotStyle.GetForeground()) {
+				t.Errorf("line %d pending dot lost its color", line)
+			}
+		}
+	}
+	assertDots(map[int]bool{2: true, 3: true, 5: true})
+	answers := app.forms.Document(app.tab().path).Answers
+	answers["notes"] = form.Answer{Value: true, Human: true}
+	answers["length"] = form.Answer{Value: "detailed", Human: true}
+	answers["reason"] = form.Answer{Value: "For review", Human: true}
+	assertDots(nil)
+}
+
+func TestUnresolvedCommentGutter(t *testing.T) {
+	t.Parallel()
+	const patch = "diff --git a/notes.md b/notes.md\n--- a/notes.md\n+++ b/notes.md\n@@ -1 +1 @@\n-Old\n+New\n"
+	app := patchApp(t, patch)
+	app.tab().state.Comments = []review.Comment{
+		{ID: "before", Side: "old", StartLine: 1, Body: "Previous text."},
+		{ID: "after", StartLine: 1, Body: "New text."},
+		{ID: "file", Scope: "file", Body: "File note."},
+	}
+	for _, split := range []bool{false, true} {
+		app.split = split
+		for _, reading := range []bool{false, true} {
+			app.viewMode = reading
+			for _, resolved := range []bool{false, true} {
+				for i := range app.tab().state.Comments {
+					app.tab().state.Comments[i].Resolved = resolved
+				}
+				app.rebuildContent()
+				want := 3
+				if resolved {
+					want = 0
+				}
+				if dots := strings.Count(ansi.Strip(app.contentViewport.GetContent()), "●"); dots != want {
+					t.Errorf("split=%t reading=%t resolved=%t: %d dots, want %d", split, reading, resolved, dots, want)
+				}
+			}
+		}
+	}
+}
 
 func TestReloadUnreadTabs(t *testing.T) {
 	dir := newGitRepo(t)

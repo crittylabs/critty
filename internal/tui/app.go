@@ -2846,11 +2846,15 @@ func (m *AppModel) updateCommentSidebar() {
 		if len(it.replies) > 0 {
 			lineInfo += commentLineStyle.Render(" · ") + inlineLabelComment.Bold(false).Render(countNoun(len(it.replies), "reply", "replies"))
 		}
-		cursorCol := lipgloss.NewStyle().Width(2)
-		prefix := cursorCol.Render("")
+		cursor := " "
 		if isSelected {
-			prefix = cursorCol.Render(cursorMarker.Render(">"))
+			cursor = cursorMarker.Render(">")
 		}
+		status := " "
+		if !it.resolved {
+			status = unreadGutterDot()
+		}
+		prefix := cursor + status + " "
 		header, button := renderCommentHeader(prefix+lineInfo, it.resolved, m.canDeleteComment(it.id), isSelected && !m.readOnly, max(1, m.commentViewport.Width()), m.icons)
 		button.translate(0, len(m.sidebarTargets))
 		button.id = it.id
@@ -4971,6 +4975,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "shift+↑/↓,C-u/d", desc: "⇅ half page (cursor follows)"},
 		{keys: "Home/End,g/G,</> · M-</M->", desc: "top/bottom"},
 		{keys: "{/}", desc: "⇅ pending items"},
+		{keys: "●", desc: "unanswered form or unresolved thread"},
 		{keys: "[/]", desc: "⇅ all items"},
 		{keys: "n/N", desc: "⇵ all hunks & items"},
 		{keys: "tab/shift+tab", desc: "⇵ file"},

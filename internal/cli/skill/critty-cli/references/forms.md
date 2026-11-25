@@ -19,6 +19,8 @@ Add interactive widgets to attached `.md` or `.markdown` files by annotating tas
 
 `required`, `consent`, choices, rankings, and select-alls need an explicit `id`.  Use explicit IDs whenever answers should survive document revisions.
 
+A gold gutter dot marks an unanswered field at its first row.  A select-all applies to other fields and has no answer of its own.
+
 ## Path inputs and defaults
 
 Use `type=file`, `type=directory`, or `type=path` instead of `text` for a single-line path.  Long paths can wrap on screen.  Directory inputs suggest directories only; file and path inputs suggest files and directories so users can navigate into folders.  A new file or directory name can be entered without creating it.  File inputs reject paths ending with `/` and existing directories, including symbolic links to directories.  Directory inputs reject existing files.  Relative completion starts at the review's working directory, and `~/` lists the user's home directory.  Answers retain the literal entered path, including spaces and Unicode, without an `@` prefix or shell escaping.  Environment variables and commands are not expanded.
@@ -72,7 +74,7 @@ Add `min-level=N` to set the shallowest level where an item can appear.  Root it
 
 Until the reviewer moves an item or confirms the order, the answer stays `null`.  An answered ranking has a `value` array in depth-first order.  When it has children, the answer also has a `rank_parents` object that maps each child value to its parent value.  Root items are absent from the map.  The corresponding definitions use `rank_parent` for each item's original parent.
 
-Critty displays a contiguous ranking in its answered order without changing the source.  Colored brackets mark each ranking, using the same color if its items appear in separate runs.  A gold dot in the left gutter marks the first row of an unanswered ranking.  A lock marks fixed items.  A four-way handle marks items that can currently change depth.  Each ranked row shows its position among its siblings.  The Answers list includes the full path, such as `2-1` for the first child of the second root item.  A comment on a ranked item keeps that item's source `start_line` and `anchor`, so it names the item regardless of its displayed position; read the position from the answer.  Inside a reordered ranking, a comment covers one item, and a range reaching into it covers the whole ranking.
+Critty displays a contiguous ranking in its answered order without changing the source.  Colored brackets mark each ranking, using the same color if its items appear in separate runs.  A lock marks fixed items.  A four-way handle marks items that can currently change depth.  Each ranked row shows its position among its siblings.  The Answers list includes the full path, such as `2-1` for the first child of the second root item.  A comment on a ranked item keeps that item's source `start_line` and `anchor`, so it names the item regardless of its displayed position; read the position from the answer.  Inside a reordered ranking, a comment covers one item, and a range reaching into it covers the whole ranking.
 
 ## Saved answers
 

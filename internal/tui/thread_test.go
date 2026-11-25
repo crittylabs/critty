@@ -248,7 +248,7 @@ func TestSidebarNavigationShowsExpandedThread(t *testing.T) {
 	if app.commentViewport.YOffset() == 0 {
 		t.Fatal("selecting the final thread did not scroll it into view")
 	}
-	if got := ansi.Strip(app.commentViewport.View()); !strings.Contains(got, "> File") || !strings.Contains(got, "short reply") {
+	if got := ansi.Strip(app.commentViewport.View()); !strings.Contains(got, ">● File") || !strings.Contains(got, "short reply") {
 		t.Fatalf("selected thread is not fully visible: %q", got)
 	}
 	app = pressKey(app, 'g')

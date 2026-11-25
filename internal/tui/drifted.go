@@ -67,6 +67,8 @@ type commentMarker struct {
 	ids  []string
 }
 
+const commentMarkerGutterWidth = 3
+
 func (m *AppModel) commentMarkerGroups() map[lineRef][]string {
 	groups := make(map[lineRef][]string)
 	if m.tab().state != nil {
@@ -97,6 +99,7 @@ func (m *AppModel) decorateCommentMarkers(content string, layout *renderedConten
 			last[lineRef{side: row.left.side, line: row.left.line}] = i
 		}
 	}
+	selected := m.selectedCommentID()
 	for ref, ids := range groups {
 		y, ok := last[ref]
 		if !ok {
@@ -104,14 +107,19 @@ func (m *AppModel) decorateCommentMarkers(content string, layout *renderedConten
 		}
 		label := commentLineStyle.Faint(true).Render(m.icons.Glyph(icons.Comment, "💬"))
 		resolved := true
+		pendingWithoutAnchor := false
 		for _, id := range ids {
-			c, _ := m.driftedComment(id)
+			c, drifted := m.driftedComment(id)
 			resolved = resolved && c.Resolved
+			pendingWithoutAnchor = pendingWithoutAnchor || !c.Resolved && (drifted || ref.line == 0)
 		}
+		cursor := " "
 		for _, id := range ids {
-			if id == m.selectedCommentID() {
-				c, _ := m.driftedComment(id)
+			if id == selected {
+				c, drifted := m.driftedComment(id)
 				resolved = c.Resolved
+				pendingWithoutAnchor = !c.Resolved && (drifted || ref.line == 0)
+				cursor = cursorMarker.Render(">")
 				break
 			}
 		}
@@ -119,15 +127,12 @@ func (m *AppModel) decorateCommentMarkers(content string, layout *renderedConten
 			label = m.icons.Join(label, commentLineStyle.Foreground(lipgloss.Blue).Render(strconv.Itoa(len(ids))))
 		}
 		label = m.icons.Join(renderResolution(resolved, "", false, false, m.icons), label)
-		prefix := "  "
-		for _, id := range ids {
-			if id == m.selectedCommentID() {
-				prefix = cursorMarker.Render(">") + " "
-				break
-			}
+		status := " "
+		if pendingWithoutAnchor {
+			status = unreadGutterDot()
 		}
-		x := max(0, m.contentViewport.Width()-lipgloss.Width(label)-2)
-		rows[y] = lipgloss.NewStyle().Width(x).Render(rows[y]) + prefix + label
+		x := max(0, m.contentViewport.Width()-lipgloss.Width(label)-commentMarkerGutterWidth)
+		rows[y] = lipgloss.NewStyle().Width(x).Render(rows[y]) + cursor + status + " " + label
 		layout.markers = append(layout.markers, commentMarker{
 			rect: mouseRect{left: x, right: m.contentViewport.Width(), top: y, bottom: y + 1}, ids: ids,
 		})

@@ -106,23 +106,7 @@ func (m *AppModel) rebuildContent() {
 		}
 	}
 
-	// Count how many comments cover each line (for overlap detection)
-	annotatedLines := make(map[int]int)
-	oldAnnotatedLines := make(map[int]int)
-	if t.state != nil {
-		for _, c := range t.state.Comments {
-			if isGeneralCommentScope(c.Scope) || commentDrifted(t, c) {
-				continue
-			}
-			lines := annotatedLines
-			if c.Side == "old" {
-				lines = oldAnnotatedLines
-			}
-			for l := c.StartLine; l <= c.EndAt(); l++ {
-				lines[l]++
-			}
-		}
-	}
+	comments := commentGutterLines(t)
 
 	selStart, selEnd := m.selectionRange()
 	selSide := m.selectionSide()
@@ -135,7 +119,7 @@ func (m *AppModel) rebuildContent() {
 	contentWidth := m.contentViewport.Width()
 	for _, ids := range groups {
 		markers := m.icons.Join(m.icons.Glyph(icons.Checked, "☑︎"), m.icons.Join(m.icons.Glyph(icons.Comment, "💬"), strconv.Itoa(len(ids))))
-		width := lipgloss.Width("> "+markers) + 1
+		width := lipgloss.Width(markers) + commentMarkerGutterWidth + 1
 		contentWidth = min(contentWidth, m.contentViewport.Width()-width)
 	}
 	boxWidth := contentWidth - m.sourceGutterWidth()
@@ -252,13 +236,7 @@ func (m *AppModel) rebuildContent() {
 			isSidebarHighlight := sidebarHighlightSide == "old" && del.OldLineNum >= sidebarHighlightStart && del.OldLineNum <= sidebarHighlightEnd
 			isSidebarHighlight = isSidebarHighlight && !isSelected && !(showCursor && isCursor)
 
-			marker := markers.deleted
-			switch {
-			case oldAnnotatedLines[del.OldLineNum] > 1:
-				marker = markers.overlap
-			case oldAnnotatedLines[del.OldLineNum] == 1:
-				marker = markers.annotated
-			}
+			marker := markers.forLine(comments[lineRef{line: del.OldLineNum, side: "old"}], false, markers.deleted)
 
 			numStyle := diffDeletedLineNum
 			if isCursor {
@@ -303,6 +281,7 @@ func (m *AppModel) rebuildContent() {
 	}
 	sourceLineCount := t.doc.SourceLineCount()
 	formDoc := m.forms.Document(t.path)
+	seenForms := map[string]bool{}
 	rankGroups := map[string]int{}
 	var rankGroupRows []rankGroupRow
 	for _, i := range m.lineOrder(t) {
@@ -336,34 +315,28 @@ func (m *AppModel) rebuildContent() {
 			return s
 		}
 
-		unansweredRank := false
+		unanswered := false
 		rankGroup := -1
-		if !t.markdownSourceView && formDoc != nil && formItem != nil && formItem.Rank {
-			var seen bool
-			rankGroup, seen = rankGroups[formItem.ID]
-			if !seen {
-				rankGroup = len(rankGroups)
-				rankGroups[formItem.ID] = rankGroup
-				_, ranked := form.RankTree(formDoc.Items, formItem.ID, formDoc.Answers[formItem.ID])
-				unansweredRank = !ranked
+		if !t.markdownSourceView && formDoc != nil && formItem != nil && formItem.SelectAll == nil {
+			if !seenForms[formItem.ID] {
+				seenForms[formItem.ID] = true
+				unanswered = !formItemAnswered(formDoc, *formItem)
+			}
+			if formItem.Rank {
+				var seen bool
+				rankGroup, seen = rankGroups[formItem.ID]
+				if !seen {
+					rankGroup = len(rankGroups)
+					rankGroups[formItem.ID] = rankGroup
+				}
 			}
 		}
 
-		// Marker column
-		var marker string
-		if count := annotatedLines[lineNum]; count > 0 {
-			if count > 1 {
-				marker = markers.overlap
-			} else {
-				marker = markers.annotated
-			}
-		} else if isChanged {
-			marker = markers.added
-		} else if unansweredRank {
-			marker = markers.unansweredRank
-		} else {
-			marker = " "
+		fallback := " "
+		if isChanged {
+			fallback = markers.added
 		}
+		marker := markers.forLine(comments[lineRef{line: lineNum}], unanswered, fallback)
 
 		// Line number
 		numStr := t.renderLineNumber(lineNum)
@@ -609,8 +582,16 @@ func (m *AppModel) renderAnnotationBox(ann annotation, maxWidth int, focused boo
 	}
 
 	var b strings.Builder
-	for _, line := range strings.Split(box, "\n") {
-		b.WriteString(prefix + line + "\n")
+	for row, line := range strings.Split(box, "\n") {
+		gutter := prefix
+		if row == 1 && !ann.resolved && isGeneralCommentScope(ann.scope) {
+			column := 0
+			if focused && m.sourceGutterWidth() > 1 {
+				column = 1
+			}
+			gutter = replaceSourceCell(gutter, column, unreadGutterDot())
+		}
+		b.WriteString(gutter + line + "\n")
 	}
 	button.translate(m.sourceGutterWidth()+2, 1)
 	return b.String(), button
@@ -786,15 +767,60 @@ func highlightMarkdownWith(line string, inline func(string) string) string {
 
 // gutterMarkers holds the one-column gutter markers rendered once per rebuild.
 type gutterMarkers struct {
-	overlap, annotated, added, deleted, unansweredRank string
+	overlap, annotated, added, deleted, pending string
+}
+
+type commentGutterLine struct {
+	count   int
+	pending bool
+}
+
+func commentGutterLines(t *FileTab) map[lineRef]commentGutterLine {
+	lines := make(map[lineRef]commentGutterLine)
+	if t.state == nil {
+		return lines
+	}
+	for _, c := range t.state.Comments {
+		if isGeneralCommentScope(c.Scope) || commentDrifted(t, c) {
+			continue
+		}
+		side := ""
+		if c.Side == "old" {
+			side = "old"
+		}
+		for line := c.StartLine; line <= c.EndAt(); line++ {
+			ref := lineRef{line: line, side: side}
+			entry := lines[ref]
+			entry.count++
+			entry.pending = entry.pending || line == c.StartLine && !c.Resolved
+			lines[ref] = entry
+		}
+	}
+	return lines
+}
+
+func (m gutterMarkers) forLine(comments commentGutterLine, unanswered bool, fallback string) string {
+	switch {
+	case comments.pending || unanswered:
+		return m.pending
+	case comments.count > 1:
+		return m.overlap
+	case comments.count == 1:
+		return m.annotated
+	}
+	return fallback
+}
+
+func unreadGutterDot() string {
+	return unreadDotStyle.Render("●")
 }
 
 func renderGutterMarkers() gutterMarkers {
 	return gutterMarkers{
 		overlap:   gutterOverlap.Render("◆"),
 		annotated: annotationGutter.Render("■"), added: diffAddedGutter.Render("+"),
-		deleted:        diffDeletedGutter.Render("-"),
-		unansweredRank: unreadDotStyle.Render("●"),
+		deleted: diffDeletedGutter.Render("-"),
+		pending: unreadGutterDot(),
 	}
 }
 

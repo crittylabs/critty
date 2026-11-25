@@ -210,15 +210,15 @@ func TestDriftedMarkerResolution(t *testing.T) {
 		{ID: "open", StartLine: 1, EndLine: 1, Drifted: true},
 	}
 	app.rebuildContent()
-	if !strings.Contains(ansi.Strip(app.contentViewport.View()), "☐ 💬 2") {
-		t.Fatal("mixed group should be unchecked when unfocused")
+	if !strings.Contains(ansi.Strip(app.contentViewport.View()), "● ☐ 💬 2") {
+		t.Fatal("mixed group should have a pending dot and be unchecked when unfocused")
 	}
 	app = pressKey(app, ']')
-	if app.selectedCommentID() != "done" || !strings.Contains(ansi.Strip(app.contentViewport.View()), "> ☑︎ 💬 2") {
+	if app.selectedCommentID() != "done" || !strings.Contains(ansi.Strip(app.contentViewport.View()), ">  ☑︎ 💬 2") {
 		t.Fatal("focused marker should show the selected thread's resolution")
 	}
 	app = pressKey(app, ']')
-	if app.selectedCommentID() != "open" || !strings.Contains(ansi.Strip(app.contentViewport.View()), "> ☐ 💬 2") {
+	if app.selectedCommentID() != "open" || !strings.Contains(ansi.Strip(app.contentViewport.View()), ">● ☐ 💬 2") {
 		t.Fatal("focused unresolved thread should be unchecked")
 	}
 	app.toggleResolve("open")

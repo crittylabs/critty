@@ -60,19 +60,26 @@ func (m *AppModel) formReviewItems() []formReviewItem {
 				continue
 			}
 			seen[item.ID] = true
-			answer := d.Answers[item.ID]
-			answered := form.Selected(item, answer)
-			if item.Choice {
-				value, ok := answer.Value.(string)
-				answered = ok && value != ""
-			}
-			if item.Required || item.Consent {
-				answered = form.Satisfied(item, answer)
-			}
-			items = append(items, formReviewItem{tab: tabIndex, item: item, answered: answered, viewed: !unviewed[item.ID]})
+			items = append(items, formReviewItem{tab: tabIndex, item: item, answered: formItemAnswered(d, item), viewed: !unviewed[item.ID]})
 		}
 	}
 	return items
+}
+
+func formItemAnswered(d *review.FormDocument, item form.Item) bool {
+	answer := d.Answers[item.ID]
+	if (item.Required || item.Consent) && !form.Satisfied(item, answer) {
+		return false
+	}
+	if item.Rank {
+		_, ranked := form.RankTree(d.Items, item.ID, answer)
+		return ranked
+	}
+	if item.Choice {
+		value, ok := answer.Value.(string)
+		return ok && value != ""
+	}
+	return form.Selected(item, answer)
 }
 
 func (m *AppModel) pendingForms() []formReviewItem {

@@ -575,33 +575,18 @@ func (l *renderedContentLayout) addCellSpan(row, left, column int, cell diffCell
 // diffGutter holds the gutter renderings and annotation counts shared by every
 // cell of one diff rebuild.
 type diffGutter struct {
-	markers      gutterMarkers
-	annotated    map[int]int // comments covering each new-side line
-	oldAnnotated map[int]int // comments covering each old-side line
-	selStart     int
-	selEnd       int
-	selSide      string
-	hlStart      int
-	hlEnd        int
-	hlSide       string
+	markers  gutterMarkers
+	comments map[lineRef]commentGutterLine
+	selStart int
+	selEnd   int
+	selSide  string
+	hlStart  int
+	hlEnd    int
+	hlSide   string
 }
 
 func (m *AppModel) diffGutter(t *FileTab) diffGutter {
-	g := diffGutter{markers: renderGutterMarkers(), annotated: map[int]int{}, oldAnnotated: map[int]int{}}
-	if t.state != nil {
-		for _, c := range t.state.Comments {
-			if isGeneralCommentScope(c.Scope) || commentDrifted(t, c) {
-				continue
-			}
-			lines := g.annotated
-			if c.Side == "old" {
-				lines = g.oldAnnotated
-			}
-			for l := c.StartLine; l <= c.EndAt(); l++ {
-				lines[l]++
-			}
-		}
-	}
+	g := diffGutter{markers: renderGutterMarkers(), comments: commentGutterLines(t)}
 	g.selStart, g.selEnd = m.selectionRange()
 	g.selSide = m.selectionSide()
 	g.hlStart, g.hlEnd, g.hlSide = m.highlightedCommentLines()
@@ -632,16 +617,7 @@ func (m *AppModel) diffCell(line *diffLine, width int, before bool, gutter diffG
 		}
 	}
 	if !passive {
-		counts := gutter.annotated
-		if ref.side == "old" {
-			counts = gutter.oldAnnotated
-		}
-		switch {
-		case counts[ref.line] > 1:
-			marker = gutter.markers.overlap
-		case counts[ref.line] == 1:
-			marker = gutter.markers.annotated
-		}
+		marker = gutter.markers.forLine(gutter.comments[ref], false, marker)
 	}
 	var num string
 	switch {
