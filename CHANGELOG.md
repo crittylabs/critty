@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.3.0
+
 ### Added
 
 - Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
@@ -10,8 +12,8 @@
 
 ### Changed
 
-- Undo and redo now cover review actions, ranking moves, and successive text edits with the same shortcuts.  Undo with <kbd>C-/</kbd>, <kbd>C-_</kbd>, <kbd>C-z</kbd>, or <kbd>M-z</kbd>.  Redo with <kbd>M-_</kbd> or <kbd>M-Z</kbd>.
-  - In reviews, undo a resolution or deletion.  Deleting a comment or reply returns to the last line of its range.  Undo there to restore the thread, then redo to delete the same comment or reply again.  The footer offers both actions.
+- Undo and redo now cover review actions, ranking moves, and successive text edits with the same shortcuts.  Undo with <kbd>C-/</kbd>, <kbd>C-\_</kbd>, <kbd>C-z</kbd>, or <kbd>M-z</kbd>.  Redo with <kbd>M-\_</kbd> or <kbd>M-Z</kbd>.
+  - In reviews, undo a resolution or deletion.  Deleting a comment or reply returns to the last line of its range.  Undo there to restore the thread, then redo to delete the same comment or reply again.  The footer offers both actions, and <kbd>C-y</kbd> also redoes the action during review navigation.
   - Each ranking keeps its own history.  One drag from pickup to drop counts as one move, as does each keyboard move.
   - Each open text field keeps up to 100 edits.  <kbd>C-y</kbd> still yanks from the kill ring.
 - Page and half-page keys scroll the content pane while keeping the current line if it is visible.  When the current line leaves the pane, it moves to the second visible row from the top when scrolling down or from the bottom when scrolling up.  At a scroll limit, half-page keys move the current line by half a page and full-page keys move it to the beginning or end.
