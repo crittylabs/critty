@@ -321,10 +321,10 @@ type renderedScreenLayout struct {
 	hasFooterHelp        bool
 	formListButton       mouseRect
 	hasFormListButton    bool
-	rankUndoButton       mouseRect
-	hasRankUndoButton    bool
-	rankRedoButton       mouseRect
-	hasRankRedoButton    bool
+	undoButton           mouseRect
+	hasUndoButton        bool
+	redoButton           mouseRect
+	hasRedoButton        bool
 	imagesButton         mouseRect
 	hasImagesButton      bool
 	lineNumbersButton    mouseRect
@@ -1221,15 +1221,11 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.stepViewHistory(true)
 	}
 	if redo, matched := editHistoryKey(msg); matched {
-		if list, ok := m.currentRankList(); ok {
-			m.restoreRank(list, redo)
-		} else if isUndoKey(msg.String()) {
-			m.undoReview()
-		}
+		m.restoreAtCursor(redo)
 		return m, nil
 	}
 	if msg.String() == "ctrl+y" {
-		m.redoReview()
+		m.restoreAtCursor(true)
 		return m, nil
 	}
 	switch msg.String() {
@@ -3474,11 +3470,11 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if button := m.formListButton(); button != "" {
 		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
 	}
-	if button := m.rankHistoryButton(false); button != "" {
-		layout.rankUndoButton, layout.hasRankUndoButton = buttonRect(footer, footerTop, button)
+	if button := m.historyButton(false); button != "" {
+		layout.undoButton, layout.hasUndoButton = buttonRect(footer, footerTop, button)
 	}
-	if button := m.rankHistoryButton(true); button != "" {
-		layout.rankRedoButton, layout.hasRankRedoButton = buttonRect(footer, footerTop, button)
+	if button := m.historyButton(true); button != "" {
+		layout.redoButton, layout.hasRedoButton = buttonRect(footer, footerTop, button)
 	}
 
 	full := lipgloss.JoinVertical(lipgloss.Left, sections...)
@@ -3804,11 +3800,10 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 		m.openFormList()
 		return m, nil
 	}
-	undoRank := imageLayout.hasRankUndoButton && imageLayout.rankUndoButton.contains(mouse)
-	redoRank := imageLayout.hasRankRedoButton && imageLayout.rankRedoButton.contains(mouse)
-	if undoRank || redoRank {
-		list, _ := m.currentRankList()
-		m.restoreRank(list, redoRank)
+	undo := imageLayout.hasUndoButton && imageLayout.undoButton.contains(mouse)
+	redo := imageLayout.hasRedoButton && imageLayout.redoButton.contains(mouse)
+	if undo || redo {
+		m.restoreAtCursor(redo)
 		return m, nil
 	}
 	if imageLayout.hasLineNumbersButton && imageLayout.lineNumbersButton.contains(mouse) {
@@ -4803,7 +4798,7 @@ func (m AppModel) renderFooterHints() string {
 	}
 	controls := []string{m.footerHelpButton(), m.imagesButton(), m.lineNumbersButton()}
 	for _, redo := range []bool{false, true} {
-		if button := m.rankHistoryButton(redo); button != "" {
+		if button := m.historyButton(redo); button != "" {
 			controls = append(controls, button)
 		}
 	}
@@ -4877,7 +4872,13 @@ func (m AppModel) footerHelpButton() string {
 	return renderBarButton("Help", "M-?")
 }
 
-func (m *AppModel) rankHistoryButton(redo bool) string {
+func (m *AppModel) historyButton(redo bool) string {
+	if m.deletionAtCursor(redo) {
+		if redo {
+			return renderBarButton("Redo delete", "M-Z")
+		}
+		return renderBarButton("Undo delete", "M-z")
+	}
 	list, ok := m.currentRankList()
 	h := m.rankHistory[list]
 	if !ok || h == nil || m.rankDrag.active {
@@ -4988,13 +4989,13 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
 		{keys: "M-↑/↓", desc: "move ranked branch to the next allowed place"},
-		{keys: "C-/ · C-_ · C-z · M-z", desc: "undo one move in this ranking"},
-		{keys: "M-_ · M-Z", desc: "redo one move in this ranking"},
+		{keys: keys.Undo.Help().Key, desc: "undo move, deletion, or resolve"},
+		{keys: keys.Redo.Help().Key, desc: "redo move, deletion, or resolve"},
 		{keys: "M-←/→ · M-b/M-f (rank)", desc: "outdent / indent under previous sibling"},
 		{keys: "rank drag", desc: "drag sideways on the same row for depth; drag to another row to move"},
 		{keys: "v/C-SPC/C-@ · space", desc: "select/form"},
 		{keys: "s/t", desc: "sidebar/view"},
-		{keys: "r/space · R · C-z/C-y", desc: "resolve / resolve and go to next / undo, redo (undo returns to the thread)"},
+		{keys: "r/space · R · C-y", desc: "resolve / resolve and go to next / redo"},
 		{keys: "V · O", desc: "reading view / open all"},
 		{keys: "#", desc: "toggle line numbers"},
 		{keys: "M-u", desc: "toggle Markdown source"},

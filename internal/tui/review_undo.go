@@ -24,7 +24,8 @@ type reviewEdit struct {
 	comment review.Comment
 	index   int
 	reply   review.Reply
-	advance bool // `R` rather than `r` or space
+	source  lineRef // cursor landing position after a deletion
+	advance bool    // `R` rather than `r` or space
 }
 
 const reviewUndoLimit = 100
@@ -99,7 +100,6 @@ func (m *AppModel) redoReview() bool {
 		return false
 	}
 	edit := m.reviewRedo[n-1]
-	m.reviewRedo = m.reviewRedo[:n-1]
 	tabIndex := m.tabIndexForPath(edit.path)
 	if tabIndex < 0 {
 		return false
@@ -111,8 +111,15 @@ func (m *AppModel) redoReview() bool {
 	case resolveEdit:
 		m.resolveThread(edit.comment.ID, edit.advance)
 	default:
-		m.deleteFromThread(tabIndex, edit.comment.ID, edit.reply.ID)
+		if edit.kind == deleteCommentEdit && !m.canDeleteComment(edit.comment.ID) {
+			m.locationError = "Cannot redo deletion: this comment is no longer deletable"
+			return false
+		}
+		if !m.deleteFromThread(tabIndex, edit.comment.ID, edit.reply.ID) {
+			return false
+		}
 	}
+	m.reviewRedo = m.reviewRedo[:n-1]
 	return true
 }
 
@@ -128,6 +135,39 @@ func (m *AppModel) focusComment(tabIndex int, id string) {
 	m.updateCommentSidebar()
 }
 
+// deletionAtCursor gives a deletion priority over a ranking on its source
+// row.  Undo focuses the restored thread, where redo is available by ID.
+func (m *AppModel) deletionAtCursor(redo bool) bool {
+	history := m.reviewUndo
+	if redo {
+		history = m.reviewRedo
+	}
+	if len(history) == 0 || len(m.tabs) == 0 || m.readOnly || m.focused != contentPane || m.rankDrag.active {
+		return false
+	}
+	edit := history[len(history)-1]
+	t := m.tab()
+	if edit.kind == resolveEdit || edit.path != t.path || t.selecting {
+		return false
+	}
+	if redo {
+		return t.cursorOnAnnotation && m.selectedCommentID() == edit.comment.ID
+	}
+	return !t.cursorOnAnnotation && !t.cursorOnForm && t.cursorLine == edit.source.line && t.cursorSide == edit.source.side
+}
+
+func (m *AppModel) restoreAtCursor(redo bool) {
+	if list, ok := m.currentRankList(); ok && !m.deletionAtCursor(redo) {
+		m.restoreRank(list, redo)
+		return
+	}
+	if redo {
+		m.redoReview()
+	} else {
+		m.undoReview()
+	}
+}
+
 // deleteFromThread removes a comment, or one of its replies when replyID
 // is set, records the deletion for undo, and returns the cursor to the
 // source line.
@@ -136,38 +176,38 @@ func (m *AppModel) deleteFromThread(tabIndex int, commentID, replyID string) boo
 	if t.state == nil {
 		return false
 	}
-	deleted := false
 	for i := range t.state.Comments {
 		c := &t.state.Comments[i]
 		if c.ID != commentID {
 			continue
 		}
+		source := commentLocation(t, *c)
+		if source.line == 0 {
+			if lines := m.visualLines(t); len(lines) > 0 {
+				source = lines[0]
+			}
+		}
 		if replyID == "" {
-			m.recordReviewEdit(reviewEdit{kind: deleteCommentEdit, path: t.path, comment: *c, index: i})
+			m.recordReviewEdit(reviewEdit{kind: deleteCommentEdit, path: t.path, comment: *c, index: i, source: source})
 			t.state.Comments = slices.Delete(t.state.Comments, i, i+1)
-			deleted = true
-			break
+		} else {
+			j := slices.IndexFunc(c.Replies, func(r review.Reply) bool { return r.ID == replyID })
+			if j < 0 {
+				return false
+			}
+			m.recordReviewEdit(reviewEdit{kind: deleteReplyEdit, path: t.path, comment: *c, index: j, reply: c.Replies[j], source: source})
+			c.Replies = slices.Delete(c.Replies, j, j+1)
+			c.UpdatedAt = review.Now()
 		}
-		j := slices.IndexFunc(c.Replies, func(r review.Reply) bool { return r.ID == replyID })
-		if j < 0 {
-			break
-		}
-		m.recordReviewEdit(reviewEdit{kind: deleteReplyEdit, path: t.path, comment: *c, index: j, reply: c.Replies[j]})
-		c.Replies = slices.Delete(c.Replies, j, j+1)
-		c.UpdatedAt = review.Now()
-		deleted = true
-		break
+		m.focused = contentPane
+		t.cursorLine, t.cursorSide = source.line, source.side
+		t.cursorOnAnnotation, t.cursorOnForm, t.selecting = false, false, false
+		t.cursorAnnoIdx = 0
+		m.persist()
+		m.rebuildContent()
+		m.updateCommentSidebar()
+		m.scrollToCursor()
+		return true
 	}
-	if !deleted {
-		return false
-	}
-	m.persist()
-	t.cursorOnAnnotation = false
-	t.cursorAnnoIdx = 0
-	if t.cursorLine == 0 {
-		m.moveCursorBy(t, 1, 1)
-	}
-	m.rebuildContent()
-	m.updateCommentSidebar()
-	return true
+	return false
 }

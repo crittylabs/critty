@@ -4,13 +4,16 @@
 
 ### Added
 
-- Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Undo or redo a drag or keyboard move independently in each list with <kbd>M-z</kbd> and <kbd>M-Z</kbd>.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
+- Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
 - Press <kbd>M-u</kbd> or click the syntax name in the file header to switch between formatted Markdown and its syntax-highlighted source.  Source view keeps markup and table spacing as written and uses a subdued color for cell separators.
 - Use the same highlighting for Markdown source references and suggestions, including suggestions for lines that contain code fences.
 
 ### Changed
 
-- In text fields, undo successive edits with <kbd>M-z</kbd> and redo them with <kbd>M-Z</kbd>.  See Help for alternative shortcuts.  Each field keeps up to 100 edits while open.  <kbd>C-y</kbd> still yanks from the kill ring.
+- Undo and redo now cover review actions, ranking moves, and successive text edits with the same shortcuts.  Undo with <kbd>C-/</kbd>, <kbd>C-_</kbd>, <kbd>C-z</kbd>, or <kbd>M-z</kbd>.  Redo with <kbd>M-_</kbd> or <kbd>M-Z</kbd>.
+  - In reviews, undo a resolution or deletion.  Deleting a comment or reply returns to the last line of its range.  Undo there to restore the thread, then redo to delete the same comment or reply again.  The footer offers both actions.
+  - Each ranking keeps its own history.  One drag from pickup to drop counts as one move, as does each keyboard move.
+  - Each open text field keeps up to 100 edits.  <kbd>C-y</kbd> still yanks from the kill ring.
 - Page and half-page keys scroll the content pane while keeping the current line if it is visible.  When the current line leaves the pane, it moves to the second visible row from the top when scrolling down or from the bottom when scrolling up.  At a scroll limit, half-page keys move the current line by half a page and full-page keys move it to the beginning or end.
 - The row after a final newline appears without a line number and uses reverse video when current.  The file header shows the source line count and labels that cursor position EOF.
 - Find unanswered form fields and unresolved comment threads by the gold dot in the gutter.  Colored brackets identify ranking and radio-button groups, even when their rows are separated.

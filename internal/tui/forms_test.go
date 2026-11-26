@@ -937,16 +937,16 @@ func TestRankUndoAndRedoAreLocalToTheCurrentList(t *testing.T) {
 	move(3, 'z')
 	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, nil)
 	_, screen := app.renderReviewScreen()
-	if !screen.hasRankUndoButton {
+	if !screen.hasUndoButton {
 		t.Fatal("missing undo button for the remaining drag")
 	}
-	app = clickMouse(app, screen.rankUndoButton.left, screen.rankUndoButton.top)
+	app = clickMouse(app, screen.undoButton.left, screen.undoButton.top)
 	saved, err := app.session.LoadForms()
 	if err != nil {
 		t.Fatal(err)
 	}
 	answer := saved.Document(d.Path()).Answers["first"]
-	if answer.Value != nil || answer.Human || app.rankHistoryButton(false) != "" {
+	if answer.Value != nil || answer.Human || app.historyButton(false) != "" {
 		t.Fatalf("one undo should restore the ranking before the entire drag, got %+v", answer)
 	}
 	// Redo the entire drag with one key. A new move discards just this
@@ -958,10 +958,10 @@ func TestRankUndoAndRedoAreLocalToTheCurrentList(t *testing.T) {
 	assertRankAnswer(t, d, "first", []string{"b", "a", "c"}, nil)
 	app.tab().cursorLine = 6
 	_, screen = app.renderReviewScreen()
-	if !screen.hasRankRedoButton {
+	if !screen.hasRedoButton {
 		t.Fatal("a new move in another list discarded redo")
 	}
-	app = clickMouse(app, screen.rankRedoButton.left, screen.rankRedoButton.top)
+	app = clickMouse(app, screen.redoButton.left, screen.redoButton.top)
 	assertRankAnswer(t, d, "second", []string{"two", "one"}, nil)
 }
 

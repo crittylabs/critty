@@ -40,12 +40,6 @@ func (h *editHistory) step(current editSnapshot, redo bool) (editSnapshot, bool)
 	return snap, true
 }
 
-// undoKeys are the keys that restore the last snapshot in any editor.
-// `C-/` reaches most terminals as `ctrl+_`.
-func isUndoKey(key string) bool {
-	return key == "ctrl+z" || key == "ctrl+/" || key == "ctrl+_"
-}
-
 func (m *AppModel) resetTextarea() {
 	m.editorHistory = editHistory{}
 	m.modalTextarea.Reset()

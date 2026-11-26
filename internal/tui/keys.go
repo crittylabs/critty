@@ -15,13 +15,12 @@ func modalTextareaKeyMap() textarea.KeyMap {
 	return bindings
 }
 
-// editHistoryKey recognizes the shared text-field and ranking shortcuts.
+// editHistoryKey recognizes the shared undo and redo shortcuts.
 func editHistoryKey(msg tea.KeyPressMsg) (redo, matched bool) {
 	if key.Matches(msg, keys.Redo) {
 		return true, true
 	}
-	name := msg.String()
-	return false, name == "alt+z" || isUndoKey(name)
+	return false, key.Matches(msg, keys.Undo)
 }
 
 // keyHintNames formats static shortcut hints without changing event names.
@@ -31,6 +30,7 @@ var keyHintNames = strings.NewReplacer(
 )
 
 type keyMap struct {
+	Undo             key.Binding
 	Redo             key.Binding
 	Quit             key.Binding
 	Tab              key.Binding
@@ -76,7 +76,8 @@ type keyMap struct {
 }
 
 var keys = keyMap{
-	Redo:             key.NewBinding(key.WithKeys("alt+_", "alt+shift+-", "alt+shift+_", "alt+Z", "alt+shift+z", "alt+shift+Z"), key.WithHelp("M-_/M-Z", "redo")),
+	Undo:             key.NewBinding(key.WithKeys("ctrl+/", "ctrl+_", "ctrl+z", "alt+z"), key.WithHelp("C-/ · C-_ · C-z · M-z", "undo")),
+	Redo:             key.NewBinding(key.WithKeys("alt+_", "alt+shift+-", "alt+shift+_", "alt+Z", "alt+shift+z", "alt+shift+Z"), key.WithHelp("M-_ · M-Z", "redo")),
 	Quit:             key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	Tab:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "toggle sidebar")),
 	Up:               key.NewBinding(key.WithKeys("up", "k", "ctrl+p"), key.WithHelp("k/C-p", "up")),
