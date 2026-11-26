@@ -882,6 +882,89 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 	assertRankAnswer(t, d, "lead", []string{"b", "c", "a"}, nil)
 }
 
+func TestRankUndoAndRedoAreLocalToTheCurrentList(t *testing.T) {
+	t.Parallel()
+	app, _ := formTestAppWithContent(t, `- [ ] Alpha <!-- form: id=first rank value=a -->
+- [ ] Beta <!-- form: id=first rank value=b -->
+- [ ] Gamma <!-- form: id=first rank value=c -->
+
+- [ ] One <!-- form: id=second rank value=one -->
+- [ ] Two <!-- form: id=second rank value=two -->
+`)
+	d := app.forms.Document(app.tab().path)
+	move := func(line int, key rune) {
+		app.tab().cursorLine = line
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: key, Mod: tea.ModAlt})
+	}
+	point := func(line int) (int, int) {
+		rect := rankControlRect(t, app, line)
+		return contentScreenPoint(app, rect.left, rect.top)
+	}
+	x, y := point(1)
+	app = pressMouse(app, x, y)
+	x, y = point(2)
+	app = moveMouse(app, x, y)
+	x, y = point(3)
+	app = moveMouse(app, x, y)
+	app = releaseMouse(app, x, y)
+	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, nil)
+	move(1, tea.KeyRight)
+	move(1, tea.KeyLeft)
+	move(5, tea.KeyDown)
+
+	undo := func(line int, code rune) {
+		t.Helper()
+		app.tab().cursorLine = line
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: code, Mod: tea.ModCtrl})
+	}
+	undo(2, '/')
+	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, map[string]string{"a": "c"})
+	// Undo can be retried after a write failure, without losing a step.
+	dir := app.session.Dir
+	app.session.Dir = filepath.Join(dir, "forms.json")
+	undo(5, '_')
+	if app.locationError == "" {
+		t.Fatal("undo did not report the save failure")
+	}
+	assertRankAnswer(t, d, "second", []string{"two", "one"}, nil)
+	app.session.Dir = dir
+	undo(5, '_')
+	if d.Answers["second"].Value != nil || d.Answers["second"].Human {
+		t.Fatal("undo did not restore the unanswered second ranking")
+	}
+	undo(5, 'z') // Exhausting this list must leave the other list alone.
+	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, map[string]string{"a": "c"})
+	undo(3, 'z')
+	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, nil)
+	_, screen := app.renderReviewScreen()
+	if !screen.hasRankUndoButton {
+		t.Fatal("missing undo button for the remaining drag")
+	}
+	app = clickMouse(app, screen.rankUndoButton.left, screen.rankUndoButton.top)
+	saved, err := app.session.LoadForms()
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer := saved.Document(d.Path()).Answers["first"]
+	if answer.Value != nil || answer.Human || app.rankHistoryButton(false) != "" {
+		t.Fatalf("one undo should restore the ranking before the entire drag, got %+v", answer)
+	}
+	// Redo the entire drag with one key. A new move discards just this
+	// list's remaining redo steps, while the other list can still redo.
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: '_', Mod: tea.ModAlt})
+	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, nil)
+	move(1, tea.KeyUp)
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: '_', Mod: tea.ModAlt})
+	assertRankAnswer(t, d, "first", []string{"b", "a", "c"}, nil)
+	app.tab().cursorLine = 6
+	_, screen = app.renderReviewScreen()
+	if !screen.hasRankRedoButton {
+		t.Fatal("a new move in another list discarded redo")
+	}
+	app = clickMouse(app, screen.rankRedoButton.left, screen.rankRedoButton.top)
+	assertRankAnswer(t, d, "second", []string{"two", "one"}, nil)
+}
+
 func TestCommentOnRankedItemNamesTheItem(t *testing.T) {
 	t.Parallel()
 	app, _ := formTestAppWithContent(t, "Intro\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")

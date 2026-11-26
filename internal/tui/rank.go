@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -285,22 +287,82 @@ func (m *AppModel) moveRank(line int, key string) bool {
 	return true
 }
 
-// saveRank records an order, restoring the previous answers if saving fails.
+type rankList struct {
+	path, id string
+}
+
+type rankHistory struct {
+	undo, redo []form.Answer
+}
+
+// currentRankList includes fixed items and continuation lines of ranked items.
+func (m *AppModel) currentRankList() (rankList, bool) {
+	if len(m.tabs) == 0 || m.readOnly || m.forms == nil || m.focused != contentPane {
+		return rankList{}, false
+	}
+	t := m.tab()
+	item := m.formRows[t.path][t.cursorLine].item
+	if item == nil || !item.Rank || t.markdownSourceView || t.cursorOnAnnotation || t.cursorSide != "" || t.selecting {
+		return rankList{}, false
+	}
+	return rankList{t.path, item.ID}, true
+}
+
+func (m *AppModel) restoreRank(list rankList, redo bool) {
+	h := m.rankHistory[list]
+	if m.rankDrag.active || h == nil {
+		return
+	}
+	from, to := &h.undo, &h.redo
+	if redo {
+		from, to = to, from
+	}
+	n := len(*from)
+	if n == 0 {
+		return
+	}
+	d := m.forms.Document(list.path)
+	current := d.Answers[list.id]
+	if m.writeRankAnswer(d, list.id, (*from)[n-1]) {
+		*from = slices.Delete(*from, n-1, n)
+		*to = append(*to, current)
+		m.rebuildContent()
+		m.scrollToCursor()
+	}
+}
+
+func (m *AppModel) writeRankAnswer(d *review.FormDocument, id string, answer form.Answer) bool {
+	answers := maps.Clone(d.Answers)
+	answers[id] = answer
+	if err := m.saveFormAnswers(d, answers); err != nil {
+		m.locationError = fmt.Sprintf("Could not save ranking: %v", err)
+		return false
+	}
+	m.locationError = ""
+	return true
+}
+
+// saveRank records one undo step per committed change to the displayed tree.
 func (m *AppModel) saveRank(d *review.FormDocument, id string, answer form.Answer) {
 	if err := form.CheckRank(d.Items, id, answer); err != nil {
 		m.locationError = err.Error()
 		return
 	}
 	previous := d.Answers[id]
+	nodes, _ := form.RankTree(d.Items, id, previous)
+	moved := !reflect.DeepEqual(rankAnswer(nodes), answer)
 	answer.Human, answer.Author = true, m.author
 	answer.Revision, answer.Round = m.forms.Revision, m.session.CJ.ReviewRound
-	d.Answers[id] = answer
-	if err := m.session.SaveForms(*m.forms); err != nil {
-		d.Answers[id] = previous
-		m.err = err
-		return
+	if m.writeRankAnswer(d, id, answer) && moved {
+		list := rankList{d.Path(), id}
+		h := m.rankHistory[list]
+		if h == nil {
+			h = &rankHistory{}
+			m.rankHistory[list] = h
+		}
+		h.undo = append(h.undo, previous)
+		h.redo = nil
 	}
-	m.err = nil
 }
 
 const rankIndentWidth = 2

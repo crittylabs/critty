@@ -237,6 +237,10 @@ func (m *AppModel) beginForms(files map[string]review.SnapshotFile, rawDiff stri
 	if err != nil {
 		return err
 	}
+	// Old snapshots may no longer satisfy the new review's form definitions.
+	if m.forms == nil || m.forms.Revision != state.Revision {
+		m.rankHistory = make(map[rankList]*rankHistory)
+	}
 	m.forms = &state
 	return m.indexForms()
 }
@@ -346,15 +350,18 @@ func (m *AppModel) saveFormSelections(d *review.FormDocument, targets []int, ans
 			return false
 		}
 	}
+	m.err = m.saveFormAnswers(d, answers)
+	return m.err == nil
+}
+
+func (m *AppModel) saveFormAnswers(d *review.FormDocument, answers map[string]form.Answer) error {
 	previous := d.Answers
 	d.Answers = answers
 	if err := m.session.SaveForms(*m.forms); err != nil {
 		d.Answers = previous
-		m.err = err
-		return false
+		return err
 	}
-	m.err = nil
-	return true
+	return nil
 }
 
 // openFormText edits standalone input or input on a selected control.

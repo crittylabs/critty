@@ -4,7 +4,7 @@
 
 ### Added
 
-- Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
+- Reorder items in a nested form ranking, move them between parents, or change their nesting depth.  Each move keeps the item and its descendants together.  Undo or redo a drag or keyboard move independently in each list.  Agents receive both the ranked order and the parent relationships.  Form authors can fix items in place, cap the depth below an item, or keep items within an allowed range of levels.
 - Press <kbd>M-u</kbd> or click the syntax name in the file header to switch between formatted Markdown and its syntax-highlighted source.  Source view keeps markup and table spacing as written and uses a subdued color for cell separators.
 - Use the same highlighting for Markdown source references and suggestions, including suggestions for lines that contain code fences.
 

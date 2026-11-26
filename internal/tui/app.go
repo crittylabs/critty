@@ -200,6 +200,7 @@ type AppModel struct {
 	pathInfo          formPathState
 	lineDrag          mouseLineDrag
 	rankDrag          rankDragState
+	rankHistory       map[rankList]*rankHistory
 	hoveredCommentAdd *tea.Mouse
 	contentLayout     renderedContentLayout
 	sidebarTargets    []int
@@ -320,6 +321,10 @@ type renderedScreenLayout struct {
 	hasFooterHelp        bool
 	formListButton       mouseRect
 	hasFormListButton    bool
+	rankUndoButton       mouseRect
+	hasRankUndoButton    bool
+	rankRedoButton       mouseRect
+	hasRankRedoButton    bool
 	imagesButton         mouseRect
 	hasImagesButton      bool
 	lineNumbersButton    mouseRect
@@ -1220,7 +1225,16 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	switch {
 	case isUndoKey(msg.String()):
-		m.undoReview()
+		if list, ok := m.currentRankList(); ok {
+			m.restoreRank(list, false)
+		} else {
+			m.undoReview()
+		}
+		return m, nil
+	case key.Matches(msg, keys.RedoRank):
+		if list, ok := m.currentRankList(); ok {
+			m.restoreRank(list, true)
+		}
 		return m, nil
 	case msg.String() == "ctrl+y":
 		m.redoReview()
@@ -3468,6 +3482,12 @@ func (m AppModel) renderReviewScreen() (string, renderedScreenLayout) {
 	if button := m.formListButton(); button != "" {
 		layout.formListButton, layout.hasFormListButton = buttonRect(footer, footerTop, button)
 	}
+	if button := m.rankHistoryButton(false); button != "" {
+		layout.rankUndoButton, layout.hasRankUndoButton = buttonRect(footer, footerTop, button)
+	}
+	if button := m.rankHistoryButton(true); button != "" {
+		layout.rankRedoButton, layout.hasRankRedoButton = buttonRect(footer, footerTop, button)
+	}
 
 	full := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
@@ -3790,6 +3810,13 @@ func (m *AppModel) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 	}
 	if imageLayout.hasFormListButton && imageLayout.formListButton.contains(mouse) {
 		m.openFormList()
+		return m, nil
+	}
+	undoRank := imageLayout.hasRankUndoButton && imageLayout.rankUndoButton.contains(mouse)
+	redoRank := imageLayout.hasRankRedoButton && imageLayout.rankRedoButton.contains(mouse)
+	if undoRank || redoRank {
+		list, _ := m.currentRankList()
+		m.restoreRank(list, redoRank)
 		return m, nil
 	}
 	if imageLayout.hasLineNumbersButton && imageLayout.lineNumbersButton.contains(mouse) {
@@ -4783,6 +4810,11 @@ func (m AppModel) renderFooterHints() string {
 		}
 	}
 	controls := []string{m.footerHelpButton(), m.imagesButton(), m.lineNumbersButton()}
+	for _, redo := range []bool{false, true} {
+		if button := m.rankHistoryButton(redo); button != "" {
+			controls = append(controls, button)
+		}
+	}
 	if button := m.formListButton(); !m.readOnly && button != "" {
 		controls = append(controls, button)
 	}
@@ -4851,6 +4883,21 @@ func (m AppModel) formListButton() string {
 
 func (m AppModel) footerHelpButton() string {
 	return renderBarButton("Help", "M-?")
+}
+
+func (m *AppModel) rankHistoryButton(redo bool) string {
+	list, ok := m.currentRankList()
+	h := m.rankHistory[list]
+	if !ok || h == nil || m.rankDrag.active {
+		return ""
+	}
+	if redo && len(h.redo) > 0 {
+		return renderBarButton("Redo move", "M-_")
+	}
+	if !redo && len(h.undo) > 0 {
+		return renderBarButton("Undo move", "C-/")
+	}
+	return ""
 }
 
 // buttonRect locates a rendered button in a block that starts at screen row
@@ -4949,6 +4996,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
 		{keys: "M-↑/↓", desc: "move ranked branch to the next allowed place"},
+		{keys: "C-/ · C-_ · C-z", desc: "undo one move in this ranking"},
+		{keys: "M-_", desc: "redo one move in this ranking"},
 		{keys: "M-←/→ · M-b/M-f (rank)", desc: "outdent / indent under previous sibling"},
 		{keys: "rank drag", desc: "drag sideways on the same row for depth; drag to another row to move"},
 		{keys: "v/C-SPC/C-@ · space", desc: "select/form"},
