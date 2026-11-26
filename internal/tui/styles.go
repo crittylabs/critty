@@ -512,6 +512,7 @@ type formChipPalette struct {
 	requiredBadge                                                       color.Color
 	badgeSymbol                                                         color.Color
 	rankBackground, fixedRankBackground, rankHandleForeground           color.Color
+	rankDragForeground                                                  color.Color
 	rankPendingBadge, rankSavedBadge, rankRequiredBadge, fixedRankBadge color.Color
 	rankBadgeSymbol                                                     color.Color
 }
@@ -544,6 +545,7 @@ func newFormChipPalette(ld lipgloss.LightDarkFunc) formChipPalette {
 		rankBackground:       ld(lipgloss.Color("#E5EFEB"), lipgloss.Color("#23332E")),
 		fixedRankBackground:  ld(lipgloss.Color("#EAE4D7"), lipgloss.Color("#3D392E")),
 		rankHandleForeground: ld(lipgloss.Color("#6E6E6E"), lipgloss.Color("#8F8F8F")),
+		rankDragForeground:   ld(lipgloss.Color("#4D4D4D"), lipgloss.Color("#C6C6C6")),
 		rankPendingBadge:     ld(lipgloss.Color("#39BDD7"), lipgloss.Color("#7EC0C4")),
 		rankSavedBadge:       ld(lipgloss.Color("#65C675"), lipgloss.Color("#A4C477")),
 		rankRequiredBadge:    ld(lipgloss.Color("#F77887"), lipgloss.Color("#E9989D")),

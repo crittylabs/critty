@@ -1062,13 +1062,51 @@ func TestRankHorizontalDragChangesDepth(t *testing.T) {
   - [ ] Leaf <!-- form: id=r rank value=leaf -->
 `)
 	d := app.forms.Document(app.tab().path)
-	drag := func(line, delta int) {
+	drag := func(line, delta int, moving ...string) {
 		t.Helper()
 		rect := rankControlRect(t, app, line)
 		x, y := contentScreenPoint(app, rect.left, rect.top)
 		before := ansi.Strip(app.contentViewport.GetContent())
+		checkLabels := func(dragging bool) {
+			t.Helper()
+			runes, cells := renderedCells(app.contentViewport.GetContent())
+			for _, label := range []string{"Child", "Second", "Leaf", "Sibling"} {
+				prefix, _, found := strings.Cut(string(runes), label)
+				if !found {
+					t.Fatalf("missing rank label %q", label)
+				}
+				want := dragging && slices.Contains(moving, label)
+				at := len([]rune(prefix))
+				style := cells[at]
+				if got := sameColor(style.Fg, formChip.rankDragForeground); got != want {
+					t.Fatalf("dimmed %q = %t, want %t", label, got, want)
+				}
+				background := formChip.rankBackground
+				if label == moving[0] {
+					background = buttonBackground
+				}
+				if want {
+					background = tintedBackground(background, 60)
+				}
+				if !sameColor(style.Bg, background) {
+					t.Fatalf("%q background = %v, want %v", label, style.Bg, background)
+				}
+				badge := formChip.rankPendingBadge
+				if d.Answers["r"].Human {
+					badge = formChip.rankSavedBadge
+				}
+				if want {
+					badge = tintedBackground(badge, 75)
+				}
+				number := cells[at-3]
+				if !sameColor(number.Bg, badge) || !sameColor(number.Fg, formChip.rankBadgeSymbol) {
+					t.Fatalf("%q number style = %v, want background %v and foreground %v", label, number, badge, formChip.rankBadgeSymbol)
+				}
+			}
+		}
 		app = pressMouse(app, x, y)
 		app = moveMouse(app, x+delta, y)
+		checkLabels(true)
 		if line == 4 {
 			during := ansi.Strip(app.contentViewport.GetContent())
 			for _, pair := range []string{" 2  Second", " 3  Second", " 1  Leaf"} {
@@ -1079,6 +1117,7 @@ func TestRankHorizontalDragChangesDepth(t *testing.T) {
 		}
 		app = moveMouse(app, x+2*delta, y) // Repeat motion changes depth only once.
 		app = releaseMouse(app, x+2*delta, y)
+		checkLabels(false)
 	}
 	check := func(parent string, want []int) {
 		t.Helper()
@@ -1090,16 +1129,16 @@ func TestRankHorizontalDragChangesDepth(t *testing.T) {
 			t.Fatalf("display order: %v, want %v", order, want)
 		}
 	}
-	drag(2, rankIndentWidth) // First child cannot indent.
+	drag(2, rankIndentWidth, "Child") // First child cannot indent.
 	if d.Answers["r"].Human {
 		t.Fatal("an invalid depth change confirmed the ranking")
 	}
-	drag(4, rankIndentWidth)
+	drag(4, rankIndentWidth, "Second", "Leaf")
 	check("first", []int{0, 1, 2, 3, 4})
 	if content := ansi.Strip(app.contentViewport.GetContent()); !strings.Contains(content, " 3  Second") || !strings.Contains(content, " 1  Leaf") {
 		t.Fatalf("drop did not update hierarchy numbers: %q", content)
 	}
-	drag(4, -rankIndentWidth)
+	drag(4, -rankIndentWidth, "Second", "Leaf")
 	check("", []int{0, 1, 2, 3, 4})
 }
 

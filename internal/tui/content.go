@@ -307,6 +307,10 @@ func (m *AppModel) rebuildContent() {
 		inlineChanges := t.inlineChanges[lineNum]
 		formItem := m.formRows[t.path][lineNum].item
 		formBackground := formLineBackground(focus, isSidebarHighlight, formItem)
+		if formItem != nil && m.rankDrag.contains(t.path, formItem.Line) {
+			formBackground = formBackground.Foreground(formChip.rankDragForeground).
+				Background(tintedBackground(formBackground.GetBackground(), 60))
+		}
 		decorate := m.isearchDecorator(lineRef{line: lineNum})
 		highlight := func(s string) string {
 			if decorate != nil {

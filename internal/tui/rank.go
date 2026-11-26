@@ -359,6 +359,9 @@ func (m *AppModel) rankDisplay(d *review.FormDocument, item *form.Item, label st
 	if item.RankFixed {
 		tint = formChip.fixedRankBadge
 	}
+	if m.rankDrag.contains(d.Path(), item.Line) {
+		tint = tintedBackground(tint, 75)
+	}
 	badge := lipgloss.NewStyle().Foreground(formChip.rankBadgeSymbol).Background(tint).Bold(true).Render(fmt.Sprintf(" %d ", number))
 	content := inlineColors(background, " "+label, true)
 	if focused {
@@ -377,7 +380,12 @@ type rankDragState struct {
 	line    int
 	path    string
 	id      string
+	branch  map[int]bool
 	preview *form.Answer
+}
+
+func (drag *rankDragState) contains(path string, line int) bool {
+	return drag.moved && drag.path == path && drag.branch[line]
 }
 
 func (m *AppModel) startRankDrag(line int, mouse tea.Mouse) bool {
@@ -393,6 +401,14 @@ func (m *AppModel) startRankDrag(line int, mouse tea.Mouse) bool {
 		return false
 	}
 	m.rankDrag = rankDragState{active: true, fixed: row.item.RankFixed, origin: mouse, line: row.item.Line, path: d.Path(), id: row.item.ID}
+	if !row.item.RankFixed {
+		layout := m.rankLayout(d, row.item.ID)
+		from := layout.position(row.item.Line)
+		m.rankDrag.branch = make(map[int]bool)
+		for _, node := range layout.nodes[from:layout.end(from)] {
+			m.rankDrag.branch[layout.items[node.Value].Line] = true
+		}
+	}
 	return true
 }
 
@@ -400,6 +416,7 @@ func (m *AppModel) startRankDrag(line int, mouse tea.Mouse) bool {
 // the pointer, without saving.
 func (m *AppModel) dragRank(mouse tea.Mouse) {
 	drag := &m.rankDrag
+	wasMoved, previous := drag.moved, drag.preview
 	if mouse.X != drag.origin.X || mouse.Y != drag.origin.Y {
 		drag.moved = true
 	}
@@ -410,6 +427,11 @@ func (m *AppModel) dragRank(mouse tea.Mouse) {
 	if d == nil || d.Path() != drag.path || m.tab().markdownSourceView {
 		return
 	}
+	defer func() {
+		if drag.moved != wasMoved || drag.preview != previous {
+			m.rebuildContent()
+		}
+	}()
 	if mouse.Y == drag.origin.Y {
 		// Use the original order so another motion on the press row does not
 		// change depth again or pick up the row that moved into this spot.
@@ -453,7 +475,6 @@ func (m *AppModel) dragRank(mouse tea.Mouse) {
 
 func (m *AppModel) previewRank(d *review.FormDocument, nodes []form.RankNode) {
 	drag := &m.rankDrag
-	previous := drag.preview
 	drag.preview, m.locationError = nil, ""
 	if nodes != nil {
 		answer := rankAnswer(nodes)
@@ -462,9 +483,6 @@ func (m *AppModel) previewRank(d *review.FormDocument, nodes []form.RankNode) {
 		} else {
 			drag.preview = &answer
 		}
-	}
-	if previous != nil || drag.preview != nil {
-		m.rebuildContent()
 	}
 }
 
@@ -480,6 +498,8 @@ func (m *AppModel) finishRankDrag() {
 	if drag.preview == nil {
 		if !drag.moved {
 			m.toggleForm(drag.line)
+		} else if !drag.fixed {
+			m.rebuildContent()
 		}
 		return
 	}
