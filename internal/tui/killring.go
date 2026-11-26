@@ -96,6 +96,7 @@ func (m *AppModel) updateKillRing(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if len(r.entries) == 0 || (msg.String() == "alt+y" && r.yank == nil) {
 		return true, nil
 	}
+	defer m.recordTextareaEdit(m.textareaSnapshot())
 	if msg.String() == "ctrl+y" {
 		m.modalTextarea.DeleteSelection()
 		r.yank = &yankState{
@@ -105,7 +106,5 @@ func (m *AppModel) updateKillRing(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		r.yank.index = (r.yank.index + 1) % len(r.entries)
 		m.setTextareaValueAt(r.yank.base, r.yank.row, r.yank.column)
 	}
-	var cmd tea.Cmd
-	cmd = m.updateModalTextarea(tea.PasteMsg{Content: r.entries[r.yank.index]})
-	return true, cmd
+	return true, m.applyTextareaInput(tea.PasteMsg{Content: r.entries[r.yank.index]})
 }

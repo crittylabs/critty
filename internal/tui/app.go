@@ -215,7 +215,7 @@ type AppModel struct {
 	modalOpenedAt        time.Time
 	modalOpeningClick    tea.Mouse
 	editorDragging       bool // a mouse selection in the comment editor is in progress
-	editorUndo           *editSnapshot
+	editorHistory        editHistory
 	reviewUndo           []reviewEdit // resolves and deletes, oldest first
 	reviewRedo           []reviewEdit
 	redoing              bool // a redo is replaying an edit
@@ -1101,9 +1101,6 @@ func (m AppModel) updateMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if !m.isTextModal() {
-		m.editorUndo = nil
-	}
 	if m.err != nil {
 		if m.finishSaveFailed && (msg.String() == "enter" || msg.String() == "y") {
 			return m.doFinish()
@@ -1231,7 +1228,7 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.undoReview()
 		}
 		return m, nil
-	case key.Matches(msg, keys.RedoRank):
+	case key.Matches(msg, keys.Redo):
 		if list, ok := m.currentRankList(); ok {
 			m.restoreRank(list, true)
 		}
@@ -1412,7 +1409,7 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.modal = replyModal
 					m.modalFocus = 0
 					m.modalTextarea.Placeholder = "Write a reply..."
-					m.modalTextarea.Reset()
+					m.resetTextarea()
 					m.modalInitial = ""
 					m.modalTextarea.Focus()
 					return m, nil
@@ -1421,7 +1418,7 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.modal = fileCommentModal
 			m.modalFocus = 0
 			m.modalTextarea.Placeholder = "Type your file comment..."
-			m.modalTextarea.Reset()
+			m.resetTextarea()
 			m.modalInitial = ""
 			m.modalTextarea.Focus()
 		}
@@ -1683,7 +1680,7 @@ func (m *AppModel) openCommentThread(id string) {
 		m.editingReplyID = ""
 		m.modalReferenceOffset = -1
 		m.modalFocus = 0
-		m.modalTextarea.Reset()
+		m.resetTextarea()
 		if reply := m.latestOwnReply(c); reply != nil {
 			m.editingReplyID = reply.ID
 			m.modal = editModal
@@ -1774,7 +1771,7 @@ func (m *AppModel) openLineComment() {
 	m.modalReferenceOffset = -1
 	m.modalFocus = 0
 	m.modalTextarea.Placeholder = "Type your comment..."
-	m.modalTextarea.Reset()
+	m.resetTextarea()
 	m.modalInitial = ""
 	m.modalTextarea.Focus()
 }
@@ -2456,8 +2453,9 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
 		return m, cmd
 	}
-	if isUndoKey(msg.String()) && m.modalFocus == 0 {
-		m.undoTextarea()
+	redo := key.Matches(msg, keys.Redo)
+	if m.modalFocus == 0 && (redo || isUndoKey(msg.String())) {
+		m.restoreTextarea(redo)
 		return m, nil
 	}
 	if msg.String() == "alt+o" && m.modalFocus == 0 {
@@ -2587,7 +2585,7 @@ func (m *AppModel) discardTextModal() {
 	m.editingReplyID = ""
 	m.modalInitial = ""
 	m.modalTextarea.Blur()
-	m.modalTextarea.Reset()
+	m.resetTextarea()
 	m.modalTextarea.SetHeight(6)
 	m.completion = completionState{}
 	m.pathInfo = formPathState{}
@@ -5064,7 +5062,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "C-s/o · M-s · tab/S-tab · enter/esc", desc: "save/edit · suggest · focus · activate/close"},
 		{keys: "M-i (editors)", desc: "show/hide image, math, and Mermaid previews without changing source"},
 		{keys: "C-v/M-v (editors and inputs)", desc: "paste from the system clipboard; comment editors also accept images"},
-		{keys: "drag,S-arrows · M-w · C-z (editors)", desc: "select text · copy it · undo the last deletion, overwrite, or paste; esc cancels the selection"},
+		{keys: "drag,S-arrows · M-w · esc (editors)", desc: "select text · copy it · cancel selection"},
+		{keys: "C-/,C-_,C-z · M-_ (editors)", desc: "undo · redo"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},

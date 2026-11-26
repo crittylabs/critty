@@ -71,11 +71,7 @@ func (m *AppModel) finishClipboardImage(msg clipboardImageMsg) tea.Cmd {
 		return nil
 	}
 	m.killRing.interrupt()
-	before := m.textareaSnapshot()
-	var cmd tea.Cmd
-	m.modalTextarea, cmd = m.modalTextarea.Update(tea.PasteMsg{Content: "![clipboard image](" + path + ")"})
-	m.recordTextareaEdit(before, true)
-	return cmd
+	return m.updateModalTextarea(tea.PasteMsg{Content: "![clipboard image](" + path + ")"})
 }
 
 func (m AppModel) clipboardTextareaView() string {

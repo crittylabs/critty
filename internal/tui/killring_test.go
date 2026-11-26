@@ -131,6 +131,16 @@ func TestYankPopSelectionAndInputLimits(t *testing.T) {
 	if got := m.modalTextarea.Value(); got != "prefix\na suffix" {
 		t.Fatalf("rotated selection replacement = %q", got)
 	}
+	for _, want := range []string{"prefix\n長いテキスト\nnext suffix", "prefix\na suffix", "prefix\n日本語🙂 suffix"} {
+		editorControl(&m, '_')
+		if got := m.modalTextarea.Value(); got != want {
+			t.Fatalf("undo yank sequence = %q, want %q", got, want)
+		}
+	}
+	editorMeta(&m, '_')
+	if got := m.modalTextarea.Value(); got != "prefix\na suffix" {
+		t.Fatalf("redo yank = %q", got)
+	}
 	m = newKillRingApp("prefix")
 	m.modalTextarea.MoveToEnd()
 	m.modalTextarea.CharLimit = 8

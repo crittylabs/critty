@@ -24,25 +24,15 @@ type lineEditor struct {
 	anchor    int  // rune index where a mouse selection started
 	selecting bool // the text between anchor and the cursor is selected
 	dragging  bool // the mouse button is still held
-	undo      *lineSnapshot
+	history   editHistory
 }
 
-// lineSnapshot is the text and cursor before a deletion, overwrite, or paste.
-type lineSnapshot struct {
-	value string
-	pos   int
+func (e lineEditor) snapshot() editSnapshot {
+	return editSnapshot{value: e.input.Value(), col: e.input.Position()}
 }
 
-func (e lineEditor) snapshot() lineSnapshot {
-	return lineSnapshot{value: e.input.Value(), pos: e.input.Position()}
-}
-
-// record keeps the snapshot taken before an edit when text was removed or
-// replaced.
-func (e *lineEditor) record(before lineSnapshot) {
-	if destructiveEdit(before.value, e.input.Value(), before.pos) {
-		e.undo = &before
-	}
+func (e *lineEditor) record(before editSnapshot) {
+	e.history.record(before, e.input.Value())
 }
 
 // replace sets the text as an undoable change.
@@ -52,19 +42,11 @@ func (e *lineEditor) replace(value string) {
 	e.record(before)
 }
 
-// undoEdit restores the text before the last deletion, overwrite, or paste
-// and keeps the current text so the undo can be undone.
-func (e *lineEditor) undoEdit() bool {
-	snap := e.undo
-	if snap == nil {
-		return false
+func (e *lineEditor) restore(redo bool) {
+	if snap, ok := e.history.step(e.snapshot(), redo); ok {
+		e.input.SetValue(snap.value)
+		e.SetCursor(snap.col)
 	}
-	current := e.snapshot()
-	e.input.SetValue(snap.value)
-	e.input.SetCursor(snap.pos)
-	e.clearSelection()
-	e.undo = &current
-	return true
 }
 
 func newLineEditor(value string, limit int) lineEditor {
@@ -150,9 +132,7 @@ func (e *lineEditor) insert(text string) {
 		e.input.SetValue(string(value[:pos]) + text + string(value[pos:]))
 		e.input.SetCursor(pos + utf8.RuneCountInString(text))
 	}
-	if e.input.Value() != before.value {
-		e.undo = &before
-	}
+	e.record(before)
 }
 
 // paste inserts pasted text with line breaks and tabs folded into spaces.
@@ -222,8 +202,9 @@ type lineEditorPasteMsg struct {
 // clipboard as text, since these fields take no images.
 func (m *AppModel) editLineEditor(editor *lineEditor, msg tea.KeyPressMsg) tea.Cmd {
 	keyName := msg.String()
-	if isUndoKey(keyName) {
-		editor.undoEdit()
+	redo := key.Matches(msg, keys.Redo)
+	if redo || isUndoKey(keyName) {
+		editor.restore(redo)
 		m.killRing.interrupt()
 		return nil
 	}

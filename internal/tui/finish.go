@@ -110,7 +110,7 @@ func (m *AppModel) openFinishModal() {
 	if m.session != nil {
 		m.finishDraft = m.session.CJ.RoundState.ReviewCommentDraft
 	}
-	m.modalTextarea.Reset()
+	m.resetTextarea()
 	m.modalTextarea.SetValue(m.finishDraft)
 	m.modalTextarea.Placeholder = "Overall comment (optional)..."
 	m.modalTextarea.Blur()
@@ -191,7 +191,7 @@ func (m *AppModel) handleFinishModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
 		return m, cmd
 	}
-	if isUndoKey(msg.String()) && m.finishFromResolve {
+	if isUndoKey(msg.String()) && m.finishFromResolve && m.modalFocus != finishText {
 		m.undoReview()
 		return m, nil
 	}

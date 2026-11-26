@@ -374,7 +374,7 @@ func (m *AppModel) openFormText(item form.Item) {
 	m.editingFormLine = item.Line
 	m.modalFocus = 0
 	m.modalTextarea.Placeholder = "Type your answer..."
-	m.modalTextarea.Reset()
+	m.resetTextarea()
 	m.modalTextarea.SetValue(text)
 	m.completion = completionState{}
 	if item.Type != "" {

@@ -21,7 +21,7 @@ var keyHintNames = strings.NewReplacer(
 )
 
 type keyMap struct {
-	RedoRank         key.Binding
+	Redo             key.Binding
 	Quit             key.Binding
 	Tab              key.Binding
 	Up               key.Binding
@@ -66,7 +66,7 @@ type keyMap struct {
 }
 
 var keys = keyMap{
-	RedoRank:         key.NewBinding(key.WithKeys("alt+_", "alt+shift+-", "alt+shift+_"), key.WithHelp("M-_", "redo rank move")),
+	Redo:             key.NewBinding(key.WithKeys("alt+_", "alt+shift+-", "alt+shift+_"), key.WithHelp("M-_", "redo")),
 	Quit:             key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	Tab:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "toggle sidebar")),
 	Up:               key.NewBinding(key.WithKeys("up", "k", "ctrl+p"), key.WithHelp("k/C-p", "up")),

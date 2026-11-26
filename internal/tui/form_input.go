@@ -30,6 +30,11 @@ func (m *AppModel) resizePathInput() {
 }
 
 func (m *AppModel) updateModalTextarea(msg tea.Msg) tea.Cmd {
+	defer m.recordTextareaEdit(m.textareaSnapshot())
+	return m.applyTextareaInput(msg)
+}
+
+func (m *AppModel) applyTextareaInput(msg tea.Msg) tea.Cmd {
 	if m.pathInputType() != "" {
 		if press, ok := msg.(tea.KeyPressMsg); ok && key.Matches(press, m.modalTextarea.KeyMap.InsertNewline) {
 			m.modalSubmit()
@@ -44,11 +49,8 @@ func (m *AppModel) updateModalTextarea(msg tea.Msg) tea.Cmd {
 			msg = tea.PasteMsg{Content: text}
 		}
 	}
-	before := m.textareaSnapshot()
 	var cmd tea.Cmd
 	m.modalTextarea, cmd = m.modalTextarea.Update(msg)
-	_, pasted := msg.(tea.PasteMsg)
-	m.recordTextareaEdit(before, pasted)
 	if m.pathInputType() != "" {
 		m.resizePathInput()
 	}

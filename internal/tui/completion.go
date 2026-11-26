@@ -279,6 +279,7 @@ func (m *AppModel) moveCompletion(delta int) {
 // acceptCompletion replaces the query with the candidate. A file ends the
 // reference with a space; a directory keeps the menu open on its entries.
 func (m *AppModel) acceptCompletion() {
+	defer m.recordTextareaEdit(m.textareaSnapshot())
 	c := &m.completion
 	item := c.items[max(0, c.selected)]
 	text := item.name

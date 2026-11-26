@@ -10,6 +10,8 @@
 
 ### Changed
 
+- In text fields, undo successive edits with <kbd>C-/</kbd>, <kbd>C-_</kbd>, or <kbd>C-z</kbd> and redo them with <kbd>M-_</kbd>.  Each field keeps up to 100 edits while open.  <kbd>C-y</kbd> still yanks from the kill ring.
+
 - Page and half-page keys scroll the content pane while keeping the current line if it is visible.  When the current line leaves the pane, it moves to the second visible row from the top when scrolling down or from the bottom when scrolling up.  At a scroll limit, half-page keys move the current line by half a page and full-page keys move it to the beginning or end.
 - The row after a final newline appears without a line number and uses reverse video when current.  The file header shows the source line count and labels that cursor position EOF.
 - Find unanswered form fields and unresolved comment threads by the gold dot in the gutter.  Colored brackets identify ranking and radio-button groups, even when their rows are separated.

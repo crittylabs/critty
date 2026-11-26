@@ -3,6 +3,8 @@ package tui
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/crittylabs/critty/v2/internal/review"
 )
 
@@ -93,6 +95,17 @@ func TestResolveNextUndoLeavesFinishDialog(t *testing.T) {
 	if app.modal != finishModal || !app.finishFromResolve {
 		t.Fatalf("R with no thread left opened modal %v (from resolve %v)", app.modal, app.finishFromResolve)
 	}
+	app = pressKey(app, tea.KeyUp)
+	app = typeSearch(app, "x")
+	app = ctrlKey(app, '/')
+	if app.modal != finishModal || app.modalTextarea.Value() != "" {
+		t.Fatalf("undo in the overall comment: modal %v text %q", app.modal, app.modalTextarea.Value())
+	}
+	editorMeta(&app, '_')
+	if got := app.modalTextarea.Value(); got != "x" {
+		t.Fatalf("redo in the overall comment = %q", got)
+	}
+	app = ctrlKey(app, 's')
 	app = ctrlKey(app, 'z')
 	if app.modal != noModal || app.finishFromResolve || commentByID(t, app, 0, "first-a").Resolved || !app.tab().cursorOnAnnotation {
 		t.Fatalf("undo from the finish dialog: modal %v resolved %v on annotation %v", app.modal, commentByID(t, app, 0, "first-a").Resolved, app.tab().cursorOnAnnotation)

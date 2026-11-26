@@ -196,7 +196,10 @@ func (m *AppModel) handleLocationModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 			m.lineInput.Blur()
 			return m, nil
 		}
-		return m, m.editLineEditor(&m.lineInput, msg)
+		if m.lineInput.Focused() {
+			return m, m.editLineEditor(&m.lineInput, msg)
+		}
+		return m, nil
 	}
 	switch msg.String() {
 	case "y", "Y":

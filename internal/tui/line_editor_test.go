@@ -278,16 +278,21 @@ func TestLineEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
 	if app.fileSelect.input.Value() != "abc" || app.fileSelect.input.Position() != 0 || app.fileSelect.query != "abc" {
 		t.Fatalf("C-z gave %q at %d (query %q)", app.fileSelect.input.Value(), app.fileSelect.input.Position(), app.fileSelect.query)
 	}
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: '_', Mod: tea.ModCtrl})
+	app = ctrlKey(app, '_')
+	if app.fileSelect.input.Value() != "ab" {
+		t.Fatalf("second undo gave %q", app.fileSelect.input.Value())
+	}
+	editorMeta(&app, '_')
+	editorMeta(&app, '_')
 	if app.fileSelect.input.Value() != "" {
-		t.Fatalf("undoing the undo gave %q", app.fileSelect.input.Value())
+		t.Fatalf("redo gave %q", app.fileSelect.input.Value())
 	}
 	app = ctrlKey(app, 'z')
 	app.fileSelect.input.click(0, 40)
 	app.fileSelect.input.drag(2, 40)
 	app.fileSelect.input.release()
-	app = typeSearch(app, "xy")
-	if app.fileSelect.input.Value() != "xyc" {
+	app = typeSearch(app, "x")
+	if app.fileSelect.input.Value() != "xc" {
 		t.Fatalf("typing over the selection gave %q", app.fileSelect.input.Value())
 	}
 	app = ctrlKey(app, 'z')
@@ -295,9 +300,14 @@ func TestLineEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
 		t.Fatalf("C-z after overwriting gave %q", app.fileSelect.input.Value())
 	}
 	app = typeSearch(app, "d")
-	app = ctrlKey(app, 'z')
-	if app.fileSelect.input.Value() != "xyc" {
-		t.Fatalf("typing does not replace the snapshot: C-z gave %q", app.fileSelect.input.Value())
+	edited := app.fileSelect.input.Value()
+	editorMeta(&app, '_')
+	if app.fileSelect.input.Value() != edited {
+		t.Fatalf("redo after a new edit gave %q", app.fileSelect.input.Value())
+	}
+	app = ctrlKey(app, '/')
+	if app.fileSelect.input.Value() != "abc" {
+		t.Fatalf("undo after typing gave %q", app.fileSelect.input.Value())
 	}
 }
 
@@ -316,9 +326,9 @@ func TestCommentEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
 	if app.modalTextarea.Value() != "hello world" || app.modalTextarea.Column() != 11 {
 		t.Fatalf("C-z gave %q at column %d", app.modalTextarea.Value(), app.modalTextarea.Column())
 	}
-	app = ctrlKey(app, 'z')
+	editorMeta(&app, '_')
 	if app.modalTextarea.Value() != "hello worl" {
-		t.Fatalf("undoing the undo gave %q", app.modalTextarea.Value())
+		t.Fatalf("redo gave %q", app.modalTextarea.Value())
 	}
 	app = ctrlKey(app, 'z')
 	rect, _ := app.textareaRegion()
@@ -326,8 +336,8 @@ func TestCommentEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
 	app = pressMouse(app, left+6, rect.top)
 	app = moveMouse(app, left+11, rect.top)
 	app = releaseMouse(app, left+11, rect.top)
-	app = typeSearch(app, "there")
-	if app.modalTextarea.Value() != "hello there" {
+	app = typeSearch(app, "x")
+	if app.modalTextarea.Value() != "hello x" {
 		t.Fatalf("typing over the selection gave %q", app.modalTextarea.Value())
 	}
 	app = ctrlKey(app, 'z')
