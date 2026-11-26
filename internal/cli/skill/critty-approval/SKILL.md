@@ -31,7 +31,7 @@ critty review --staged --attachment APPROVAL.md --attachment PUBLICATION.md
 
 For documents only, replace `--staged` with `--null`.  Attach only the files the request needs.  Add `--result <directory>/answers-round-1.json` for a form; omit it for ordinary approval.  Use a fresh result and summary path for each invocation.
 
-Follow `/critty` to launch, wait, read feedback, and reopen the same session.  Retain the invocation, working directory, session and round, reviewed diff/source and attachment snapshots, complete output, and any form result.  On later rounds, pass the complete ordered attachment list and form result option again, preserving previous results first.
+Follow `/critty` to launch, wait, read feedback, and reopen the same session.  Retain the invocation, working directory, session and round, reviewed snapshots, complete output, and any form result.  Resume with a fresh result path for form rounds.  Omit attachment flags to reuse saved snapshots, or pass the complete ordered list to review updated documents.
 
 Answer clarification questions in comments first.  Before editing or replacing any reviewed input, follow the [revision checklist](../critty-cli/references/forms.md#before-revising-a-form): preserve the completed round, compare the proposed inputs, and tell the reviewer which answers will survive and which permissions need fresh consent.  Stable IDs alone do not preserve consent after reviewed content changes.  Keep progress updates outside reviewed inputs when they do not change the requested decision.
 

@@ -25,7 +25,7 @@ Create scratch space with `critty tmp create` and use its returned `directory` f
 - Verify the summary's session, round, and reviewed input against this invocation.  Keep complete finish output; summaries omit attachment bodies, form answers, and individual consents.  Read [result contracts](references/results.md) before interpreting forms or recovering a result.
 - Comments use source coordinates from the reviewed version, which may differ from disk.  Read the complete thread before replying, identify your agent with `--author`, and follow `/critty`'s Resolve settled threads section once agreement is recorded.
 - Use literal shell arguments.  For three or more replies, or any body with awkward quoting, use the [bulk JSON interface](references/comments.md#bulk-comments).
-- Saved reviews are retained after approval.  Stop preserves state; removal deletes it.  Follow `/critty-history` for task completion and retention.
+- Saved reviews are retained after approval by default.  For configured cleanup and exceptions, see [result contracts](references/results.md).  Stop preserves state.  Use `/critty-history` for task completion and retention.
 
 ## Choose the needed reference
 

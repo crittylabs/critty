@@ -70,7 +70,7 @@ Add `min-level=N` and `max-level=N` to set the shallowest and deepest levels whe
 
 Until the reviewer moves an item or confirms the order, the answer stays `null`.  An answered ranking has a `value` array in depth-first order.  When it has children, the answer also has a `rank_parents` object that maps each child value to its parent value.  Root items are absent from the map.  The corresponding definitions use `rank_parent` for each item's original parent.
 
-Reordering leaves the source unchanged.  A comment on a ranked item keeps its source `start_line` and `anchor`.  Read the item's rank from the answer.  Inside a reordered ranking, a comment covers one item, and a range reaching into it covers the whole ranking.
+The attachment snapshot and Markdown source view retain the original order.  A comment on a ranked item keeps its source `start_line` and `anchor`.  Use the answer to determine its current position and parent.  Inside a reordered ranking, a comment covers one item, and a range reaching into it covers the whole ranking.
 
 ## Saved answers
 

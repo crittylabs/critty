@@ -79,4 +79,4 @@ Name the concrete outcome in each option.  Approval requires a selection, but an
 
 Give independently authorized operations separate consent IDs.  Add `required` only when permission is a prerequisite to approving the request; otherwise approval may decline that operation.  Leave confirmations and consents unchecked in the source.  Initial checkmarks, ordinary checkboxes, and choices do not authorize actions.
 
-Read [attachment forms](../../critty-cli/references/forms.md) for widget and answer-retention contracts before revising a form.  Keep field wording, definitions, and explicit IDs stable; add explanations in surrounding prose or comments.  Changed fields need new answers, and new candidates remain unanswered even after an earlier select-all.
+Before revising a form, follow the [revision checklist](../../critty-cli/references/forms.md#before-revising-a-form) to preserve eligible answers and identify permissions that need fresh consent.

@@ -84,7 +84,7 @@ Rules:
 - Read the whole thread before replying; `critty` defines how to identify new feedback and avoid repeated replies.
 - Use a single-quoted argument for a short body without apostrophes.  For bodies containing apostrophes, multiple lines, or complex quoting, use a JSON file even for one comment.  Double quotes let the shell interpret backticks and `$`.
 - Line numbers are 1-indexed source coordinates, not positions in the diff text.  Staged reviews use index contents, committed comparisons use the right endpoint, and supplied diffs use the saved snapshot.  Files on disk may differ or be absent.  Use comment anchors when content changes between rounds.
-- Bodies are Markdown; code fences and inline code render in the TUI.
+- In Markdown reviews, source references quote the underlying markup, even when the document is formatted.  To propose a replacement, put its exact source inside a fence labeled `suggestion`.  Use matching backtick fences of at least three characters, longer than any run of backticks starting a replacement line after indentation.  This keeps fenced examples inside the suggestion.
 - Pass `--resolve` under `/critty`'s Resolve settled threads section or at the user's request.  The same applies to the `resolve` field in bulk JSON.
 
 ## Bulk comments

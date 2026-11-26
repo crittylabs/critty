@@ -2,7 +2,7 @@
 
 ## Forms and exported results
 
-Task-list items annotated with `<!-- form: ... -->` in attached `.md` or `.markdown` files are interactive forms: checkboxes, required confirmations, choices, consents, text answers, rankings, and select-all controls.  Unannotated items remain display-only.  Read [attachment forms](forms.md) before writing a form or interpreting its answers; it lists each widget's annotation, answer value, and constraints.  `critty-approval` defines when to use confirmations and consents and how to interpret permission.
+For form annotations, defaults, and per-field answers, see [attachment forms](forms.md).  For permission to execute an operation, follow [critty-approval](../../critty-approval/SKILL.md).
 
 `--answers` labels Comment as **Confirm answers** and selects it by default, for rounds that collect form answers without approving the design; the verdict remains `comment`.  The setting persists across the session's rounds until `--no-answers`.
 
@@ -10,11 +10,11 @@ Task-list items annotated with `<!-- form: ... -->` in attached `.md` or `.markd
 
 | Result field | Meaning |
 | --- | --- |
-| `version`, `session`, `round` | Schema version, session ID, and completed round. |
+| `version`, `session`, `round` | Form schema version, session ID, and completed round.  Version 4 covers [ranked hierarchies and constraints](forms.md#rankings). |
 | `image_base` | Session directory that resolves `attachments/` image paths in answers and comments. |
 | `review_revision`, `reviewed_target` | Revision identifier and the exact reviewed input. |
 | `attachments` | Ordered documents with source paths, snapshots, field `definitions`, and `answers`. |
-| `approved` | Human review outcome, including required-confirmation checks. |
+| `verdict`, `approved`, `review_comment` | Submitted decision, approval flag, and optional overall comment. |
 | `consents` | On approval, document ID → field ID → boolean for individual permissions. |
 
 Answers submitted with `verdict: comment`, including `--answers` rounds, can record preferences or requirements without granting approval or execution permission.  Overall approval and initial checkmarks supply no individual consent.  Form review cleanup is deferred.  Preserve the result before running the printed cleanup command, and follow `critty-approval` to match decisions to operations.

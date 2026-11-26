@@ -113,7 +113,7 @@ Open referenced comment images with the image-viewing tool, including images in 
 
 Read the overall review comment and each thread with its replies and the work already recorded.  Act on new or edited reviewer feedback and reply once with the change or answer.  Apply requested suggestion blocks verbatim in the reviewed representation.  Leave unanswered agent comments and completion replies unchanged unless a material correction or new result is needed; an unresolved flag or new round alone does not request another reply.
 
-When a file-level or line comment, or its file entry, carries `textconv`, treat it as feedback on converted text.  Its line numbers, anchors, quotes, and suggestions describe that representation, not the original bytes.  Before editing, follow [Edit originals from textconv feedback](../critty-cli/references/inputs.md#edit-originals-from-textconv-feedback): locate the original value, preserve its format and encoding, and verify the edit by converting it again.  Ask for clarification if the target cannot be identified reliably.
+For feedback carrying `textconv` on the comment or file entry, follow [Edit originals from textconv feedback](../critty-cli/references/inputs.md#edit-originals-from-textconv-feedback) to translate the suggestion into the original format and verify it against the converted snapshot.
 
 When a human request in chat or review feedback names another AI, select the workflow by who should act on its findings.  Honor an explicitly selected skill.  Otherwise apply the intent in any language; these English examples illustrate the distinction:
 
