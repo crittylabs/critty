@@ -51,13 +51,16 @@ Text answers use Markdown.  Pasted images are saved in the session and reference
 
 ## Rankings
 
-Use the same `id` and a distinct `value` on each ranked item.  Indent a ranked item under another item of that field to give it a parent.
+Use the same `id` and a distinct `value` on each ranked item.  Indent a ranked item under another item of that field to give it a parent.  For a classification question, put the categories and all the items in one contiguous ranking so reviewers can move items between categories.
 
 ```markdown
-- [ ] Prepare <!-- form: id=steps rank value=prepare -->
-  - [ ] Gather inputs <!-- form: id=steps rank value=inputs -->
-  - [ ] Validate inputs <!-- form: id=steps rank value=validate -->
-- [ ] Publish <!-- form: id=steps rank value=publish -->
+Which component should own each part of an upload retry?
+Move each task under its owner.  Order within a component is optional.
+
+- [ ] Client <!-- form: id=ownership rank value=client fixed -->
+  - [ ] Choose the retry delay <!-- form: id=ownership rank value=delay min-level=2 max-level=2 -->
+- [ ] Service <!-- form: id=ownership rank value=service fixed -->
+  - [ ] Detect duplicate uploads <!-- form: id=ownership rank value=deduplicate min-level=2 max-level=2 -->
 ```
 
 Ranked branches move with their descendants.  Keep a ranking contiguous to let reviewers change a branch's depth and parent.

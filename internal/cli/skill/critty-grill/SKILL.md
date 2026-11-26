@@ -45,7 +45,9 @@ Run `critty tmp create` once for the interview and read the JSON `directory` fie
 
 Write `QUESTIONS.md` there with a short topic summary, settled decisions relevant to this round, and numbered questions with stable descriptive IDs.  For each question, state the decision, its consequences, and a recommended answer with a reason.
 
-Use unchecked choice items for mutually exclusive answers.  Tag the one recommended choice of each question with `tags=recommended`, and put an item with `select-all=recommended` before the questions so the user can accept every recommendation at once and then change individual answers.  Add `text` to an "Other" choice when the listed choices are not exhaustive, and offer a `value=defer text` choice so the user can postpone a decision with a reason.  Use a standalone `text` item for open-ended questions, and a `rank` field when the decision is an order of priorities.  Keep comments for challenging a premise or discussing a question.
+Use unchecked choice items for mutually exclusive answers.  Tag the one recommended choice of each question with `tags=recommended`, and put an item with `select-all=recommended` before the questions so the user can accept every recommendation at once and then change individual answers.  Add `text` to an "Other" choice when the listed choices are not exhaustive, and offer a `value=defer text` choice so the user can postpone a decision with a reason.  Use a standalone `text` item for open-ended questions.  Keep comments for challenging a premise or discussing a question.
+
+Use a flat ranking to ask which item comes first.  Offer a [nested ranking](../critty-cli/references/forms.md#rankings) when the decision is where each item belongs.  For example, ask which component owns each step of an upload retry, or how readers should find pages in a documentation outline.  Fix the categories when they are already agreed.  If the hierarchy itself is up for discussion, let the user move whole branches.  State whether the order within each group matters.
 
 Unchecked items and silence mean unanswered, not rejection or agreement.  A deferral is an answer that keeps the decision open.  Use ordinary choices rather than `consent`: these are design answers, not permission to execute operations.  Leave questions optional so the user can submit partial answers.
 
@@ -108,7 +110,7 @@ After completion, match the session, round, attachment snapshots, and definition
 
 Confirm answers, Comment, and Reject submissions can supply interview answers without approving the design.  Treat those answers as provisional and carry them into the next round for confirmation.  If a choice and comment conflict, keep that decision open and ask for clarification; do not silently prefer one.  An unexplained alternative remains open.  An overall Approve does not answer blank questions.
 
-Revise the decision record from the actual responses.  Explain what each changed answer affects, including earlier conclusions that now need another look.  Reply to substantive feedback using `/critty`'s comment workflow.
+Revise the decision record from the actual responses.  For a classification question, use the submitted `rank_parents` to record which items belong together.  Use their order in `value` only if the question asked about order.  Explain what each changed answer affects, including earlier conclusions that now need another look.  Reply to substantive feedback using `/critty`'s comment workflow.
 
 For selected glossary and ADR outputs, record newly settled terms and accepted ADRs before opening the next round, using the artifact reference and the caller's review policy.  Keep tentative answers in the question attachment until confirmed.  Carry a concise account of answers and rationale into the conversation as well, including exact constraints and explicit deferrals, so a following skill can continue without interpreting Critty JSON.
 
