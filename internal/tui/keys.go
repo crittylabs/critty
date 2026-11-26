@@ -5,6 +5,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func modalTextareaKeyMap() textarea.KeyMap {
@@ -12,6 +13,15 @@ func modalTextareaKeyMap() textarea.KeyMap {
 	bindings.InputBegin.SetKeys(append(bindings.InputBegin.Keys(), "alt+shift+,", "alt+shift+<")...)
 	bindings.InputEnd.SetKeys(append(bindings.InputEnd.Keys(), "alt+shift+.", "alt+shift+>")...)
 	return bindings
+}
+
+// editHistoryKey recognizes the shared text-field and ranking shortcuts.
+func editHistoryKey(msg tea.KeyPressMsg) (redo, matched bool) {
+	if key.Matches(msg, keys.Redo) {
+		return true, true
+	}
+	name := msg.String()
+	return false, name == "alt+z" || isUndoKey(name)
 }
 
 // keyHintNames formats static shortcut hints without changing event names.
@@ -66,7 +76,7 @@ type keyMap struct {
 }
 
 var keys = keyMap{
-	Redo:             key.NewBinding(key.WithKeys("alt+_", "alt+shift+-", "alt+shift+_"), key.WithHelp("M-_", "redo")),
+	Redo:             key.NewBinding(key.WithKeys("alt+_", "alt+shift+-", "alt+shift+_", "alt+Z", "alt+shift+z", "alt+shift+Z"), key.WithHelp("M-_/M-Z", "redo")),
 	Quit:             key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	Tab:              key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "toggle sidebar")),
 	Up:               key.NewBinding(key.WithKeys("up", "k", "ctrl+p"), key.WithHelp("k/C-p", "up")),

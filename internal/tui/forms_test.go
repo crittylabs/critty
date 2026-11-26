@@ -934,7 +934,7 @@ func TestRankUndoAndRedoAreLocalToTheCurrentList(t *testing.T) {
 	}
 	undo(5, 'z') // Exhausting this list must leave the other list alone.
 	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, map[string]string{"a": "c"})
-	undo(3, 'z')
+	move(3, 'z')
 	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, nil)
 	_, screen := app.renderReviewScreen()
 	if !screen.hasRankUndoButton {
@@ -951,7 +951,7 @@ func TestRankUndoAndRedoAreLocalToTheCurrentList(t *testing.T) {
 	}
 	// Redo the entire drag with one key. A new move discards just this
 	// list's remaining redo steps, while the other list can still redo.
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: '_', Mod: tea.ModAlt})
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'z', Mod: tea.ModAlt | tea.ModShift})
 	assertRankAnswer(t, d, "first", []string{"b", "c", "a"}, nil)
 	move(1, tea.KeyUp)
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: '_', Mod: tea.ModAlt})

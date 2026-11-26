@@ -201,14 +201,12 @@ type lineEditorPasteMsg struct {
 // editLineEditor applies a key to an input.  `C-v` and `M-v` read the system
 // clipboard as text, since these fields take no images.
 func (m *AppModel) editLineEditor(editor *lineEditor, msg tea.KeyPressMsg) tea.Cmd {
-	keyName := msg.String()
-	redo := key.Matches(msg, keys.Redo)
-	if redo || isUndoKey(keyName) {
+	if redo, matched := editHistoryKey(msg); matched {
 		editor.restore(redo)
 		m.killRing.interrupt()
 		return nil
 	}
-	if keyName != "ctrl+v" && keyName != "alt+v" {
+	if keyName := msg.String(); keyName != "ctrl+v" && keyName != "alt+v" {
 		return editor.edit(msg, &m.killRing)
 	}
 	m.clipboardID++

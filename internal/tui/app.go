@@ -1220,20 +1220,15 @@ func (m *AppModel) handleReviewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "alt+right", "alt+f":
 		return m, m.stepViewHistory(true)
 	}
-	switch {
-	case isUndoKey(msg.String()):
+	if redo, matched := editHistoryKey(msg); matched {
 		if list, ok := m.currentRankList(); ok {
-			m.restoreRank(list, false)
-		} else {
+			m.restoreRank(list, redo)
+		} else if isUndoKey(msg.String()) {
 			m.undoReview()
 		}
 		return m, nil
-	case key.Matches(msg, keys.Redo):
-		if list, ok := m.currentRankList(); ok {
-			m.restoreRank(list, true)
-		}
-		return m, nil
-	case msg.String() == "ctrl+y":
+	}
+	if msg.String() == "ctrl+y" {
 		m.redoReview()
 		return m, nil
 	}
@@ -2453,8 +2448,7 @@ func (m *AppModel) handleTextModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if handled, cmd := m.handleTextareaSelectionKey(msg); handled {
 		return m, cmd
 	}
-	redo := key.Matches(msg, keys.Redo)
-	if m.modalFocus == 0 && (redo || isUndoKey(msg.String())) {
+	if redo, matched := editHistoryKey(msg); matched && m.modalFocus == 0 {
 		m.restoreTextarea(redo)
 		return m, nil
 	}
@@ -4994,8 +4988,8 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "f", desc: "file comment"},
 		{keys: "F", desc: "answer list"},
 		{keys: "M-↑/↓", desc: "move ranked branch to the next allowed place"},
-		{keys: "C-/ · C-_ · C-z", desc: "undo one move in this ranking"},
-		{keys: "M-_", desc: "redo one move in this ranking"},
+		{keys: "C-/ · C-_ · C-z · M-z", desc: "undo one move in this ranking"},
+		{keys: "M-_ · M-Z", desc: "redo one move in this ranking"},
 		{keys: "M-←/→ · M-b/M-f (rank)", desc: "outdent / indent under previous sibling"},
 		{keys: "rank drag", desc: "drag sideways on the same row for depth; drag to another row to move"},
 		{keys: "v/C-SPC/C-@ · space", desc: "select/form"},
@@ -5063,7 +5057,7 @@ func (m AppModel) renderHelp(innerWidth int) string {
 		{keys: "M-i (editors)", desc: "show/hide image, math, and Mermaid previews without changing source"},
 		{keys: "C-v/M-v (editors and inputs)", desc: "paste from the system clipboard; comment editors also accept images"},
 		{keys: "drag,S-arrows · M-w · esc (editors)", desc: "select text · copy it · cancel selection"},
-		{keys: "C-/,C-_,C-z · M-_ (editors)", desc: "undo · redo"},
+		{keys: "C-/,C-_,C-z,M-z · M-_,M-Z (editors)", desc: "undo · redo"},
 		{keys: "C-k/u/w,M-d · C-y/M-y · @path,tab", desc: "kill · yank · complete"},
 		{keys: "tab · ↑/↓ · enter (path answers)", desc: "complete · ⇅ choose · accept/save; no @ needed"},
 		{keys: "a/r/c · tab/S-tab · enter · esc · q", desc: "select approve/reject/comment · focus · submit · back · abort (outside input)"},

@@ -282,7 +282,7 @@ func TestLineEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
 	if app.fileSelect.input.Value() != "ab" {
 		t.Fatalf("second undo gave %q", app.fileSelect.input.Value())
 	}
-	editorMeta(&app, '_')
+	editorMeta(&app, 'Z')
 	editorMeta(&app, '_')
 	if app.fileSelect.input.Value() != "" {
 		t.Fatalf("redo gave %q", app.fileSelect.input.Value())
@@ -322,11 +322,11 @@ func TestCommentEditorUndoRestoresDeletionAndOverwrite(t *testing.T) {
 	if app.modalTextarea.Value() != "hello worl" {
 		t.Fatalf("backspace left %q", app.modalTextarea.Value())
 	}
-	app = ctrlKey(app, 'z')
+	editorMeta(&app, 'z')
 	if app.modalTextarea.Value() != "hello world" || app.modalTextarea.Column() != 11 {
-		t.Fatalf("C-z gave %q at column %d", app.modalTextarea.Value(), app.modalTextarea.Column())
+		t.Fatalf("M-z gave %q at column %d", app.modalTextarea.Value(), app.modalTextarea.Column())
 	}
-	editorMeta(&app, '_')
+	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'Z', Mod: tea.ModAlt | tea.ModShift})
 	if app.modalTextarea.Value() != "hello worl" {
 		t.Fatalf("redo gave %q", app.modalTextarea.Value())
 	}
