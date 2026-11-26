@@ -373,26 +373,24 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 	t.Cleanup(func() { lookPath, findMathRaTeX = oldLook, oldFind })
 	findMathRaTeX = func(string) (string, error) { return "", nil }
 	lookPath = func(string) (string, error) { return "", exec.ErrNotFound }
-	for _, name := range []string{"doctor", "check"} {
-		root := &cobra.Command{Use: "critty"}
-		root.AddCommand(newDoctorCommand())
-		root.SetArgs([]string{name, "--json"})
-		var out bytes.Buffer
-		root.SetOut(&out)
-		if err := root.Execute(); err != nil {
-			t.Fatal(err)
-		}
-		var r doctorReport
-		if err := json.Unmarshal(out.Bytes(), &r); err != nil || len(r.Checks) == 0 {
-			t.Fatalf("invalid report %s: %v", out.String(), err)
-		}
-		if d := diagnosticFor(t, r, "git/version"); d.Status != "warn" {
-			t.Fatalf("missing Git must warn without failing standalone reviews: %+v", d)
-		}
-		for _, tool := range []string{"ratex", "latex", "dvipng"} {
-			if d := diagnosticFor(t, r, "math/"+tool); d.Status != "info" {
-				t.Fatalf("missing optional math tool must not fail doctor: %+v", d)
-			}
+	root := &cobra.Command{Use: "critty", SilenceErrors: true, SilenceUsage: true}
+	root.AddCommand(newDoctorCommand())
+	root.SetArgs([]string{"doctor", "--json"})
+	var out bytes.Buffer
+	root.SetOut(&out)
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var r doctorReport
+	if err := json.Unmarshal(out.Bytes(), &r); err != nil || len(r.Checks) == 0 {
+		t.Fatalf("invalid report %s: %v", out.String(), err)
+	}
+	if d := diagnosticFor(t, r, "git/version"); d.Status != "warn" {
+		t.Fatalf("missing Git must warn without failing standalone reviews: %+v", d)
+	}
+	for _, tool := range []string{"ratex", "latex", "dvipng"} {
+		if d := diagnosticFor(t, r, "math/"+tool); d.Status != "info" {
+			t.Fatalf("missing optional math tool must not fail doctor: %+v", d)
 		}
 	}
 	first := integrations()["codex"][0]
@@ -406,15 +404,12 @@ func TestDoctorAliasAndJSON(t *testing.T) {
 	if err := os.WriteFile(first.dest, data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	root := &cobra.Command{Use: "critty", SilenceErrors: true, SilenceUsage: true}
-	root.AddCommand(newDoctorCommand())
+	out.Reset()
 	root.SetArgs([]string{"check", "--json"})
-	var out bytes.Buffer
-	root.SetOut(&out)
 	if err := root.Execute(); err == nil {
 		t.Fatal("partial installation returned success")
 	}
-	var r doctorReport
+	r = doctorReport{}
 	if err := json.Unmarshal(out.Bytes(), &r); err != nil {
 		t.Fatalf("error lost JSON report: %v", err)
 	}

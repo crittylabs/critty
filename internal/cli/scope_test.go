@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/crittylabs/critty/v2/internal/config"
@@ -62,11 +61,6 @@ func TestResolveExplicitScopes(t *testing.T) {
 			if err != nil || string(content) != "staged" || !mode.staged || mode.ref != "HEAD" {
 				t.Fatalf("staged review did not use the index: %+v, content=%q, error=%v", mode, content, err)
 			}
-		}
-		mode.sessionKey = "0123456789ab"
-		cmd, err := buildTUICommand(mode, "tmux")
-		if err != nil || !strings.Contains(cmd, "--session '0123456789ab'") {
-			t.Fatalf("command=%q err=%v", cmd, err)
 		}
 	}
 	reviewStaged, reviewUnstaged, reviewCode = false, false, false

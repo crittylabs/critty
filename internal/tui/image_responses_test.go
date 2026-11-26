@@ -80,13 +80,15 @@ func TestTerminalTrafficDoesNotEnterEditor(t *testing.T) {
 			writes := make(chan error, 1)
 			go func() {
 				defer writer.Close()
-				for _, chunk := range tc.chunks {
+				for i, chunk := range tc.chunks {
+					if i > 0 {
+						// Deliver the rest of the response after the Alt-key deadline.
+						time.Sleep(100 * time.Millisecond)
+					}
 					if _, err := io.WriteString(writer, chunk); err != nil {
 						writes <- err
 						return
 					}
-					// Cross the Alt-key deadline and separate traffic from editor text.
-					time.Sleep(100 * time.Millisecond)
 				}
 				_, err := io.WriteString(writer, "after")
 				writes <- err

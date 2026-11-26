@@ -70,21 +70,26 @@ func TestResolveCommit(t *testing.T) {
 	runGit(t, dir, "commit", "-qam", "next")
 	runGit(t, dir, "tag", "next")
 	runGit(t, dir, "merge", "--no-ff", "-qm", "merge", "side")
-	sha, err := resolveCommit("next")
+	next, err := ResolveCommit("next")
 	if err != nil {
 		t.Fatal(err)
 	}
 	writeFile(t, dir, "file.txt", []byte("working\n"))
 	writeFile(t, dir, "untracked.txt", []byte("untracked\n"))
+	for _, alias := range []string{next.Head, next.Head[:10], "HEAD~1"} {
+		got, err := ResolveCommit(alias)
+		want := next
+		want.Range = alias
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("ResolveCommit(%q) = %+v, %v; want %+v", alias, got, err, want)
+		}
+	}
 	for _, tc := range []struct {
 		ref, path, before, after string
 		status                   ChangeStatus
 	}{
 		{"root", "file.txt", "", "root\n", StatusAdded},
 		{"next", "file.txt", "root\n", "next\n", StatusModified},
-		{sha, "file.txt", "root\n", "next\n", StatusModified},
-		{sha[:10], "file.txt", "root\n", "next\n", StatusModified},
-		{"HEAD~1", "file.txt", "root\n", "next\n", StatusModified},
 		{"HEAD", "side.txt", "", "side\n", StatusAdded},
 	} {
 		t.Run(tc.ref, func(t *testing.T) {
@@ -206,18 +211,11 @@ func TestReviewSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := two.Files()
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := three.Files()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(a) != 2 || len(b) != 1 || reflect.DeepEqual(a, b) {
-		t.Fatalf("two-dot=%v three-dot=%v", a, b)
-	}
-	for _, source := range []ReviewSource{two, three} {
+	for _, tc := range []struct {
+		source ReviewSource
+		count  int
+	}{{two, 2}, {three, 1}} {
+		source := tc.source
 		out, err := gitCommand("diff", "--name-status", "-z", source.Range, "--")
 		if err != nil {
 			t.Fatal(err)
@@ -226,7 +224,7 @@ func TestReviewSources(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := parseNameStatusZ(out); !reflect.DeepEqual(files, want) {
+		if want := parseNameStatusZ(out); len(files) != tc.count || !reflect.DeepEqual(files, want) {
 			t.Fatalf("%s: files=%v, git diff=%v", source.Range, files, want)
 		}
 	}

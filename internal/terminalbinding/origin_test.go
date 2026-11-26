@@ -72,21 +72,17 @@ func TestMuxlessNotificationAndPrivateOrigin(t *testing.T) {
 	if err := s.Notify(r.ID, target); err != nil {
 		t.Fatal(err)
 	}
-	got, err := resolve(t, s, r.ID, func(context.Context, Target) (string, error) { t.Fatal("scanned muxless terminal"); return "", nil })
-	if err != nil || got != target || !Remote(got, got.Origin) {
-		t.Fatalf("resolve=%+v, %v", got, err)
-	}
 	// A notification persists only the positive bit, never connection addresses.
-	r = prepare(t, s)
-	if err := s.Notify(r.ID, target); err != nil {
-		t.Fatal(err)
-	}
 	data, err := os.ReadFile(filepath.Join(s.dir, "request-"+r.ID+".json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(data), "private-address-fixture") {
 		t.Fatal("SSH addresses persisted")
+	}
+	got, err := resolve(t, s, r.ID, func(context.Context, Target) (string, error) { t.Fatal("scanned muxless terminal"); return "", nil })
+	if err != nil || got != target || !Remote(got, got.Origin) {
+		t.Fatalf("resolve=%+v, %v", got, err)
 	}
 }
 
@@ -124,23 +120,6 @@ esac
 				t.Fatalf("remote=%v, want %v", got, tc.want)
 			}
 		})
-	}
-}
-
-func TestNotificationDeduplicatesEnrichedPane(t *testing.T) {
-	s := testStore(t)
-	r := prepare(t, s)
-	target := testTarget("%1")
-	if err := s.Notify(r.ID, target); err != nil {
-		t.Fatal(err)
-	}
-	target.Origin = Origin{PID: 10, Started: "born", Terminal: "ghostty", SSH: true}
-	if err := s.Notify(r.ID, target); err != nil {
-		t.Fatal(err)
-	}
-	got, err := resolve(t, s, r.ID, func(context.Context, Target) (string, error) { t.Fatal("scanned"); return "", nil })
-	if err != nil || got.Origin != target.Origin {
-		t.Fatalf("resolve=%+v,%v", got, err)
 	}
 }
 

@@ -37,7 +37,11 @@ func TestDeferralPersistsAndChangesInvalidateIt(t *testing.T) {
 	if _, err := s.FinishPolicy(task.ID, Policy{End: "keep"}); err != nil {
 		t.Fatal(err)
 	}
-	now := s.now().AddDate(0, 0, 60)
+	now := s.now()
+	if err := os.Chtimes(session.Path(), now, now); err != nil {
+		t.Fatal(err)
+	}
+	now = now.AddDate(0, 0, 60)
 	s.now = func() time.Time { return now }
 	policy, err := (Policy{}).Normalize()
 	if err != nil {

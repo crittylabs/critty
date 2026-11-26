@@ -80,11 +80,13 @@ def wait_until(
     condition: Callable[[], Any], description: str, timeout: float = 20
 ) -> Any:
     deadline = time.monotonic() + timeout
+    interval = 0.02
     while time.monotonic() < deadline:
         value = condition()
         if value:
             return value
-        time.sleep(0.1)
+        time.sleep(interval)
+        interval = min(0.1, interval * 2)
     raise AssertionError(f"timeout: {description}")
 
 
@@ -205,10 +207,10 @@ class Round:
         needs_confirmation = approved and any(
             not c.get("resolved") for c in self.comments()
         )
-        self.keys("q")
         if approved:
-            self.keys("a")
-        self.keys("Enter")
+            self.keys("q", "a", "Enter")
+        else:
+            self.keys("q", "Enter")
         if needs_confirmation:
             wait_until(
                 lambda: "Resolve all & approve?" in self.screen(),
@@ -1164,7 +1166,10 @@ def scenarios() -> None:
             "existing feedback confirmation",
         )
         unchanged.keys("n")
-        unchanged.settle()
+        wait_until(
+            lambda: "Resolve all & approve?" not in unchanged.screen(),
+            "resolve-all confirmation dismissed",
+        )
         assert not unchanged.result.exists(), (
             "declining resolve-all submitted the round"
         )
@@ -1282,17 +1287,13 @@ def scenarios() -> None:
             submission.text(body)
             submission.wait_screen("● Comment", "first input selects Comment")
             submission.keys("C-s")
-            submission.settle()
-            assert not submission.result.exists(), "C-s submitted the overall comment"
-            assert "● Comment" in submission.screen(), (
-                "new overall feedback did not select Comment"
-            )
-            if verdict != "comment":
-                submission.keys(action)
+            if verdict == "comment":
                 submission.settle()
-            assert not submission.result.exists(), (
-                "selecting a verdict submitted the review"
-            )
+                assert "● Comment" in submission.screen(), "C-s changed the verdict"
+            else:
+                submission.keys(action)
+                submission.wait_screen(f"● {verdict.title()}", "verdict selected")
+            assert not submission.result.exists(), "review ended before Submit"
             submission.keys("Enter")
             submission.completed(verdict == "approve")
             assert f"verdict: {verdict}" in submission.err.read_text()
@@ -1328,7 +1329,7 @@ def scenarios() -> None:
         draft.keys("q", "q")
         wait_until(lambda: "Abort review?" in draft.screen(), "abort confirmation")
         draft.keys("n")
-        draft.settle()
+        wait_until(lambda: "Abort review?" not in draft.screen(), "abort dismissed")
         assert not draft.result.exists(), "declining abort ended the review"
         wait_until(
             lambda: "Saved draft" in draft.screen(), "draft after declining abort"

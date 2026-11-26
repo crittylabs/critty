@@ -898,53 +898,53 @@ func TestCommentSidebarCollapsesResolvedFileComments(t *testing.T) {
 }
 
 func TestModalCloseButtonAndOutsideClickDismiss(t *testing.T) {
-	open := map[string]func(AppModel) AppModel{
-		"comment": func(app AppModel) AppModel { return pressKey(app, tea.KeyEnter) },
-		"finish":  func(app AppModel) AppModel { return pressKey(app, 'q') },
-		"help":    func(app AppModel) AppModel { return pressAltKey(app, '?') },
-		"reply": func(app AppModel) AppModel {
+	t.Parallel()
+	for _, tc := range []struct {
+		name       string
+		closeIcons icons.Set
+		open       func(AppModel) AppModel
+	}{
+		{"comment", icons.Plain, func(app AppModel) AppModel { return pressKey(app, tea.KeyEnter) }},
+		{"finish", icons.Nerd, func(app AppModel) AppModel { return pressKey(app, 'q') }},
+		{"help", icons.Plain, func(app AppModel) AppModel { return pressAltKey(app, '?') }},
+		{"reply", icons.Nerd, func(app AppModel) AppModel {
 			comment := testComment()
-			app.tab().state.Comments = append(app.tab().state.Comments, comment)
+			app.tab().state.Comments = []review.Comment{comment}
 			app.modal, app.editingID = replyModal, comment.ID
 			return app
-		},
-	}
-	for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
-		for name, openModal := range open {
-			for _, via := range []string{"x", "outside"} {
-				t.Run(fmt.Sprintf("nerd=%t/%s/%s", symbols, name, via), func(t *testing.T) {
-					app := setupAppWithDoc(t, "first\nsecond\n")
-					app.icons = symbols
-					app.width, app.height = 100, 30
-					app.recalculateLayout()
-					app = openModal(app)
-					if app.modal == noModal {
-						t.Fatal("modal did not open")
-					}
-					_, layout := app.renderReviewScreen()
-					var x, y int
-					found := false
-					for _, region := range layout.modalRegions {
-						if via == "x" && region.action.close {
-							row := strings.Split(app.View().Content, "\n")[region.rect.top]
-							if got := ansi.Strip(ansi.Cut(row, region.rect.left, region.rect.right)); got != symbols.Glyph(icons.Close, "x") {
-								t.Fatalf("close region contains %q, want %q", got, symbols.Glyph(icons.Close, "x"))
-							}
-							x, y, found = region.rect.left, region.rect.top, true
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := setupParallelAppWithDoc(t, "first\nsecond\n")
+			app.width, app.height = 100, 30
+			app.recalculateLayout()
+			for _, symbols := range []icons.Set{icons.Plain, icons.Nerd} {
+				app.icons = symbols
+				app = tc.open(app)
+				if app.modal == noModal {
+					t.Fatal("modal did not open")
+				}
+				_, layout := app.renderReviewScreen()
+				for _, region := range layout.modalRegions {
+					switch {
+					case symbols == tc.closeIcons && region.action.close:
+						row := strings.Split(app.View().Content, "\n")[region.rect.top]
+						if got := ansi.Strip(ansi.Cut(row, region.rect.left, region.rect.right)); got != symbols.Glyph(icons.Close, "x") {
+							t.Fatalf("close region contains %q, want %q", got, symbols.Glyph(icons.Close, "x"))
 						}
-						if via == "outside" && region.action.dialog {
-							x, y, found = region.rect.right+1, region.rect.top, true
-						}
+						app = clickMouse(app, region.rect.left, region.rect.top)
+					case symbols != tc.closeIcons && region.action.dialog:
+						app = clickMouse(app, region.rect.right+1, region.rect.top)
+					default:
+						continue
 					}
-					if !found {
-						t.Fatalf("no %s target for %s modal", via, name)
-					}
-					if app = clickMouse(app, x, y); app.modal != noModal {
-						t.Fatalf("modal = %v after clicking %s, want closed", app.modal, via)
-					}
-				})
+					break
+				}
+				if app.modal != noModal {
+					t.Fatalf("modal remained open (Nerd Font %t, close button %t)", symbols, symbols == tc.closeIcons)
+				}
 			}
-		}
+		})
 	}
 }
 

@@ -62,7 +62,7 @@ func TestLineEditorWideCharactersAndScrolling(t *testing.T) {
 	}
 }
 
-func TestGotoLineDialogSelectsAndCopiesWithMouse(t *testing.T) {
+func TestGotoLineInputMouseEditing(t *testing.T) {
 	app := setupAppWithDoc(t, "one\ntwo\nthree")
 	app.width, app.height = 80, 24
 	app.recalculateLayout()
@@ -79,6 +79,13 @@ func TestGotoLineDialogSelectsAndCopiesWithMouse(t *testing.T) {
 	}
 	rect := inputRect()
 	left := rect.left + len(gotoLinePrompt)
+	for _, tc := range []struct{ offset, want int }{{-2, 0}, {0, 0}, {2, 2}, {5, 5}, {8, 5}} {
+		app = pressKey(app, tea.KeyTab)
+		app = clickMouse(app, left+tc.offset, rect.top)
+		if app.modalFocus != 0 || !app.lineInput.Focused() || app.lineInput.Position() != tc.want {
+			t.Fatalf("click at %d: input focus = %d, cursor = %d, want focused cursor at %d", tc.offset, app.modalFocus, app.lineInput.Position(), tc.want)
+		}
+	}
 	app = pressMouse(app, left+1, rect.top)
 	app = moveMouse(app, left+4, rect.top)
 	app = releaseMouse(app, left+4, rect.top)

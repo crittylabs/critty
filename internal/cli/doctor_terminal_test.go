@@ -17,7 +17,7 @@ func TestDoctorTerminalMarker(t *testing.T) {
 	lookPath = func(name string) (string, error) { return "", exec.ErrNotFound }
 	t.Cleanup(func() { lookPath, probeDoctorMarker = old, oldProbe })
 	for _, mode := range []string{"unprobed", "local", "local failure", "invalid", "notified", "legacy"} {
-		t.Run(mode, func(t *testing.T) {
+		runMarkerTest(t, mode, func(t *testing.T) {
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			var id string
 			want := "info"

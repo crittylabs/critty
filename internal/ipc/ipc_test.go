@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,6 +52,9 @@ func TestReviewCycleRoundTrip(t *testing.T) {
 		}
 	}()
 
+	if _, err := Listen(sock); err == nil {
+		t.Fatal("replaced a live review socket")
+	}
 	if !Alive(sock) {
 		t.Fatal("expected socket alive")
 	}
@@ -90,44 +94,18 @@ func TestReviewCycleServerCloseWithoutFinish(t *testing.T) {
 
 func TestListenReplacesStaleSocket(t *testing.T) {
 	sock := shortSockPath(t)
-	ln, err := Listen(sock)
+	ln, err := net.ListenUnix("unix", &net.UnixAddr{Name: sock, Net: "unix"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	closeTestSocket(t, ln) // leaves the socket file behind on some platforms
+	ln.SetUnlinkOnClose(false)
+	closeTestSocket(t, ln)
 
 	ln2, err := Listen(sock)
 	if err != nil {
 		t.Fatalf("expected stale socket replacement, got %v", err)
 	}
 	closeTestSocket(t, ln2)
-}
-
-func TestListenRejectsLiveSocket(t *testing.T) {
-	sock := shortSockPath(t)
-	ln, err := Listen(sock)
-	if err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan struct{})
-	t.Cleanup(func() {
-		closeTestSocket(t, ln)
-		<-done
-	})
-	go func() {
-		defer close(done)
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			closeTestSocket(t, conn)
-		}
-	}()
-
-	if _, err := Listen(sock); err == nil {
-		t.Fatal("expected error for a live socket")
-	}
 }
 
 func TestWaitAliveTimesOut(t *testing.T) {

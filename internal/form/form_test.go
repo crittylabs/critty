@@ -196,14 +196,14 @@ func TestRankFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	defaults := Defaults(items)
-	if order, ranked := RankOrder(items, "r", defaults["r"]); ranked || !slices.Equal(order, []string{"a", "b"}) || Satisfied(items[0], defaults["r"]) {
-		t.Fatalf("initial ranking: %v %v", order, ranked)
+	if tree, ranked := RankTree(items, "r", defaults["r"]); ranked || !slices.Equal(tree, []RankNode{{Value: "a"}, {Value: "b"}}) || Satisfied(items[0], defaults["r"]) {
+		t.Fatalf("initial ranking: %v %v", tree, ranked)
 	}
 	answer := Answer{Value: []any{"b", "a"}, Human: true}
-	if order, ranked := RankOrder(items, "r", answer); !ranked || !slices.Equal(order, []string{"b", "a"}) || !Satisfied(items[1], answer) {
-		t.Fatalf("decoded ranking: %v %v", order, ranked)
+	if tree, ranked := RankTree(items, "r", answer); !ranked || !slices.Equal(tree, []RankNode{{Value: "b"}, {Value: "a"}}) || !Satisfied(items[1], answer) {
+		t.Fatalf("decoded ranking: %v %v", tree, ranked)
 	}
-	if _, ranked := RankOrder(items, "r", Answer{Value: []any{"a", "c"}}); ranked {
+	if _, ranked := RankTree(items, "r", Answer{Value: []any{"a", "c"}}); ranked {
 		t.Fatal("accepted a ranking of other values")
 	}
 	for _, source := range []string{
@@ -404,7 +404,7 @@ func TestRankConstraints(t *testing.T) {
 	}
 	for _, source := range []string{
 		"- [ ] A <!-- form: fixed -->",
-		"- [ ] A <!-- form: id=r rank value=a max-depth=-1 -->",
+		"- [ ] A <!-- form: id=r rank value=a max-depth=-1 -->\n- [ ] B <!-- form: id=r rank value=b -->",
 		"- [ ] A <!-- form: id=r rank value=a max-depth=0 -->\n  - [ ] B <!-- form: id=r rank value=b -->",
 	} {
 		if _, err := Parse(source); err == nil {
@@ -413,49 +413,35 @@ func TestRankConstraints(t *testing.T) {
 	}
 }
 
-func TestMinimumRankLevelAppliesToMovedDescendants(t *testing.T) {
+func TestRankLevelsOfMovedDescendants(t *testing.T) {
 	t.Parallel()
 	const source = `- [ ] Root <!-- form: id=r rank value=root -->
   - [ ] Branch <!-- form: id=r rank value=branch -->
-    - [ ] Leaf <!-- form: id=r rank value=leaf min-level=3 -->
+    - [ ] Leaf <!-- form: id=r rank value=leaf min-level=3 max-level=3 -->
+  - [ ] Peer <!-- form: id=r rank value=peer -->
 `
 	items, err := Parse(source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	answer := Answer{Value: []string{"root", "branch", "leaf"}, RankParents: map[string]string{"leaf": "branch"}}
+	answer := Answer{Value: []string{"root", "peer", "branch", "leaf"}, RankParents: map[string]string{"peer": "root", "leaf": "branch"}}
 	if err := CheckRank(items, "r", answer); err == nil || !strings.Contains(err.Error(), "Leaf") {
 		t.Fatalf("promoting its ancestor returned %v", err)
 	}
-	for _, level := range []string{"0", "4", "none"} {
-		if _, err := Parse(strings.Replace(source, "min-level=3", "min-level="+level, 1)); err == nil {
-			t.Errorf("accepted %s", level)
-		}
-	}
-}
-
-func TestMaximumRankLevelAppliesToMovedDescendants(t *testing.T) {
-	t.Parallel()
-	const source = `- [ ] Inbox <!-- form: id=r rank value=inbox -->
-- [ ] Branch <!-- form: id=r rank value=branch -->
-  - [ ] Leaf <!-- form: id=r rank value=leaf min-level=2 max-level=2 -->
-`
-	items, err := Parse(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	answer := Answer{Value: []string{"inbox", "branch", "leaf"}, RankParents: map[string]string{"branch": "inbox", "leaf": "branch"}}
+	answer.RankParents["branch"] = "peer"
 	if err := CheckRank(items, "r", answer); err == nil || !strings.Contains(err.Error(), "shallower") {
 		t.Fatalf("indenting its ancestor returned %v", err)
 	}
-	answer.RankParents = map[string]string{"leaf": "inbox"}
-	answer.Value = []string{"inbox", "leaf", "branch"}
+	answer.RankParents["leaf"] = "peer"
 	if err := CheckRank(items, "r", answer); err != nil {
 		t.Fatalf("reparenting at the same level failed: %v", err)
 	}
-	for _, level := range []string{"0", "1", "none"} {
-		if _, err := Parse(strings.Replace(source, "max-level=2", "max-level="+level, 1)); err == nil {
-			t.Errorf("accepted %s", level)
+	for _, invalid := range []string{
+		"min-level=0", "min-level=4", "min-level=none",
+		"min-level=3 max-level=0", "min-level=3 max-level=2", "min-level=3 max-level=none",
+	} {
+		if _, err := Parse(strings.Replace(source, "min-level=3 max-level=3", invalid, 1)); err == nil {
+			t.Errorf("accepted %s", invalid)
 		}
 	}
 }

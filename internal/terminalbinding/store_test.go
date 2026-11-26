@@ -21,8 +21,10 @@ func testTarget(pane string) Target {
 }
 
 func TestProbeCurrentTerminal(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []string{"pane", "notification", "wrong notification", "display failure", "timeout"} {
 		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
 			s := testStore(t)
 			if err := s.Register(testTarget("%99")); err != nil {
 				t.Fatal(err)
@@ -101,6 +103,10 @@ func TestNotificationSkipsScreensAndConsumesRequest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	target.Origin = Origin{PID: 10, Started: "born", Terminal: "ghostty", SSH: true}
+	if err := s.Notify(r.ID, target); err != nil {
+		t.Fatal(err)
+	}
 	got, err := resolve(t, s, r.ID, func(context.Context, Target) (string, error) {
 		t.Fatal("notified request scanned screens")
 		return "", nil
@@ -110,21 +116,6 @@ func TestNotificationSkipsScreensAndConsumesRequest(t *testing.T) {
 	}
 	if err := s.Notify(r.ID, target); err == nil {
 		t.Fatal("consumed request accepted notification")
-	}
-}
-
-func TestConflictingNotificationsFail(t *testing.T) {
-	t.Parallel()
-	s := testStore(t)
-	r := prepare(t, s)
-	for _, pane := range []string{"%1", "%2"} {
-		if err := s.Notify(r.ID, testTarget(pane)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	_, err := resolve(t, s, r.ID, func(context.Context, Target) (string, error) { t.Fatal("scanned despite notification"); return "", nil })
-	if err == nil || !strings.Contains(err.Error(), "multiple panes") {
-		t.Fatalf("want ambiguity: %v", err)
 	}
 }
 
@@ -242,14 +233,12 @@ func TestConcurrentNotificationsPreserveConflicts(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	if err := s.locked(func() error {
-		p, err := s.read(r.ID)
-		if err == nil && len(p.Notifications) != 2 {
-			t.Errorf("lost notifications: %v", p.Notifications)
-		}
-		return err
-	}); err != nil {
-		t.Fatal(err)
+	_, err := resolve(t, s, r.ID, func(context.Context, Target) (string, error) {
+		t.Fatal("scanned despite conflicting notifications")
+		return "", nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "multiple panes") {
+		t.Fatalf("want ambiguity: %v", err)
 	}
 }
 

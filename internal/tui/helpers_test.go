@@ -16,6 +16,11 @@ import (
 	"github.com/crittylabs/critty/v2/internal/review"
 )
 
+func initAdaptiveStyles(hasDarkBG bool) {
+	background := lipgloss.LightDark(hasDarkBG)(lipgloss.Color("#FFFFFF"), lipgloss.Color("#10141c"))
+	initAdaptiveStylesWithBackground(hasDarkBG, background)
+}
+
 // setupSession points XDG state at a temp dir and opens a doc session there.
 func setupSession(t *testing.T, docPath string) *review.Session {
 	t.Helper()
@@ -58,7 +63,7 @@ func newDocApp(t *testing.T, content string, session func(string) *review.Sessio
 	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
-	app := NewApp(testFile, AppConfig{Session: session(testFile), Author: "Tester"})
+	app := NewApp(testFile, AppConfig{Session: session(testFile), Author: "Tester", MathRaTeX: "off"})
 	app.tabs = []FileTab{{path: testFile}}
 	app.activeTab = 0
 	updated, _ := app.Update(app.loadDocuments()())
@@ -201,7 +206,7 @@ func wheelMouse(app AppModel, x, y int, button tea.MouseButton) AppModel {
 }
 
 func newCommentNavigationTestApp() AppModel {
-	app := NewApp("first.go", AppConfig{})
+	app := NewApp("first.go", AppConfig{MathRaTeX: "off"})
 	app.sidebarView = commentsView
 	lines := []string{"one", "two", "three", "four"}
 	tab := func(path string, comments ...review.Comment) FileTab {
@@ -242,7 +247,7 @@ func newChangeNavigationTestApp() AppModel {
 }
 
 func newScrollTestApp(path string, lines []string, isMarkdown bool, width, height int) AppModel {
-	app := NewApp(path, AppConfig{})
+	app := NewApp(path, AppConfig{MathRaTeX: "off"})
 	app.tabs[0].doc = &document.Document{
 		Path:    path,
 		Content: strings.Join(lines, "\n"),
@@ -263,9 +268,10 @@ func newFinishTestApp(t *testing.T, comments []review.Comment) (AppModel, chan F
 	t.Chdir(t.TempDir())
 	finishCh := make(chan FinishEvent, 4)
 	app := NewApp("test.go", AppConfig{
-		Session:  setupSession(t, "test.go"),
-		Author:   "Tester",
-		FinishCh: finishCh,
+		MathRaTeX: "off",
+		Session:   setupSession(t, "test.go"),
+		Author:    "Tester",
+		FinishCh:  finishCh,
 	})
 	app.tabs[0].state = &fileReview{Comments: comments}
 	app.sidebarView = commentsView

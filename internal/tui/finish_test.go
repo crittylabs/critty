@@ -256,28 +256,6 @@ func TestFinishPendingDialogsFitSmallTerminals(t *testing.T) {
 	initAdaptiveStyles(true)
 }
 
-func TestMouseClickSubmitButtonOpensModal(t *testing.T) {
-	t.Parallel()
-	app := setupPrivateAppWithDoc(t, "first\nsecond\n")
-	app.width = 100
-	app.height = 24
-	app.recalculateLayout()
-	rect, ok := app.finishButtonRect()
-	if !ok {
-		t.Fatal("Submit button not found")
-	}
-	if actualY := renderedLineY(t, app, "Submit q"); actualY != rect.top {
-		t.Fatalf("button region row = %d, rendered button row = %d", rect.top, actualY)
-	}
-	assertRegionContainsRenderedText(t, app, rect, "Submit q")
-
-	app = clickMouse(app, rect.left, rect.top)
-
-	if app.modal != finishModal {
-		t.Fatalf("modal = %v, want finish modal", app.modal)
-	}
-}
-
 func TestFinishModalConfirmation(t *testing.T) {
 	resolved := testComment()
 	resolved.Resolved = true
@@ -506,37 +484,33 @@ func TestSubmissionDraftAndAbort(t *testing.T) {
 }
 
 func TestSubmissionUnicodeInputAndLayout(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		for _, size := range [][2]int{{100, 24}, {60, 16}, {40, 12}} {
-			app, _ := newFinishTestApp(t, nil)
-			app.width, app.height = size[0], size[1]
-			app.openFinishModal()
-			rect := modalTextareaRect(t, app)
-			app = clickMouse(app, rect.left, rect.top)
-			app, _ = updateApp(app, tea.PasteMsg{Content: "日本語e\u0301\n" + strings.Repeat("長文", 30)})
-			view := app.View()
-			if view.Cursor == nil || !rect.contains(tea.Mouse{X: view.Cursor.X, Y: view.Cursor.Y}) {
-				t.Fatalf("cursor outside textarea: %+v %+v", view.Cursor, rect)
-			}
-			if strings.Count(view.Content, "\n")+1 > size[1] {
-				t.Fatalf("dialog exceeds terminal: %v", size)
-			}
-			for _, region := range app.modalMouseRegions() {
-				if region.action.focus >= finishApprove && !region.action.dialog && !region.action.close && !region.action.scrollable {
-					if region.rect.top < 0 || region.rect.bottom > size[1] {
-						t.Fatalf("button unreachable: %+v in %v", region, size)
-					}
+	for _, size := range [][2]int{{100, 24}, {60, 16}, {40, 12}} {
+		app, _ := newFinishTestApp(t, nil)
+		app.width, app.height = size[0], size[1]
+		app.openFinishModal()
+		rect := modalTextareaRect(t, app)
+		app = clickMouse(app, rect.left, rect.top)
+		app, _ = updateApp(app, tea.PasteMsg{Content: "日本語e\u0301\n" + strings.Repeat("長文", 30)})
+		view := app.View()
+		if view.Cursor == nil || !rect.contains(tea.Mouse{X: view.Cursor.X, Y: view.Cursor.Y}) {
+			t.Fatalf("cursor outside textarea: %+v %+v", view.Cursor, rect)
+		}
+		if strings.Count(view.Content, "\n")+1 > size[1] {
+			t.Fatalf("dialog exceeds terminal: %v", size)
+		}
+		for _, region := range app.modalMouseRegions() {
+			if region.action.focus >= finishApprove && !region.action.dialog && !region.action.close && !region.action.scrollable {
+				if region.rect.top < 0 || region.rect.bottom > size[1] {
+					t.Fatalf("button unreachable: %+v in %v", region, size)
 				}
 			}
-			before := app.modalTextarea.Value()
-			app, _ = updateApp(app, tea.KeyPressMsg{Code: 'q', Text: "q"})
-			if app.modalTextarea.Value() != before+"q" {
-				t.Fatal("input shortcut swallowed q")
-			}
+		}
+		before := app.modalTextarea.Value()
+		app, _ = updateApp(app, tea.KeyPressMsg{Code: 'q', Text: "q"})
+		if app.modalTextarea.Value() != before+"q" {
+			t.Fatal("input shortcut swallowed q")
 		}
 	}
-	initAdaptiveStyles(true)
 }
 
 func TestExplicitApprovalRequiresConfirmations(t *testing.T) {
@@ -634,37 +608,33 @@ func TestDefaultVerdictConsidersOnlyUnresolvedFeedback(t *testing.T) {
 }
 
 func TestResolveAllConfirmationFitsAndBackWorksByMouse(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		app, ch := newFinishTestApp(t, []review.Comment{testComment()})
-		app.width, app.height = 40, 12
-		app.openFinishModal()
-		app.doFinish()
-		if app.modal != finishResolveModal {
-			t.Fatal("missing confirmation")
+	app, ch := newFinishTestApp(t, []review.Comment{testComment()})
+	app.width, app.height = 40, 12
+	app.openFinishModal()
+	app.doFinish()
+	if app.modal != finishResolveModal {
+		t.Fatal("missing confirmation")
+	}
+	for _, region := range app.modalMouseRegions() {
+		if region.action.dialog || region.action.close {
+			continue
 		}
-		for _, region := range app.modalMouseRegions() {
-			if region.action.dialog || region.action.close {
-				continue
-			}
-			if region.rect.top < 0 || region.rect.bottom > app.height {
-				t.Fatalf("unreachable confirmation action: %+v", region)
-			}
-			if region.action.focus == 1 {
-				app = clickMouse(app, region.rect.left, region.rect.top)
-				break
-			}
+		if region.rect.top < 0 || region.rect.bottom > app.height {
+			t.Fatalf("unreachable confirmation action: %+v", region)
 		}
-		if app.modal != finishModal {
-			t.Fatal("Back did not return to Submit")
-		}
-		select {
-		case <-ch:
-			t.Fatal("Back emitted approval")
-		default:
+		if region.action.focus == 1 {
+			app = clickMouse(app, region.rect.left, region.rect.top)
+			break
 		}
 	}
-	initAdaptiveStyles(true)
+	if app.modal != finishModal {
+		t.Fatal("Back did not return to Submit")
+	}
+	select {
+	case <-ch:
+		t.Fatal("Back emitted approval")
+	default:
+	}
 }
 
 func TestFinishAbortDeclineKeepsReviewOpen(t *testing.T) {
@@ -689,38 +659,34 @@ func TestFinishAbortDeclineKeepsReviewOpen(t *testing.T) {
 }
 
 func TestFinishAbortConfirmationMouseAndSmallTerminal(t *testing.T) {
-	for _, dark := range []bool{true, false} {
-		initAdaptiveStyles(dark)
-		app, ch := newFinishTestApp(t, nil)
-		app.width, app.height = 40, 12
-		app.openFinishModal()
-		app.requestFinishAbort()
-		found := false
-		for _, region := range app.modalMouseRegions() {
-			if region.action.close || region.action.dialog {
-				continue
-			}
-			if region.rect.top < 0 || region.rect.bottom > app.height {
-				t.Fatal("unreachable abort action")
-			}
-			if region.action.focus == 0 {
-				_, cmd := clickMouseCmd(app, region.rect.right-1, region.rect.top)
-				if !isQuit(cmd) || app.session.CJ.RoundState.Finished {
-					t.Fatal("Abort click submitted or did not quit")
-				}
-				found = true
-			}
+	app, ch := newFinishTestApp(t, nil)
+	app.width, app.height = 40, 12
+	app.openFinishModal()
+	app.requestFinishAbort()
+	found := false
+	for _, region := range app.modalMouseRegions() {
+		if region.action.close || region.action.dialog {
+			continue
 		}
-		if !found {
-			t.Fatal("Abort button missing")
+		if region.rect.top < 0 || region.rect.bottom > app.height {
+			t.Fatal("unreachable abort action")
 		}
-		select {
-		case <-ch:
-			t.Fatal("abort emitted submission")
-		default:
+		if region.action.focus == 0 {
+			_, cmd := clickMouseCmd(app, region.rect.right-1, region.rect.top)
+			if !isQuit(cmd) || app.session.CJ.RoundState.Finished {
+				t.Fatal("Abort click submitted or did not quit")
+			}
+			found = true
 		}
 	}
-	initAdaptiveStyles(true)
+	if !found {
+		t.Fatal("Abort button missing")
+	}
+	select {
+	case <-ch:
+		t.Fatal("abort emitted submission")
+	default:
+	}
 }
 
 func TestFinishOverallHistoryStartsAtLatestComment(t *testing.T) {

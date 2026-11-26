@@ -20,29 +20,21 @@ func TestFinishMouseSubmitAfterOverallComment(t *testing.T) {
 				app.recalculateLayout()
 				app.toggleResolve(comment.ID)
 				app = pressKey(app, 'q')
-				click := func(focus int, textarea bool) tea.Cmd {
-					t.Helper()
-					for _, region := range app.modalMouseRegions() {
-						if region.action.dialog || region.action.close || region.action.scrollable || region.action.textarea != textarea || (!textarea && region.action.focus != focus) {
-							continue
-						}
-						x := region.rect.left
-						switch position {
-						case "center":
-							x = (region.rect.left + region.rect.right - 1) / 2
-						case "right":
-							x = region.rect.right - 1
-						}
-						app = hoverMouse(app, x, region.rect.top)
-						var cmd tea.Cmd
-						app, cmd = clickMouseCmd(app, x, region.rect.top)
-						app = releaseMouse(app, x, region.rect.top)
-						return cmd
+				click := func(rect mouseRect) tea.Cmd {
+					x := rect.left
+					switch position {
+					case "center":
+						x = (rect.left + rect.right - 1) / 2
+					case "right":
+						x = rect.right - 1
 					}
-					t.Fatalf("missing mouse action: focus=%d textarea=%t", focus, textarea)
-					return nil
+					app = hoverMouse(app, x, rect.top)
+					var cmd tea.Cmd
+					app, cmd = clickMouseCmd(app, x, rect.top)
+					app = releaseMouse(app, x, rect.top)
+					return cmd
 				}
-				click(finishText, true)
+				click(modalTextareaRect(t, app))
 				const body = "どちらの動画もOKです！"
 				for _, r := range body {
 					app, _ = updateApp(app, tea.KeyPressMsg{Code: r, Text: string(r)})
@@ -50,11 +42,11 @@ func TestFinishMouseSubmitAfterOverallComment(t *testing.T) {
 				if app.finishVerdict != review.VerdictComment {
 					t.Fatalf("input verdict = %s", app.finishVerdict)
 				}
-				click(finishApprove, false)
+				click(finishRegion(t, app, finishApprove))
 				if app.finishVerdict != review.VerdictApprove {
 					t.Fatalf("mouse selection verdict = %s", app.finishVerdict)
 				}
-				if cmd := click(finishSubmit, false); !isQuit(cmd) {
+				if cmd := click(finishRegion(t, app, finishSubmit)); !isQuit(cmd) {
 					t.Fatalf("Submit did not quit: modal=%v error=%v", app.modal, app.err)
 				}
 				if event := takeEvent(t, ch); !event.Approved {
@@ -73,33 +65,29 @@ func TestFinishMouseSubmitMissingConfirmationKeepsButtonsAligned(t *testing.T) {
 	app, ch := formTestApp(t)
 	app.width, app.height = 74, 38
 	app.recalculateLayout()
-	app.openFinishModal()
-	for _, region := range app.modalMouseRegions() {
-		if region.action.textarea {
-			app = clickMouse(app, region.rect.left, region.rect.top)
-			break
-		}
+	header, ok := app.finishButtonRect()
+	if !ok {
+		t.Fatal("Submit button missing")
 	}
-	app, _ = updateApp(app, tea.PasteMsg{Content: "どちらの動画もOKです！"})
-	for _, region := range app.modalMouseRegions() {
-		if region.action.pick && region.action.focus == finishApprove {
-			app = clickMouse(app, region.rect.left, region.rect.top)
-			break
-		}
+	assertRegionContainsRenderedText(t, app, header, "Submit q")
+	app = clickMouse(app, header.left, header.top)
+	if app.modal != finishModal {
+		t.Fatal("Submit button did not open the dialog")
 	}
+	input := modalTextareaRect(t, app)
+	app = clickMouse(app, input.left, input.top)
+	const body = "Review 界e\u0301"
+	app, _ = updateApp(app, tea.PasteMsg{Content: body})
+	approve := finishRegion(t, app, finishApprove)
+	app = clickMouse(app, approve.left, approve.top)
 	if app.finishVerdict != review.VerdictApprove {
 		t.Fatal("Approve was not selected")
 	}
-	for _, region := range app.modalMouseRegions() {
-		if region.action.focus == finishSubmit && !region.action.dialog && !region.action.textarea {
-			var cmd tea.Cmd
-			app, cmd = clickMouseCmd(app, region.rect.left, region.rect.top)
-			app = releaseMouse(app, region.rect.left, region.rect.top)
-			if isQuit(cmd) {
-				t.Fatal("missing confirmation allowed submission")
-			}
-			break
-		}
+	submit := finishRegion(t, app, finishSubmit)
+	app, cmd := clickMouseCmd(app, submit.left, submit.top)
+	app = releaseMouse(app, submit.left, submit.top)
+	if isQuit(cmd) {
+		t.Fatal("missing confirmation allowed submission")
 	}
 	select {
 	case <-ch:
@@ -109,27 +97,19 @@ func TestFinishMouseSubmitMissingConfirmationKeepsButtonsAligned(t *testing.T) {
 	if app.modal != finishFormsModal || !strings.Contains(app.View().Content, "Required items must be completed") {
 		t.Fatalf("blocked Submit did not show its reason:\n%s", app.View().Content)
 	}
-	for _, region := range app.modalMouseRegions() {
-		if region.action.focus == finishCancelForms && !region.action.dialog && !region.action.close {
-			assertRegionContainsRenderedText(t, app, region.rect, "Cancel ESC")
-			app = clickMouse(app, region.rect.left, region.rect.top)
-			break
-		}
-	}
+	cancel := finishRegion(t, app, finishCancelForms)
+	assertRegionContainsRenderedText(t, app, cancel, "Cancel ESC")
+	app = clickMouse(app, cancel.left, cancel.top)
 	if app.modal != finishModal {
 		t.Fatal("Cancel did not return to Submit")
 	}
-	for _, region := range app.modalMouseRegions() {
-		if region.action.focus == finishBack && !region.action.dialog && !region.action.textarea {
-			assertRegionContainsRenderedText(t, app, region.rect, "Back ESC")
-			app = clickMouse(app, region.rect.left, region.rect.top)
-			break
-		}
-	}
+	back := finishRegion(t, app, finishBack)
+	assertRegionContainsRenderedText(t, app, back, "Back ESC")
+	app = clickMouse(app, back.left, back.top)
 	if app.modal != noModal {
 		t.Fatal("Back did not close the blocked submission")
 	}
-	if app.finishDraft != "どちらの動画もOKです！" {
+	if app.finishDraft != body {
 		t.Fatal("Back discarded the overall comment")
 	}
 }

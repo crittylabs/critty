@@ -384,12 +384,6 @@ var (
 	rankMovedDown = lipgloss.NewStyle()
 )
 
-// initAdaptiveStyles updates background-dependent styles based on terminal background.
-func initAdaptiveStyles(hasDarkBG bool) {
-	background := lipgloss.LightDark(hasDarkBG)(lipgloss.Color("#FFFFFF"), lipgloss.Color("#10141c"))
-	initAdaptiveStylesWithBackground(hasDarkBG, background)
-}
-
 func initAdaptiveStylesWithBackground(hasDarkBG bool, background color.Color) {
 	ld := lipgloss.LightDark(hasDarkBG)
 	terminalIsDark = hasDarkBG

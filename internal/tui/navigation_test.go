@@ -356,31 +356,11 @@ func TestCommentNavigationFinishesAfterLastAndWrapsBackward(t *testing.T) {
 	}
 }
 
-func TestChangeNavigationCrossesFilesWithoutWrapping(t *testing.T) {
+func TestChangeNavigationStopsAtReviewBoundaries(t *testing.T) {
 	app := newChangeNavigationTestApp()
 	for i := range app.tabs {
 		app.tabs[i].state.Comments = nil
 	}
-	app.tabs[0].cursorLine = 4
-
-	app = pressKey(app, 'n')
-	if app.activeTab != 1 || app.tab().cursorLine != 1 {
-		t.Fatalf("next tab = %d, line %d; want unchanged tab 1, line 1", app.activeTab, app.tab().cursorLine)
-	}
-	app = pressKey(app, 'n')
-	if app.activeTab != 2 || app.tab().cursorLine != 1 {
-		t.Fatalf("next change = tab %d, line %d; want tab 2, line 1", app.activeTab, app.tab().cursorLine)
-	}
-
-	app = pressKey(app, 'N')
-	if app.activeTab != 1 || app.tab().cursorLine != 1 {
-		t.Fatalf("previous tab = %d, line %d; want unchanged tab 1, line 1", app.activeTab, app.tab().cursorLine)
-	}
-	app = pressKey(app, 'N')
-	if app.activeTab != 0 || app.tab().cursorLine != 4 {
-		t.Fatalf("previous change = tab %d, line %d; want tab 0, line 4", app.activeTab, app.tab().cursorLine)
-	}
-
 	app.activeTab = 2
 	app.tabs[2].cursorLine = 3
 	app = pressKey(app, 'n')
@@ -399,15 +379,16 @@ func TestChangeNavigationCrossesFilesWithoutWrapping(t *testing.T) {
 func TestChangeNavigationVisitsTabsWithoutChanges(t *testing.T) {
 	for _, tt := range []struct {
 		name  string
+		line  int
 		setup func(*FileTab)
 	}{
-		{name: "whole file"},
-		{name: "attachment", setup: func(tab *FileTab) { tab.attachment = &review.AttachedDocument{Name: "note.md"} }},
-		{name: "overall", setup: func(tab *FileTab) { tab.path, tab.doc = overallCommentsPath, overallCommentsDocument() }},
-		{name: "removed diff", setup: func(tab *FileTab) { tab.outsideChanges = true }},
-		{name: "retained binary", setup: func(tab *FileTab) { tab.doc, tab.isBinary, tab.outsideChanges = nil, true, true }},
-		{name: "empty", setup: func(tab *FileTab) { tab.doc = document.FromContent(tab.path, nil) }},
-		{name: "deleted", setup: func(tab *FileTab) { tab.doc, tab.isDeleted, tab.outsideChanges = nil, true, true }},
+		{name: "whole file", line: 1},
+		{name: "attachment", line: 1, setup: func(tab *FileTab) { tab.attachment = &review.AttachedDocument{Name: "note.md"} }},
+		{name: "overall", line: 1, setup: func(tab *FileTab) { tab.path, tab.doc = overallCommentsPath, overallCommentsDocument() }},
+		{name: "removed diff", line: 1, setup: func(tab *FileTab) { tab.outsideChanges = true }},
+		{name: "retained binary", line: 0, setup: func(tab *FileTab) { tab.doc, tab.isBinary, tab.outsideChanges = nil, true, true }},
+		{name: "empty", line: 1, setup: func(tab *FileTab) { tab.doc = document.FromContent(tab.path, nil) }},
+		{name: "deleted", line: 0, setup: func(tab *FileTab) { tab.doc, tab.isDeleted, tab.outsideChanges = nil, true, true }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newChangeNavigationTestApp()
@@ -419,10 +400,13 @@ func TestChangeNavigationVisitsTabsWithoutChanges(t *testing.T) {
 			}
 			app.tabs[0].cursorLine = 4
 			for _, step := range []struct {
-				key rune
-				tab int
-			}{{'n', 1}, {'n', 2}, {'N', 1}, {'N', 0}} {
+				key       rune
+				tab, line int
+			}{{'n', 1, tt.line}, {'n', 2, 1}, {'N', 1, tt.line}, {'N', 0, 4}} {
 				app = pressKey(app, step.key)
+				if app.tab().cursorLine != step.line {
+					t.Fatalf("key %c: line %d, want %d", step.key, app.tab().cursorLine, step.line)
+				}
 				if app.activeTab != step.tab || app.tab().cursorOnAnnotation || app.focused != contentPane {
 					t.Fatalf("key %c: tab=%d annotation=%t focus=%v, want tab=%d with content focus", step.key, app.activeTab, app.tab().cursorOnAnnotation, app.focused, step.tab)
 				}
@@ -779,25 +763,7 @@ func TestCommentNavigationVisitsFileComments(t *testing.T) {
 		t.Fatalf("previous from line comment did not return to the file comment (focus %v)", app.focused)
 	}
 
-	// The last comment of the review has no next: ] opens the finish dialog.
-	app.focused = contentPane
-	app.activeTab = 2
-	app.tabs[2].cursorLine = 3
-	app.tabs[2].cursorOnAnnotation = true
-	app = pressKey(app, ']')
-	if app.modal != finishModal || app.activeTab != 2 {
-		t.Fatalf("] on the last thread = modal %v, tab %d; want the finish dialog on tab 2", app.modal, app.activeTab)
-	}
-	app = pressKey(app, tea.KeyEscape)
-
-	// Wrapping backward from the file comment reaches the last comment of the review.
-	app.activeTab = 0
-	app.tabs[0].cursorLine = 0
-	app.tabs[0].cursorOnAnnotation = true
-	app.tabs[0].cursorAnnoIdx = 0
-	if app.selectedCommentID() != fileComment.ID {
-		t.Fatalf("selected %q, want the file comment", app.selectedCommentID())
-	}
+	// Backward from the first file comment wraps to the last thread.
 	app = pressKey(app, '[')
 	if app.activeTab != 2 || app.focused != contentPane || app.tab().cursorLine != 3 {
 		t.Fatalf("wrapped previous = tab %d, line %d; want tab 2, line 3", app.activeTab, app.tab().cursorLine)

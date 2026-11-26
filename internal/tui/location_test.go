@@ -151,40 +151,6 @@ func TestGotoLineButtons(t *testing.T) {
 	}
 }
 
-func TestGotoLineInputClickMovesCursor(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		x    int
-		want int
-	}{
-		{"prompt", -2, 0},
-		{"start", 0, 0},
-		{"middle", 2, 2},
-		{"end", 5, 5},
-		{"past end", 8, 5},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			app := setupAppWithDoc(t, "one\ntwo\nthree")
-			app.width, app.height = 80, 24
-			app.recalculateLayout()
-			app.openGotoLine()
-			app.lineInput.SetValue("12345")
-			app = pressKey(app, tea.KeyTab)
-			for _, region := range app.modalMouseRegions() {
-				if !region.action.lineInput {
-					continue
-				}
-				app, _ = clickMouseCmd(app, region.rect.left+len(gotoLinePrompt)+tc.x, region.rect.top)
-				if app.modalFocus != 0 || !app.lineInput.Focused() || app.lineInput.Position() != tc.want {
-					t.Fatalf("input focus = %d, cursor = %d; want focused input at %d", app.modalFocus, app.lineInput.Position(), tc.want)
-				}
-				return
-			}
-			t.Fatal("input mouse region missing")
-		})
-	}
-}
-
 func TestSourceNavigationAcrossTabs(t *testing.T) {
 	app := setupAppWithDoc(t, "first")
 	path := filepath.Join(filepath.Dir(app.tab().path), "second.go")

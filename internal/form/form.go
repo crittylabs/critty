@@ -575,16 +575,6 @@ func RankTree(items []Item, id string, answer Answer) ([]RankNode, bool) {
 	return source, false
 }
 
-// RankOrder returns values in depth-first order.
-func RankOrder(items []Item, id string, answer Answer) ([]string, bool) {
-	nodes, ranked := RankTree(items, id, answer)
-	values := make([]string, len(nodes))
-	for i, node := range nodes {
-		values[i] = node.Value
-	}
-	return values, ranked
-}
-
 // RankNumbers numbers the siblings at each level of a depth-first ranking.
 func RankNumbers(nodes []RankNode) []string {
 	numbers := make([]string, len(nodes))

@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// Passthrough replies go to the client's selected pane, not the querying pane.
-// With allow-passthrough=on, only clients displaying the window receive queries.
-// With all, include clients whose sessions contain linked or hidden windows.
 func imageProbeAllowed() bool {
 	value := os.Getenv("TMUX")
 	if value == "" {
@@ -37,7 +34,14 @@ func imageProbeAllowed() bool {
 	if err != nil {
 		return false
 	}
-	mode, outputText, ok := strings.Cut(strings.TrimSpace(string(output)), "\n")
+	return tmuxProbeHasSingleReceiver(pane, string(output))
+}
+
+// Passthrough replies go to the client's selected pane, not the querying pane.
+// With allow-passthrough=on, only clients displaying the window receive queries.
+// With all, include clients whose sessions contain linked or hidden windows.
+func tmuxProbeHasSingleReceiver(pane, output string) bool {
+	mode, outputText, ok := strings.Cut(strings.TrimSpace(output), "\n")
 	if !ok || mode != "on" && mode != "all" {
 		return false
 	}

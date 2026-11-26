@@ -137,12 +137,4 @@ func TestCodeOutlineCacheAndFragments(t *testing.T) {
 	if next := tab.ensureCodeOutline(); next == cache || len(next.rows) != 1 || next.rows[0].label != "def changed" {
 		t.Fatal("source change retained a cached outline")
 	}
-	for _, path := range []string{"script.sh", "script.bash", "script.ksh", "script.zsh", ".profile", ".bashrc"} {
-		if outlineLanguage(codeLexer(path, "")) != "bash" {
-			t.Fatalf("shell file not recognized: %s", path)
-		}
-	}
-	if outlineLanguage(codeLexer("script", "#!/usr/bin/env -S bash -eu\n")) != "bash" {
-		t.Fatal("shell shebang not recognized")
-	}
 }

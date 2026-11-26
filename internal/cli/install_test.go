@@ -164,18 +164,32 @@ func TestOpenCodeCommandKeepsArgumentsAndDropsClaudeKeys(t *testing.T) {
 	}
 }
 
-func TestInstalledSkillLinksAndSize(t *testing.T) {
+func TestInstallAgentSkills(t *testing.T) {
 	for _, agent := range []string{"claude-code", "codex", "opencode", "gemini", "agents", "antigravity"} {
 		for _, global := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/global=%v", agent, global), func(t *testing.T) {
 				home := t.TempDir()
 				t.Setenv("HOME", home)
 				t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
-				t.Chdir(t.TempDir())
+				if global {
+					t.Chdir(home)
+				} else {
+					t.Chdir(t.TempDir())
+				}
 				files := integrations()[agent]
+				var legacyDirs []string
 				for _, f := range files {
-					if err := installIntegrationFile(f, global); err != nil {
-						t.Fatal(err)
+					name := filepath.Base(filepath.Dir(f.dest))
+					if filepath.Base(f.dest) == "SKILL.md" && (name == "critty-ai-review" || name == "critty-ai-cowork") {
+						legacyDirs = append(legacyDirs, seedLegacyAISkill(t, f, global))
+					}
+				}
+				if err := installCmd.RunE(installCmd, []string{agent}); err != nil {
+					t.Fatal(err)
+				}
+				for _, dir := range legacyDirs {
+					if _, err := os.Stat(dir); !os.IsNotExist(err) {
+						t.Errorf("legacy skill still exists: %s (%v)", dir, err)
 					}
 				}
 				for _, f := range files {
@@ -314,52 +328,6 @@ func seedLegacyAISkill(t *testing.T, f integrationFile, global bool) string {
 		t.Fatal(err)
 	}
 	return dir
-}
-
-func TestInstallRetiresLegacyAISkills(t *testing.T) {
-	for _, agent := range agentTargets {
-		for _, global := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/global=%t", agent, global), func(t *testing.T) {
-				home := t.TempDir()
-				t.Setenv("HOME", home)
-				t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
-				if global {
-					t.Chdir(home)
-				} else {
-					t.Chdir(t.TempDir())
-				}
-				var legacyDirs []string
-				for _, f := range integrations()[agent] {
-					name := filepath.Base(filepath.Dir(f.dest))
-					if filepath.Base(f.dest) == "SKILL.md" && (name == "critty-ai-review" || name == "critty-ai-cowork") {
-						legacyDirs = append(legacyDirs, seedLegacyAISkill(t, f, global))
-					}
-				}
-				if err := installCmd.RunE(installCmd, []string{agent}); err != nil {
-					t.Fatal(err)
-				}
-				for _, dir := range legacyDirs {
-					if _, err := os.Stat(dir); !os.IsNotExist(err) {
-						t.Errorf("legacy skill still exists: %s (%v)", dir, err)
-					}
-				}
-				for _, f := range integrations()[agent] {
-					dest, err := integrationDest(f, global)
-					if err != nil {
-						t.Fatal(err)
-					}
-					got, err := os.ReadFile(dest)
-					if err != nil {
-						t.Fatal(err)
-					}
-					want, err := f.content()
-					if err != nil || !bytes.Equal(got, want) {
-						t.Errorf("replacement differs: %s (%v)", dest, err)
-					}
-				}
-			})
-		}
-	}
 }
 
 func TestInstallPreservesUnsafeOrUnreplacedLegacySkills(t *testing.T) {

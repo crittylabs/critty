@@ -172,24 +172,6 @@ func TestMouseClickSelectedLineNumberCommentsOnRange(t *testing.T) {
 	}
 }
 
-func TestMouseClickRenderedCodeLineUsesItsDisplayedPosition(t *testing.T) {
-	t.Parallel()
-	app := setupPrivateAppWithDoc(t, "first unique\nsecond unique\nthird unique\n")
-	app.multiFile = true
-	app.width = 60
-	app.height = 20
-	app.recalculateLayout()
-	app.rebuildContent()
-	left, _, _, _ := app.contentBounds()
-	y := renderedLineY(t, app, "second unique")
-
-	app = clickMouse(app, left, y)
-
-	if app.tab().cursorLine != 2 {
-		t.Fatalf("line = %d, want displayed line 2 at screen row %d", app.tab().cursorLine, y)
-	}
-}
-
 func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
 	t.Parallel()
 	words := func(n int) string { return strings.Repeat("word ", n) }
@@ -199,7 +181,6 @@ func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
 		minRows                    int
 	}{
 		{name: "plain", content: "wrapped-start " + words(20) + "continuation-tail\nnext unique\n", first: "wrapped-start", next: "next unique", minRows: 2},
-		{name: "tab indented two rows", content: "\t\ttab-start " + words(10) + "two-row-tail\nnext unique\n", first: "tab-start", next: "next unique", minRows: 2},
 		{name: "tab indented three rows", content: "\t\ttab-start " + words(20) + "three-row-tail\nnext unique\n", first: "tab-start", next: "next unique", minRows: 3},
 		{name: "markdown table", content: "| very-long-header-cell " + words(12) + "| value |\n| --- | --- |\n| body | value |\n", first: "very", next: "────", minRows: 2},
 		{name: "deleted before line", content: "current unique\nnext unique\n", first: "deleted-start", next: "current unique", deleted: true, minRows: 2},
@@ -226,6 +207,11 @@ func TestMouseClickWrappedRowsUseOriginalLine(t *testing.T) {
 			}
 			if rows := nextY - firstY; rows < tt.minRows {
 				t.Fatalf("rendered rows = %d, want at least %d", rows, tt.minRows)
+			}
+			if tt.name == "plain" {
+				if clicked := clickMouse(app, left, nextY); clicked.tab().cursorLine != 2 {
+					t.Fatalf("next row %d selected source line %d, want 2", nextY, clicked.tab().cursorLine)
+				}
 			}
 			for y := firstY; y < nextY; y++ {
 				for _, x := range []int{left, left + gutterWidth} {

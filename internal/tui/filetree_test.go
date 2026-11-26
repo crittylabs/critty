@@ -125,7 +125,7 @@ func TestReviewTabsFollowExpandedTreeOrder(t *testing.T) {
 }
 
 func newFileTreeTestApp() AppModel {
-	app := NewApp("root.go", AppConfig{Project: "test-project"})
+	app := NewApp("root.go", AppConfig{Project: "test-project", MathRaTeX: "off"})
 	app.multiFile = true
 	app.tabs = nil
 	for _, path := range []string{"a/sub/z.go", "a/y.go", "b/x.go", "root.go"} {

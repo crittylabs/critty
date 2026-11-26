@@ -233,7 +233,7 @@ func formTestAppWithContent(t *testing.T, content string) (AppModel, chan Finish
 	}
 	doc := review.AttachedDocument{ID: "a", Source: "/missing/form.md", Name: "form.md", Content: content}
 	ch := make(chan FinishEvent, 1)
-	app := NewApp("target.md", AppConfig{Session: sess, Documents: []review.AttachedDocument{doc}, Author: "Human", FinishCh: ch})
+	app := NewApp("target.md", AppConfig{MathRaTeX: "off", Session: sess, Documents: []review.AttachedDocument{doc}, Author: "Human", FinishCh: ch})
 	for i := range app.tabs {
 		app.tabs[i].state = &fileReview{}
 		if app.tabs[i].attachment != nil {
@@ -784,6 +784,41 @@ Unrelated text
 	}
 }
 
+func assertRankAnswer(t *testing.T, doc *review.FormDocument, id string, order []string, parents map[string]string) {
+	t.Helper()
+	answer := doc.Answers[id]
+	nodes, ranked := form.RankTree(doc.Items, id, answer)
+	if !ranked || !answer.Human || !maps.Equal(answer.RankParents, parents) || len(nodes) != len(order) {
+		t.Fatalf("%s answer = %+v, want human order %v with parents %v", id, answer, order, parents)
+	}
+	for i, node := range nodes {
+		if node.Value != order[i] {
+			t.Fatalf("%s item %d = %q, want %q", id, i+1, node.Value, order[i])
+		}
+	}
+}
+
+func rankControlRect(t *testing.T, app AppModel, line int) mouseRect {
+	t.Helper()
+	for _, control := range app.contentLayout.formControls {
+		if control.line == line {
+			return control.rect
+		}
+	}
+	t.Fatalf("no ranking control at line %d", line)
+	return mouseRect{}
+}
+
+func dragRankUnder(t *testing.T, app AppModel, from, to int) AppModel {
+	t.Helper()
+	start, target := rankControlRect(t, app, from), rankControlRect(t, app, to)
+	x, y := contentScreenPoint(app, start.left, start.top)
+	tx, ty := contentScreenPoint(app, max(start.left+rankIndentWidth, target.left), target.top)
+	app = pressMouse(app, x, y)
+	app = moveMouse(app, tx, ty)
+	return releaseMouse(app, tx, ty)
+}
+
 func TestRankFieldReordersInPlace(t *testing.T) {
 	t.Parallel()
 	app, _ := formTestAppWithContent(t, "# Lead\n1. [ ] Alpha <!-- form: id=lead rank value=a -->\n2. [ ] Beta <!-- form: id=lead rank value=b -->\n3. [ ] Gamma <!-- form: id=lead rank value=c -->\n\nAfter\n")
@@ -820,17 +855,13 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 	}
 	app.tab().cursorLine, app.tab().cursorOnForm = 2, true
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyUp, Mod: tea.ModAlt})
-	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"a", "b", "c"}) || !d.Answers["lead"].Human {
-		t.Fatalf("M-↑ on the first item did not confirm the order: %+v", d.Answers["lead"])
-	}
+	assertRankAnswer(t, d, "lead", []string{"a", "b", "c"}, nil)
 	assertPendingDot(false)
 	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyDown, Mod: tea.ModAlt})
 	if got := rows(); !slices.Equal(got, []string{"Beta", "Alpha", "Gamma", "After"}) {
 		t.Fatalf("display order: %v", got)
 	}
-	if order, ranked := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !ranked || !slices.Equal(order, []string{"b", "a", "c"}) || !d.Answers["lead"].Human {
-		t.Fatalf("answer: %+v", d.Answers["lead"])
-	}
+	assertRankAnswer(t, d, "lead", []string{"b", "a", "c"}, nil)
 	if app.tab().cursorLine != 2 || app.rankMove(app.tab(), 2) != 1 || app.rankMove(app.tab(), 3) != -1 || app.rankMove(app.tab(), 4) != 0 {
 		t.Fatal("moved rows are not tracked")
 	}
@@ -838,26 +869,17 @@ func TestRankFieldReordersInPlace(t *testing.T) {
 	if app.tab().cursorLine != 4 {
 		t.Fatalf("cursor did not follow display order: line %d", app.tab().cursorLine)
 	}
-	rowTop := map[int]int{}
-	for _, control := range app.contentLayout.formControls {
-		if _, ok := rowTop[control.line]; !ok {
-			rowTop[control.line] = control.rect.top
-		}
-	}
-	x, y := contentScreenPoint(app, gutterWidth+4, rowTop[4])
+	start, target := rankControlRect(t, app, 4), rankControlRect(t, app, 2)
+	x, y := contentScreenPoint(app, gutterWidth+4, start.top)
 	app = pressMouse(app, x, y)
-	_, y = contentScreenPoint(app, gutterWidth+4, rowTop[2])
+	_, y = contentScreenPoint(app, gutterWidth+4, target.top)
 	app = moveMouse(app, x, y)
-	if order, _ := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !slices.Equal(order, []string{"b", "a", "c"}) {
-		t.Fatal("dragging changed the saved answer before release")
-	}
+	assertRankAnswer(t, d, "lead", []string{"b", "a", "c"}, nil)
 	app = releaseMouse(app, x, y)
 	if got := rows(); !slices.Equal(got, []string{"Beta", "Gamma", "Alpha", "After"}) {
 		t.Fatalf("dragging did not move Gamma to Alpha: %v", got)
 	}
-	if order, _ := form.RankOrder(d.Items, "lead", d.Answers["lead"]); !d.Answers["lead"].Human || !slices.Equal(order, []string{"b", "c", "a"}) {
-		t.Fatalf("dragged order not saved: %+v", d.Answers["lead"])
-	}
+	assertRankAnswer(t, d, "lead", []string{"b", "c", "a"}, nil)
 }
 
 func TestCommentOnRankedItemNamesTheItem(t *testing.T) {
@@ -915,14 +937,6 @@ func TestNestedRankingMovesSubtrees(t *testing.T) {
   - [ ] Other child <!-- form: id=lead rank value=other -->
 `)
 	doc := app.forms.Document(app.tab().path)
-	check := func(values []string, parents map[string]string) {
-		t.Helper()
-		answer := doc.Answers["lead"]
-		order, ranked := form.RankOrder(doc.Items, "lead", answer)
-		if !ranked || !answer.Human || !slices.Equal(order, values) || !maps.Equal(answer.RankParents, parents) {
-			t.Fatalf("answer = %+v, want order %v and parents %v", answer, values, parents)
-		}
-	}
 	move := func(line int, key rune, mod tea.KeyMod) {
 		t.Helper()
 		app.tab().cursorLine = line
@@ -932,57 +946,39 @@ func TestNestedRankingMovesSubtrees(t *testing.T) {
 		}
 	}
 	move(2, tea.KeyDown, tea.ModAlt)
-	check([]string{"b", "other", "a", "child", "grandchild", "sibling"},
+	assertRankAnswer(t, doc, "lead", []string{"b", "other", "a", "child", "grandchild", "sibling"},
 		map[string]string{"other": "b", "child": "a", "grandchild": "child", "sibling": "a"})
 	move(3, tea.KeyLeft, tea.ModAlt)
-	check([]string{"b", "other", "a", "sibling", "child", "grandchild"},
+	assertRankAnswer(t, doc, "lead", []string{"b", "other", "a", "sibling", "child", "grandchild"},
 		map[string]string{"other": "b", "grandchild": "child", "sibling": "a"})
 	move(3, tea.KeyUp, tea.ModAlt)
 	move(3, tea.KeyRight, tea.ModAlt)
-	check([]string{"b", "other", "child", "grandchild", "a", "sibling"},
+	assertRankAnswer(t, doc, "lead", []string{"b", "other", "child", "grandchild", "a", "sibling"},
 		map[string]string{"other": "b", "child": "b", "grandchild": "child", "sibling": "a"})
 
-	control := func(line int) mouseRect {
-		t.Helper()
-		for _, control := range app.contentLayout.formControls {
-			if control.line == line {
-				return control.rect
-			}
-		}
-		t.Fatalf("no control for line %d", line)
-		return mouseRect{}
-	}
-	drag := func(from, to int) {
-		t.Helper()
-		start, target := control(from), control(to)
-		x, y := contentScreenPoint(app, start.left, start.top)
-		tx, ty := contentScreenPoint(app, max(start.left+rankIndentWidth, target.left), target.top)
-		app = pressMouse(app, x, y)
-		app = moveMouse(app, tx, ty)
-		app = releaseMouse(app, tx, ty)
-	}
-	drag(6, 2)
+	app = dragRankUnder(t, app, 6, 2)
 	values := []string{"a", "sibling", "b", "other", "child", "grandchild"}
 	parents := map[string]string{"b": "a", "other": "b", "child": "b", "grandchild": "child", "sibling": "a"}
-	check(values, parents)
+	assertRankAnswer(t, doc, "lead", values, parents)
 	if got := app.lineOrder(app.tab()); !slices.Equal(got[:7], []int{0, 1, 4, 5, 6, 2, 3}) {
 		t.Fatalf("visible source lines: %v", got)
 	}
-	root, grandchild := control(2), control(4)
+	root, grandchild := rankControlRect(t, app, 2), rankControlRect(t, app, 4)
 	if grandchild.left-root.left != 3*rankIndentWidth {
 		t.Fatalf("grandchild indentation: root %v, grandchild %v", root, grandchild)
 	}
-	drag(2, 4) // A branch cannot be dropped onto its own descendant.
-	check(values, parents)
+	app = dragRankUnder(t, app, 2, 4) // A branch cannot be dropped onto its own descendant.
+	assertRankAnswer(t, doc, "lead", values, parents)
 
 	saved, err := app.session.LoadForms()
 	if err != nil {
 		t.Fatal(err)
 	}
 	result := saved.Result(true, 1)
-	if result.Version != 4 || !maps.Equal(result.Document(doc.Path()).Answers["lead"].RankParents, parents) {
-		t.Fatalf("hierarchy missing from saved result: %+v", result)
+	if result.Version != 4 {
+		t.Fatalf("nested result version = %d, want 4", result.Version)
 	}
+	assertRankAnswer(t, result.Document(doc.Path()), "lead", values, parents)
 	app.tab().markdownSourceView = true
 	if got := app.lineOrder(app.tab()); !slices.Equal(got[:7], []int{0, 1, 2, 3, 4, 5, 6}) {
 		t.Fatalf("source view order changed: %v", got)
@@ -991,26 +987,36 @@ func TestNestedRankingMovesSubtrees(t *testing.T) {
 
 func TestFlatRankingCanGainAndLoseChildren(t *testing.T) {
 	t.Parallel()
-	app, _ := formTestAppWithContent(t, `- [ ] Alpha <!-- form: id=lead rank value=a -->
+	for _, keys := range []struct {
+		name            string
+		indent, outdent rune
+	}{
+		{"Alt arrows", tea.KeyRight, tea.KeyLeft},
+		{"Ghostty Option arrows", 'f', 'b'},
+	} {
+		t.Run(keys.name, func(t *testing.T) {
+			app, _ := formTestAppWithContent(t, `- [ ] Alpha <!-- form: id=lead rank value=a -->
 
 - [ ] Beta <!-- form: id=lead rank value=b -->
   with a continuation
 `)
-	doc := app.forms.Document(app.tab().path)
-	app.tab().cursorLine = 3
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModAlt})
-	if got := doc.Answers["lead"].RankParents["b"]; got != "a" {
-		t.Fatalf("Beta's parent is %q", got)
-	}
-	if got := app.forms.Result(true, 1).Version; got != 4 {
-		t.Fatalf("nested result version = %d", got)
-	}
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: tea.KeyLeft, Mod: tea.ModAlt})
-	if got := doc.Answers["lead"].RankParents; len(got) != 0 {
-		t.Fatalf("unexpected hierarchy: %v", got)
-	}
-	if got := app.forms.Result(true, 1).Version; got != 2 {
-		t.Fatalf("flat result version = %d", got)
+			doc := app.forms.Document(app.tab().path)
+			app.tab().cursorLine = 3
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: keys.indent, Mod: tea.ModAlt})
+			if got := doc.Answers["lead"].RankParents["b"]; got != "a" {
+				t.Fatalf("indent with %v: Beta's parent = %q", keys.indent, got)
+			}
+			if got := app.forms.Result(true, 1).Version; got != 4 {
+				t.Fatalf("nested result version = %d", got)
+			}
+			app, _ = updateApp(app, tea.KeyPressMsg{Code: keys.outdent, Mod: tea.ModAlt})
+			if got := doc.Answers["lead"].RankParents; len(got) != 0 {
+				t.Fatalf("outdent with %v: unexpected hierarchy %v", keys.outdent, got)
+			}
+			if got := app.forms.Result(true, 1).Version; got != 2 {
+				t.Fatalf("flat result version = %d", got)
+			}
+		})
 	}
 }
 
@@ -1036,17 +1042,13 @@ func TestRankMovesPastParentAtSiblingBoundary(t *testing.T) {
 			app.tab().cursorLine = tt.line
 			app, _ = updateApp(app, tea.KeyPressMsg{Code: tt.key, Mod: tea.ModAlt})
 			d := app.forms.Document(app.tab().path)
-			answer := d.Answers["r"]
-			order, ranked := form.RankOrder(d.Items, "r", answer)
 			parents := map[string]string{"parent": "root", "first": "parent", "leaf": "first", "last": "parent", "next": "root"}
 			if tt.key == tea.KeyUp {
 				parents["first"] = "root"
 			} else {
 				parents["last"] = "root"
 			}
-			if !ranked || !slices.Equal(order, tt.want) || !maps.Equal(answer.RankParents, parents) {
-				t.Fatalf("move = %v with parents %v, want %v with %v", order, answer.RankParents, tt.want, parents)
-			}
+			assertRankAnswer(t, d, "r", tt.want, parents)
 		})
 	}
 }
@@ -1062,26 +1064,21 @@ func TestRankHorizontalDragChangesDepth(t *testing.T) {
 	d := app.forms.Document(app.tab().path)
 	drag := func(line, delta int) {
 		t.Helper()
-		for _, control := range app.contentLayout.formControls {
-			if control.line == line {
-				x, y := contentScreenPoint(app, control.rect.left, control.rect.top)
-				before := ansi.Strip(app.contentViewport.GetContent())
-				app = pressMouse(app, x, y)
-				app = moveMouse(app, x+delta, y)
-				if line == 4 {
-					during := ansi.Strip(app.contentViewport.GetContent())
-					for _, pair := range []string{" 2  Second", " 3  Second", " 1  Leaf"} {
-						if strings.Contains(during, pair) != strings.Contains(before, pair) {
-							t.Fatalf("number changed during drag: %q", pair)
-						}
-					}
+		rect := rankControlRect(t, app, line)
+		x, y := contentScreenPoint(app, rect.left, rect.top)
+		before := ansi.Strip(app.contentViewport.GetContent())
+		app = pressMouse(app, x, y)
+		app = moveMouse(app, x+delta, y)
+		if line == 4 {
+			during := ansi.Strip(app.contentViewport.GetContent())
+			for _, pair := range []string{" 2  Second", " 3  Second", " 1  Leaf"} {
+				if strings.Contains(during, pair) != strings.Contains(before, pair) {
+					t.Fatalf("number changed during drag: %q", pair)
 				}
-				app = moveMouse(app, x+2*delta, y) // Repeat motion changes depth only once.
-				app = releaseMouse(app, x+2*delta, y)
-				return
 			}
 		}
-		t.Fatalf("no control at line %d", line)
+		app = moveMouse(app, x+2*delta, y) // Repeat motion changes depth only once.
+		app = releaseMouse(app, x+2*delta, y)
 	}
 	check := func(parent string, want []int) {
 		t.Helper()
@@ -1114,42 +1111,15 @@ func TestRankHorizontalDragOutdentsPastRemainingSiblings(t *testing.T) {
   - [ ] Sibling <!-- form: id=r rank value=sibling -->
 - [ ] Next <!-- form: id=r rank value=next -->
 `)
-	for _, control := range app.contentLayout.formControls {
-		if control.line != 2 {
-			continue
-		}
-		x, y := contentScreenPoint(app, control.rect.left, control.rect.top)
-		app = pressMouse(app, x, y)
-		app = moveMouse(app, x-2, y)
-		app = moveMouse(app, x-3, y)
-		app = releaseMouse(app, x-3, y)
-		d := app.forms.Document(app.tab().path)
-		answer := d.Answers["r"]
-		order, ranked := form.RankOrder(d.Items, "r", answer)
-		want := []string{"parent", "sibling", "branch", "leaf", "next"}
-		if !ranked || !slices.Equal(order, want) || !maps.Equal(answer.RankParents, map[string]string{"leaf": "branch", "sibling": "parent"}) {
-			t.Fatalf("outdent = %v with parents %v", order, answer.RankParents)
-		}
-		return
-	}
-	t.Fatal("no control for Branch")
-}
-
-func TestRankAcceptsGhosttyOptionArrowSequences(t *testing.T) {
-	t.Parallel()
-	app, _ := formTestAppWithContent(t, `- [ ] First <!-- form: id=r rank value=first -->
-- [ ] Second <!-- form: id=r rank value=second -->
-`)
-	app.tab().cursorLine = 2
+	rect := rankControlRect(t, app, 2)
+	x, y := contentScreenPoint(app, rect.left, rect.top)
+	app = pressMouse(app, x, y)
+	app = moveMouse(app, x-2, y)
+	app = moveMouse(app, x-3, y)
+	app = releaseMouse(app, x-3, y)
 	d := app.forms.Document(app.tab().path)
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'f', Mod: tea.ModAlt})
-	if parent := d.Answers["r"].RankParents["second"]; parent != "first" {
-		t.Fatalf("M-f set parent to %q", parent)
-	}
-	app, _ = updateApp(app, tea.KeyPressMsg{Code: 'b', Mod: tea.ModAlt})
-	if parent := d.Answers["r"].RankParents["second"]; parent != "" {
-		t.Fatalf("M-b left parent at %q", parent)
-	}
+	assertRankAnswer(t, d, "r", []string{"parent", "sibling", "branch", "leaf", "next"},
+		map[string]string{"leaf": "branch", "sibling": "parent"})
 }
 
 func TestRankFixedAndDepthLimits(t *testing.T) {
@@ -1170,34 +1140,15 @@ func TestRankFixedAndDepthLimits(t *testing.T) {
 	if d.Answers["r"].Human || !strings.Contains(app.locationError, "Inbox") {
 		t.Fatalf("over-depth keyboard move: %+v, %s", d.Answers["r"], app.locationError)
 	}
-	control := func(line int) mouseRect {
-		t.Helper()
-		for _, control := range app.contentLayout.formControls {
-			if control.line == line {
-				return control.rect
-			}
-		}
-		t.Fatalf("no control at line %d", line)
-		return mouseRect{}
-	}
-	drag := func(from, to int) {
-		t.Helper()
-		origin, target := control(from), control(to)
-		x, y := contentScreenPoint(app, origin.left, origin.top)
-		tx, ty := contentScreenPoint(app, max(origin.left+rankIndentWidth, target.left), target.top)
-		app = pressMouse(app, x, y)
-		app = moveMouse(app, tx, ty)
-		app = releaseMouse(app, tx, ty)
-	}
-	drag(1, 4)
+	app = dragRankUnder(t, app, 1, 4)
 	if d.Answers["r"].Human {
 		t.Fatal("drag moved fixed item")
 	}
-	drag(2, 1)
+	app = dragRankUnder(t, app, 2, 1)
 	if d.Answers["r"].Human || !strings.Contains(app.locationError, "Inbox") {
 		t.Fatalf("over-depth drop: %+v, %s", d.Answers["r"], app.locationError)
 	}
-	drag(4, 1)
+	app = dragRankUnder(t, app, 4, 1)
 	if parent := d.Answers["r"].RankParents["draft"]; parent != "inbox" {
 		t.Fatalf("valid drop set parent to %q", parent)
 	}
@@ -1247,12 +1198,8 @@ func TestVerticalRankMovesSkipParentsThatCannotAcceptBranch(t *testing.T) {
 				t.Fatalf("disallowed outdent: %+v, %s", d.Answers["r"], app.locationError)
 			}
 			app, _ = updateApp(app, tea.KeyPressMsg{Code: tt.key, Mod: tea.ModAlt})
-			answer := d.Answers["r"]
-			order, ranked := form.RankOrder(d.Items, "r", answer)
 			wantParents := map[string]string{"branch": "destination", "leaf": "branch", "peer": "destination"}
-			if !ranked || !slices.Equal(order, tt.want) || !maps.Equal(answer.RankParents, wantParents) {
-				t.Fatalf("move = %v with parents %v, want %v with %v", order, answer.RankParents, tt.want, wantParents)
-			}
+			assertRankAnswer(t, d, "r", tt.want, wantParents)
 			if app.tab().cursorLine != tt.line || app.locationError != "" {
 				t.Fatalf("cursor = %d, error = %q", app.tab().cursorLine, app.locationError)
 			}
@@ -1260,7 +1207,7 @@ func TestVerticalRankMovesSkipParentsThatCannotAcceptBranch(t *testing.T) {
 	}
 }
 
-func TestFixedRankLockReplacesDragHandle(t *testing.T) {
+func TestRankHandlesAndGutter(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		name string
@@ -1271,7 +1218,11 @@ func TestFixedRankLockReplacesDragHandle(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			app, _ := formTestAppWithContent(t, `- [ ] Inbox <!-- form: id=r rank value=inbox fixed -->
-  - [ ] Review <!-- form: id=r rank value=review -->
+  - [ ] Pinned <!-- form: id=r rank value=pinned min-level=2 max-level=2 -->
+  - [ ] Movable <!-- form: id=r rank value=movable -->
+- [ ] Archive <!-- form: id=r rank value=archive fixed max-depth=0 -->
+- [ ] Review <!-- form: id=r rank value=review -->
+- [ ] Draft <!-- form: id=r rank value=draft -->
 `)
 			app.icons = tt.font
 			check := func(wantDot bool) {
@@ -1279,20 +1230,32 @@ func TestFixedRankLockReplacesDragHandle(t *testing.T) {
 				app.rebuildContent()
 				rows := strings.Split(app.contentViewport.GetContent(), "\n")
 				row := rows[app.contentLayout.lineRanges[1].start]
-				handle := app.sourceGutterWidth() + 1
 				if dot := ansi.Strip(ansi.Cut(row, 0, 1)) == "●"; dot != wantDot {
 					t.Fatalf("left gutter dot = %t, want %t", dot, wantDot)
 				}
-				if got, want := ansi.Strip(ansi.Cut(row, handle, handle+1)), tt.font.Glyph(icons.Lock, "▣"); got != want {
-					t.Fatalf("fixed item handle = %q, want %q", got, want)
-				}
-				movable := rows[app.contentLayout.lineRanges[2].start]
-				handle += rankIndentWidth
-				if got, want := ansi.Strip(ansi.Cut(movable, handle, handle+1)), tt.font.Glyph(icons.MoveFourDirections, "✥"); got != want {
-					t.Fatalf("movable item handle = %q, want %q", got, want)
-				}
 				if strings.Contains(ansi.Strip(row), "Fixed") {
-					t.Fatal("fixed item still has label text")
+					t.Fatal("lock handle is accompanied by a redundant Fixed label")
+				}
+				for i, item := range []struct {
+					depth  int
+					handle string
+					number string
+				}{
+					{0, tt.font.Glyph(icons.Lock, "▣"), "1"},
+					{1, tt.font.Glyph(icons.MoveVertical, "↕"), "1"},
+					{1, tt.font.Glyph(icons.MoveFourDirections, "✥"), "2"},
+					{0, tt.font.Glyph(icons.Lock, "▣"), "2"},
+					{0, tt.font.Glyph(icons.MoveVertical, "↕"), "3"},
+					{0, tt.font.Glyph(icons.MoveFourDirections, "✥"), "4"},
+				} {
+					start := app.sourceGutterWidth() + 1 + item.depth*rankIndentWidth
+					row := rows[app.contentLayout.lineRanges[i+1].start]
+					if got := ansi.Strip(ansi.Cut(row, start, start+1)); got != item.handle {
+						t.Errorf("line %d handle = %q, want %q", i+1, got, item.handle)
+					}
+					if got := ansi.Strip(ansi.Cut(row, start+2, start+5)); got != " "+item.number+" " {
+						t.Errorf("line %d rank badge shifted: %q", i+1, got)
+					}
 				}
 			}
 			check(true)
@@ -1301,38 +1264,5 @@ func TestFixedRankLockReplacesDragHandle(t *testing.T) {
 			app.toggleForm(1)
 			check(false)
 		})
-	}
-}
-
-func TestRankHandleReflectsAvailableDepthChanges(t *testing.T) {
-	t.Parallel()
-	app, _ := formTestAppWithContent(t, `- [ ] Inbox <!-- form: id=r rank value=inbox fixed -->
-  - [ ] Pinned level <!-- form: id=r rank value=pinned min-level=2 max-level=2 -->
-- [ ] Archive <!-- form: id=r rank value=archive fixed max-depth=0 -->
-- [ ] Review <!-- form: id=r rank value=review -->
-- [ ] Draft <!-- form: id=r rank value=draft -->
-`)
-	for _, font := range []icons.Set{icons.Plain, icons.Nerd} {
-		app.icons = font
-		app.rebuildContent()
-		rows := strings.Split(app.contentViewport.GetContent(), "\n")
-		for i, want := range []string{
-			font.Glyph(icons.Lock, "▣"), font.Glyph(icons.MoveVertical, "↕"),
-			font.Glyph(icons.Lock, "▣"), font.Glyph(icons.MoveVertical, "↕"),
-			font.Glyph(icons.MoveFourDirections, "✥"),
-		} {
-			start := app.sourceGutterWidth() + 1
-			if i == 1 {
-				start += rankIndentWidth
-			}
-			row := rows[app.contentLayout.lineRanges[i+1].start]
-			if got := ansi.Strip(ansi.Cut(row, start, start+1)); got != want {
-				t.Errorf("line %d handle = %q, want %q", i+1, got, want)
-			}
-			wantNumber := []string{"1", "1", "2", "3", "4"}[i]
-			if got := ansi.Strip(ansi.Cut(row, start+2, start+5)); got != " "+wantNumber+" " {
-				t.Errorf("line %d rank badge shifted: %q", i+1, got)
-			}
-		}
 	}
 }

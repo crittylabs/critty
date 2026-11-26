@@ -9,10 +9,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/crittylabs/critty/v2/internal/terminalbinding"
 )
+
+// Marker resolution waits for notifications to settle before consuming a request.
+func runMarkerTest(t *testing.T, name string, f func(*testing.T)) {
+	t.Helper()
+	t.Run(name, func(t *testing.T) { synctest.Test(t, f) })
+}
 
 func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
 	for _, tc := range []struct {
@@ -25,7 +32,7 @@ func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
 		{name: "SSH custom fallback", request: "missing", ssh: "remote", custom: true},
 		{name: "SSH rejects desktop", request: "missing", ssh: "remote"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		runMarkerTest(t, tc.name, func(t *testing.T) {
 			if tc.request == "unmatched" {
 				// Storage tests cover marker polling; this checks fallback on expiry.
 				previousTimeout := terminalRequestTimeout
@@ -119,58 +126,60 @@ func TestReviewLauncherFallsBackAfterTerminalRequestFailure(t *testing.T) {
 }
 
 func TestTerminalNotificationRoutesReview(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	t.Setenv("TMUX", "/recorded/socket,123,0")
-	t.Setenv("TMUX_PANE", "%42")
-	for _, key := range []string{"ZELLIJ", "ZELLIJ_SESSION_NAME", "ZELLIJ_PANE_ID", "ZELLIJ_SOCKET_DIR", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
-		t.Setenv(key, "")
-	}
-	prepare, _, err := rootCmd.Find([]string{"terminal", "prepare"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var output bytes.Buffer
-	prepare.SetOut(&output)
-	t.Cleanup(func() { prepare.SetOut(nil) })
-	if err := prepare.RunE(prepare, nil); err != nil {
-		t.Fatal(err)
-	}
-	var request terminalbinding.Request
-	if err := json.Unmarshal(output.Bytes(), &request); err != nil {
-		t.Fatal(err)
-	}
-	if request.ID == "" || request.Marker != "CRITTY-"+request.ID {
-		t.Fatalf("invalid prepare response: %s", output.Bytes())
-	}
-	notify, _, err := rootCmd.Find([]string{"terminal", "notify"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := notify.RunE(notify, []string{request.ID}); err != nil {
-		t.Fatal(err)
-	}
-	// The daemon shell can have an unrelated context and no multiplexer binaries.
-	t.Setenv("TMUX", "/stale/socket,987,0")
-	t.Setenv("TMUX_PANE", "%99")
-	t.Setenv("PATH", t.TempDir())
-	previousOrigin := reviewOrigin
-	t.Cleanup(func() { reviewOrigin = previousOrigin })
-	previous := terminalRequest
-	terminalRequest = request.ID
-	t.Cleanup(func() { terminalRequest = previous })
-	got, err := reviewTerminalContext()
-	if err != nil || got != (tmuxContext{socket: "/recorded/socket", pane: "%42"}) {
-		t.Fatalf("review context: %+v, %v", got, err)
-	}
-	if _, err := reviewTerminalContext(); err == nil || !strings.Contains(err.Error(), "unavailable") {
-		t.Fatalf("consumed request fell back to stale daemon context: %v", err)
-	}
-	for _, cmd := range []string{"review", "sessions resume", "plan"} {
-		command, _, err := rootCmd.Find(strings.Fields(cmd))
-		if err != nil || command.Flags().Lookup("terminal-request") == nil {
-			t.Fatalf("%s does not accept terminal request: %v", cmd, err)
+	synctest.Test(t, func(t *testing.T) {
+		t.Setenv("XDG_STATE_HOME", t.TempDir())
+		t.Setenv("TMUX", "/recorded/socket,123,0")
+		t.Setenv("TMUX_PANE", "%42")
+		for _, key := range []string{"ZELLIJ", "ZELLIJ_SESSION_NAME", "ZELLIJ_PANE_ID", "ZELLIJ_SOCKET_DIR", "HERDR_WORKSPACE_ID", "HERDR_TAB_ID", "HERDR_PANE_ID", "CMUX_SOCKET_PATH", "CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID"} {
+			t.Setenv(key, "")
 		}
-	}
+		prepare, _, err := rootCmd.Find([]string{"terminal", "prepare"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var output bytes.Buffer
+		prepare.SetOut(&output)
+		t.Cleanup(func() { prepare.SetOut(nil) })
+		if err := prepare.RunE(prepare, nil); err != nil {
+			t.Fatal(err)
+		}
+		var request terminalbinding.Request
+		if err := json.Unmarshal(output.Bytes(), &request); err != nil {
+			t.Fatal(err)
+		}
+		if request.ID == "" || request.Marker != "CRITTY-"+request.ID {
+			t.Fatalf("invalid prepare response: %s", output.Bytes())
+		}
+		notify, _, err := rootCmd.Find([]string{"terminal", "notify"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := notify.RunE(notify, []string{request.ID}); err != nil {
+			t.Fatal(err)
+		}
+		// The daemon shell can have an unrelated context and no multiplexer binaries.
+		t.Setenv("TMUX", "/stale/socket,987,0")
+		t.Setenv("TMUX_PANE", "%99")
+		t.Setenv("PATH", t.TempDir())
+		previousOrigin := reviewOrigin
+		t.Cleanup(func() { reviewOrigin = previousOrigin })
+		previous := terminalRequest
+		terminalRequest = request.ID
+		t.Cleanup(func() { terminalRequest = previous })
+		got, err := reviewTerminalContext()
+		if err != nil || got != (tmuxContext{socket: "/recorded/socket", pane: "%42"}) {
+			t.Fatalf("review context: %+v, %v", got, err)
+		}
+		if _, err := reviewTerminalContext(); err == nil || !strings.Contains(err.Error(), "unavailable") {
+			t.Fatalf("consumed request fell back to stale daemon context: %v", err)
+		}
+		for _, cmd := range []string{"review", "sessions resume", "plan"} {
+			command, _, err := rootCmd.Find(strings.Fields(cmd))
+			if err != nil || command.Flags().Lookup("terminal-request") == nil {
+				t.Fatalf("%s does not accept terminal request: %v", cmd, err)
+			}
+		}
+	})
 }
 
 func TestMultiplexerTerminalNotificationRoutesReview(t *testing.T) {
@@ -178,7 +187,7 @@ func TestMultiplexerTerminalNotificationRoutesReview(t *testing.T) {
 		{Kind: "cmux", Socket: "/recorded/socket", Workspace: "w1", Pane: "s1"},
 		{Kind: "zellij", Socket: "/recorded/socket", Workspace: "session", Pane: "0"},
 	} {
-		t.Run(target.Kind, func(t *testing.T) {
+		runMarkerTest(t, target.Kind, func(t *testing.T) {
 			t.Setenv("XDG_STATE_HOME", t.TempDir())
 			store := terminalbinding.DefaultStore()
 			request, err := store.Prepare()

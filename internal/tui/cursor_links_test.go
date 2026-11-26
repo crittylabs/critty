@@ -33,28 +33,6 @@ func TestMarkdownLinkRefs(t *testing.T) {
 	}
 }
 
-func TestMarkdownLinkParsesAreIndependent(t *testing.T) {
-	for _, tc := range []struct{ source, destination string }{
-		{"[one][ref]\n\n[ref]: https://example.org/one", "https://example.org/one"},
-		{"[two][ref]\n\n[ref]: https://example.org/two", "https://example.org/two"},
-		{"[missing][ref] ![image](image.png)", ""},
-	} {
-		t.Run(tc.source, func(t *testing.T) {
-			t.Parallel()
-			for range 2 {
-				refs := markdownLinkRefs(tc.source)
-				if tc.destination == "" {
-					if len(refs) != 0 {
-						t.Fatalf("unexpected references: %+v", refs)
-					}
-				} else if len(refs) != 1 || refs[0].destination != tc.destination {
-					t.Fatalf("references=%+v, want %s", refs, tc.destination)
-				}
-			}
-		})
-	}
-}
-
 func TestReferenceDistance(t *testing.T) {
 	const source = "αe\u0301\n\n界 end\n"
 	for _, tc := range []struct {

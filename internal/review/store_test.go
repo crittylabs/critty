@@ -39,7 +39,7 @@ func setupStateDir(t *testing.T) {
 	t.Chdir(t.TempDir())
 }
 
-func TestSessionRoundTrip(t *testing.T) {
+func TestDocumentSessionLifecycle(t *testing.T) {
 	setupStateDir(t)
 	if err := os.WriteFile("plan.md", []byte("# Test\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -53,19 +53,11 @@ func TestSessionRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	abs, err := OpenDocSession("", filepath.Join(cwd, "plan.md"))
-	if err != nil {
-		t.Fatalf("opening with absolute path: %v", err)
-	}
-	if sess.Key != abs.Key {
-		t.Errorf("relative and absolute paths yield different keys: %s vs %s", sess.Key, abs.Key)
-	}
-	dotted, err := OpenDocSession("", "./plan.md")
-	if err != nil {
-		t.Fatalf("opening with dotted path: %v", err)
-	}
-	if sess.Key != dotted.Key {
-		t.Errorf("dotted path yields a different key: %s vs %s", sess.Key, dotted.Key)
+	for _, alias := range []string{filepath.Join(cwd, "plan.md"), "./plan.md"} {
+		other, err := OpenDocSession("", alias)
+		if err != nil || other.Key != sess.Key {
+			t.Fatalf("opening %q: session=%v, err=%v; want key %s", alias, other, err, sess.Key)
+		}
 	}
 	if got := len(sess.FileComments("plan.md")); got != 0 {
 		t.Errorf("expected no comments, got %d", got)
@@ -112,6 +104,28 @@ func TestSessionRoundTrip(t *testing.T) {
 	}
 	if c.Author != "Tester" || c.Anchor != "# Test" || c.Scope != "line" {
 		t.Errorf("field mismatch: %+v", c)
+	}
+
+	entries, err := ListSessionEntries()
+	if err != nil {
+		t.Fatalf("listing sessions: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Key != sess.Key {
+		t.Fatalf("expected one registry entry for %s, got %+v", sess.Key, entries)
+	}
+
+	if err := sess.Clear(); err != nil {
+		t.Fatalf("clearing: %v", err)
+	}
+	if _, err := os.Stat(sess.Dir); !os.IsNotExist(err) {
+		t.Error("review folder should be removed")
+	}
+	entries, err = ListSessionEntries()
+	if err != nil {
+		t.Fatalf("listing sessions after clear: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected no registry entries, got %+v", entries)
 	}
 }
 
@@ -192,42 +206,4 @@ func isHex(s string) bool {
 	return strings.IndexFunc(s, func(r rune) bool {
 		return !strings.ContainsRune("0123456789abcdef", r)
 	}) < 0
-}
-
-func TestSessionClearRemovesFolderAndRegistryEntry(t *testing.T) {
-	setupStateDir(t)
-	if err := os.WriteFile("plan.md", []byte("# Test\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	sess, err := OpenDocSession("", "plan.md")
-	if err != nil {
-		t.Fatalf("opening session: %v", err)
-	}
-	sess.SetFileComments("plan.md", "", []Comment{{ID: "c_abc123", StartLine: 1, EndLine: 1, Body: "x"}})
-	if err := sess.Save(); err != nil {
-		t.Fatalf("saving: %v", err)
-	}
-
-	entries, err := ListSessionEntries()
-	if err != nil {
-		t.Fatalf("listing sessions: %v", err)
-	}
-	if len(entries) != 1 || entries[0].Key != sess.Key {
-		t.Fatalf("expected one registry entry for %s, got %+v", sess.Key, entries)
-	}
-
-	if err := sess.Clear(); err != nil {
-		t.Fatalf("clearing: %v", err)
-	}
-	if _, err := os.Stat(sess.Dir); !os.IsNotExist(err) {
-		t.Error("review folder should be removed")
-	}
-	entries, err = ListSessionEntries()
-	if err != nil {
-		t.Fatalf("listing sessions after clear: %v", err)
-	}
-	if len(entries) != 0 {
-		t.Errorf("expected no registry entries, got %+v", entries)
-	}
 }

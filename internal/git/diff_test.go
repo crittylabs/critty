@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -121,13 +120,12 @@ func writeFile(t *testing.T, dir, name string, data []byte) {
 func newRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	configDir := t.TempDir()
+	writeFile(t, configDir, "gitconfig", []byte("[user]\n\tname = Test\n\temail = test@example.com\n[commit]\n\tgpgsign = false\n"))
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(configDir, "gitconfig"))
 	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 	t.Chdir(dir)
 	runGit(t, dir, "init", "-q")
-	runGit(t, dir, "config", "user.email", "test@example.com")
-	runGit(t, dir, "config", "user.name", "Test")
-	runGit(t, dir, "config", "commit.gpgsign", "false")
 	return dir
 }
 
@@ -208,54 +206,16 @@ func TestStagedFilesBeforeInitialCommit(t *testing.T) {
 }
 
 func TestInlineDiff(t *testing.T) {
-	before := "prefix.  `tfil` maintains a screen model of the output and enables mouse reporting.  Hovering continues."
-	after := "prefix.  When Codex starts, `tfil` begins maintaining a screen model of the output and enables mouse reporting.  Non-interactive commands stay quiet.  Hovering continues."
-	oldSegments, newSegments := inlineDiffTokens(splitInlineTokens(before), splitInlineTokens(after))
-
-	assertSegments := func(name, want string, segments []InlineSegment) string {
-		t.Helper()
-		var got strings.Builder
-		var changedText strings.Builder
-		changed := false
-		unchanged := false
-		for _, segment := range segments {
-			got.WriteString(segment.Content)
-			if segment.Changed {
-				changed = true
-				changedText.WriteString(segment.Content)
-			} else {
-				unchanged = true
-			}
-		}
-		if got.String() != want {
-			t.Errorf("%s reconstructed as %q, want %q", name, got.String(), want)
-		}
-		if !changed || !unchanged {
-			t.Errorf("%s segments did not separate changed and common text: %+v", name, segments)
-		}
-		return changedText.String()
-	}
-
-	oldChanged := assertSegments("old", before, oldSegments)
-	newChanged := assertSegments("new", after, newSegments)
-	if oldChanged != "maintains" {
-		t.Errorf("old changed text = %q, want %q", oldChanged, "maintains")
-	}
-	if strings.Contains(newChanged, "screen model") || strings.Contains(newChanged, "Hovering") {
-		t.Errorf("new changed text contains common words: %q", newChanged)
-	}
-	for _, want := range []string{"When Codex starts", "begins maintaining", "Non-interactive commands"} {
-		if !strings.Contains(newChanged, want) {
-			t.Errorf("new changed text %q does not contain %q", newChanged, want)
-		}
-	}
-}
-
-func TestInlineDiffWhitespace(t *testing.T) {
 	for _, tc := range []struct {
 		name, before, after string
 		old, new            []InlineSegment
 	}{
+		{
+			name:   "insertions around a replaced word",
+			before: "start item keeps shared words.  End.", after: "start new item now retains shared words.  Added.  End.",
+			old: []InlineSegment{{"start item ", false}, {"keeps", true}, {" shared words.  End.", false}},
+			new: []InlineSegment{{"start ", false}, {"new ", true}, {"item ", false}, {"now retains", true}, {" shared words.", false}, {"  Added.", true}, {"  End.", false}},
+		},
 		{
 			name:   "changed phrase",
 			before: "foo bar quux", after: "foo baz quuz",
@@ -309,11 +269,12 @@ func TestInlineDiffWhitespace(t *testing.T) {
 	}
 }
 
-func TestDiffFileAnnotatesReplacementLines(t *testing.T) {
+func TestDiffFileLineAnnotations(t *testing.T) {
 	dir := newRepo(t)
 
 	writeFile(t, dir, "README.md", []byte("prefix old suffix\n"))
-	runGit(t, dir, "add", "README.md")
+	writeFile(t, dir, "gone.txt", []byte("one\ntwo\nthree\n"))
+	runGit(t, dir, "add", ".")
 	runGit(t, dir, "commit", "-q", "-m", "initial")
 	writeFile(t, dir, "README.md", []byte("prefix new suffix\n"))
 
@@ -328,24 +289,17 @@ func TestDiffFileAnnotatesReplacementLines(t *testing.T) {
 	if len(deleted) != 1 || len(deleted[0].Inline) == 0 {
 		t.Fatalf("expected inline changes for deleted replacement line, got %+v", deleted)
 	}
-}
 
-func TestDiffFileDeletedFileAnchorsBeforeFirstLine(t *testing.T) {
-	dir := newRepo(t)
-
-	writeFile(t, dir, "gone.txt", []byte("one\ntwo\nthree\n"))
-	runGit(t, dir, "add", "gone.txt")
-	runGit(t, dir, "commit", "-q", "-m", "initial")
 	runGit(t, dir, "rm", "-q", "gone.txt")
 
-	info, err := DiffFile("gone.txt", "", "HEAD")
+	info, err = DiffFile("gone.txt", "", "HEAD")
 	if err != nil {
 		t.Fatalf("DiffFile: %v", err)
 	}
 	if len(info.DeletedAfter) != 1 {
 		t.Fatalf("DeletedAfter keys = %v, want only 0", info.DeletedAfter)
 	}
-	deleted := info.DeletedAfter[0]
+	deleted = info.DeletedAfter[0]
 	if len(deleted) != 3 {
 		t.Fatalf("DeletedAfter[0] = %+v, want the three deleted lines", deleted)
 	}
@@ -367,7 +321,7 @@ func TestCurrentBranch(t *testing.T) {
 		}
 	}
 	check("feature/sidebar")
-	runGit(t, dir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "--allow-empty", "-qm", "Initial")
+	runGit(t, dir, "commit", "--allow-empty", "-qm", "Initial")
 	check("feature/sidebar")
 	runGit(t, dir, "checkout", "--detach", "-q")
 	check("HEAD")

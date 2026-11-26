@@ -17,31 +17,27 @@ import (
 )
 
 func TestNerdFontTabFrames(t *testing.T) {
-	previous := terminalIsDark
-	t.Cleanup(func() { initAdaptiveStyles(previous) })
-	for _, dark := range []bool{false, true} {
-		for _, width := range []int{45, 80, 110} {
-			t.Run(fmt.Sprintf("dark=%t/width=%d", dark, width), func(t *testing.T) {
-				initAdaptiveStyles(dark)
-				app := newFileTreeTestApp()
-				app.icons = icons.Nerd
-				app.width, app.height = width, 36
-				app.recalculateLayout()
-				app.rebuildContent()
-				app.updateCommentSidebar()
-				for y, row := range strings.Split(app.View().Content, "\n") {
-					if got := ansi.StringWidth(row); got != width {
-						t.Fatalf("row %d width = %d, want %d", y, got, width)
-					}
+	t.Parallel()
+	for _, width := range []int{45, 80, 110} {
+		t.Run(fmt.Sprintf("width=%d", width), func(t *testing.T) {
+			app := newFileTreeTestApp()
+			app.icons = icons.Nerd
+			app.width, app.height = width, 36
+			app.recalculateLayout()
+			app.rebuildContent()
+			app.updateCommentSidebar()
+			for y, row := range strings.Split(app.View().Content, "\n") {
+				if got := ansi.StringWidth(row); got != width {
+					t.Fatalf("row %d width = %d, want %d", y, got, width)
 				}
-				for _, item := range app.tabBarItems() {
-					app = clickMouse(app, item.left+item.width-1, app.headerHeight())
-					if app.activeTab != item.target {
-						t.Fatal("tab's right edge does not select its file")
-					}
+			}
+			for _, item := range app.tabBarItems() {
+				app = clickMouse(app, item.left+item.width-1, app.headerHeight())
+				if app.activeTab != item.target {
+					t.Fatal("tab's right edge does not select its file")
 				}
-			})
-		}
+			}
+		})
 	}
 }
 

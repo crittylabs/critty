@@ -489,26 +489,29 @@ func TestMarkdownPreviewsRetainedAcrossTabSwitch(t *testing.T) {
 
 func TestMarkdownReferenceParsesAreIndependent(t *testing.T) {
 	for _, tc := range []struct {
-		name, source     string
-		images, formulas []string
+		name, source            string
+		links, images, formulas []string
 	}{
-		{"first definition", "![one][pic]\n\n[pic]: first.png\n\n> ```\n> $a$\n> ```", []string{"first.png"}, []string{"a"}},
-		{"other definition", "![two][pic]\n\n[pic]: second.png\n\n$b$", []string{"second.png"}, []string{"b"}},
-		{"undefined", "![missing][pic] and `$literal$`", nil, nil},
-		{"math hides images", "$$![hidden](hidden.png)$$", nil, []string{"![hidden](hidden.png)"}},
+		{"first definition", "[one][ref] ![one][pic]\n\n[ref]: https://example.org/one\n[pic]: first.png\n\n> ```\n> $a$\n> ```", []string{"https://example.org/one"}, []string{"first.png"}, []string{"a"}},
+		{"other definition", "[two][ref] ![two][pic]\n\n[ref]: https://example.org/two\n[pic]: second.png\n\n$b$", []string{"https://example.org/two"}, []string{"second.png"}, []string{"b"}},
+		{"undefined", "[missing][ref] ![missing][pic] and `$literal$`", nil, nil, nil},
+		{"math hides images", "$$![hidden](hidden.png)$$", nil, nil, []string{"![hidden](hidden.png)"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			for range 2 {
-				var images, formulas []string
+				var links, images, formulas []string
+				for _, ref := range markdownLinkRefs(tc.source) {
+					links = append(links, ref.destination)
+				}
 				for _, ref := range markdownImageRefs(tc.source) {
 					images = append(images, ref.destination)
 				}
 				for _, ref := range markdownMathRefs(tc.source) {
 					formulas = append(formulas, ref.renderBody)
 				}
-				if !reflect.DeepEqual(images, tc.images) || !reflect.DeepEqual(formulas, tc.formulas) {
-					t.Fatalf("images=%v, math=%v; want images=%v, math=%v", images, formulas, tc.images, tc.formulas)
+				if !slices.Equal(links, tc.links) || !slices.Equal(images, tc.images) || !slices.Equal(formulas, tc.formulas) {
+					t.Fatalf("links=%v, images=%v, math=%v; want %v, %v, %v", links, images, formulas, tc.links, tc.images, tc.formulas)
 				}
 			}
 		})
