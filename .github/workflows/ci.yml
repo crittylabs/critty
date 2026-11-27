@@ -24,7 +24,7 @@ jobs:
       contents: read
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.4
+        uses: step-security/harden-runner@v2.23.0
         with:
           egress-policy: audit
 
@@ -34,7 +34,7 @@ jobs:
 
       # Cache poisoning is not a concern here; this job only runs tests and
       # publishes nothing.
-      - uses: actions/setup-go@v7.0.0
+      - uses: actions/setup-go@v7.1.0
         with:
           go-version-file: go.mod
 
