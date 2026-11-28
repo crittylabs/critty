@@ -3,8 +3,8 @@ module github.com/crittylabs/critty/v2
 go 1.27.2
 
 require (
-	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.1.1
+	charm.land/bubbles/v2 v2.2.2
+	charm.land/bubbletea/v2 v2.1.3
 	charm.land/lipgloss/v2 v2.1.1
 	charm.land/x/nerdfont v0.1.0
 	github.com/alecthomas/chroma/v2 v2.27.0
@@ -13,14 +13,14 @@ require (
 	github.com/bluekeyes/go-gitdiff v0.9.0
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
-	github.com/charmbracelet/x/ansi v0.11.9
-	github.com/dlclark/regexp2/v2 v2.13.1
+	github.com/charmbracelet/x/ansi v0.11.10
+	github.com/dlclark/regexp2/v2 v2.13.2
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gofrs/flock v0.13.2
 	github.com/mattn/go-runewidth v0.0.31
 	github.com/mattn/go-shellwords v1.0.17
 	github.com/pelletier/go-toml/v2 v2.4.3
-	github.com/rivo/uniseg v0.4.7
+	github.com/rivo/uniseg v0.4.8-0.20261110175422-3a370411ca06
 	github.com/sahilm/fuzzy v0.1.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
